@@ -1,35 +1,13 @@
--- AegisHub • Fish It • Rayfield UI (Android)
--- AutoFish per-rod + Perfect Cast + Speed x5, Auto Sell + Protect Tiers, Sell All, Teleport, Rejoin/Server Hop, Anti-AFK, FPS Boost
--- HUD: Rod, ReelDelayEff, CompleteDelayEff, Status
-
--------------------- Rayfield UI --------------------
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-getgenv().Rayfield = Rayfield
-
-local Window = Rayfield:CreateWindow({
-    Name = "AegisHub • Fish It",
-    Icon = 0,
-    LoadingTitle = "AegisHub",
-    LoadingSubtitle = "Fish It Automation",
-    Theme = "Default",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "AegisHub_FishIt" },
-    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
-    KeySystem = false,
-})
-
-local tabMain   = Window:CreateTab("Main")
-local tabInv    = Window:CreateTab("Inventory")
-local tabTP     = Window:CreateTab("Teleport")
-local tabMisc   = Window:CreateTab("Misc")
+-- AegisHub • Fish It • Rayfield UI (Delta Android Safe)
+-- Perbaikan: dual-source Rayfield loader + guard semua UI + status overlay
+-- Fitur: AutoFish per-rod + Perfect Cast + Speed x5 (delay otomatis), Auto Sell, Protect Tiers, Sell All, Teleport, Rejoin/Server Hop, Anti-AFK, FPS Boost
 
 -------------------- Services --------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
-local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -55,7 +33,32 @@ local function mount(gui)
     end
 end
 
--------------------- HUD --------------------
+-------------------- Status Overlay (selalu tampil) --------------------
+local OSG = Instance.new("ScreenGui")
+OSG.Name = "AegisHub_Status"
+OSG.ResetOnSpawn = false
+OSG.IgnoreGuiInset = true
+mount(OSG)
+
+local StatusBox = Instance.new("TextLabel", OSG)
+StatusBox.AnchorPoint = Vector2.new(0,0)
+StatusBox.Position = UDim2.new(0, 10, 0, 10)
+StatusBox.Size = UDim2.fromOffset(420, 60)
+StatusBox.BackgroundColor3 = Color3.fromRGB(22,24,36)
+StatusBox.BackgroundTransparency = 0.2
+StatusBox.TextColor3 = Color3.fromRGB(235,240,255)
+StatusBox.TextXAlignment = Enum.TextXAlignment.Left
+StatusBox.TextYAlignment = Enum.TextYAlignment.Top
+StatusBox.TextWrapped = true
+StatusBox.Font = Enum.Font.GothamSemibold
+StatusBox.TextScaled = true
+StatusBox.Text = "AegisHub: init…"
+do local c=Instance.new("UICorner", StatusBox); c.CornerRadius = UDim.new(0,8) end
+
+local function setStatus(t) StatusBox.Text = "AegisHub: "..t end
+setStatus("Loading UI…")
+
+-------------------- HUD pojok kanan bawah --------------------
 local HUD_SG = Instance.new("ScreenGui")
 HUD_SG.Name = "AegisHub_HUD"
 HUD_SG.ResetOnSpawn = false
@@ -65,7 +68,7 @@ mount(HUD_SG)
 local HUD = Instance.new("TextLabel", HUD_SG)
 HUD.AnchorPoint = Vector2.new(1,1)
 HUD.Position = UDim2.new(1,-10,1,-10)
-HUD.Size = UDim2.fromOffset(360, 28)
+HUD.Size = UDim2.fromOffset(380, 30)
 HUD.BackgroundColor3 = Color3.fromRGB(21,24,37)
 HUD.BackgroundTransparency = 0.25
 HUD.Font = Enum.Font.GothamSemibold
@@ -93,13 +96,13 @@ local function setAntiAFK(on)
 end
 setAntiAFK(true)
 
--------------------- State --------------------
+-------------------- State & helpers --------------------
 local state = {
-    SPEED = 5,                  -- ×1..×5
+    SPEED = 5,
     perfectCast = true,
     AFon = false, AFfishing = false,
-    reelPreset = 1.2,           -- bypass
-    completePreset = 2.5,       -- custom
+    reelPreset = 1.2,       -- bypass (reel)
+    completePreset = 2.5,   -- custom (complete)
     reelOverride = nil,
     completeOverride = nil,
     protectTiers = {Common=false,Uncommon=false,Rare=false,Epic=false,Legendary=true,Mythic=true,Secret=true},
@@ -111,15 +114,64 @@ local function effDelays()
     local r = (state.reelOverride     or state.reelPreset)     / state.SPEED
     return clamp(c, 0.35, 12), clamp(r, 0.15, 6)
 end
-local function notifyRay(title, content)
-    if getgenv and getgenv().Rayfield and getgenv().Rayfield:Notify then
-        getgenv().Rayfield:Notify({Title=title, Content=content, Duration=3})
+
+-------------------- Load Rayfield (dual source) --------------------
+local Rayfield
+do
+    local ok1, lib1 = pcall(function()
+        return loadstring(game:HttpGet('https://sirius.menu/rayfield', true))()
+    end)
+    if ok1 and lib1 then
+        Rayfield = lib1
+        setStatus("Rayfield loaded (sirius.menu)")
+    else
+        local ok2, lib2 = pcall(function()
+            return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source', true))()
+        end)
+        if ok2 and lib2 then
+            Rayfield = lib2
+            setStatus("Rayfield loaded (GitHub fallback)")
+        else
+            setStatus("Rayfield gagal dimuat. Menampilkan alasan di HUD & overlay. (Pastikan koneksi/SSL Delta)")
+        end
     end
 end
 
-local lblStatus = tabMain:CreateLabel("Rod: ?  |  Reel: -  |  Cmpl: -  |  Spd: 5x")
+if not Rayfield then
+    HUD.Text = "AegisHub • UI gagal dimuat (Rayfield tidak tersedia)"
+end
 
--------------------- Net & Modules (Async) --------------------
+-------------------- Jika Rayfield tersedia, buat window & tabs --------------------
+local tabMain, tabInv, tabTP, tabMisc
+local lblStatus -- Rayfield Label (bisa nil kalau gagal)
+if Rayfield then
+    local okWin, Window = pcall(function()
+        return Rayfield:CreateWindow({
+            Name = "AegisHub • Fish It",
+            Icon = 0,
+            LoadingTitle = "AegisHub",
+            LoadingSubtitle = "Fish It Automation",
+            Theme = "Default",
+            DisableRayfieldPrompts = false,
+            DisableBuildWarnings = false,
+            ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "AegisHub_FishIt" },
+            Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+            KeySystem = false,
+        })
+    end)
+    if okWin and Window then
+        tabMain = Window:CreateTab("Main")
+        tabInv  = Window:CreateTab("Inventory")
+        tabTP   = Window:CreateTab("Teleport")
+        tabMisc = Window:CreateTab("Misc")
+        lblStatus = tabMain:CreateLabel("Rod: ?  |  Reel: -  |  Cmpl: -  |  Spd: 5x")
+        setStatus("UI ready")
+    else
+        setStatus("CreateWindow gagal (Rayfield).")
+    end
+end
+
+-------------------- Net / Remotes / Modules (async) --------------------
 local net, RF_ChargeFishingRod, RF_RequestMinigame, RE_FishingCompleted, RE_EquipHotbar, RE_RepText, RF_SellAll
 local animator, AIdle, AReel, AShake
 local Replion, ItemUtility
@@ -130,22 +182,23 @@ task.spawn(function()
         if not got then error("Missing: "..name) end
         return got
     end
-    local okNet
-    okNet, net = pcall(function()
+
+    local okNet, netOrErr = pcall(function()
         local p = safeWaitChild(ReplicatedStorage, "Packages", 10)
         p = safeWaitChild(p, "_Index", 10)
         p = safeWaitChild(p, "sleitnick_net@0.2.0", 10)
         return safeWaitChild(p, "net", 10)
     end)
-    if okNet then
+    if not okNet then
+        setStatus("Remotes tidak ditemukan.")
+    else
+        net = netOrErr
         RF_ChargeFishingRod = net:FindFirstChild("RF/ChargeFishingRod")
         RF_RequestMinigame  = net:FindFirstChild("RF/RequestFishingMinigameStarted")
         RE_FishingCompleted = net:FindFirstChild("RE/FishingCompleted")
         RE_EquipHotbar      = net:FindFirstChild("RE/EquipToolFromHotbar")
         RE_RepText          = net:FindFirstChild("RE/ReplicateTextEffect")
         RF_SellAll          = net:FindFirstChild("RF/SellAllItems")
-    else
-        notifyRay("Init", "Remotes tidak ditemukan (UI tetap jalan).")
     end
 
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -164,7 +217,7 @@ task.spawn(function()
     if okU then ItemUtility = modU end
 end)
 
--------------------- Rod Delays --------------------
+-------------------- Rod preset delays --------------------
 local RodDelays = {
     ["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},
     ["Ghostfinn Rod"]={custom=1.12,bypass=1.45},["Astral Rod"]={custom=1.90,bypass=1.45},
@@ -197,21 +250,9 @@ local function refreshRodDelays()
     end
 end
 
-RS.RenderStepped:Connect(function()
-    local rod = getEquippedRodName() or "?"
-    local cEff, rEff = effDelays()
-    HUD.Text = string.format("Rod:%s | Reel:%.2fs | Cmpl:%.2fs | %s", rod, rEff, cEff, state.AFon and "ON" or "OFF")
-    lblStatus:Set("Rod: "..rod.."  |  Reel: "..string.format("%.2fs", rEff).."  |  Cmpl: "..string.format("%.2fs", cEff).."  |  Spd: "..tostring(state.SPEED).."x")
-end)
+-------------------- Auto finish dari text effect --------------------
 task.spawn(function()
-    local pg = LocalPlayer:WaitForChild("PlayerGui")
-    local display = pg:WaitForChild("Backpack"):WaitForChild("Display")
-    display.ChildAdded:Connect(function() task.wait(0.05); refreshRodDelays() end)
-end)
-
--------------------- Auto Finish Event --------------------
-task.spawn(function()
-    repeat task.wait() until RE_RepText ~= nil or tick() > math.huge
+    repeat task.wait() until RE_RepText ~= nil or not wait()
     if not RE_RepText then return end
     RE_RepText.OnClientEvent:Connect(function(data)
         if not (state.AFon and state.AFfishing) then return end
@@ -227,7 +268,7 @@ task.spawn(function()
     end)
 end)
 
--------------------- Auto Fish Core --------------------
+-------------------- AutoFish core --------------------
 local function StartAutoFish()
     if state.AFon then return end
     state.AFon = true
@@ -271,6 +312,14 @@ local function StopAutoFish()
 end
 
 -------------------- Inventory / Sell / Protect --------------------
+local Replion, ItemUtility
+task.spawn(function()
+    local okR, modR = pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
+    if okR then Replion = modR end
+    local okU, modU = pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
+    if okU then ItemUtility = modU end
+end)
+
 local function protectByTiers()
     if not (Replion and ItemUtility) then return end
     local Data = Replion.Client:WaitReplion("Data")
@@ -326,127 +375,251 @@ local islandCoords = {
 }
 local tpNames = {}; for n,_ in pairs(islandCoords) do table.insert(tpNames, n) end; table.sort(tpNames)
 
--------------------- RAYFIELD: Controls --------------------
--- Main
-tabMain:CreateToggle({
-    Name = "Auto Fish (per-rod)",
-    CurrentValue = false,
-    Callback = function(v) if v then StartAutoFish() else StopAutoFish() end end
-})
-tabMain:CreateToggle({
-    Name = "Perfect Cast",
-    CurrentValue = true,
-    Callback = function(v) state.perfectCast = v end
-})
-tabMain:CreateInput({
-    Name = "Speed Multiplier (1–5, default 5)",
-    PlaceholderText = "5",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(text)
-        local n = tonumber(text) or 5
-        state.SPEED = math.clamp(math.floor(n+0.5), 1, 5)
-        notifyRay("Speed", "Set ke x"..state.SPEED)
-    end
-})
-tabMain:CreateInput({
-    Name = "Override Reel Delay (opsional)",
-    PlaceholderText = "ex: 1.45 (kosongkan utk auto)",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(t) local n=tonumber(t); state.reelOverride=n end
-})
-tabMain:CreateInput({
-    Name = "Override Complete Delay (opsional)",
-    PlaceholderText = "ex: 3.20 (kosongkan utk auto)",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(t) local n=tonumber(t); state.completeOverride=n end
-})
-
--- Inventory
-tabInv:CreateToggle({
-    Name = "Auto Sell (>= Threshold)",
-    CurrentValue = false,
-    Callback = function(v) state.AutoSell.on = v end
-})
-tabInv:CreateInput({
-    Name = "Threshold Auto Sell (default 60)",
-    PlaceholderText = "60",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(t) local n=tonumber(t); if n then state.AutoSell.threshold = math.max(1, math.floor(n)) end end
-})
-tabInv:CreateButton({
-    Name = "Protect Tiers (Legendary/Mythic/Secret)",
-    Callback = function() state.protectTiers.Legendary=true; state.protectTiers.Mythic=true; state.protectTiers.Secret=true; protectByTiers() end
-})
-tabInv:CreateButton({ Name = "Sell All Non-Favorite", Callback = sellAllNonFav })
-for _,tier in ipairs({"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}) do
-    tabInv:CreateToggle({
-        Name = "Protect "..tier,
-        CurrentValue = state.protectTiers[tier] or false,
-        Callback = function(v) state.protectTiers[tier]=v end
+-------------------- Kalau Rayfield berhasil, bikin kontrolnya --------------------
+if Rayfield and tabMain then
+    -- Main
+    tabMain:CreateToggle({
+        Name = "Auto Fish (per-rod)",
+        CurrentValue = false,
+        Callback = function(v) if v then StartAutoFish() else StopAutoFish() end end
     })
-end
-
--- Teleport
-local currentTP = tpNames[1]
-tabTP:CreateDropdown({
-    Name = "Pilih Lokasi",
-    Options = tpNames,
-    CurrentOption = currentTP,
-    MultipleOptions = false,
-    Callback = function(opt) currentTP = type(opt)=="table" and opt[1] or opt end
-})
-tabTP:CreateButton({
-    Name = "Teleport",
-    Callback = function()
-        local pos = islandCoords[currentTP]
-        local charFolder = workspace:FindFirstChild("Characters")
-        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart",2))
-        if hrp and pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0)) end
-    end
-})
-
--- Misc
-tabMisc:CreateToggle({
-    Name = "Anti-AFK",
-    CurrentValue = true,
-    Callback = function(v) setAntiAFK(v) end
-})
-tabMisc:CreateToggle({
-    Name = "FPS Boost",
-    CurrentValue = false,
-    Callback = function(v) BoostFPS(v) end
-})
-tabMisc:CreateButton({
-    Name = "Rejoin",
-    Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end
-})
-tabMisc:CreateButton({
-    Name = "Server Hop",
-    Callback = function()
-        local placeId = game.PlaceId
-        local servers, cursor = {}, ""
-        for _=1,3 do
-            local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
-            local ok,res = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-            if ok and res and res.data then
-                for _,sv in ipairs(res.data) do
-                    if sv.playing < sv.maxPlayers and sv.id ~= game.JobId then table.insert(servers, sv.id) end
-                end
-                cursor = res.nextPageCursor or ""; if #servers>0 then break end
-            else break end
+    tabMain:CreateToggle({
+        Name = "Perfect Cast",
+        CurrentValue = true,
+        Callback = function(v) state.perfectCast = v end
+    })
+    tabMain:CreateInput({
+        Name = "Speed Multiplier (1–5, default 5)",
+        PlaceholderText = "5",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(text)
+            local n = tonumber(text) or 5
+            state.SPEED = math.clamp(math.floor(n+0.5), 1, 5)
+            if Rayfield.Notify then Rayfield:Notify({Title="Speed", Content="Set ke x"..state.SPEED, Duration=3}) end
         end
-        if #servers>0 then TeleportService:TeleportToPlaceInstance(placeId, servers[math.random(1,#servers)], LocalPlayer) end
-    end
-})
-
--------------------- Teleport to Fish It (jika bukan di game) --------------------
-if game.PlaceId ~= TARGET_PLACE then
-    Rayfield:Notify({Title="AegisHub", Content="Kamu bukan di Fish It (PlaceId: "..tostring(game.PlaceId).."). Klik tombol Teleport di tab Misc.", Duration=6})
-    tabMisc:CreateButton({
-        Name = "Teleport to Fish It",
-        Callback = function() TeleportService:Teleport(TARGET_PLACE, LocalPlayer) end
     })
+    tabMain:CreateInput({
+        Name = "Override Reel Delay (opsional)",
+        PlaceholderText = "ex: 1.45 (kosongkan utk auto)",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(t) local n=tonumber(t); state.reelOverride=n end
+    })
+    tabMain:CreateInput({
+        Name = "Override Complete Delay (opsional)",
+        PlaceholderText = "ex: 3.20 (kosongkan utk auto)",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(t) local n=tonumber(t); state.completeOverride=n end
+    })
+
+    -- Inventory
+    tabInv:CreateToggle({
+        Name = "Auto Sell (>= Threshold)",
+        CurrentValue = false,
+        Callback = function(v) state.AutoSell.on = v end
+    })
+    tabInv:CreateInput({
+        Name = "Threshold Auto Sell (default 60)",
+        PlaceholderText = "60",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(t) local n=tonumber(t); if n then state.AutoSell.threshold = math.max(1, math.floor(n)) end end
+    })
+    tabInv:CreateButton({
+        Name = "Protect Tiers (Legendary/Mythic/Secret)",
+        Callback = function() state.protectTiers.Legendary=true; state.protectTiers.Mythic=true; state.protectTiers.Secret=true; protectByTiers() end
+    })
+    tabInv:CreateButton({ Name = "Sell All Non-Favorite", Callback = sellAllNonFav })
+    for _,tier in ipairs({"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}) do
+        tabInv:CreateToggle({
+            Name = "Protect "..tier,
+            CurrentValue = state.protectTiers[tier] or false,
+            Callback = function(v) state.protectTiers[tier]=v end
+        })
+    end
+
+    -- Teleport
+    local currentTP = tpNames[1]
+    tabTP:CreateDropdown({
+        Name = "Pilih Lokasi",
+        Options = tpNames,
+        CurrentOption = currentTP,
+        MultipleOptions = false,
+        Callback = function(opt) currentTP = type(opt)=="table" and opt[1] or opt end
+    })
+    tabTP:CreateButton({
+        Name = "Teleport",
+        Callback = function()
+            local pos = islandCoords[currentTP]
+            local charFolder = workspace:FindFirstChild("Characters")
+            local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+            local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart",2))
+            if hrp and pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0)) end
+        end
+    })
+
+    -- Misc
+    tabMisc:CreateToggle({
+        Name = "Anti-AFK",
+        CurrentValue = true,
+        Callback = function(v) setAntiAFK(v) end
+    })
+    tabMisc:CreateToggle({
+        Name = "FPS Boost",
+        CurrentValue = false,
+        Callback = function(v) BoostFPS(v) end
+    })
+    tabMisc:CreateButton({
+        Name = "Rejoin",
+        Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end
+    })
+    tabMisc:CreateButton({
+        Name = "Server Hop",
+        Callback = function()
+            local placeId = game.PlaceId
+            local servers, cursor = {}, ""
+            for _=1,3 do
+                local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
+                local ok,res = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
+                if ok and res and res.data then
+                    for _,sv in ipairs(res.data) do
+                        if sv.playing < sv.maxPlayers and sv.id ~= game.JobId then table.insert(servers, sv.id) end
+                    end
+                    cursor = res.nextPageCursor or ""; if #servers>0 then break end
+                else break end
+            end
+            if #servers>0 then TeleportService:TeleportToPlaceInstance(placeId, servers[math.random(1,#servers)], LocalPlayer) end
+        end
+    })
+
+    if game.PlaceId ~= TARGET_PLACE then
+        if Rayfield.Notify then Rayfield:Notify({Title="AegisHub", Content="Kamu bukan di Fish It. Gunakan tombol Teleport.", Duration=6}) end
+        tabMisc:CreateButton({
+            Name = "Teleport to Fish It",
+            Callback = function() TeleportService:Teleport(TARGET_PLACE, LocalPlayer) end
+        })
+    end
+
+    pcall(function() Rayfield:LoadConfiguration() end)
 end
 
-Rayfield:LoadConfiguration()
+-------------------- Live HUD & Label update (safe) --------------------
+local function safeSetLabel(txt)
+    if lblStatus and type(lblStatus.Set)=="function" then
+        pcall(function() lblStatus:Set(txt) end)
+    end
+end
+
+RS.RenderStepped:Connect(function()
+    local function getRod()
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local display = pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+        if not display then return nil end
+        for _,tile in ipairs(display:GetChildren()) do
+            local ok,lbl = pcall(function() return tile.Inner.Tags.ItemName end)
+            if ok and lbl and lbl:IsA("TextLabel") and RodDelays[lbl.Text] then return lbl.Text end
+        end
+        return nil
+    end
+    local rod = getRod() or "?"
+    local cEff, rEff = effDelays()
+    HUD.Text = string.format("Rod:%s | Reel:%.2fs | Cmpl:%.2fs | %s", rod, rEff, cEff, state.AFon and "ON" or "OFF")
+    safeSetLabel(("Rod: %s  |  Reel: %.2fs  |  Cmpl: %.2fs  |  Spd: %dx"):format(rod, rEff, cEff, state.SPEED))
+end)
+
+-------------------- Refresh preset saat backpack berubah --------------------
+task.spawn(function()
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    local display = pg:WaitForChild("Backpack"):WaitForChild("Display")
+    display.ChildAdded:Connect(function() task.wait(0.05)
+        local rod = (function()
+            for _,tile in ipairs(display:GetChildren()) do
+                local ok,lbl = pcall(function() return tile.Inner.Tags.ItemName end)
+                if ok and lbl and lbl:IsA("TextLabel") and RodDelays[lbl.Text] then return lbl.Text end
+            end
+        end)()
+        if rod and RodDelays[rod] then
+            state.completePreset = RodDelays[rod].custom
+            state.reelPreset     = RodDelays[rod].bypass
+        end
+    end)
+end)
+
+-------------------- Event finish dari ReplicateTextEffect --------------------
+task.spawn(function()
+    local ok, _ = pcall(function()
+        local p = ReplicatedStorage:WaitForChild("Packages", 10)
+        local idx = p and p:WaitForChild("_Index", 10)
+        local sn = idx and idx:WaitForChild("sleitnick_net@0.2.0", 10)
+        local n = sn and sn:WaitForChild("net", 10)
+        RE_RepText = n and n:FindFirstChild("RE/ReplicateTextEffect")
+    end)
+    if not RE_RepText then return end
+    RE_RepText.OnClientEvent:Connect(function(data)
+        if not (state.AFon and state.AFfishing) then return end
+        if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
+        local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+        if head and data.Container == head then
+            task.spawn(function()
+                local _, rEff = effDelays()
+                task.wait(rEff)
+                if RE_FishingCompleted then pcall(function() RE_FishingCompleted:FireServer() end) end
+            end)
+        end
+    end)
+end)
+
+-------------------- Start/Stop hooks (dipanggil dari UI) --------------------
+function StartAutoFish()
+    if state.AFon then return end
+    state.AFon = true
+    -- ambil remotes jika belum
+    if not net then
+        pcall(function()
+            local p = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"]
+            net = p and p:FindFirstChild("net")
+            if net then
+                RF_ChargeFishingRod = net:FindFirstChild("RF/ChargeFishingRod")
+                RF_RequestMinigame  = net:FindFirstChild("RF/RequestFishingMinigameStarted")
+                RE_FishingCompleted = net:FindFirstChild("RE/FishingCompleted")
+                RE_EquipHotbar      = net:FindFirstChild("RE/EquipToolFromHotbar")
+            end
+        end)
+    end
+    task.spawn(function()
+        while state.AFon do
+            pcall(function()
+                state.AFfishing = true
+                if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
+                task.wait(0.05)
+                local ts = workspace:GetServerTimeNow()
+                if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
+                task.wait(0.2)
+                if AShake then AShake:Play() end
+                pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
+
+                local baseX, baseY = -0.7499996423721313, 1
+                local x,y
+                if state.perfectCast then
+                    x = baseX + (math.random(-500,500)/1e7)
+                    y = baseY + (math.random(-500,500)/1e7)
+                else
+                    x = math.random(-1000,1000)/1000
+                    y = math.random(0,1000)/1000
+                end
+                if AIdle then AIdle:Play() end
+                if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
+
+                local cEff = effDelays()
+                task.wait(cEff)
+                state.AFfishing = false
+            end)
+            task.wait(0.05)
+        end
+    end)
+end
+
+function StopAutoFish()
+    state.AFon=false; state.AFfishing=false
+    pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end)
+end
+
+-- Selesai
