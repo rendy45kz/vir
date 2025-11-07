@@ -2,6 +2,28 @@
 -- AutoFish per-rod + Perfect Cast + Speed x5, Auto Sell + Protect Tiers, Sell All, Teleport, Rejoin/Server Hop, Anti-AFK, FPS Boost
 -- HUD: Rod, ReelDelayEff, CompleteDelayEff, Status
 
+-------------------- Rayfield UI --------------------
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+getgenv().Rayfield = Rayfield
+
+local Window = Rayfield:CreateWindow({
+    Name = "AegisHub • Fish It",
+    Icon = 0,
+    LoadingTitle = "AegisHub",
+    LoadingSubtitle = "Fish It Automation",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "AegisHub_FishIt" },
+    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
+    KeySystem = false,
+})
+
+local tabMain   = Window:CreateTab("Main")
+local tabInv    = Window:CreateTab("Inventory")
+local tabTP     = Window:CreateTab("Teleport")
+local tabMisc   = Window:CreateTab("Misc")
+
 -------------------- Services --------------------
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -94,28 +116,6 @@ local function notifyRay(title, content)
         getgenv().Rayfield:Notify({Title=title, Content=content, Duration=3})
     end
 end
-
--------------------- Rayfield UI --------------------
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-getgenv().Rayfield = Rayfield
-
-local Window = Rayfield:CreateWindow({
-    Name = "AegisHub • Fish It",
-    Icon = 0,
-    LoadingTitle = "AegisHub",
-    LoadingSubtitle = "Fish It Automation",
-    Theme = "Default",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "AegisHub_FishIt" },
-    Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
-    KeySystem = false,
-})
-
-local tabMain   = Window:CreateTab("Main")
-local tabInv    = Window:CreateTab("Inventory")
-local tabTP     = Window:CreateTab("Teleport")
-local tabMisc   = Window:CreateTab("Misc")
 
 local lblStatus = tabMain:CreateLabel("Rod: ?  |  Reel: -  |  Cmpl: -  |  Spd: 5x")
 
