@@ -1,29 +1,93 @@
+-- ==== XSX UI INIT (Android fix) ====
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
 local XSX = loadstring(game:HttpGet('https://raw.githubusercontent.com/depthso/XSX-UI-Library/refs/heads/main/xsx%20lib.lua'))()
 
--- (Optional) Theme colors
+-- (Opsional) Tema
 XSX.headerColor  = Color3.fromRGB(51,158,190)
 XSX.companyColor = Color3.fromRGB(163,151,255)
 XSX.acientColor  = Color3.fromRGB(159,115,255)
 
+-- Beberapa build XSX crash kalau pakai Blur di mobile, jadi OFF
 XSX:Init({
     version   = "1.7.x",
     title     = "ZiaanHub - Fish It",
     company   = "@ziaandev",
-    keybind   = Enum.KeyCode.G, -- toggle UI
-    BlurEffect = true
+    keybind   = Enum.KeyCode.G, -- masih bisa buat PC
+    BlurEffect = false
 })
 
--- Helpers: notifications (map ke XSX)
-local function NotifySuccess(t,c,d) XSX:Notify((t or "OK")..": "..(c or ""), d or 4, "success") end
-local function NotifyError(t,c,d)   XSX:Notify((t or "Error")..": "..(c or ""), d or 5, "error") end
-local function NotifyInfo(t,c,d)    XSX:Notify((t or "Info")..": "..(c or ""), d or 4) end
-local function NotifyWarning(t,c,d) XSX:Notify((t or "Warn")..": "..(c or ""), d or 4, "alert") end
+-- Auto-OPEN jendela (beberapa versi XSX start dalam keadaan minimize).
+local function forceOpenXSX()
+    -- cobain method umum yang sering dipakai di fork XSX
+    for _, m in ipairs({"ToggleUI", "Toggle", "Open", "Show"}) do
+        local f = XSX[m]
+        if type(f) == "function" then
+            pcall(function()
+                -- panggil 2x kalau method-nya toggle untuk memastikan "ON"
+                f(XSX) ; task.wait(0.05) ; f(XSX)
+            end)
+            break
+        end
+    end
+    -- fallback: pastikan ScreenGui XSX enabled
+    local gui = CoreGui:FindFirstChildWhichIsA("ScreenGui", true)
+    if gui and gui.DisplayOrder ~= nil then
+        gui.Enabled = true
+        pcall(function() gui.DisplayOrder = 1_000_000 end)
+    end
+end
+task.defer(forceOpenXSX)
 
+-- Tombol melayang untuk Android (touch) agar bisa Show/Hide tanpa keyboard
+local function makeMobileToggle()
+    if not UserInputService.TouchEnabled then return end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "ZiaanHub_XSX_Toggle"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.Parent = (gethui and gethui()) or CoreGui
+
+    local b = Instance.new("TextButton")
+    b.Name = "ToggleBtn"
+    b.AnchorPoint = Vector2.new(1,1)
+    b.Position = UDim2.new(1, -14, 1, -14)
+    b.Size = UDim2.fromOffset(160, 50)
+    b.BackgroundColor3 = Color3.fromRGB(30,32,46)
+    b.TextColor3 = Color3.fromRGB(235,240,255)
+    b.Text = "📋  TAMPILKAN MENU"
+    b.Font = Enum.Font.GothamSemibold
+    b.TextScaled = true
+    b.AutoButtonColor = true
+    b.Parent = sg
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+
+    local visible = true
+    local function toggle()
+        visible = not visible
+        -- coba panggil method yang ada
+        for _, m in ipairs({"ToggleUI", "Toggle", "Open", "Show"}) do
+            local f = XSX[m]
+            if type(f) == "function" then pcall(f, XSX) end
+        end
+        b.Text = visible and "📋  SEMBUNYIKAN MENU" or "📋  TAMPILKAN MENU"
+    end
+    b.MouseButton1Click:Connect(toggle)
+
+    -- pastikan awalnya kelihatan
+    b.Text = "📋  SEMBUNYIKAN MENU"
+end
+task.defer(makeMobileToggle)
+
+-- Watermark & FPS
 XSX:Watermark("ZiaanHub")
 local fpsWM = XSX:Watermark("FPS")
 game:GetService("RunService").RenderStepped:Connect(function(dt)
-    fpsWM:SetText("FPS: "..math.max(1, math.round(1/dt)))
+    pcall(function() fpsWM:SetText("FPS: "..math.max(1, math.round(1/dt))) end)
 end)
+-- ==== END XSX UI INIT (Android fix) ====
+
 
 -------------------------------------------
 ----- =======[ Services & Globals ] =======
