@@ -1,0 +1,351 @@
+-- ZiaanHub • Fish It • Delta Android • BOOT-FIRST GUI (selalu tampil)
+-- Aman untuk dieksekusi di luar Fish It: panel tetap muncul + tombol teleport.
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+local TARGET_PLACE = 121864768012064 -- Fish It
+
+-- ========== mount gui PALING AWAL ==========
+local function mount(gui)
+    if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
+    local parents = { (gethui and gethui()) or nil, CoreGui, Players.LocalPlayer:FindFirstChild("PlayerGui") }
+    for _,p in ipairs(parents) do
+        if p and p:IsDescendantOf(game) then
+            if pcall(function() gui.Parent = p end) then return p end
+        end
+    end
+end
+
+local SG = Instance.new("ScreenGui")
+SG.Name = "ZiaanHub_Boot"
+SG.ResetOnSpawn = false
+SG.IgnoreGuiInset = true
+mount(SG)
+
+local Panel = Instance.new("Frame", SG)
+Panel.Size = UDim2.fromOffset(400, 480)
+Panel.Position = UDim2.new(0, 20, 0.5, -240)
+Panel.BackgroundColor3 = Color3.fromRGB(22,24,36)
+Panel.BackgroundTransparency = 0.15
+Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel", Panel)
+Title.BackgroundTransparency = 1
+Title.Text = "ZiaanHub • Fish It"
+Title.Font = Enum.Font.GothamSemibold
+Title.TextScaled = true
+Title.TextColor3 = Color3.fromRGB(235,240,255)
+Title.Size = UDim2.fromOffset(260, 32)
+Title.Position = UDim2.new(0,12,0,8)
+
+local Info = Instance.new("TextLabel", Panel)
+Info.BackgroundTransparency = 1
+Info.Font = Enum.Font.Gotham
+Info.TextXAlignment = Enum.TextXAlignment.Left
+Info.TextScaled = true
+Info.TextColor3 = Color3.fromRGB(210,215,235)
+Info.Text = "Status: Loading..."
+Info.Size = UDim2.fromOffset(360, 22)
+Info.Position = UDim2.new(0, 15, 0, 40)
+
+local Scroll = Instance.new("ScrollingFrame", Panel)
+Scroll.AnchorPoint = Vector2.new(0,1)
+Scroll.Position = UDim2.new(0, 10, 1, -10)
+Scroll.Size = UDim2.new(1, -20, 1, -76)
+Scroll.BackgroundTransparency = 1
+Scroll.ScrollBarThickness = 6
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+local List = Instance.new("UIListLayout", Scroll)
+List.Padding = UDim.new(0,8)
+List.SortOrder = Enum.SortOrder.LayoutOrder
+
+local function rowBase(h)
+    local r = Instance.new("Frame")
+    r.Parent = Scroll
+    r.BackgroundTransparency = 0.15
+    r.BackgroundColor3 = Color3.fromRGB(30,32,46)
+    r.Size = UDim2.new(1, 0, 0, h or 40)
+    Instance.new("UICorner", r).CornerRadius = UDim.new(0, 8)
+    return r
+end
+
+local function RowButton(text, color, cb)
+    local r = rowBase(40)
+    local B = Instance.new("TextButton", r)
+    B.Size = UDim2.new(1, -20, 1, -10)
+    B.Position = UDim2.new(0,10,0,5)
+    B.BackgroundColor3 = color or Color3.fromRGB(70,120,200)
+    B.Text = text
+    B.Font = Enum.Font.GothamSemibold
+    B.TextScaled = true
+    B.TextColor3 = Color3.fromRGB(255,255,255)
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0,8)
+    B.MouseButton1Click:Connect(function() pcall(cb) end)
+    return B
+end
+local function RowToggle(label, default, cb)
+    local r = rowBase(40)
+    local L = Instance.new("TextLabel", r); L.BackgroundTransparency=1; L.Font=Enum.Font.Gotham
+    L.TextXAlignment=Enum.TextXAlignment.Left; L.TextScaled=true; L.TextColor3=Color3.fromRGB(235,240,255)
+    L.Text = label; L.Size = UDim2.new(1,-110,1,0); L.Position = UDim2.new(0,10,0,0)
+    local B = Instance.new("TextButton", r)
+    B.AnchorPoint = Vector2.new(1,0.5); B.Position = UDim2.new(1,-10,0.5,0); B.Size = UDim2.fromOffset(96,30)
+    B.BackgroundColor3 = default and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
+    B.Text = default and "ON" or "OFF"; B.Font=Enum.Font.GothamSemibold; B.TextScaled=true; B.TextColor3=Color3.fromRGB(255,255,255)
+    Instance.new("UICorner", B).CornerRadius = UDim.new(0,8)
+    local state = default
+    B.MouseButton1Click:Connect(function()
+        state = not state; B.Text = state and "ON" or "OFF"
+        B.BackgroundColor3 = state and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
+        pcall(cb, state)
+    end)
+    task.defer(function() pcall(cb, default) end)
+    return B
+end
+local function RowTextbox(placeholder, onCommit)
+    local r = rowBase(40)
+    local TB = Instance.new("TextBox", r)
+    TB.PlaceholderText = placeholder
+    TB.Font = Enum.Font.Gotham; TB.Text = ""; TB.TextScaled = true
+    TB.BackgroundTransparency = 0.1; TB.BackgroundColor3 = Color3.fromRGB(40,42,58)
+    TB.TextColor3 = Color3.fromRGB(235,240,255)
+    TB.Size = UDim2.new(1,-20,1,-10); TB.Position = UDim2.new(0,10,0,5)
+    Instance.new("UICorner", TB).CornerRadius = UDim.new(0,8)
+    TB.FocusLost:Connect(function(enter) if enter then pcall(onCommit, TB.Text) end end)
+    return TB
+end
+
+-- tombol melayang (always visible)
+local TSG = Instance.new("ScreenGui"); TSG.Name="Ziaan_Toggle"; TSG.ResetOnSpawn=false; TSG.IgnoreGuiInset=true; mount(TSG)
+local BTN = Instance.new("TextButton", TSG)
+BTN.AnchorPoint = Vector2.new(1,1); BTN.Position = UDim2.new(1,-14,1,-14)
+BTN.Size = UDim2.fromOffset(190, 52)
+BTN.BackgroundColor3 = Color3.fromRGB(30,32,46)
+BTN.TextColor3 = Color3.fromRGB(235,240,255)
+BTN.Font = Enum.Font.GothamSemibold; BTN.TextScaled = true
+BTN.Text = "📋  SEMBUNYIKAN MENU"
+Instance.new("UICorner", BTN).CornerRadius = UDim.new(0,10)
+local visible = true
+BTN.MouseButton1Click:Connect(function()
+    visible = not visible
+    SG.Enabled = visible
+    BTN.Text = visible and "📋  SEMBUNYIKAN MENU" or "📋  TAMPILKAN MENU"
+end)
+
+-- Blur mengikuti panel
+local Blur = Instance.new("BlurEffect"); Blur.Size = 0; Blur.Parent = Lighting
+task.spawn(function()
+    while SG.Parent do
+        Blur.Enabled = SG.Enabled; Blur.Size = SG.Enabled and 16 or 0
+        task.wait(0.1)
+    end
+end)
+
+-- HUD
+local HUD = Instance.new("TextLabel", SG)
+HUD.AnchorPoint = Vector2.new(1,1); HUD.Position = UDim2.new(1,-12,1,-12)
+HUD.Size = UDim2.fromOffset(380,34)
+HUD.BackgroundColor3 = Color3.fromRGB(21,24,37); HUD.BackgroundTransparency = 0.25
+HUD.Font = Enum.Font.GothamSemibold; HUD.TextScaled = true; HUD.TextColor3 = Color3.fromRGB(235,240,255)
+HUD.TextXAlignment = Enum.TextXAlignment.Right
+Instance.new("UICorner", HUD).CornerRadius = UDim.new(0,10)
+
+-- ========== INIT ASINKRON ==========
+task.spawn(function()
+    local function setStatus(t) Info.Text = "Status: "..t end
+    setStatus("Loading...")
+
+    -- jika bukan di Fish It, tawarkan teleport
+    if game.PlaceId ~= TARGET_PLACE then
+        setStatus("Bukan di Fish It (PlaceId "..tostring(game.PlaceId)..")")
+        RowButton("Teleport to Fish It", Color3.fromRGB(46,160,67), function()
+            TeleportService:Teleport(TARGET_PLACE, Players.LocalPlayer)
+        end)
+        return
+    end
+
+    -- ambil dependensi dengan timeout aman
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local okPackages = ReplicatedStorage:WaitForChild("Packages", 10)
+    if not okPackages then setStatus("Packages timeout"); return end
+
+    local function safeWaitChild(obj, name, t)
+        local got = obj:FindFirstChild(name) or obj:WaitForChild(name, t or 10)
+        if not got then error("Missing: "..name) end
+        return got
+    end
+
+    local ok, net = pcall(function()
+        local p = safeWaitChild(ReplicatedStorage, "Packages", 10)
+        p = safeWaitChild(p, "_Index", 10)
+        p = safeWaitChild(p, "sleitnick_net@0.2.0", 10)
+        return safeWaitChild(p, "net", 10)
+    end)
+    if not ok then setStatus("net not found: "..tostring(net)); return end
+    setStatus("Remotes OK")
+
+    -- remotes (optional; jangan hentikan UI jika ada yang hilang)
+    local RF_ChargeFishingRod = net:FindFirstChild("RF/ChargeFishingRod")
+    local RF_RequestMinigame  = net:FindFirstChild("RF/RequestFishingMinigameStarted")
+    local RE_FishingCompleted = net:FindFirstChild("RE/FishingCompleted")
+    local RE_EquipHotbar      = net:FindFirstChild("RE/EquipToolFromHotbar")
+    local RE_RepText          = net:FindFirstChild("RE/ReplicateTextEffect")
+    local RF_SellAll          = net:FindFirstChild("RF/SellAllItems")
+
+    -- anims
+    local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local humanoid  = character:WaitForChild("Humanoid")
+    local animator  = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+
+    local okIdle, RodIdle  = pcall(function() return ReplicatedStorage.Modules.Animations.FishingRodReelIdle end)
+    local okReel, RodReel  = pcall(function() return ReplicatedStorage.Modules.Animations.EasyFishReelStart end)
+    local okShake,RodShake = pcall(function() return ReplicatedStorage.Modules.Animations.CastFromFullChargePosition1Hand end)
+
+    local AIdle  = okIdle  and animator:LoadAnimation(RodIdle)
+    local AReel  = okReel  and animator:LoadAnimation(RodReel)
+    local AShake = okShake and animator:LoadAnimation(RodShake)
+
+    -- delays & helpers
+    local RodDelays = {
+        ["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},
+        ["Ghostfinn Rod"]={custom=1.12,bypass=1.45},["Astral Rod"]={custom=1.90,bypass=1.45},
+        ["Chrome Rod"]={custom=2.30,bypass=2.00},["Steampunk Rod"]={custom=2.50,bypass=2.30},
+        ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},
+        ["Demascus Rod"]={custom=3.90,bypass=3.80},["Grass Rod"]={custom=3.80,bypass=3.90},
+        ["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
+        ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},
+    }
+    local currentCustomDelay, currentBypassDelay = 2.5, 1.2
+    local perfectCast, AFon, AFfishing = true, false, false
+
+    local function getEquippedRodName()
+        local pg = Players.LocalPlayer:FindFirstChild("PlayerGui")
+        local display = pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+        if not display then return nil end
+        for _,tile in ipairs(display:GetChildren()) do
+            local ok,lbl = pcall(function() return tile.Inner.Tags.ItemName end)
+            if ok and lbl and lbl:IsA("TextLabel") then
+                local n = lbl.Text; if RodDelays[n] then return n end
+            end
+        end
+        return nil
+    end
+    local function refreshRodDelays()
+        local rod = getEquippedRodName()
+        if rod and RodDelays[rod] then
+            currentCustomDelay = RodDelays[rod].custom
+            currentBypassDelay = RodDelays[rod].bypass
+        else
+            currentCustomDelay, currentBypassDelay = 10, 1
+        end
+    end
+
+    if RE_RepText then
+        RE_RepText.OnClientEvent:Connect(function(data)
+            if not (AFon and AFfishing) then return end
+            if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
+            local head = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Head")
+            if head and data.Container == head then
+                task.spawn(function()
+                    task.wait(currentBypassDelay)
+                    pcall(function() RE_FishingCompleted:FireServer() end)
+                end)
+            end
+        end)
+    end
+
+    local function StartAutoFish()
+        if AFon then return end
+        AFon = true
+        refreshRodDelays()
+        task.spawn(function()
+            while AFon do
+                pcall(function()
+                    AFfishing = true
+                    if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
+                    task.wait(0.1)
+                    local ts = workspace:GetServerTimeNow()
+                    if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
+                    task.wait(0.4)
+                    if AShake then AShake:Play() end
+                    pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
+
+                    local baseX, baseY = -0.7499996423721313, 1
+                    local x,y
+                    if perfectCast then
+                        x = baseX + (math.random(-500,500)/1e7)
+                        y = baseY + (math.random(-500,500)/1e7)
+                    else
+                        x = math.random(-1000,1000)/1000
+                        y = math.random(0,1000)/1000
+                    end
+                    if AIdle then AIdle:Play() end
+                    if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
+
+                    task.wait(currentCustomDelay)
+                    AFfishing = false
+                    refreshRodDelays()
+                end)
+                task.wait(0.08)
+            end
+        end)
+    end
+    local function StopAutoFish()
+        AFon=false; AFfishing=false
+        pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end)
+    end
+
+    -- Inventory helpers (optional, tidak memblok UI kalau modul hilang)
+    local protectTiers = {Legendary=true, Mythic=true, Secret=true}
+    local Replion, ItemUtility do
+        local ok1, m1 = pcall(function() return require(ReplicatedStorage.Packages.replion) end)
+        local ok2, m2 = pcall(function() return require(ReplicatedStorage.Modules.ItemUtility) end)
+        Replion = ok1 and m1 or nil; ItemUtility = ok2 and m2 or nil
+    end
+    local function protectByTiers()
+        if not (Replion and ItemUtility) then return end
+        local Data = Replion.Client:WaitReplion("Data")
+        local items = Data and Data:Get({"Inventory","Items"})
+        if type(items) ~= "table" then return end
+        for _,it in ipairs(items) do
+            local base = ItemUtility:GetItemData(it.Id)
+            local tier = base and base.Data and tostring(base.Data.Tier)
+            if tier and protectTiers[tier] and not it.Favorited then it.Favorited = true end
+        end
+    end
+    local function sellAll()
+        protectByTiers(); task.wait(0.2)
+        local s = net:FindFirstChild("RF/SellAllItems")
+        if s then pcall(function() s:InvokeServer() end) end
+    end
+
+    -- ========== Build controls setelah semua siap ==========
+    Info.Text = "Status: Ready"
+
+    RowToggle("Auto Fish (per-rod)", false, function(v) if v then StartAutoFish() else StopAutoFish() end end)
+    RowToggle("Perfect Cast", true, function(v) perfectCast = v end)
+    RowTextbox("Bypass Delay (cth: 1.45)", function(t) local n=tonumber(t); if n then currentBypassDelay=n end end)
+    RowButton("Protect Tiers (Legendary/Mythic/Secret)", Color3.fromRGB(90,120,200), function() protectByTiers() end)
+    RowButton("Sell All Non-Favorite", Color3.fromRGB(180,80,80), function() sellAll() end)
+
+    -- HUD updater
+    RS.RenderStepped:Connect(function()
+        local rod = getEquippedRodName() or "?"
+        HUD.Text = string.format("Rod: %s  |  C: %.2fs  |  B: %.2fs  |  %s", rod, currentCustomDelay or 0, currentBypassDelay or 0, AFon and "ON" or "OFF")
+        Info.Text = string.format("Rod: %s   C: %.2fs   B: %.2fs", rod, currentCustomDelay or 0, currentBypassDelay or 0)
+    end)
+
+    -- refresh delays ketika UI backpack berubah
+    task.spawn(function()
+        local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
+        local display = pg:WaitForChild("Backpack"):WaitForChild("Display")
+        display.ChildAdded:Connect(function() task.wait(0.05); refreshRodDelays() end)
+    end)
+end)
