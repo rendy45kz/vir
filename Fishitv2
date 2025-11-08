@@ -1,501 +1,258 @@
--- ZiaanHub • Fish It • Delta Android • BOOT-FIRST + Speed x5 + Premium Pack
--- Selalu tampil (GUI dibuat duluan), semua inisialisasi dijalankan async & aman.
+-- AegisHub • Fish It • Orion UI (custom branding + logo)
+-- Tempelkan DI BAWAH logika/fitur kamu yang sudah jalan (StartAutoFish, StopAutoFish, protectByTiers, sellAllNonFav, BoostFPS, setAntiAFK, dll).
 
--------------------- Services --------------------
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
+local LocalPlayer = Players.LocalPlayer
 
-local TARGET_PLACE = 121864768012064 -- Fish It
-
--------------------- Mount GUI (paling awal) --------------------
-local function mount(gui)
-    if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
-    for _,p in ipairs({(gethui and gethui()) or nil, CoreGui, Players.LocalPlayer:FindFirstChild("PlayerGui")}) do
-        if p and p:IsDescendantOf(game) then
-            if pcall(function() gui.Parent = p end) then
-                pcall(function()
-                    if gui:IsA("ScreenGui") then
-                        gui.DisplayOrder = 1_000_000
-                        gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                    end
-                end)
-                return p
-            end
-        end
-    end
-end
-
-local SG = Instance.new("ScreenGui")
-SG.Name = "ZiaanHub_Boot"
-SG.ResetOnSpawn = false
-SG.IgnoreGuiInset = true
-mount(SG)
-
--------------------- Panel Kecil + Layout --------------------
-local Panel = Instance.new("Frame", SG)
-Panel.Size = UDim2.fromOffset(320, 420)
-Panel.Position = UDim2.new(0, 14, 0.5, -210)
-Panel.BackgroundColor3 = Color3.fromRGB(22,24,36)
-Panel.BackgroundTransparency = 0.15
-Instance.new("UICorner", Panel).CornerRadius = UDim.new(0, 12)
-
-local Title = Instance.new("TextLabel", Panel)
-Title.BackgroundTransparency = 1
-Title.Text = "ZiaanHub • Fish It"
-Title.Font = Enum.Font.GothamSemibold
-Title.TextScaled = true
-Title.TextColor3 = Color3.fromRGB(235,240,255)
-Title.Size = UDim2.fromOffset(220, 26)
-Title.Position = UDim2.new(0, 12, 0, 6)
-
-local Info = Instance.new("TextLabel", Panel)
-Info.BackgroundTransparency = 1
-Info.Font = Enum.Font.Gotham
-Info.TextXAlignment = Enum.TextXAlignment.Left
-Info.TextScaled = true
-Info.TextColor3 = Color3.fromRGB(210,215,235)
-Info.Text = "Status: Loading…"
-Info.Size = UDim2.fromOffset(300, 18)
-Info.Position = UDim2.new(0, 12, 0, 34)
-
-local Scroll = Instance.new("ScrollingFrame", Panel)
-Scroll.AnchorPoint = Vector2.new(0,1)
-Scroll.Position = UDim2.new(0, 8, 1, -8)
-Scroll.Size = UDim2.new(1, -16, 1, -60)
-Scroll.BackgroundTransparency = 1
-Scroll.ScrollBarThickness = 5
-Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-local List = Instance.new("UIListLayout", Scroll)
-List.Padding = UDim.new(0,6)
-List.SortOrder = Enum.SortOrder.LayoutOrder
-
-local function rowBase(h)
-    local r = Instance.new("Frame"); r.Parent = Scroll
-    r.BackgroundTransparency = 0.15
-    r.BackgroundColor3 = Color3.fromRGB(30,32,46)
-    r.Size = UDim2.new(1, 0, 0, h or 36)
-    Instance.new("UICorner", r).CornerRadius = UDim.new(0, 8)
-    return r
-end
-local function RowToggle(label, default, cb)
-    local r = rowBase(36)
-    local L = Instance.new("TextLabel", r)
-    L.BackgroundTransparency = 1; L.Font = Enum.Font.Gotham
-    L.TextXAlignment = Enum.TextXAlignment.Left; L.TextScaled = true
-    L.TextColor3 = Color3.fromRGB(235,240,255); L.Text = label
-    L.Size = UDim2.new(1, -100, 1, 0); L.Position = UDim2.new(0,8,0,0)
-    local B = Instance.new("TextButton", r)
-    B.AnchorPoint = Vector2.new(1,0.5); B.Position = UDim2.new(1,-8,0.5,0)
-    B.Size = UDim2.fromOffset(84, 26)
-    B.BackgroundColor3 = default and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
-    B.Text = default and "ON" or "OFF"
-    B.Font = Enum.Font.GothamSemibold; B.TextScaled = true; B.TextColor3 = Color3.fromRGB(255,255,255)
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0,6)
-    local state = default
-    B.MouseButton1Click:Connect(function()
-        state = not state
-        B.Text = state and "ON" or "OFF"
-        B.BackgroundColor3 = state and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
-        pcall(cb, state)
+-- ====== Loader Orion (guarded) ======
+local OrionLib
+do
+    local ok, lib = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
     end)
-    task.defer(function() pcall(cb, default) end)
-    return r
-end
-local function RowButton(text, color, cb)
-    local r = rowBase(36)
-    local B = Instance.new("TextButton", r)
-    B.Size = UDim2.new(1, -16, 1, -8); B.Position = UDim2.new(0,8,0,4)
-    B.BackgroundColor3 = color or Color3.fromRGB(70,120,200)
-    B.Text = text; B.Font = Enum.Font.GothamSemibold; B.TextScaled = true; B.TextColor3 = Color3.fromRGB(255,255,255)
-    Instance.new("UICorner", B).CornerRadius = UDim.new(0,6)
-    B.MouseButton1Click:Connect(function() pcall(cb) end)
-    return r
-end
-local function RowTextbox(placeholder, onCommit)
-    local r = rowBase(36)
-    local TB = Instance.new("TextBox", r)
-    TB.PlaceholderText = placeholder; TB.Font = Enum.Font.Gotham; TB.Text = ""; TB.TextScaled = true
-    TB.BackgroundTransparency = 0.1; TB.BackgroundColor3 = Color3.fromRGB(40,42,58)
-    TB.TextColor3 = Color3.fromRGB(235,240,255)
-    TB.Size = UDim2.new(1, -16, 1, -8); TB.Position = UDim2.new(0,8,0,4)
-    Instance.new("UICorner", TB).CornerRadius = UDim.new(0,6)
-    TB.FocusLost:Connect(function(enter) if enter then pcall(onCommit, TB.Text) end end)
-    return r
-end
-
--------------------- Floating Toggle --------------------
-local TSG = Instance.new("ScreenGui"); TSG.Name="Ziaan_Toggle"; TSG.ResetOnSpawn=false; TSG.IgnoreGuiInset=true; mount(TSG)
-local BTN = Instance.new("TextButton", TSG)
-BTN.AnchorPoint = Vector2.new(1,1); BTN.Position = UDim2.new(1,-10,1,-10)
-BTN.Size = UDim2.fromOffset(160, 44)
-BTN.BackgroundColor3 = Color3.fromRGB(30,32,46)
-BTN.TextColor3 = Color3.fromRGB(235,240,255)
-BTN.Font = Enum.Font.GothamSemibold; BTN.TextScaled = true
-BTN.Text = "📋  HIDE"
-Instance.new("UICorner", BTN).CornerRadius = UDim.new(0,8)
-local visible = true
-BTN.MouseButton1Click:Connect(function()
-    visible = not visible
-    SG.Enabled = visible
-    BTN.Text = visible and "📋  HIDE" or "📋  SHOW"
-end)
-
--------------------- Blur & HUD --------------------
-local Blur = Instance.new("BlurEffect"); Blur.Size = 0; Blur.Parent = Lighting
-task.spawn(function()
-    while SG.Parent do
-        Blur.Enabled = SG.Enabled; Blur.Size = SG.Enabled and 12 or 0
-        task.wait(0.1)
-    end
-end)
-
-local HUD = Instance.new("TextLabel", SG)
-HUD.AnchorPoint = Vector2.new(1,1); HUD.Position = UDim2.new(1,-10,1,-10)
-HUD.Size = UDim2.fromOffset(360, 30)
-HUD.BackgroundColor3 = Color3.fromRGB(21,24,37); HUD.BackgroundTransparency = 0.25
-HUD.Font = Enum.Font.GothamSemibold; HUD.TextScaled = true; HUD.TextColor3 = Color3.fromRGB(235,240,255)
-HUD.TextXAlignment = Enum.TextXAlignment.Right
-Instance.new("UICorner", HUD).CornerRadius = UDim.new(0,8)
-
--------------------- Anti-AFK --------------------
-local AFKConn
-local function setAntiAFK(on)
-    if on then
-        if AFKConn then AFKConn:Disconnect() end
-        AFKConn = LocalPlayer.Idled:Connect(function()
-            pcall(function()
-                VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                task.wait(0.8)
-                VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-            end)
-        end)
-    else
-        if AFKConn then AFKConn:Disconnect(); AFKConn=nil end
+    if ok and lib then OrionLib = lib else
+        warn("[AegisHub] Gagal memuat OrionLib"); return
     end
 end
-setAntiAFK(true)
 
--------------------- INIT ASINKRON --------------------
-task.spawn(function()
-    local function setStatus(t) Info.Text = "Status: "..t end
-    setStatus("Loading…")
+-- ====== Window ======
+local Window = OrionLib:MakeWindow({
+    Name = "AegisHub • Fish It",
+    HidePremium = true,
+    SaveConfig = true,
+    ConfigFolder = "AegisHub_FishIt",
+    IntroEnabled = false
+})
 
-    -- bila bukan Fish It → tawarkan teleport
-    if game.PlaceId ~= TARGET_PLACE then
-        setStatus("Bukan di Fish It ("..tostring(game.PlaceId)..")")
-        RowButton("Teleport to Fish It", Color3.fromRGB(46,160,67), function()
-            TeleportService:Teleport(TARGET_PLACE, Players.LocalPlayer)
-        end)
-        return
+-- ====== Logo (optional) ======
+local LOGO_ID = "rbxassetid://0" -- ganti dengan Decal ID kamu (contoh: rbxassetid://1234567890)
+if LOGO_ID ~= "rbxassetid://0" then
+    local SG = Instance.new("ScreenGui")
+    SG.Name = "AegisHub_Logo"; SG.ResetOnSpawn = false; SG.IgnoreGuiInset = true
+    local okParent = pcall(function() SG.Parent = (gethui and gethui()) or CoreGui end)
+    if okParent then
+        local Frame = Instance.new("Frame", SG)
+        Frame.Size = UDim2.fromOffset(160, 50)
+        Frame.Position = UDim2.new(0, 14, 0, 14)
+        Frame.BackgroundTransparency = 1
+
+        local Img = Instance.new("ImageLabel", Frame)
+        Img.Size = UDim2.fromOffset(50, 50)
+        Img.BackgroundTransparency = 1
+        Img.Image = LOGO_ID
+
+        local Title = Instance.new("TextLabel", Frame)
+        Title.BackgroundTransparency = 1
+        Title.Position = UDim2.new(0, 58, 0, 6)
+        Title.Size = UDim2.fromOffset(460, 18)
+        Title.Text = "AegisHub"
+        Title.Font = Enum.Font.GothamBold
+        Title.TextScaled = true
+        Title.TextColor3 = Color3.fromRGB(230, 235, 255)
+
+        local Sub = Instance.new("TextLabel", Frame)
+        Sub.BackgroundTransparency = 1
+        Sub.Position = UDim2.new(0, 58, 0, 26)
+        Sub.Size = UDim2.fromOffset(460, 18)
+        Sub.Text = "Fish It Automation"
+        Sub.Font = Enum.Font.Gotham
+        Sub.TextScaled = true
+        Sub.TextColor3 = Color3.fromRGB(195, 205, 230)
     end
+end
 
-    -- Ambil remotes aman
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local function safeWaitChild(obj, name, t)
-        local got = obj:FindFirstChild(name) or obj:WaitForChild(name, t or 10)
-        if not got then error("Missing: "..name) end
-        return got
-    end
+-- ====== Tabs ======
+local tabMain   = Window:MakeTab({Name="Main", Icon="rbxassetid://4483345998", PremiumOnly=false})
+local tabInv    = Window:MakeTab({Name="Inventory", Icon="rbxassetid://4483345998", PremiumOnly=false})
+local tabTP     = Window:MakeTab({Name="Teleport", Icon="rbxassetid://4483345998", PremiumOnly=false})
+local tabMisc   = Window:MakeTab({Name="Misc", Icon="rbxassetid://4483345998", PremiumOnly=false})
 
-    local okNet, net = pcall(function()
-        local p = safeWaitChild(ReplicatedStorage, "Packages", 10)
-        p = safeWaitChild(p, "_Index", 10)
-        p = safeWaitChild(p, "sleitnick_net@0.2.0", 10)
-        return safeWaitChild(p, "net", 10)
-    end)
-    if not okNet then setStatus("net missing"); return end
+-- ====== Status label kecil di Main ======
+local statusLabel = tabMain:AddParagraph("Status", "Rod: ?  |  Reel: -  |  Cmpl: -  |  Spd: 5x")
 
-    local RF_ChargeFishingRod = net:FindFirstChild("RF/ChargeFishingRod")
-    local RF_RequestMinigame  = net:FindFirstChild("RF/RequestFishingMinigameStarted")
-    local RE_FishingCompleted = net:FindFirstChild("RE/FishingCompleted")
-    local RE_EquipHotbar      = net:FindFirstChild("RE/EquipToolFromHotbar")
-    local RE_RepText          = net:FindFirstChild("RE/ReplicateTextEffect")
-    local RF_SellAll          = net:FindFirstChild("RF/SellAllItems")
+-- ====== Bridge ke variabel/fungsi yg sudah ada ======
+-- Pastikan variabel berikut ada di skrip utamamu: state, effDelays, StartAutoFish, StopAutoFish, protectByTiers, sellAllNonFav, BoostFPS, setAntiAFK
+-- Jika namanya beda, tinggal ubah callback di bawah.
 
-    -- Animations
-    local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
-    local humanoid  = character:WaitForChild("Humanoid")
-    local animator  = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
-
-    local okIdle, RodIdle  = pcall(function() return ReplicatedStorage.Modules.Animations.FishingRodReelIdle end)
-    local okReel, RodReel  = pcall(function() return ReplicatedStorage.Modules.Animations.EasyFishReelStart end)
-    local okShake,RodShake = pcall(function() return ReplicatedStorage.Modules.Animations.CastFromFullChargePosition1Hand end)
-
-    local AIdle  = okIdle  and animator:LoadAnimation(RodIdle)
-    local AReel  = okReel  and animator:LoadAnimation(RodReel)
-    local AShake = okShake and animator:LoadAnimation(RodShake)
-
-    -- Preset delay per rod (complete=custom, reel=bypass)
-    local RodDelays = {
-        ["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},
-        ["Ghostfinn Rod"]={custom=1.12,bypass=1.45},["Astral Rod"]={custom=1.90,bypass=1.45},
-        ["Chrome Rod"]={custom=2.30,bypass=2.00},["Steampunk Rod"]={custom=2.50,bypass=2.30},
-        ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},
-        ["Demascus Rod"]={custom=3.90,bypass=3.80},["Grass Rod"]={custom=3.80,bypass=3.90},
-        ["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
-        ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},
-    }
-
-    -- State (premium)
-    local SPEED = 5 -- default x5
-    local perfectCast, AFon, AFfishing = true, false, false
-    local reelPreset, completePreset = 1.2, 2.5
-    local reelOverride, completeOverride = nil, nil -- bisa diisi user
-    local function getEquippedRodName()
-        local pg = Players.LocalPlayer:FindFirstChild("PlayerGui")
-        local display = pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
-        if not display then return nil end
-        for _,tile in ipairs(display:GetChildren()) do
-            local ok,lbl = pcall(function() return tile.Inner.Tags.ItemName end)
-            if ok and lbl and lbl:IsA("TextLabel") then
-                local n = lbl.Text; if RodDelays[n] then return n end
-            end
-        end
-        return nil
-    end
-    local function refreshRodDelays()
-        local rod = getEquippedRodName()
-        if rod and RodDelays[rod] then
-            completePreset = RodDelays[rod].custom
-            reelPreset     = RodDelays[rod].bypass
+-- Main
+tabMain:AddToggle({
+    Name = "Auto Fish",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if StartAutoFish then StartAutoFish() end
         else
-            completePreset = 10
-            reelPreset     = 1
+            if StopAutoFish then StopAutoFish() end
         end
     end
-    local function clamp(n, min, max) if n < min then return min elseif n > max then return max else return n end end
-    local function effectiveDelays()
-        local c = (completeOverride or completePreset) / SPEED
-        local r = (reelOverride     or reelPreset)     / SPEED
-        -- guard rail (jangan terlalu ekstrem)
-        return clamp(c, 0.35, 12), clamp(r, 0.15, 6)
-    end
+})
 
-    -- Event: auto finish saat "Exclaim" muncul
-    if RE_RepText then
-        RE_RepText.OnClientEvent:Connect(function(data)
-            if not (AFon and AFfishing) then return end
-            if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
-            local head = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Head")
-            if head and data.Container == head then
-                task.spawn(function()
-                    local _, rEff = effectiveDelays()
-                    task.wait(rEff)
-                    pcall(function() RE_FishingCompleted:FireServer() end)
-                end)
-            end
-        end)
+tabMain:AddToggle({
+    Name = "Perfect Cast",
+    Default = true,
+    Callback = function(v)
+        if state then state.perfectCast = v end
     end
+})
 
-    -- Auto Fish
-    local function StartAutoFish()
-        if AFon then return end
-        AFon = true
-        refreshRodDelays()
-        task.spawn(function()
-            while AFon do
-                pcall(function()
-                    AFfishing = true
-                    if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
-                    task.wait(0.05) -- lebih cepat sedikit
-                    local ts = workspace:GetServerTimeNow()
-                    if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
-                    task.wait(0.2)
-                    if AShake then AShake:Play() end
-                    pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
-
-                    local baseX, baseY = -0.7499996423721313, 1
-                    local x,y
-                    if perfectCast then
-                        x = baseX + (math.random(-500,500)/1e7)
-                        y = baseY + (math.random(-500,500)/1e7)
-                    else
-                        x = math.random(-1000,1000)/1000
-                        y = math.random(0,1000)/1000
-                    end
-                    if AIdle then AIdle:Play() end
-                    if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
-
-                    local cEff = effectiveDelays()
-                    task.wait(cEff) -- complete delay efektif
-                    AFfishing = false
-                    refreshRodDelays()
-                end)
-                task.wait(0.05)
-            end
-        end)
+tabMain:AddSlider({
+    Name = "Speed x",
+    Min = 1, Max = 5, Default = (state and state.SPEED) or 5,
+    Color = Color3.fromRGB(120, 160, 255),
+    Increment = 1,
+    Callback = function(val)
+        if state then state.SPEED = math.clamp(val, 1, 5) end
     end
-    local function StopAutoFish()
-        AFon=false; AFfishing=false
-        pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end)
-    end
+})
 
-    ---------------- Premium: Inventory / Sell / Protect / FPS ----------------
-    local protectTiers = {Common=false,Uncommon=false,Rare=false,Epic=false,Legendary=true,Mythic=true,Secret=true}
-    local Replion, ItemUtility do
-        local ok1, m1 = pcall(function() return require(ReplicatedStorage.Packages.replion) end)
-        local ok2, m2 = pcall(function() return require(ReplicatedStorage.Modules.ItemUtility) end)
-        Replion = ok1 and m1 or nil; ItemUtility = ok2 and m2 or nil
+tabMain:AddTextbox({
+    Name = "Reel Delay (opt.)",
+    Default = "",
+    TextDisappear = false,
+    Callback = function(txt)
+        if state then state.reelOverride = tonumber(txt) end
     end
-    local function protectByTiers()
-        if not (Replion and ItemUtility) then return end
-        local Data = Replion.Client:WaitReplion("Data")
-        local items = Data and Data:Get({"Inventory","Items"})
-        if type(items) ~= "table" then return end
-        for _,it in ipairs(items) do
-            local base = ItemUtility:GetItemData(it.Id)
-            local tier = base and base.Data and tostring(base.Data.Tier)
-            if tier and protectTiers[tier] and not it.Favorited then it.Favorited = true end
+})
+
+tabMain:AddTextbox({
+    Name = "Complete Delay (opt.)",
+    Default = "",
+    TextDisappear = false,
+    Callback = function(txt)
+        if state then state.completeOverride = tonumber(txt) end
+    end
+})
+
+-- Inventory
+tabInv:AddToggle({
+    Name = "Auto Sell",
+    Default = false,
+    Callback = function(v)
+        if state then state.AutoSell.on = v end
+    end
+})
+
+tabInv:AddTextbox({
+    Name = "Threshold",
+    Default = tostring((state and state.AutoSell and state.AutoSell.threshold) or 60),
+    TextDisappear = false,
+    Callback = function(txt)
+        if state and state.AutoSell then
+            local n = tonumber(txt)
+            if n then state.AutoSell.threshold = math.max(1, math.floor(n)) end
         end
     end
-    local function sellAllNonFav()
-        protectByTiers(); task.wait(0.15)
-        if RF_SellAll then pcall(function() RF_SellAll:InvokeServer() end) end
-    end
-    local AutoSell = {on=false, threshold=60, last=0}
-    task.spawn(function()
-        while true do
-            if AutoSell.on and (os.time() - AutoSell.last >= 45) and Replion then
-                local count = 0
-                local Data = Replion.Client:WaitReplion("Data")
-                local items = Data and Data:Get({"Inventory","Items"})
-                if type(items)=="table" then
-                    for _,it in ipairs(items) do if not it.Favorited then count += (it.Count or 1) end end
-                end
-                if count >= AutoSell.threshold then sellAllNonFav(); AutoSell.last=os.time() end
-            end
-            task.wait(8)
+})
+
+tabInv:AddButton({
+    Name = "Protect High Tiers",
+    Callback = function()
+        if state then
+            state.protectTiers.Legendary = true
+            state.protectTiers.Mythic    = true
+            state.protectTiers.Secret    = true
         end
-    end)
-
-    local function BoostFPS(on)
-        if on then
-            for _,v in ipairs(game:GetDescendants()) do
-                if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic; v.Reflectance = 0
-                elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1 end
-            end
-            for _,e in ipairs(Lighting:GetChildren()) do if e:IsA("PostEffect") then e.Enabled=false end end
-            Lighting.GlobalShadows = false; Lighting.FogEnd = 1e9
-            settings().Rendering.QualityLevel = "Level01"
-        else
-            -- tidak restore penuh (aman)
-        end
+        if protectByTiers then protectByTiers() end
     end
+})
 
-    ---------------- Teleport / Server ----------------
-    local islandCoords = {
-        ["Weather Machine"]=Vector3.new(-1471,-3,1929),["Esoteric Depths"]=Vector3.new(3157,-1303,1439),
-        ["Tropical Grove"]=Vector3.new(-2038,3,3650), ["Stingray Shores"]=Vector3.new(-32,4,2773),
-        ["Kohana Volcano"]=Vector3.new(-519,24,189),  ["Coral Reefs"]=Vector3.new(-3095,1,2177),
-        ["Crater Island"]=Vector3.new(968,1,4854),    ["Kohana"]=Vector3.new(-658,3,719),
-        ["Winter Fest"]=Vector3.new(1611,4,3280),     ["Isoteric Island"]=Vector3.new(1987,4,1400),
-        ["Treasure Hall"]=Vector3.new(-3600,-267,-1558),["Lost Shore"]=Vector3.new(-3663,38,-989),
-        ["Sishypus Statue"]=Vector3.new(-3792,-135,-986),
-    }
-    local tpNames = {}; for n,_ in pairs(islandCoords) do table.insert(tpNames, n) end; table.sort(tpNames)
-
-    ---------------- Build Controls (ringkas) ----------------
-    setStatus("Ready")
-
-    RowToggle("Auto Fish (per-rod)", false, function(v) if v then StartAutoFish() else StopAutoFish() end end)
-    RowToggle("Perfect Cast", true, function(v) perfectCast = v end)
-
-    -- Speed 1–5× (gunakan TextBox angka biar ringan)
-    RowTextbox("Speed Multiplier 1-5 (default 5)", function(t)
-        local n = tonumber(t) or 5
-        SPEED = math.clamp(math.floor(n + 0.5), 1, 5)
-    end)
-
-    -- Override manual (opsional)
-    RowTextbox("Override Reel Delay (e.g. 1.45) opsional", function(t)
-        local n = tonumber(t); reelOverride = n
-    end)
-    RowTextbox("Override Complete Delay (e.g. 3.20) opsional", function(t)
-        local n = tonumber(t); completeOverride = n
-    end)
-
-    -- Inventory premium
-    RowToggle("Auto Sell (≥ threshold)", false, function(v) AutoSell.on = v end)
-    RowTextbox("Auto Sell Threshold (default 60)", function(t)
-        local n = tonumber(t); if n then AutoSell.threshold = math.max(1, math.floor(n)) end
-    end)
-    RowButton("Protect Tiers (Legend/Myth/Secret)", Color3.fromRGB(90,120,200), function() protectByTiers() end)
-    RowButton("Sell All Non-Favorite", Color3.fromRGB(180,80,80), function() sellAllNonFav() end)
-
-    -- Protect detail tier
-    for _,tier in ipairs({"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}) do
-        RowToggle("Protect "..tier, protectTiers[tier] or false, function(v) protectTiers[tier]=v end)
+tabInv:AddButton({
+    Name = "Sell Non-Fav",
+    Callback = function()
+        if sellAllNonFav then sellAllNonFav() end
     end
+})
 
-    -- Teleport ringkas
-    do
-        local r = rowBase(44)
-        local L = Instance.new("TextLabel", r)
-        L.BackgroundTransparency=1; L.Font=Enum.Font.GothamSemibold
-        L.TextXAlignment=Enum.TextXAlignment.Left; L.TextScaled=true
-        L.TextColor3=Color3.fromRGB(235,240,255)
-        L.Size = UDim2.new(1, -112, 1, 0); L.Position = UDim2.new(0,8,0,0)
-        local idx = 1; L.Text = "TP: "..tpNames[idx]
-        local Prev = Instance.new("TextButton", r)
-        Prev.Size = UDim2.fromOffset(34,26); Prev.Position = UDim2.new(1,-106,0.5,-13)
-        Prev.BackgroundColor3 = Color3.fromRGB(40,42,58); Prev.Text = "◀"
-        Prev.Font = Enum.Font.GothamSemibold; Prev.TextScaled = true; Prev.TextColor3 = Color3.fromRGB(255,255,255)
-        Instance.new("UICorner", Prev).CornerRadius = UDim.new(0,6)
-        local Next = Prev:Clone(); Next.Parent=r; Next.Position = UDim2.new(1,-68,0.5,-13); Next.Text="▶"
-        local Go   = Prev:Clone(); Go.Parent=r; Go.Position = UDim2.new(1,-30,0.5,-13); Go.Text="Go"; Go.Size=UDim2.fromOffset(26,26)
-        local function upd() L.Text = "TP: "..tpNames[idx] end
-        Prev.MouseButton1Click:Connect(function() idx = (idx-2)%#tpNames + 1; upd() end)
-        Next.MouseButton1Click:Connect(function() idx = (idx)%#tpNames + 1; upd() end)
-        Go.MouseButton1Click:Connect(function()
-            local name = tpNames[idx]; local pos = islandCoords[name]
-            local charFolder = workspace:FindFirstChild("Characters")
-            local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-            local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart",2))
-            if hrp and pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0)) end
-        end)
+-- Teleport (pakai tabel islandCoords milikmu kalau sudah ada)
+local islandCoords = rawget(getfenv(), "islandCoords") or {}
+local tpNames = {}
+for n,_ in pairs(islandCoords) do table.insert(tpNames, n) end
+table.sort(tpNames)
+local chosen = tpNames[1]
+tabTP:AddDropdown({
+    Name = "Location",
+    Default = chosen or "",
+    Options = tpNames,
+    Callback = function(opt) chosen = opt end
+})
+tabTP:AddButton({
+    Name = "Go",
+    Callback = function()
+        local pos = islandCoords[chosen]
+        local charFolder = workspace:FindFirstChild("Characters")
+        local char = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart"))
+        if hrp and pos then hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0)) end
     end
+})
 
-    RowButton("Rejoin", Color3.fromRGB(70,120,200), function()
-        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-    end)
-    RowButton("Server Hop", Color3.fromRGB(90,90,120), function()
-        local placeId = game.PlaceId
+-- Misc
+tabMisc:AddToggle({
+    Name = "Anti-AFK",
+    Default = true,
+    Callback = function(v)
+        if setAntiAFK then setAntiAFK(v) end
+    end
+})
+tabMisc:AddToggle({
+    Name = "FPS Boost",
+    Default = false,
+    Callback = function(v)
+        if BoostFPS then BoostFPS(v) end
+    end
+})
+tabMisc:AddButton({
+    Name = "Rejoin",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+    end
+})
+tabMisc:AddButton({
+    Name = "Server Hop",
+    Callback = function()
+        local HttpService = game:GetService("HttpService")
+        local TeleportService = game:GetService("TeleportService")
         local servers, cursor = {}, ""
         for _=1,3 do
-            local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
-            local ok,res = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
+            local url = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
+            local ok, res = pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
             if ok and res and res.data then
                 for _,sv in ipairs(res.data) do
                     if sv.playing < sv.maxPlayers and sv.id ~= game.JobId then table.insert(servers, sv.id) end
                 end
-                cursor = res.nextPageCursor or ""; if #servers>0 then break end
+                cursor = res.nextPageCursor or ""
+                if #servers > 0 then break end
             else break end
         end
-        if #servers>0 then TeleportService:TeleportToPlaceInstance(placeId, servers[math.random(1,#servers)], LocalPlayer) end
-    end)
+        if #servers > 0 then
+            TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+        end
+    end
+})
 
-    RowToggle("Anti-AFK", true, function(v) setAntiAFK(v) end)
-    RowToggle("FPS Boost", false, function(v) BoostFPS(v) end)
-
-    ---------------- Live HUD & Info ----------------
-    RS.RenderStepped:Connect(function()
-        local rod = getEquippedRodName() or "?"
-        local cEff, rEff = effectiveDelays()
-        HUD.Text  = string.format("Rod:%s | Reel:%.2fs | Cmpl:%.2fs | %s", rod, rEff, cEff, AFon and "ON" or "OFF")
-        Info.Text = string.format("Rod:%s  Reel:%.2fs  Cmpl:%.2fs  Spd:%dx", rod, rEff, cEff, SPEED)
-    end)
-
-    -- refresh preset saat Backpack berubah
-    task.spawn(function()
-        local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
-        local display = pg:WaitForChild("Backpack"):WaitForChild("Display")
-        display.ChildAdded:Connect(function() task.wait(0.05); refreshRodDelays() end)
-    end)
+-- ====== Live status updater (label) ======
+spawn(function()
+    while task.wait(0.2) do
+        local rod = "?"
+        pcall(function()
+            local pg = LocalPlayer:FindFirstChild("PlayerGui")
+            local display = pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+            if display then
+                for _,tile in ipairs(display:GetChildren()) do
+                    local ok,lbl = pcall(function() return tile.Inner and tile.Inner.Tags and tile.Inner.Tags.ItemName end)
+                    if ok and lbl and lbl:IsA("TextLabel") then rod = lbl.Text break end
+                end
+            end
+        end)
+        local cEff, rEff = 0, 0
+        pcall(function()
+            cEff, rEff = effDelays()
+        end)
+        if statusLabel and statusLabel.Set then
+            statusLabel:Set(("Rod: %s  |  Reel: %.2fs  |  Cmpl: %.2fs  |  Spd: %dx"):format(rod, rEff or 0, cEff or 0, (state and state.SPEED) or 5))
+        end
+    end
 end)
+
+OrionLib:Init()
