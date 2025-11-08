@@ -1,23 +1,23 @@
--- AegisHub • Ultra-Compact Glass Sidebar UI (Delta Android friendly)
--- Ringkas, responsif, draggable, overlay toggle. Kompatibel dengan StartAutoFish/StopAutoFish/state/effDelays.
+-- AegisHub • Glass Sidebar UI (compact + draggable + logo overlay toggle)
+-- Drop-in pengganti UI sebelumnya. Kompatibel dengan StartAutoFish/StopAutoFish/state/effDelays bila ada.
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
-local UIS = game:GetService("UserInputService")
 
--- ====== CONFIG MINI ======
-local LOGO_ID = "rbxassetid://6031071053" -- ganti ke logo kamu
-local ACCENT   = Color3.fromRGB(170,150,255)
-local GLASS_BG = Color3.fromRGB(26,28,40)
-local PANEL_BG = Color3.fromRGB(22,24,36)
-local FONT     = Enum.Font.Gotham
-local FBOLD    = Enum.Font.GothamSemibold
-local SHOW_HUD = false   -- set ke true kalau ingin HUD kecil di pojok
+-- ========== CONFIG ==========
+local LOGO_ID = "rbxassetid://6031071053"  -- ganti ke logo kamu
+local THEME_ACCENT = Color3.fromRGB(170,150,255)
+local THEME_BG_GLASS = Color3.fromRGB(26,28,40)
+local THEME_PANEL = Color3.fromRGB(22,24,36)
+local SCALE = 0.6                     -- ↓ dikecilkan (sebelumnya 0.9)
+local PANEL_W, PANEL_H = 520, 320     -- ↓ dikecilkan (sebelumnya 700, 420)
+local FONT_MAIN = Enum.Font.Gotham
+local FONT_BOLD = Enum.Font.GothamSemibold
 
--- ====== HELPERS ======
+-- ========== HELPERS ==========
 local function mount(gui)
     if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
     for _,p in ipairs({(gethui and gethui()) or nil, CoreGui, LocalPlayer:FindFirstChild("PlayerGui")}) do
@@ -30,118 +30,102 @@ local function mount(gui)
         end
     end
 end
+
 local function mk(class, props, parent)
-    local o = Instance.new(class); for k,v in pairs(props or {}) do o[k]=v end; o.Parent = parent; return o
+    local o = Instance.new(class)
+    if props then for k,v in pairs(props) do o[k]=v end end
+    if parent then o.Parent = parent end
+    return o
 end
 
--- ====== RESPONSIVE SIZE ======
-local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
--- panel mengisi 68–72% lebar & 46–52% tinggi, pakai clamp agar tidak kebesaran di HP kecil
-local PANEL_W = math.clamp(math.floor(vp.X * 0.72), 420, 560)
-local PANEL_H = math.clamp(math.floor(vp.Y * 0.50), 280, 340)
--- skala global kecil
-local SCALE = 0.66
-
--- ====== BLUR ======
+-- ========== BLUR ==========
 local Blur = Lighting:FindFirstChild("AegisHub_UIBlur") or mk("BlurEffect", {Name="AegisHub_UIBlur", Size=0}, Lighting)
 
--- ====== ROOTS ======
-local SG = mk("ScreenGui", {Name="AegisHub_MiniUI", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(SG)
-mk("UIScale", {Scale=SCALE}, SG)
+-- ========== ROOTS ==========
+local SG = mk("ScreenGui", {Name="AegisHub_GlassUI", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(SG)
+local UIScaleRoot = mk("UIScale", {Scale=SCALE}, SG)
 
--- ====== OVERLAY LOGO (DRAGGABLE) ======
-local OverlaySG = mk("ScreenGui", {Name="AegisHub_Overlay", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(OverlaySG)
-local Overlay = mk("ImageButton", {
-    Parent=OverlaySG, Position=UDim2.new(0,10,0,10), Size=UDim2.fromOffset(40,40),
-    BackgroundColor3=PANEL_BG, Image=LOGO_ID, AutoButtonColor=true, ZIndex=100
+-- ========= OVERLAY LOGO (TOGGLE) =========
+local LogoSG = mk("ScreenGui", {Name="AegisHub_LogoToggle", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(LogoSG)
+local LogoBtn = mk("ImageButton", {
+    Parent=LogoSG, AnchorPoint=Vector2.new(0,0), Position=UDim2.new(0,12,0,12),
+    Size=UDim2.fromOffset(48,48), BackgroundColor3=THEME_PANEL, Image=LOGO_ID
 })
-mk("UICorner", {CornerRadius=UDim.new(1,0)}, Overlay)
-mk("UIStroke", {Parent=Overlay, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
-local dragging, startPos, startUI
-Overlay.InputBegan:Connect(function(i)
-    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-        dragging=true; startPos=i.Position; startUI=Overlay.Position
-        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
-    end
-end)
-UIS.InputChanged:Connect(function(i)
-    if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-        local d = i.Position - startPos
-        local nx = math.clamp(startUI.X.Offset + d.X, 4, workspace.CurrentCamera.ViewportSize.X - 44)
-        local ny = math.clamp(startUI.Y.Offset + d.Y, 4, workspace.CurrentCamera.ViewportSize.Y - 44)
-        Overlay.Position = UDim2.new(0, nx, 0, ny)
-    end
-end)
+mk("UICorner", {CornerRadius=UDim.new(1,0)}, LogoBtn)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, LogoBtn)
 
--- ====== MAIN PANEL ======
+-- ========= MAIN PANEL (GLASS) =========
 local Root = mk("Frame", {
-    Parent=SG, Position=UDim2.new(0, 12, 0.08, 0), Size=UDim2.fromOffset(PANEL_W, PANEL_H),
-    BackgroundColor3=GLASS_BG, BackgroundTransparency=0.15
+    Parent=SG, Position=UDim2.new(0,80,0.07,0), Size=UDim2.fromOffset(PANEL_W, PANEL_H),
+    BackgroundColor3=THEME_BG_GLASS, BackgroundTransparency=0.15
 })
-mk("UICorner", {CornerRadius=UDim.new(0,12)}, Root)
-mk("UIStroke", {Thickness=1, Color=Color3.new(1,1,1), Transparency=0.82}, Root)
+mk("UICorner", {CornerRadius=UDim.new(0,16)}, Root)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.82}, Root)
+
+-- gradient tipis biar kaca
 mk("UIGradient", {
     Rotation=90,
+    Color = ColorSequence.new(Color3.new(1,1,1), Color3.new(1,1,1)),
     Transparency = NumberSequence.new{
         NumberSequenceKeypoint.new(0, 0.88),
         NumberSequenceKeypoint.new(1, 0.92)
     }
 }, Root)
 
--- Header (draggable)
-local Header = mk("Frame", {Parent=Root, Size=UDim2.new(1,0,0,30), BackgroundTransparency=1})
-mk("TextLabel", {
-    Parent=Header, Position=UDim2.new(0,10,0,6), Size=UDim2.fromOffset(280,18), BackgroundTransparency=1,
-    Text="AegisHub • Fish It", Font=FBOLD, TextSize=13, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left
+-- ========= HEADER (DRAGGABLE) =========
+local Header = mk("Frame", {Parent=Root, Size=UDim2.new(1,0,0,38), BackgroundTransparency=1})
+local Title = mk("TextLabel", {
+    Parent=Header, Position=UDim2.new(0,12,0,7), Size=UDim2.fromOffset(360,24), BackgroundTransparency=1,
+    Text="AegisHub • Fish It", Font=FONT_BOLD, TextSize=18, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left
 })
-local dot = mk("Frame", {Parent=Header, AnchorPoint=Vector2.new(1,0), Position=UDim2.new(1,-10,0,10), Size=UDim2.fromOffset(6,6), BackgroundColor3=ACCENT})
-mk("UICorner", {Parent=dot, CornerRadius=UDim.new(1,0)})
+local ActiveDot = mk("Frame", {Parent=Header, AnchorPoint=Vector2.new(1,0), Position=UDim2.new(1,-12,0,12), Size=UDim2.fromOffset(8,8), BackgroundColor3=THEME_ACCENT})
+mk("UICorner", {CornerRadius=UDim.new(1,0)}, ActiveDot)
 
-Header.InputBegan:Connect(function(i)
-    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-        dragging=true; startPos=i.Position; startUI=Root.Position
-        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
+-- drag logic
+local dragging, dragStart, startPos
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = Root.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
     end
 end)
-UIS.InputChanged:Connect(function(i)
-    if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-        local d = i.Position - startPos
-        local nx = math.clamp(startUI.X.Offset + d.X, 0, math.max(0, workspace.CurrentCamera.ViewportSize.X - PANEL_W))
-        local ny = math.clamp(startUI.Y.Offset + d.Y, 0, math.max(0, workspace.CurrentCamera.ViewportSize.Y - PANEL_H))
-        Root.Position = UDim2.new(0, nx, 0, ny)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        Root.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- Layout: Sidebar + Content
-local Sidebar = mk("Frame", {
-    Parent=Root, Position=UDim2.new(0,10,0,40), Size=UDim2.new(0, math.floor(PANEL_W*0.42), 1, -50),
-    BackgroundColor3=Color3.fromRGB(24,26,38), BackgroundTransparency=0.25
-})
-mk("UICorner", {CornerRadius=UDim.new(0,10)}, Sidebar)
-mk("UIStroke", {Parent=Sidebar, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.88})
+-- ========= SIDEBAR + CONTENT =========
+local Sidebar = mk("Frame", {Parent=Root, Position=UDim2.new(0,12,0,46), Size=UDim2.fromOffset(260, PANEL_H-58),
+    BackgroundColor3=Color3.fromRGB(24,26,38), BackgroundTransparency=0.25})
+mk("UICorner", {CornerRadius=UDim.new(0,12)}, Sidebar)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.88}, Sidebar)
 
-local Content = mk("Frame", {
-    Parent=Root, Position=UDim2.new(0, math.floor(PANEL_W*0.42)+24, 0, 40), Size=UDim2.new(1, - (math.floor(PANEL_W*0.42)+34), 1, -50),
-    BackgroundColor3=Color3.fromRGB(24,26,38), BackgroundTransparency=0.25
-})
-mk("UICorner", {CornerRadius=UDim.new(0,10)}, Content)
-mk("UIStroke", {Parent=Content, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.88})
+local Content = mk("Frame", {Parent=Root, Position=UDim2.new(0,284,0,46), Size=UDim2.fromOffset(PANEL_W-296, PANEL_H-58),
+    BackgroundColor3=Color3.fromRGB(24,26,38), BackgroundTransparency=0.25})
+mk("UICorner", {CornerRadius=UDim.new(0,12)}, Content)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.88}, Content)
 
--- Sidebar: Search kecil
+-- Search kecil
 local Search = mk("TextBox", {
-    Parent=Sidebar, Position=UDim2.new(0,8,0,6), Size=UDim2.new(1,-16,0,24),
-    BackgroundColor3=Color3.fromRGB(30,32,46), PlaceholderText="Search", Text="", TextSize=12,
-    Font=FONT, TextColor3=Color3.fromRGB(235,240,255), ClearTextOnFocus=false
+    Parent=Sidebar, Position=UDim2.new(0,10,0,8), Size=UDim2.fromOffset(240,30),
+    BackgroundColor3=Color3.fromRGB(30,32,46), PlaceholderText="Search", Text="", TextSize=15,
+    Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255), ClearTextOnFocus=false
 })
 mk("UICorner", {CornerRadius=UDim.new(0,8)}, Search)
-mk("UIStroke", {Parent=Search, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, Search)
 
--- Sidebar: menu list
+-- List menu
 local Menu = mk("ScrollingFrame", {
-    Parent=Sidebar, Position=UDim2.new(0,6,0,34), Size=UDim2.new(1,-12,1,-42),
-    BackgroundTransparency=1, ScrollBarThickness=4, AutomaticCanvasSize=Enum.AutomaticSize.Y
+    Parent=Sidebar, Position=UDim2.new(0,8,0,44), Size=UDim2.new(1,-16,1,-52),
+    BackgroundTransparency=1, ScrollBarThickness=5, AutomaticCanvasSize=Enum.AutomaticSize.Y
 })
-mk("UIListLayout", {Parent=Menu, Padding=UDim.new(0,5), SortOrder=Enum.SortOrder.LayoutOrder})
+local List = mk("UIListLayout", {Parent=Menu, Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder})
 
 local sections = {
     {id="farm",   title="Farming"},
@@ -149,150 +133,192 @@ local sections = {
     {id="info",   title="Information"},
     {id="discord",title="Discord"},
 }
-local selected, buttons = "farm", {}
-local function menuBtn(data)
+
+local selected = "farm"
+local buttons = {}
+
+local function makeBtn(data)
     local B = mk("TextButton", {
-        Parent=Menu, Size=UDim2.new(1,-2,0,26), BackgroundColor3=Color3.fromRGB(30,32,46),
-        Text=data.title, Font=FBOLD, TextSize=12, TextColor3=Color3.fromRGB(230,235,255)
+        Parent=Menu, Size=UDim2.new(1,-4,0,34), BackgroundColor3=Color3.fromRGB(30,32,46),
+        Text=data.title, Font=FONT_BOLD, TextSize=15, TextColor3=Color3.fromRGB(230,235,255)
     })
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
-    local st = mk("UIStroke", {Parent=B, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
+    local st = mk("UIStroke", {Parent=B, Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85})
     local function refresh()
-        local active = (selected==data.id)
+        local active = (selected == data.id)
         B.BackgroundColor3 = active and Color3.fromRGB(38,40,58) or Color3.fromRGB(30,32,46)
-        st.Color, st.Transparency = (active and ACCENT or Color3.new(1,1,1)), (active and 0.45 or 0.85)
+        st.Color = active and THEME_ACCENT or Color3.fromRGB(255,255,255)
+        st.Transparency = active and 0.4 or 0.85
     end
     B.MouseButton1Click:Connect(function()
         selected = data.id
-        for _,v in pairs(buttons) do v() end
+        for _,v in pairs(buttons) do v.refresh() end
         for _,p in pairs(Content:GetChildren()) do if p:IsA("Frame") then p.Visible = (p.Name==selected) end end
     end)
-    buttons[data.id] = refresh; refresh()
+    buttons[data.id] = {refresh=refresh}
+    refresh()
 end
-for _,d in ipairs(sections) do menuBtn(d) end
+for _,d in ipairs(sections) do makeBtn(d) end
 
--- ===== Components (mini) =====
-local function page(id) return mk("Frame", {Parent=Content, Name=id, BackgroundTransparency=1, Size=UDim2.fromScale(1,1), Visible=(id==selected)}) end
-local function label(parent, x, y, txt, bold)
-    return mk("TextLabel", {Parent=parent, Position=UDim2.new(0,x,0,y), Size=UDim2.new(1,-x*2,0,18),
-        BackgroundTransparency=1, Text=txt, Font=bold and FBOLD or FONT, TextSize=12, TextColor3=ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+-- ========= PAGES =========
+local function page(id)
+    return mk("Frame", {Parent=Content, Name=id, BackgroundTransparency=1, Size=UDim2.fromScale(1,1), Visible=(id==selected)})
 end
-local function switch(parent, y, text, default, cb)
-    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,26), BackgroundColor3=Color3.fromRGB(30,32,46)})
-    mk("UICorner", {CornerRadius=UDim.new(0,8)}, R)
-    mk("UIStroke", {Parent=R, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
-    mk("TextLabel", {Parent=R, BackgroundTransparency=1, Position=UDim2.new(0,8,0,0), Size=UDim2.new(1,-100,1,0),
-        Text=text, Font=FONT, TextSize=12, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
-    local B = mk("TextButton", {Parent=R, AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-6,0.5,0), Size=UDim2.fromOffset(74,22),
+
+-- Farming
+local PFarm = page("farm")
+local FarmTitle = mk("TextLabel", {Parent=PFarm, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Farming", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+
+local function switch(parent, y, label, default, cb)
+    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 36),
+        BackgroundColor3=Color3.fromRGB(30,32,46)})
+    mk("UICorner", {CornerRadius=UDim.new(0,10)}, R)
+    mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, R)
+    mk("TextLabel", {Parent=R, BackgroundTransparency=1, Position=UDim2.new(0,10,0,0), Size=UDim2.new(1,-110,1,0),
+        Text=label, Font=FONT_MAIN, TextSize=15, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+    local B = mk("TextButton", {Parent=R, AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-8,0.5,0), Size=UDim2.fromOffset(86,26),
         BackgroundColor3 = default and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120),
-        Text = default and "ON" or "OFF", Font=FBOLD, TextSize=11, TextColor3=Color3.new(1,1,1)})
-    mk("UICorner", {CornerRadius=UDim.new(0,6)}, B)
-    local st = default
+        Text = default and "ON" or "OFF", Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(255,255,255)})
+    mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
+    local s = default
     B.MouseButton1Click:Connect(function()
-        st = not st
-        B.Text = st and "ON" or "OFF"
-        B.BackgroundColor3 = st and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
-        pcall(cb, st)
+        s = not s
+        B.Text = s and "ON" or "OFF"
+        B.BackgroundColor3 = s and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120)
+        pcall(cb, s)
     end)
     task.defer(function() pcall(cb, default) end)
 end
+
 local function field(parent, y, placeholder, cb)
-    local F = mk("TextBox", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,26),
-        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", Font=FONT, TextSize=12, TextColor3=Color3.fromRGB(235,240,255)})
-    mk("UICorner", {CornerRadius=UDim.new(0,8)}, F)
-    mk("UIStroke", {Parent=F, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
-    F.FocusLost:Connect(function(enter) if enter then pcall(cb, F.Text) end end)
+    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 36),
+        BackgroundColor3=Color3.fromRGB(30,32,46)})
+    mk("UICorner", {CornerRadius=UDim.new(0,10)}, R)
+    mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, R)
+    local TB = mk("TextBox", {Parent=R, Position=UDim2.new(0,10,0,5), Size=UDim2.new(1,-20,1,-10),
+        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", TextSize=15,
+        Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255)})
+    mk("UICorner", {CornerRadius=UDim.new(0,8)}, TB)
+    TB.FocusLost:Connect(function(enter) if enter then pcall(cb, TB.Text) end end)
 end
-local function button(parent, y, text, cb)
-    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,26),
-        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FBOLD, TextSize=12, TextColor3=Color3.fromRGB(235,240,255)})
-    mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
-    mk("UIStroke", {Parent=B, Thickness=1, Color=ACCENT, Transparency=0.45})
+
+switch(PFarm, 44, "Auto Fish", false, function(v)
+    if v then if StartAutoFish then StartAutoFish() end else if StopAutoFish then StopAutoFish() end end
+end)
+switch(PFarm, 86, "Perfect Cast", true, function(v)
+    if rawget(getfenv(),"state") then state.perfectCast = v end
+end)
+field(PFarm, 128, "Speed x  (1–5, default 5)", function(txt)
+    local n = tonumber(txt) or 5
+    if rawget(getfenv(),"state") then state.SPEED = math.clamp(math.floor(n+0.5),1,5) end
+end)
+field(PFarm, 170, "Override Reel Delay (opsional, ex: 1.45)", function(txt)
+    if rawget(getfenv(),"state") then state.reelOverride = tonumber(txt) end
+end)
+field(PFarm, 212, "Override Complete Delay (opsional, ex: 3.2)", function(txt)
+    if rawget(getfenv(),"state") then state.completeOverride = tonumber(txt) end
+end)
+
+-- Inventory
+local PInv = page("inv")
+mk("TextLabel", {Parent=PInv, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Inventory", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+
+local function btn(parent, x, y, w, text, cb)
+    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,x,0,y), Size=UDim2.fromOffset(w,36),
+        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FONT_BOLD, TextSize=15, TextColor3=Color3.fromRGB(235,240,255)})
+    mk("UICorner", {CornerRadius=UDim.new(0,10)}, B)
+    mk("UIStroke", {Thickness=1, Color=THEME_ACCENT, Transparency=0.45}, B)
     B.MouseButton1Click:Connect(function() pcall(cb) end)
 end
-
--- ===== Pages =====
-local PFarm = page("farm")
-label(PFarm, 10, 6, "Farming", true)
-switch(PFarm, 26, "Auto Fish", false, function(v) if v then if StartAutoFish then StartAutoFish() end else if StopAutoFish then StopAutoFish() end end end)
-switch(PFarm, 56, "Perfect Cast", true, function(v) if rawget(getfenv(),"state") then state.perfectCast = v end end)
-field(PFarm,  86, "Speed x (1–5, default 5)", function(t) local n=tonumber(t) or 5; if rawget(getfenv(),"state") then state.SPEED = math.clamp(math.floor(n+0.5),1,5) end end)
-field(PFarm, 116, "Override Reel Delay (opsional, ex: 1.45)", function(t) if rawget(getfenv(),"state") then state.reelOverride = tonumber(t) end end)
-field(PFarm, 146, "Override Complete Delay (opsional, ex: 3.2)", function(t) if rawget(getfenv(),"state") then state.completeOverride = tonumber(t) end end)
-
-local PInv = page("inv")
-label(PInv, 10, 6, "Inventory", true)
-button(PInv, 28, "Protect High Tiers", function()
+btn(PInv, 12, 44, 160, "Protect High Tiers", function()
     if rawget(getfenv(),"state") then
         state.protectTiers = state.protectTiers or {}
-        state.protectTiers.Legendary=true; state.protectTiers.Mythic=true; state.protectTiers.Secret=true
+        state.protectTiers.Legendary = true; state.protectTiers.Mythic = true; state.protectTiers.Secret = true
     end
     if protectByTiers then protectByTiers() end
 end)
-button(PInv, 58, "Sell Non-Favorite", function() if sellAllNonFav then sellAllNonFav() end end)
-switch(PInv, 88, "Auto Sell (>= threshold)", false, function(v) if rawget(getfenv(),"state") then state.AutoSell = state.AutoSell or {}; state.AutoSell.on=v end end)
-field(PInv, 118, "Threshold (default 60)", function(t) if rawget(getfenv(),"state") then state.AutoSell = state.AutoSell or {}; state.AutoSell.threshold = math.max(1, math.floor(tonumber(t) or 60)) end end)
+btn(PInv, 184, 44, 160, "Sell Non-Fav", function()
+    if sellAllNonFav then sellAllNonFav() end
+end)
 
+-- Information (ringkas)
 local PInfo = page("info")
-label(PInfo, 10, 6, "Information", true)
-mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,10,0,26), Size=UDim2.new(1,-20,0,36), BackgroundTransparency=1,
-    Text="[+] Auto timing per-rod  [+] Speed x5  [+] Compact UI", Font=FONT, TextSize=12, TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true})
+mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Information", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,44), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24,20),
+    BackgroundTransparency=1, Text="[+] Auto timing per-rod  [+] Speed x5  [+] Compact UI", Font=FONT_MAIN, TextSize=14,
+    TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left})
 
+-- Discord Card
 local PD = page("discord")
-label(PD, 10, 6, "Discord", true)
-local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,10,0,26), Size=UDim2.new(1,-20,0,86), BackgroundColor3=Color3.fromRGB(30,32,46)})
-mk("UICorner", {CornerRadius=UDim.new(0,10)}, Card)
-mk("UIStroke", {Parent=Card, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.82})
-mk("ImageLabel", {Parent=Card, Position=UDim2.new(0,10,0,10), Size=UDim2.fromOffset(28,28), BackgroundTransparency=1, Image="rbxassetid://6034996695"})
-mk("TextLabel", {Parent=Card, Position=UDim2.new(0,44,0,8), Size=UDim2.new(1,-54,0,18), BackgroundTransparency=1, Text="Discord - AegisHub", Font=FBOLD, TextSize=12, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
-mk("TextLabel", {Parent=Card, Position=UDim2.new(0,44,0,26), Size=UDim2.new(1,-54,0,16), BackgroundTransparency=1, Text="Indonesia 🇮🇩", Font=FONT, TextSize=11, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left})
-local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(0,10,0,54), Size=UDim2.new(1,-20,0,22), BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋  Copy Link", Font=FBOLD, TextSize=11, TextColor3=Color3.fromRGB(235,240,255)})
-mk("UICorner", {CornerRadius=UDim.new(0,6)}, Copy)
-mk("UIStroke", {Parent=Copy, Thickness=1, Color=ACCENT, Transparency=0.45})
+mk("TextLabel", {Parent=PD, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Discord", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,12,0,46), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 108),
+    BackgroundColor3=Color3.fromRGB(30,32,46)})
+mk("UICorner", {CornerRadius=UDim.new(0,12)}, Card)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.82}, Card)
+local Img = mk("ImageLabel", {Parent=Card, Position=UDim2.new(0,12,0,12), Size=UDim2.fromOffset(40,40), BackgroundTransparency=1, Image="rbxassetid://6034996695"})
+local DTitle = mk("TextLabel", {Parent=Card, Position=UDim2.new(0,62,0,10), Size=UDim2.fromOffset(320,22), BackgroundTransparency=1,
+    Text="Discord - AegisHub", Font=FONT_BOLD, TextSize=16, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+local DSub = mk("TextLabel", {Parent=Card, Position=UDim2.new(0,62,0,34), Size=UDim2.fromOffset(320,18), BackgroundTransparency=1,
+    Text="Indonesia 🇮🇩", Font=FONT_MAIN, TextSize=14, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left})
+local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(0,12,0,64), Size=UDim2.fromOffset(Content.AbsoluteSize.X-48,28),
+    BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋  Copy Link", Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+mk("UICorner", {CornerRadius=UDim.new(0,8)}, Copy)
+mk("UIStroke", {Thickness=1, Color=THEME_ACCENT, Transparency=0.45}, Copy)
 local DISCORD_LINK = "https://discord.gg/your-invite"
 Copy.MouseButton1Click:Connect(function()
     pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
-    Copy.Text="✅ Copied!"; task.delay(1, function() Copy.Text="📋  Copy Link" end)
+    Copy.Text="✅ Copied!"; task.delay(1.1, function() Copy.Text="📋  Copy Link" end)
 end)
 
--- ===== DEFAULT PAGE STATE =====
-for _,p in pairs(Content:GetChildren()) do if p:IsA("Frame") then p.Visible = (p.Name==selected) end end
+-- ========= HUD kecil (pojok kanan bawah) =========
+local HUD = mk("TextLabel", {Parent=SG, AnchorPoint=Vector2.new(1,1), Position=UDim2.new(1,-10,1,-10),
+    Size=UDim2.fromOffset(380,26), BackgroundColor3=Color3.fromRGB(21,24,37), BackgroundTransparency=0.2,
+    Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Right, Text="AegisHub • Ready"})
+mk("UICorner", {CornerRadius=UDim.new(0,10)}, HUD)
+mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, HUD)
 
--- ===== SHOW/HIDE =====
+-- ========= TOGGLE SHOW/HIDE =========
 local visible = true
 local function setVisible(v)
     visible = v
+    local goal = { BackgroundTransparency = v and 0.15 or 1 }
+    TweenService:Create(Root, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal):Play()
     Root.Visible = v
-    TweenService:Create(Blur, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = v and 12 or 0}):Play()
+    Sidebar.Visible = v
+    Content.Visible = v
+    Header.Visible = v
+    TweenService:Create(Blur, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = v and 14 or 0}):Play()
 end
-Overlay.MouseButton1Click:Connect(function() setVisible(not visible) end)
+LogoBtn.MouseButton1Click:Connect(function() setVisible(not visible) end)
 setVisible(true)
 
--- ===== OPTIONAL HUD (kecil) =====
-if SHOW_HUD then
-    local HUD = mk("TextLabel", {Parent=SG, AnchorPoint=Vector2.new(1,1), Position=UDim2.new(1,-8,1,-8),
-        Size=UDim2.fromOffset(280,22), BackgroundColor3=Color3.fromRGB(21,24,37), BackgroundTransparency=0.2,
-        Font=FBOLD, TextSize=11, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Right, Text="AegisHub • Ready"})
-    mk("UICorner", {CornerRadius=UDim.new(0,8)}, HUD)
-    mk("UIStroke", {Parent=HUD, Thickness=1, Color=Color3.new(1,1,1), Transparency=0.85})
-    local function safeEff()
-        local ef = rawget(getfenv(),"effDelays")
-        if type(ef)=="function" then local c,r=ef(); return ("R:%.2fs C:%.2fs"):format(r or 0, c or 0) end
-        return "R:- C:-"
-    end
-    game:GetService("RunService").RenderStepped:Connect(function()
-        local rod="?"
-        pcall(function()
-            local pg=LocalPlayer:FindFirstChild("PlayerGui")
-            local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
-            if display then
-                for _,tile in ipairs(display:GetChildren()) do
-                    local ok,lbl=pcall(function() return tile.Inner and tile.Inner.Tags and tile.Inner.Tags.ItemName end)
-                    if ok and lbl and lbl:IsA("TextLabel") then rod=lbl.Text break end
-                end
-            end
-        end)
-        local spd=(rawget(getfenv(),"state") and state.SPEED) or 5
-        HUD.Text = ("Rod:%s | %s | x%d"):format(rod, safeEff(), spd)
-    end)
+-- ========= LIVE HUD UPDATE (jika effDelays/state ada) =========
+local function safeEff()
+    local ef = rawget(getfenv(),"effDelays")
+    if type(ef)=="function" then local c,r=ef(); return ("Reel: %.2fs  |  Cmpl: %.2fs"):format(r or 0, c or 0) end
+    return "Reel: -  |  Cmpl: -"
 end
+game:GetService("RunService").RenderStepped:Connect(function()
+    local rod="?"
+    pcall(function()
+        local pg=LocalPlayer:FindFirstChild("PlayerGui")
+        local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+        if display then
+            for _,tile in ipairs(display:GetChildren()) do
+                local ok,lbl=pcall(function() return tile.Inner and tile.Inner.Tags and tile.Inner.Tags.ItemName end)
+                if ok and lbl and lbl:IsA("TextLabel") then rod=lbl.Text break end
+            end
+        end
+    end)
+    local spd=(rawget(getfenv(),"state") and state.SPEED) or 5
+    HUD.Text = ("Rod: %s  |  %s  |  Spd: %dx"):format(rod, safeEff(), spd)
+end)
+
+-- ========= DEFAULT PAGE =========
+selected = "farm"
+for _,v in pairs(buttons) do v.refresh() end
+for _,p in pairs(Content:GetChildren()) do if p:IsA("Frame") then p.Visible = (p.Name==selected) end end
