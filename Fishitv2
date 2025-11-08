@@ -1,6 +1,4 @@
--- AegisHub • Compact Glass UI (checkbox + dropdown + draggable neon overlay)
--- Kecil, rapi, mobile-friendly (Delta). Tidak pakai library eksternal.
-
+-- AegisHub • Compact Glass UI (FIX: no AbsoluteSize at build-time)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
@@ -9,22 +7,22 @@ local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 
 -- ===== THEME =====
-local LOGO_ID = "rbxassetid://6031071053"      -- ganti ke Decal ID logo kamu
-local NEON    = Color3.fromRGB(120, 90, 255)    -- warna neon
+local LOGO_ID = "rbxassetid://6031071053"
+local NEON    = Color3.fromRGB(120, 90, 255)
 local GLASS   = Color3.fromRGB(24, 26, 38)
 local PANEL   = Color3.fromRGB(18, 20, 28)
-local SCALE   = 0.78                            -- makin kecil
-local PW, PH  = 620, 360                        -- panel size
+local SCALE   = 0.78
+local PW, PH  = 620, 360
 local FONT    = Enum.Font.Gotham
 local FBOLD   = Enum.Font.GothamSemibold
 
--- ===== helpers =====
 local function mount(g)
     if syn and syn.protect_gui then pcall(syn.protect_gui, g) end
     for _,p in ipairs({(gethui and gethui()) or nil, CoreGui, LocalPlayer:FindFirstChild("PlayerGui")}) do
         if p and p:IsDescendantOf(game) then
             if pcall(function() g.Parent = p end) then
-                g.DisplayOrder = 1_000_000; g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                g.DisplayOrder = 1_000_000
+                g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
                 return
             end
         end
@@ -34,31 +32,29 @@ local function mk(class, props, parent)
     local o = Instance.new(class); for k,v in pairs(props or {}) do o[k]=v end; o.Parent = parent; return o
 end
 
--- ===== blur =====
+-- blur
 local Blur = Lighting:FindFirstChild("AegisHub_UIBlur") or mk("BlurEffect", {Name="AegisHub_UIBlur", Size=0}, Lighting)
 
--- ===== roots =====
+-- roots
 local SG = mk("ScreenGui", {Name="AegisHub_UI", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(SG)
 mk("UIScale", {Scale=SCALE}, SG)
 
--- ===== overlay logo (draggable + neon) =====
+-- overlay logo (draggable + neon)
 local OSG = mk("ScreenGui", {Name="AegisHub_Overlay", ResetOnSpawn=false, IgnoreGuiInset=true}); mount(OSG)
 local Overlay = mk("ImageButton", {
     Parent=OSG, Position=UDim2.new(0,12,0,12), Size=UDim2.fromOffset(52,52),
-    Image=LOGO_ID, BackgroundColor3=PANEL
+    Image=LOGO_ID, BackgroundColor3=PANEL, ZIndex=100
 })
 mk("UICorner", {CornerRadius=UDim.new(1,0)}, Overlay)
 local ring = mk("ImageLabel", {
     Parent=Overlay, AnchorPoint=Vector2.new(0.5,0.5), Position=UDim2.new(0.5,0,0.5,0),
-    BackgroundTransparency=1, Image="rbxassetid://5081164435", ImageColor3=NEON, ImageTransparency=0.25, Size=UDim2.fromOffset(70,70)
+    BackgroundTransparency=1, Image="rbxassetid://5081164435", ImageColor3=NEON, ImageTransparency=0.25, Size=UDim2.fromOffset(70,70), ZIndex=100
 })
-
--- drag overlay
-do
+do -- drag overlay
     local dragging, startPos, startUI
     Overlay.InputBegan:Connect(function(i)
         if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            dragging = true; startPos = i.Position; startUI = Overlay.Position
+            dragging=true; startPos=i.Position; startUI=Overlay.Position
             i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
         end
     end)
@@ -70,26 +66,24 @@ do
     end)
 end
 
--- ===== main panel =====
+-- main panel
 local Root = mk("Frame", {
     Parent=SG, Position=UDim2.new(0,80,0.08,0), Size=UDim2.fromOffset(PW, PH),
-    BackgroundColor3=GLASS, BackgroundTransparency=0.14
+    BackgroundColor3=GLASS, BackgroundTransparency=0.14, ZIndex=50
 })
 mk("UICorner", {CornerRadius=UDim.new(0,14)}, Root)
 mk("UIStroke", {Thickness=1, Color=NEON, Transparency=0.65}, Root)
 mk("UIGradient", {
     Rotation=90,
-    Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.90),
-        NumberSequenceKeypoint.new(1, 0.94)
-    }
+    Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0,0.90), NumberSequenceKeypoint.new(1,0.94)}
 }, Root)
 
 -- header (draggable)
-local Header = mk("Frame", {Parent=Root, Size=UDim2.new(1,0,0,34), BackgroundTransparency=1})
+local Header = mk("Frame", {Parent=Root, Size=UDim2.new(1,0,0,34), BackgroundTransparency=1, ZIndex=51})
 mk("TextLabel", {
     Parent=Header, Position=UDim2.new(0,10,0,7), Size=UDim2.fromOffset(280,20), BackgroundTransparency=1,
-    Text="AegisHub • Fish It", Font=FBOLD, TextSize=16, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left
+    Text="AegisHub • Fish It", Font=FBOLD, TextSize=16, TextColor3=Color3.fromRGB(235,240,255),
+    TextXAlignment=Enum.TextXAlignment.Left, ZIndex=51
 })
 do
     local dragging, sPos, sUI
@@ -107,25 +101,26 @@ do
     end)
 end
 
--- layout (sidebar + content)
-local Sidebar = mk("Frame", {Parent=Root, Position=UDim2.new(0,10,0,44), Size=UDim2.fromOffset(230, PH-56),
-    BackgroundColor3=Color3.fromRGB(28,30,42), BackgroundTransparency=0.20})
-mk("UICorner", {CornerRadius=UDim.new(0,10)}, Sidebar)
-local Content = mk("Frame", {Parent=Root, Position=UDim2.new(0,250,0,44), Size=UDim2.fromOffset(PW-260, PH-56),
-    BackgroundColor3=Color3.fromRGB(28,30,42), BackgroundTransparency=0.20})
-mk("UICorner", {CornerRadius=UDim.new(0,10)}, Content)
+-- layout
+local Sidebar = mk("Frame", {
+    Parent=Root, Position=UDim2.new(0,10,0,44), Size=UDim2.new(0,230,1,-56),
+    BackgroundColor3=Color3.fromRGB(28,30,42), BackgroundTransparency=0.20, ZIndex=50
+}); mk("UICorner", {CornerRadius=UDim.new(0,10)}, Sidebar)
+local Content = mk("Frame", {
+    Parent=Root, Position=UDim2.new(0,250,0,44), Size=UDim2.new(1,-260,1,-56),
+    BackgroundColor3=Color3.fromRGB(28,30,42), BackgroundTransparency=0.20, ZIndex=50
+}); mk("UICorner", {CornerRadius=UDim.new(0,10)}, Content)
 
--- search kecil
+-- search
 local Search = mk("TextBox", {
-    Parent=Sidebar, Position=UDim2.new(0,8,0,8), Size=UDim2.fromOffset(214,28),
-    BackgroundColor3=Color3.fromRGB(32,34,48), PlaceholderText="Search", Text="", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)
-})
-mk("UICorner", {CornerRadius=UDim.new(0,8)}, Search)
+    Parent=Sidebar, Position=UDim2.new(0,8,0,8), Size=UDim2.new(1,-16,0,28),
+    BackgroundColor3=Color3.fromRGB(32,34,48), PlaceholderText="Search", Text="", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50
+}); mk("UICorner", {CornerRadius=UDim.new(0,8)}, Search)
 
--- menu list
+-- menu
 local Menu = mk("ScrollingFrame", {
     Parent=Sidebar, Position=UDim2.new(0,6,0,42), Size=UDim2.new(1,-12,1,-50),
-    BackgroundTransparency=1, ScrollBarThickness=4, AutomaticCanvasSize=Enum.AutomaticSize.Y
+    BackgroundTransparency=1, ScrollBarThickness=4, AutomaticCanvasSize=Enum.AutomaticSize.Y, ZIndex=50
 })
 mk("UIListLayout", {Parent=Menu, Padding=UDim.new(0,6), SortOrder=Enum.SortOrder.LayoutOrder})
 
@@ -140,7 +135,7 @@ local selected, buttons = "farm", {}
 local function menuBtn(item)
     local B = mk("TextButton", {
         Parent=Menu, Size=UDim2.new(1,-2,0,30), BackgroundColor3=Color3.fromRGB(32,34,48),
-        Text=item.title, Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)
+        Text=item.title, Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50
     })
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
     local glow = mk("UIStroke", {Parent=B, Thickness=1, Color=NEON, Transparency=0.8})
@@ -158,20 +153,15 @@ local function menuBtn(item)
 end
 for _,it in ipairs(sections) do menuBtn(it) end
 
--- ===== components: checkbox, dropdown, button, field =====
+-- components
 local function checkbox(parent, y, text, default, cb)
-    local Row = mk("Frame", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 30),
-        BackgroundTransparency=1})
-    local Box = mk("TextButton", {
-        Parent=Row, Position=UDim2.new(0,0,0,3), Size=UDim2.fromOffset(22,22),
-        BackgroundColor3 = default and NEON or Color3.fromRGB(50,52,62), Text="", AutoButtonColor=false
-    })
+    local Row = mk("Frame", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,30), BackgroundTransparency=1, ZIndex=50})
+    local Box = mk("TextButton", {Parent=Row, Position=UDim2.new(0,0,0,3), Size=UDim2.fromOffset(22,22), BackgroundColor3 = default and NEON or Color3.fromRGB(50,52,62), Text="", AutoButtonColor=false, ZIndex=50})
     mk("UICorner", {CornerRadius=UDim.new(0,6)}, Box)
     mk("UIStroke", {Parent=Box, Thickness=1, Color=NEON, Transparency=0.25})
     local Tick = mk("ImageLabel", {Parent=Box, BackgroundTransparency=1, Image="rbxassetid://3926305904", ImageRectOffset=Vector2.new(312,4), ImageRectSize=Vector2.new(24,24),
-        Size=UDim2.fromScale(1,1), ImageColor3=Color3.new(1,1,1), ImageTransparency = default and 0 or 1})
-    local Lab = mk("TextLabel", {Parent=Row, Position=UDim2.new(0,30,0,0), Size=UDim2.new(1,-30,1,0),
-        BackgroundTransparency=1, Text=text, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+        Size=UDim2.fromScale(1,1), ImageColor3=Color3.new(1,1,1), ImageTransparency = default and 0 or 1, ZIndex=50})
+    mk("TextLabel", {Parent=Row, Position=UDim2.new(0,30,0,0), Size=UDim2.new(1,-30,1,0), BackgroundTransparency=1, Text=text, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left, ZIndex=50})
     local state = default
     Box.MouseButton1Click:Connect(function()
         state = not state
@@ -181,38 +171,34 @@ local function checkbox(parent, y, text, default, cb)
     end)
     task.defer(function() pcall(cb, default) end)
 end
-
 local function field(parent, y, placeholder, cb)
-    local F = mk("TextBox", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 30),
-        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+    local F = mk("TextBox", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,30),
+        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50})
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, F)
     F.FocusLost:Connect(function(enter) if enter then pcall(cb, F.Text) end end)
 end
-
 local function button(parent, y, text, cb)
-    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 30),
-        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,30),
+        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50})
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
     mk("UIStroke", {Parent=B, Thickness=1, Color=NEON, Transparency=0.45})
     B.MouseButton1Click:Connect(function() pcall(cb) end)
 end
-
 local function dropdown(parent, y, label, options, onSelect)
-    local Row = mk("Frame", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 30), BackgroundTransparency=1})
-    mk("TextLabel", {Parent=Row, Position=UDim2.new(0,0,0,0), Size=UDim2.fromOffset(110,30), BackgroundTransparency=1,
-        Text=label, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(225,230,255), TextXAlignment=Enum.TextXAlignment.Left})
+    local Row = mk("Frame", {Parent=parent, Position=UDim2.new(0,10,0,y), Size=UDim2.new(1,-20,0,30), BackgroundTransparency=1, ZIndex=50})
+    mk("TextLabel", {Parent=Row, Position=UDim2.new(0,0,0,0), Size=UDim2.fromOffset(110,30), BackgroundTransparency=1, Text=label, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(225,230,255), TextXAlignment=Enum.TextXAlignment.Left, ZIndex=50})
     local Box = mk("TextButton", {Parent=Row, Position=UDim2.new(0,118,0,0), Size=UDim2.new(1,-118,0,30),
-        BackgroundColor3=Color3.fromRGB(34,36,52), Text="Select…", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+        BackgroundColor3=Color3.fromRGB(34,36,52), Text="Select…", Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50})
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, Box)
     local Open = false
     local ListFrame = mk("Frame", {Parent=Row, Position=UDim2.new(0,118,0,32), Size=UDim2.new(1,-118,0,0),
-        BackgroundColor3=Color3.fromRGB(34,36,52), Visible=false, ClipsDescendants=true})
+        BackgroundColor3=Color3.fromRGB(34,36,52), Visible=false, ClipsDescendants=true, ZIndex=60})
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, ListFrame)
-    local Scroll = mk("ScrollingFrame", {Parent=ListFrame, Size=UDim2.fromScale(1,1), BackgroundTransparency=1, ScrollBarThickness=4, AutomaticCanvasSize=Enum.AutomaticSize.Y})
+    local Scroll = mk("ScrollingFrame", {Parent=ListFrame, Size=UDim2.fromScale(1,1), BackgroundTransparency=1, ScrollBarThickness=4, AutomaticCanvasSize=Enum.AutomaticSize.Y, ZIndex=60})
     mk("UIListLayout", {Parent=Scroll, Padding=UDim.new(0,4), SortOrder=Enum.SortOrder.LayoutOrder})
     for _,opt in ipairs(options) do
         local It = mk("TextButton", {Parent=Scroll, Size=UDim2.new(1,-8,0,26), BackgroundColor3=Color3.fromRGB(40,42,58),
-            Text=opt, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+            Text=opt, Font=FONT, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), ZIndex=60})
         mk("UICorner", {CornerRadius=UDim.new(0,6)}, It)
         It.MouseButton1Click:Connect(function()
             Box.Text = opt; Open=false
@@ -224,16 +210,13 @@ local function dropdown(parent, y, label, options, onSelect)
     Box.MouseButton1Click:Connect(function()
         Open = not Open
         ListFrame.Visible = true
-        TweenService:Create(ListFrame, TweenInfo.new(0.15), {Size=UDim2.new(1,0,0, math.min(#options*30+6, 150))}):Play()
-        if not Open then
-            TweenService:Create(ListFrame, TweenInfo.new(0.15), {Size=UDim2.new(1,0,0,0)}):Play()
-            task.delay(0.15, function() ListFrame.Visible=false end)
-        end
+        TweenService:Create(ListFrame, TweenInfo.new(0.15), {Size=UDim2.new(1,0,0, Open and math.min(#options*30+6, 150) or 0)}):Play()
+        if not Open then task.delay(0.15, function() ListFrame.Visible=false end) end
     end)
 end
 
--- ===== pages =====
-local function page(id) return mk("Frame", {Parent=Content, Name=id, BackgroundTransparency=1, Size=UDim2.fromScale(1,1), Visible=(id=="farm")}) end
+-- pages
+local function page(id) return mk("Frame", {Parent=Content, Name=id, BackgroundTransparency=1, Size=UDim2.fromScale(1,1), Visible=(id=="farm"), ZIndex=50}) end
 
 -- FARMING
 local PFarm = page("farm")
@@ -243,15 +226,9 @@ end)
 checkbox(PFarm, 42, "Perfect Cast", true, function(v)
     if rawget(getfenv(),"state") then state.perfectCast = v end
 end)
-field(PFarm, 76,  "Speed x (1–5)", function(t)
-    if rawget(getfenv(),"state") then state.SPEED = math.clamp(tonumber(t) or 5, 1, 5) end
-end)
-field(PFarm, 110, "Override Reel Delay (ex: 1.45)", function(t)
-    if rawget(getfenv(),"state") then state.reelOverride = tonumber(t) end
-end)
-field(PFarm, 144, "Override Complete Delay (ex: 3.2)", function(t)
-    if rawget(getfenv(),"state") then state.completeOverride = tonumber(t) end
-end)
+field(PFarm, 76,  "Speed x (1–5)", function(t) if rawget(getfenv(),"state") then state.SPEED = math.clamp(tonumber(t) or 5,1,5) end end)
+field(PFarm, 110, "Override Reel Delay (ex: 1.45)", function(t) if rawget(getfenv(),"state") then state.reelOverride = tonumber(t) end end)
+field(PFarm, 144, "Override Complete Delay (ex: 3.2)", function(t) if rawget(getfenv(),"state") then state.completeOverride = tonumber(t) end end)
 
 -- INVENTORY
 local PInv = page("inv")
@@ -268,17 +245,15 @@ button(PInv, 78, "Protect High Tiers", function()
     end
     if protectByTiers then protectByTiers() end
 end)
-button(PInv, 114, "Sell Non-Favorite", function()
-    if sellAllNonFav then sellAllNonFav() end
-end)
+button(PInv, 114, "Sell Non-Favorite", function() if sellAllNonFav then sellAllNonFav() end end)
 
--- DISCORD (kartu)
+-- DISCORD
 local PD = page("discord")
-local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,10,0,10), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 90), BackgroundColor3=Color3.fromRGB(32,34,48)})
+local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,10,0,10), Size=UDim2.new(1,-20,0,90), BackgroundColor3=Color3.fromRGB(32,34,48), ZIndex=50})
 mk("UICorner", {CornerRadius=UDim.new(0,10)}, Card)
-mk("TextLabel", {Parent=Card, Position=UDim2.new(0,10,0,10), Size=UDim2.fromOffset(200,20), BackgroundTransparency=1, Text="Discord - AegisHub", Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
-mk("TextLabel", {Parent=Card, Position=UDim2.new(0,10,0,34), Size=UDim2.fromOffset(200,16), BackgroundTransparency=1, Text="Indonesia 🇮🇩", Font=FONT, TextSize=13, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left})
-local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(1,-160,0,28), Size=UDim2.fromOffset(150,28), BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋 Copy Link", Font=FBOLD, TextSize=13, TextColor3=Color3.fromRGB(235,240,255)})
+mk("TextLabel", {Parent=Card, Position=UDim2.new(0,10,0,10), Size=UDim2.new(1,-20,0,18), BackgroundTransparency=1, Text="Discord - AegisHub", Font=FBOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left, ZIndex=50})
+mk("TextLabel", {Parent=Card, Position=UDim2.new(0,10,0,34), Size=UDim2.new(1,-20,0,16), BackgroundTransparency=1, Text="Indonesia 🇮🇩", Font=FONT, TextSize=13, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left, ZIndex=50})
+local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(1,-160,0,28), Size=UDim2.fromOffset(150,28), BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋 Copy Link", Font=FBOLD, TextSize=13, TextColor3=Color3.fromRGB(235,240,255), ZIndex=50})
 mk("UICorner", {CornerRadius=UDim.new(0,8)}, Copy)
 mk("UIStroke", {Parent=Copy, Thickness=1, Color=NEON, Transparency=0.45})
 local DISCORD_LINK = "https://discord.gg/your-invite"
@@ -289,30 +264,26 @@ end)
 
 -- ABOUT
 local PAbout = page("about")
-mk("TextLabel", {Parent=PAbout, Position=UDim2.new(0,10,0,10), Size=UDim2.fromOffset(Content.AbsoluteSize.X-20, 18), BackgroundTransparency=1,
-    Text="AegisHub — Compact UI • Neon • Draggable • Checkboxes • Dropdown", Font=FONT, TextSize=13, TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left})
+mk("TextLabel", {Parent=PAbout, Position=UDim2.new(0,10,0,10), Size=UDim2.new(1,-20,0,18), BackgroundTransparency=1,
+    Text="AegisHub — Compact UI • Neon • Draggable • Checkboxes • Dropdown", Font=FONT, TextSize=13, TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left, ZIndex=50})
 
--- ===== dropdown demo untuk teleport (opsional: pakai datamu)
-local islandCoords = rawget(getfenv(),"islandCoords") or {
-    ["Kohana"] = Vector3.new(-658,3,719),
-    ["Stingray Shores"] = Vector3.new(-32,4,2773),
-    ["Coral Reefs"] = Vector3.new(-3095,1,2177),
-}
-local names = {}; for n,_ in pairs(islandCoords) do table.insert(names, n) end; table.sort(names)
-local chosen = names[1] or "Kohana"
+-- contoh dropdown teleport (opsional)
+local islands = rawget(getfenv(),"islandCoords") or { ["Kohana"]=Vector3.new(-658,3,719), ["Stingray Shores"]=Vector3.new(-32,4,2773), ["Coral Reefs"]=Vector3.new(-3095,1,2177), }
+local names = {}; for n,_ in pairs(islands) do table.insert(names, n) end; table.sort(names)
+local chosen = names[1]
 dropdown(PFarm, 178, "Teleport", names, function(opt) chosen = opt end)
 button(PFarm, 214, "Go Teleport", function()
-    local pos = islandCoords[chosen]; if not pos then return end
+    local pos = islands[chosen]; if not pos then return end
     local cf = workspace:FindFirstChild("Characters")
     local ch = cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp = ch and (ch:FindFirstChild("HumanoidRootPart") or ch:FindFirstChildWhichIsA("BasePart"))
     if hrp then hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0)) end
 end)
 
--- ===== page switching default =====
+-- default page state
 for _,p in pairs(Content:GetChildren()) do if p:IsA("Frame") then p.Visible = (p.Name==selected) end end
 
--- ===== toggle show/hide via overlay =====
+-- show/hide toggle
 local visible = true
 local function setVisible(v)
     visible = v
