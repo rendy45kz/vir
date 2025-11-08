@@ -1,5 +1,5 @@
--- AegisHub • Fish It • Vanis UI (Premium Set Only)
--- Hapus fitur lain. Tambah: Fishing V1/V2, Inventory (sell ops), Shop, Teleport (island/NPC/Player), Event.
+-- AegisHub • Fish It • Vanis UI (Premium Set Only + Dropdown Auto)
+-- Fitur: Fishing V1/V2, Inventory (sell ops), Shop, Teleport (Island/NPC/Player via dropdown auto), Event.
 -- Anti-AFK otomatis ON.
 
 -------------------- Services --------------------
@@ -33,6 +33,14 @@ local function mount(gui)
             end
         end
     end
+end
+
+local function dedupe(list)
+    local seen, out = {}, {}
+    for _,v in ipairs(list) do
+        if not seen[v] then seen[v]=true; table.insert(out, v) end
+    end
+    return out
 end
 
 -------------------- Anti-AFK (auto ON) --------------------
@@ -73,19 +81,17 @@ local state = {
     -- Inventory
     autoSellAll=false,
     autoSellEvery=45, lastSell=0,
-    sellCustomAmount=0,               -- generic amount for "Auto sell input amount"
-    coughSellAmount=0,                -- custom amount for Cough Fish
+    sellCustomAmount=0,
+    coughSellAmount=0,
 
-    -- internals
     lastActionTick=os.clock(),
 }
-local function clamp(n,a,b) if n<a then return a elseif n>b then return b else return n end end
+local function clamp(n,a,b) if n<a then return a elseif n>b then return n end return n end
 local function effDelays() -- returns completeDelay, reelDelay
-    -- "Blatant" → percepat drastis
     if state.blatant then
         local c = (state.completeOverride or 0.40)
         local r = (state.reelOverride or 0.18)
-        return clamp(c,0.15,12), clamp(r,0.10,6)
+        return math.max(0.15, c), math.max(0.10, r)
     end
     local c=(state.completeOverride or state.completePreset)/state.SPEED
     local r=(state.reelOverride     or state.reelPreset)/state.SPEED
@@ -188,7 +194,6 @@ task.spawn(function()
         if not (state.AFon and state.AFfishing) then return end
         if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
         if state.instant then
-            -- V2: Instant Fishing
             pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end)
             return
         end
@@ -233,18 +238,15 @@ function StartAutoFish()
             pcall(function()
                 castOnce()
                 local cEff, rEff = effDelays()
-                -- V1 ReelDelay = rEff; Custom complete = cEff
                 local waitTime = (state.instant and 0.05) or cEff
                 local t0=os.clock()
                 while os.clock()-t0 < waitTime do
-                    -- V2: Auto Recast / Anti stuck
                     if state.autoRecast and (os.clock()-state.lastActionTick) > state.idleDelay then
                         castOnce()
-                        t0=os.clock() -- restart window
+                        t0=os.clock()
                     end
                     task.wait(0.02)
                 end
-                -- optional "reel delay" before restarting loop
                 task.wait((state.instant and 0.03) or rEff)
                 state.AFfishing=false
                 refreshRodDelays()
@@ -281,7 +283,6 @@ local function sellAll()
     if RF_SellAll then pcall(function() RF_SellAll:InvokeServer() end) end
 end
 
--- Auto sell ALL loop
 task.spawn(function()
     while true do
         if state.autoSellAll and (os.time()-state.lastSell)>=state.autoSellEvery then
@@ -291,13 +292,10 @@ task.spawn(function()
     end
 end)
 
--- Sell custom amount of ANY fish: we approximate by un-fav N items then SellAll, then refav others.
 local function sellAnyAmount(n)
     if n<=0 then return end
     local left = n
-    -- Mark everything Fav first
     setFavByPredicate(function() return true end, true)
-    -- Un-fav up to N items (non-favorited will be sold by SellAll)
     eachInventory(function(it)
         if left>0 and it.Favorited then
             it.Favorited=false
@@ -305,16 +303,12 @@ local function sellAnyAmount(n)
         end
     end)
     sellAll()
-    -- Restore: fav all again
     setFavByPredicate(function() return true end, true)
 end
 
--- Sell only "Cough Fish" amount
 local function sellCoughAmount(n)
     if n<=0 then return end
-    -- Fav ALL except Cough Fish
     setFavByPredicate(function(_, name) return not string.find(string.lower(name), "cough") end, true)
-    -- Unfav N Cough fish
     local left = n
     setFavByPredicate(function(it,name)
         if left<=0 then return false end
@@ -326,7 +320,6 @@ local function sellCoughAmount(n)
         return false
     end, false)
     sellAll()
-    -- Restore favorites
     setFavByPredicate(function() return true end, true)
 end
 
@@ -340,7 +333,7 @@ local islandCoords={
     ["Treasure Hall"]=Vector3.new(-3600,-267,-1558),["Lost Shore"]=Vector3.new(-3663,38,-989),
     ["Sishypus Statue"]=Vector3.new(-3792,-135,-986),
 }
-local tpNames={}; for n,_ in pairs(islandCoords) do table.insert(tpNames,n) end; table.sort(tpNames)
+local tpIslandNames={}; for n,_ in pairs(islandCoords) do table.insert(tpIslandNames,n) end; table.sort(tpIslandNames)
 
 local function tpTo(vec)
     local cf = Workspace:FindFirstChild("Characters")
@@ -383,7 +376,6 @@ local function openShopByKeyword(keywordList)
         for _,k in ipairs(keywordList) do
             if string.find(txt, string.lower(k)) then return true end
         end
-        -- juga cek nama parent (NPC)
         local n=(pp.Parent and pp.Parent.Name) or ""
         n=string.lower(n)
         for _,k in ipairs(keywordList) do
@@ -393,7 +385,61 @@ local function openShopByKeyword(keywordList)
     end, 200)
 end
 
--------------------- VANIS UI --------------------
+-------------------- AUTO LISTS: Players & NPCs --------------------
+local function buildPlayerNames()
+    local names = {}
+    for _,pl in ipairs(Players:GetPlayers()) do
+        table.insert(names, pl.Name)
+    end
+    table.sort(names)
+    return names
+end
+
+-- NPC indexing: map name -> list of parts
+local NPCIndex = {}
+local function indexNPCs()
+    NPCIndex = {}
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") then
+            local hasHum = m:FindFirstChildOfClass("Humanoid") ~= nil
+            local hasPrompt = m:FindFirstChildWhichIsA("ProximityPrompt", true) ~= nil
+            if hasHum or hasPrompt then
+                -- skip real players' characters
+                if not Players:FindFirstChild(m.Name) then
+                    local part = m:FindFirstChild("HumanoidRootPart") or m:FindFirstChildWhichIsA("BasePart")
+                    if part then
+                        NPCIndex[m.Name] = NPCIndex[m.Name] or {}
+                        table.insert(NPCIndex[m.Name], part)
+                    end
+                end
+            end
+        end
+    end
+end
+indexNPCs()
+
+-- Debounce NPC refresh on world changes
+local npc_refresh_queued=false
+local function queueNPCRefresh()
+    if npc_refresh_queued then return end
+    npc_refresh_queued=true
+    task.delay(0.5, function()
+        pcall(indexNPCs)
+        npc_refresh_queued=false
+        -- also refresh dropdown UI if exists (handled below)
+        if _G.__DDL_NPC_API and _G.__DDL_NPC_LIST then
+            _G.__DDL_NPC_LIST = dedupe({})
+            for name,_ in pairs(NPCIndex) do table.insert(_G.__DDL_NPC_LIST, name) end
+            table.sort(_G.__DDL_NPC_LIST)
+            pcall(function() _G.__DDL_NPC_API:UpdateDropdown(_G.__DDL_NPC_LIST) end)
+        end
+    end)
+end
+Workspace.DescendantAdded:Connect(queueNPCRefresh)
+Workspace.DescendantRemoving:Connect(queueNPCRefresh)
+
+-------------------- VANIS UI (LIBS KAMU YANG FIX & ADA DROPDOWN) --------------------
+-- Ganti URL di bawah ke libs kamu yang sudah di-fix (punya CreateDropdown)
 local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/rendy45kz/vir/main/tesfish.lua'))()
 local Window  = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
 
@@ -487,54 +533,59 @@ PageShop:CreateButton("Weather Shop", "Buka weather shop", function()
     openShopByKeyword({"weather","shop"})
 end)
 
--------------------- Teleport --------------------
--- Full Island list
-for _,name in ipairs(tpNames) do
-    PageTP:CreateButton("Island: "..name, "Teleport ke "..name, function() tpTo(islandCoords[name]) end)
+-------------------- Teleport (Dropdown Auto) --------------------
+-- Island dropdown (from table)
+local ddlIsland = PageTP:CreateDropdown("Teleport Island", tpIslandNames, function(name)
+    local pos = islandCoords[name]
+    if pos then tpTo(pos) end
+end)
+
+-- NPC dropdown (auto scan Workspace)
+_G.__DDL_NPC_LIST = {}
+for name,_ in pairs(NPCIndex) do table.insert(_G.__DDL_NPC_LIST, name) end
+_G.__DDL_NPC_LIST = dedupe(_G.__DDL_NPC_LIST)
+table.sort(_G.__DDL_NPC_LIST)
+
+local ddlNPC = PageTP:CreateDropdown("Teleport NPC", _G.__DDL_NPC_LIST, function(name)
+    local parts = NPCIndex[name]
+    if not parts or #parts==0 then return end
+    -- pilih yang terdekat ke pemain
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local best,dist
+    for _,part in ipairs(parts) do
+        local d = (part.Position - hrp.Position).Magnitude
+        if not dist or d<dist then best=part; dist=d end
+    end
+    if best then tpTo(best.Position + Vector3.new(0,3,0)) end
+end)
+_G.__DDL_NPC_API = ddlNPC
+
+-- Player dropdown (realtime names)
+local function refreshPlayerDD()
+    local names = buildPlayerNames()
+    if _G.__DDL_PLAYER_API then _G.__DDL_PLAYER_API:UpdateDropdown(names) end
 end
 
--- NPC tp by name (input)
-local npcTarget=""; PageTP:CreateBox("Teleport to NPC (ketik nama NPC)", 10044538000, function(txt)
-    npcTarget = tostring(txt or "")
-end)
-PageTP:CreateButton("Go to NPC", "Cari & teleport ke NPC terdekat yang cocok", function()
-    if npcTarget=="" then return end
-    local best,dist
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(npcTarget)) then
-            local part = m:FindFirstChild("HumanoidRootPart") or m:FindFirstChildWhichIsA("BasePart")
-            if part then
-                local d=(part.Position-hrp.Position).Magnitude
-                if not dist or d<dist then best=part; dist=d end
-            end
-        end
-    end
-    if best then
-        tpTo(best.Position + Vector3.new(0,3,0))
-    end
-end)
-
--- Player tp
-local selPlayer=""; PageTP:CreateBox("Teleport to Player (ketik nama)", 10044538000, function(txt)
-    selPlayer = tostring(txt or "")
-end)
-PageTP:CreateButton("Go to Player", "Teleport ke pemain", function()
-    if selPlayer=="" then return end
-    local target = Players:FindFirstChild(selPlayer)
-    if not target then
-        -- partial match
-        for _,pl in ipairs(Players:GetPlayers()) do
-            if string.find(string.lower(pl.Name), string.lower(selPlayer)) then target=pl; break end
-        end
-    end
+local ddlPlayer = PageTP:CreateDropdown("Teleport Player", buildPlayerNames(), function(name)
+    local target = Players:FindFirstChild(name)
     if target and target.Character then
         local hrp = target.Character:FindFirstChild("HumanoidRootPart")
         if hrp then tpTo(hrp.Position + Vector3.new(0,3,0)) end
     end
 end)
+_G.__DDL_PLAYER_API = ddlPlayer
+
+-- Auto refresh player list on join/leave
+Players.PlayerAdded:Connect(refreshPlayerDD)
+Players.PlayerRemoving:Connect(refreshPlayerDD)
+
+-- Optional: tombol masuk ke Fish It kalau bukan map target
+if game.PlaceId ~= TARGET_PLACE then
+    PageTP:CreateButton("Teleport ke Fish It", "Masuk ke game Fish It", function()
+        TeleportService:Teleport(TARGET_PLACE, LocalPlayer)
+    end)
+end
 
 -------------------- Event --------------------
 PageEvent:CreateLabel("Event Options")
