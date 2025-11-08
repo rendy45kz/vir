@@ -1,5 +1,6 @@
--- AegisHub • Fish It • Vanis UI (Delta Android Safe, with Overlay Toggle)
--- One-tab-many-frames so every menu shows up | Overlay neon toggle (draggable)
+-- AegisHub • Fish It • Vanis UI (Premium Set Only)
+-- Hapus fitur lain. Tambah: Fishing V1/V2, Inventory (sell ops), Shop, Teleport (island/NPC/Player), Event.
+-- Anti-AFK otomatis ON.
 
 -------------------- Services --------------------
 local Players            = game:GetService("Players")
@@ -12,6 +13,7 @@ local HttpService        = game:GetService("HttpService")
 local TeleportService    = game:GetService("TeleportService")
 local VirtualUser        = game:GetService("VirtualUser")
 local ReplicatedStorage  = game:GetService("ReplicatedStorage")
+local Workspace          = game:GetService("Workspace")
 
 local TARGET_PLACE = 121864768012064 -- Fish It
 
@@ -33,7 +35,7 @@ local function mount(gui)
     end
 end
 
--------------------- Anti-AFK --------------------
+-------------------- Anti-AFK (auto ON) --------------------
 local AFKConn
 local function setAntiAFK(on)
     if on then
@@ -53,14 +55,38 @@ setAntiAFK(true)
 
 -------------------- State & timing --------------------
 local state = {
-    SPEED=5, perfectCast=true, AFon=false, AFfishing=false,
-    reelPreset=1.2, completePreset=2.5,
+    -- Fishing V1/V2
+    AFon=false, AFfishing=false,
+    blatant=false,                -- V1: Very fast mode
+    instant=false,                -- V2: Instant Fishing
+    perfectCast=true,             -- V2
+    autoRecast=true,              -- V2
+    idleDelay=3.0,                -- V2: anti-stuck recast delay (seconds)
+    floating=false,               -- V2: float toggle
+    floatForce=Vector3.new(0,35,0),
+
+    -- Delays
+    SPEED=5,
+    reelPreset=1.20, completePreset=2.50,
     reelOverride=nil, completeOverride=nil,
-    protectTiers={Common=false,Uncommon=false,Rare=false,Epic=false,Legendary=true,Mythic=true,Secret=true},
-    AutoSell={on=false, threshold=60, last=0},
+
+    -- Inventory
+    autoSellAll=false,
+    autoSellEvery=45, lastSell=0,
+    sellCustomAmount=0,               -- generic amount for "Auto sell input amount"
+    coughSellAmount=0,                -- custom amount for Cough Fish
+
+    -- internals
+    lastActionTick=os.clock(),
 }
 local function clamp(n,a,b) if n<a then return a elseif n>b then return b else return n end end
-local function effDelays()
+local function effDelays() -- returns completeDelay, reelDelay
+    -- "Blatant" → percepat drastis
+    if state.blatant then
+        local c = (state.completeOverride or 0.40)
+        local r = (state.reelOverride or 0.18)
+        return clamp(c,0.15,12), clamp(r,0.10,6)
+    end
     local c=(state.completeOverride or state.completePreset)/state.SPEED
     local r=(state.reelOverride     or state.reelPreset)/state.SPEED
     return clamp(c,0.35,12), clamp(r,0.15,6)
@@ -102,7 +128,7 @@ task.spawn(function()
     if okU then ItemUtility=modU end
 end)
 
--------------------- Rod presets & helpers --------------------
+-------------------- Rod helper (HUD) --------------------
 local RodDelays = {
     ["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},
     ["Ghostfinn Rod"]={custom=1.12,bypass=1.45},["Astral Rod"]={custom=1.90,bypass=1.45},
@@ -132,13 +158,40 @@ local function refreshRodDelays()
     end
 end
 
--------------------- Auto-finish by text effect --------------------
+-------------------- Float (V2) --------------------
+local floatBV
+local function setFloating(on)
+    state.floating = on
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if on and hrp then
+        if not floatBV then
+            floatBV = Instance.new("BodyVelocity")
+            floatBV.MaxForce = Vector3.new(0, 1e5, 0)
+            floatBV.Velocity = state.floatForce
+            floatBV.Parent = hrp
+        else
+            floatBV.Velocity = state.floatForce
+            floatBV.Parent = hrp
+        end
+        pcall(function() char:FindFirstChildOfClass("Humanoid").PlatformStand = false end)
+    else
+        if floatBV then floatBV:Destroy(); floatBV=nil end
+    end
+end
+
+-------------------- Auto-finish dari text effect (V1/V2) --------------------
 task.spawn(function()
     repeat task.wait() until RE_RepText ~= nil
     if not RE_RepText then return end
     RE_RepText.OnClientEvent:Connect(function(data)
         if not (state.AFon and state.AFfishing) then return end
         if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
+        if state.instant then
+            -- V2: Instant Fishing
+            pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end)
+            return
+        end
         local head=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
         if head and data.Container==head then
             task.spawn(function()
@@ -150,91 +203,134 @@ task.spawn(function()
     end)
 end)
 
--------------------- AutoFish core --------------------
+-------------------- Fishing Loop (V1/V2) --------------------
+local function castOnce()
+    state.AFfishing=true
+    if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
+    task.wait(0.02)
+    local ts=workspace:GetServerTimeNow()
+    if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
+    task.wait(state.blatant and 0.05 or 0.20)
+    if AShake then AShake:Play() end
+    pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
+    local bx,by=-0.7499996423721313,1
+    local x,y
+    if state.perfectCast then
+        x = bx+(math.random(-500,500)/1e7); y = by+(math.random(-500,500)/1e7)
+    else
+        x = math.random(-1000,1000)/1000; y = math.random(0,1000)/1000
+    end
+    if AIdle then AIdle:Play() end
+    if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
+    state.lastActionTick=os.clock()
+end
+
 function StartAutoFish()
     if state.AFon then return end
     state.AFon=true; refreshRodDelays()
     task.spawn(function()
         while state.AFon do
             pcall(function()
-                state.AFfishing=true
-                if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
-                task.wait(0.05)
-                local ts=workspace:GetServerTimeNow()
-                if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
-                task.wait(0.2)
-                if AShake then AShake:Play() end
-                pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
-                local bx,by=-0.7499996423721313,1
-                local x,y
-                if state.perfectCast then
-                    x = bx+(math.random(-500,500)/1e7); y = by+(math.random(-500,500)/1e7)
-                else
-                    x = math.random(-1000,1000)/1000; y = math.random(0,1000)/1000
+                castOnce()
+                local cEff, rEff = effDelays()
+                -- V1 ReelDelay = rEff; Custom complete = cEff
+                local waitTime = (state.instant and 0.05) or cEff
+                local t0=os.clock()
+                while os.clock()-t0 < waitTime do
+                    -- V2: Auto Recast / Anti stuck
+                    if state.autoRecast and (os.clock()-state.lastActionTick) > state.idleDelay then
+                        castOnce()
+                        t0=os.clock() -- restart window
+                    end
+                    task.wait(0.02)
                 end
-                if AIdle then AIdle:Play() end
-                if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
-                local cEff=effDelays()
-                task.wait(cEff)
+                -- optional "reel delay" before restarting loop
+                task.wait((state.instant and 0.03) or rEff)
                 state.AFfishing=false
                 refreshRodDelays()
             end)
-            task.wait(0.05)
+            task.wait( state.blatant and 0.01 or 0.05 )
         end
     end)
 end
+
 function StopAutoFish()
     state.AFon=false; state.AFfishing=false
     pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end)
 end
 
 -------------------- Inventory helpers --------------------
-task.spawn(function()
-    local okR,modR=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
-    if okR then Replion=modR end
-    local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
-    if okU then ItemUtility=modU end
-end)
-local function protectByTiers()
-    if not (Replion and ItemUtility) then return end
+local function eachInventory(fn)
+    if not Replion then return end
     local Data=Replion.Client:WaitReplion("Data")
     local items=Data and Data:Get({"Inventory","Items"})
     if type(items)~="table" then return end
-    for _,it in ipairs(items) do
-        local base=ItemUtility:GetItemData(it.Id)
-        local tier=base and base.Data and tostring(base.Data.Tier)
-        if tier and state.protectTiers[tier] and not it.Favorited then it.Favorited=true end
-    end
+    for _,it in ipairs(items) do fn(it) end
 end
-local function sellAllNonFav()
-    protectByTiers(); task.wait(0.15)
+
+local function setFavByPredicate(pred, fav)
+    if not (Replion and ItemUtility) then return end
+    eachInventory(function(it)
+        local base=ItemUtility:GetItemData(it.Id)
+        local name = (base and base.Data and tostring(base.Data.Name)) or ""
+        if pred(it, name) then it.Favorited = fav end
+    end)
+end
+
+local function sellAll()
     if RF_SellAll then pcall(function() RF_SellAll:InvokeServer() end) end
 end
+
+-- Auto sell ALL loop
 task.spawn(function()
     while true do
-        if state.AutoSell.on and (os.time()-state.AutoSell.last>=45) and Replion then
-            local cnt=0; local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
-            if type(items)=="table" then for _,it in ipairs(items) do if not it.Favorited then cnt += (it.Count or 1) end end end
-            if cnt>=state.AutoSell.threshold then sellAllNonFav(); state.AutoSell.last=os.time() end
+        if state.autoSellAll and (os.time()-state.lastSell)>=state.autoSellEvery then
+            sellAll(); state.lastSell=os.time()
         end
-        task.wait(8)
+        task.wait(3)
     end
 end)
 
--------------------- FPS Boost --------------------
-local function BoostFPS(on)
-    if on then
-        for _,v in ipairs(game:GetDescendants()) do
-            if v:IsA("BasePart") then v.Material=Enum.Material.SmoothPlastic; v.Reflectance=0
-            elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency=1 end
+-- Sell custom amount of ANY fish: we approximate by un-fav N items then SellAll, then refav others.
+local function sellAnyAmount(n)
+    if n<=0 then return end
+    local left = n
+    -- Mark everything Fav first
+    setFavByPredicate(function() return true end, true)
+    -- Un-fav up to N items (non-favorited will be sold by SellAll)
+    eachInventory(function(it)
+        if left>0 and it.Favorited then
+            it.Favorited=false
+            left = left - (it.Count or 1)
         end
-        for _,e in ipairs(Lighting:GetChildren()) do if e:IsA("PostEffect") then e.Enabled=false end end
-        Lighting.GlobalShadows=false; Lighting.FogEnd=1e9
-        settings().Rendering.QualityLevel="Level01"
-    end
+    end)
+    sellAll()
+    -- Restore: fav all again
+    setFavByPredicate(function() return true end, true)
 end
 
--------------------- Teleport spots --------------------
+-- Sell only "Cough Fish" amount
+local function sellCoughAmount(n)
+    if n<=0 then return end
+    -- Fav ALL except Cough Fish
+    setFavByPredicate(function(_, name) return not string.find(string.lower(name), "cough") end, true)
+    -- Unfav N Cough fish
+    local left = n
+    setFavByPredicate(function(it,name)
+        if left<=0 then return false end
+        if string.find(string.lower(name),"cough") and it.Favorited then
+            it.Favorited=false
+            left = left - (it.Count or 1)
+            return true
+        end
+        return false
+    end, false)
+    sellAll()
+    -- Restore favorites
+    setFavByPredicate(function() return true end, true)
+end
+
+-------------------- Teleport data --------------------
 local islandCoords={
     ["Weather Machine"]=Vector3.new(-1471,-3,1929),["Esoteric Depths"]=Vector3.new(3157,-1303,1439),
     ["Tropical Grove"]=Vector3.new(-2038,3,3650),  ["Stingray Shores"]=Vector3.new(-32,4,2773),
@@ -246,97 +342,240 @@ local islandCoords={
 }
 local tpNames={}; for n,_ in pairs(islandCoords) do table.insert(tpNames,n) end; table.sort(tpNames)
 
-----------------------------------------------------------------
--- ===================== VANIS UI ==============================
-----------------------------------------------------------------
-local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/rendy45kz/vir/main/tesfish.lua'))()
-local Window  = library:CreateWindow("AegisHub • Fish It", "v2", 10044538000)
-
--- Satu TAB saja → banyak FRAME (supaya semua menu muncul)
-local Tab      = Window:CreateTab("AegisHub")
-local PageMain = Tab:CreateFrame("Main")
-local PageInv  = Tab:CreateFrame("Inventory")
-local PageTP   = Tab:CreateFrame("Teleport")
-local PageMisc = Tab:CreateFrame("Misc")
-
--------------------- MAIN --------------------
-local LiveLabel = PageMain:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Spd: 5x")
-
-PageMain:CreateToggle("Auto Fish (per-rod)", "Mulai/berhenti auto fish", function(v)
-    if v then StartAutoFish() else StopAutoFish() end
-end)
-PageMain:CreateToggle("Perfect Cast", "Lemparan presisi", function(v) state.perfectCast = v end)
-PageMain:CreateBox("Speed x (1–5, default 5)", 10044538000, function(t)
-    local n=tonumber(t) or 5; state.SPEED=math.clamp(math.floor(n+0.5),1,5)
-end)
-PageMain:CreateBox("Override Reel Delay (opsional, ex: 1.45)", 10044538000, function(t)
-    state.reelOverride = tonumber(t)
-end)
-PageMain:CreateBox("Override Complete Delay (opsional, ex: 3.2)", 10044538000, function(t)
-    state.completeOverride = tonumber(t)
-end)
-
--------------------- INVENTORY --------------------
-PageInv:CreateToggle("Auto Sell (≥ Threshold)", "Jual otomatis saat cukup", function(v) state.AutoSell.on=v end)
-PageInv:CreateBox("Threshold Auto Sell (default 60)", 10044538000, function(t)
-    local n=tonumber(t); if n then state.AutoSell.threshold = math.max(1, math.floor(n)) end
-end)
-PageInv:CreateButton("Protect High Tiers", "Fav Legendary/Mythic/Secret", function()
-    state.protectTiers.Legendary=true; state.protectTiers.Mythic=true; state.protectTiers.Secret=true; protectByTiers()
-end)
-PageInv:CreateButton("Sell Non-Favorite", "Jual semua non-fav", function() sellAllNonFav() end)
-for _,tier in ipairs({"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}) do
-    PageInv:CreateToggle("Protect "..tier, "Tandai tier ini sebagai favorit", function(v) state.protectTiers[tier]=v end)
-end
-
--------------------- TELEPORT --------------------
 local function tpTo(vec)
-    local cf = workspace:FindFirstChild("Characters")
+    local cf = Workspace:FindFirstChild("Characters")
     local ch = cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp = ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
     if hrp and vec then hrp.CFrame = CFrame.new(vec + Vector3.new(0,5,0)) end
 end
-for _,name in ipairs(tpNames) do
-    PageTP:CreateButton("Teleport: "..name, "Pergi ke "..name, function() tpTo(islandCoords[name]) end)
-end
-if game.PlaceId ~= TARGET_PLACE then
-    PageTP:CreateButton("Teleport ke Fish It", "Masuk ke game Fish It", function()
-        TeleportService:Teleport(TARGET_PLACE, LocalPlayer)
-    end)
-end
 
--------------------- MISC --------------------
-PageMisc:CreateToggle("Anti-AFK", "Cegah idle kick", function(v) setAntiAFK(v) end)
-PageMisc:CreateToggle("FPS Boost", "Kurangi efek visual untuk performa", function(v) BoostFPS(v) end)
-PageMisc:CreateButton("Rejoin", "Masuk ulang server saat ini", function()
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end)
-PageMisc:CreateButton("Server Hop", "Pindah server publik kosong", function()
-    local placeId=game.PlaceId; local servers,cursor={}, ""
-    for _=1,3 do
-        local url="https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
-        local ok,res=pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-        if ok and res and res.data then
-            for _,sv in ipairs(res.data) do if sv.playing<sv.maxPlayers and sv.id~=game.JobId then table.insert(servers,sv.id) end end
-            cursor=res.nextPageCursor or ""; if #servers>0 then break end
-        else break end
+-------------------- Shop / Event helpers (generic ProximityPrompt) --------------------
+local function fireNearestPrompt(filterFn, maxDist)
+    maxDist = maxDist or 80
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+    local nearest,dist
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            local ok, use = pcall(function() return filterFn(d) end)
+            if ok and use then
+                local p = d.Parent and d.Parent:IsA("BasePart") and d.Parent.Position or (d.Parent and d.Parent.Parent and d.Parent.Parent:IsA("BasePart") and d.Parent.Parent.Position)
+                if p then
+                    local dd=(p-hrp.Position).Magnitude
+                    if dd<=maxDist and (not dist or dd<dist) then nearest=d; dist=dd end
+                end
+            end
+        end
     end
-    if #servers>0 then TeleportService:TeleportToPlaceInstance(placeId, servers[math.random(1,#servers)], LocalPlayer) end
+    if nearest then
+        pcall(function() fireproximityprompt(nearest,5) end)
+        return true
+    end
+    return false
+end
+
+local function openShopByKeyword(keywordList)
+    keywordList = keywordList or {}
+    return fireNearestPrompt(function(pp)
+        local txt = (pp.ObjectText or "") .. " " .. (pp.ActionText or "")
+        txt = string.lower(txt)
+        for _,k in ipairs(keywordList) do
+            if string.find(txt, string.lower(k)) then return true end
+        end
+        -- juga cek nama parent (NPC)
+        local n=(pp.Parent and pp.Parent.Name) or ""
+        n=string.lower(n)
+        for _,k in ipairs(keywordList) do
+            if string.find(n, string.lower(k)) then return true end
+        end
+        return false
+    end, 200)
+end
+
+-------------------- VANIS UI --------------------
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/rendy45kz/vir/main/tesfish.lua'))()
+local Window  = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
+
+local Tab          = Window:CreateTab("AegisHub")
+local PageV1       = Tab:CreateFrame("Fishing V1")
+local PageV2       = Tab:CreateFrame("Fishing V2")
+local PageInv      = Tab:CreateFrame("Inventory")
+local PageShop     = Tab:CreateFrame("Shop")
+local PageTP       = Tab:CreateFrame("Teleport")
+local PageEvent    = Tab:CreateFrame("Event")
+
+-------------------- Fishing V1 --------------------
+local LiveLabel = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: normal")
+
+PageV1:CreateToggle("Blatant Mode", "Very fast fishing mode", function(v)
+    state.blatant = v
+    LiveLabel:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Mode: %s")
+        :format(getEquippedRodName() or "?", select(2,effDelays()), select(1,effDelays()), v and "blatant" or "normal"))
 end)
 
--------------------- Live label (HUD di dalam UI) --------------------
+PageV1:CreateBox("Reel Delay (seconds)", 10044538000, function(t)
+    local n=tonumber(t); state.reelOverride = n
+end)
+PageV1:CreateBox("Custom Complete Delay (seconds)", 10044538000, function(t)
+    local n=tonumber(t); state.completeOverride = n
+end)
+
+PageV1:CreateToggle("Start / Stop", "Mulai / hentikan loop", function(v)
+    if v then StartAutoFish() else StopAutoFish() end
+end)
+
+PageV1:CreateButton("Cancel Fishing Now", "Batalkan siklus & reset", function()
+    StopAutoFish()
+end)
+
+-------------------- Fishing V2 --------------------
+PageV2:CreateToggle("Instant Fishing", "Selesaikan segera saat bite", function(v)
+    state.instant = v
+end)
+PageV2:CreateToggle("Perfect Cast", "Akurasi lemparan maksimal", function(v)
+    state.perfectCast = v
+end)
+PageV2:CreateToggle("Auto Recast / Anti Stuck", "Recast saat idle terlalu lama", function(v)
+    state.autoRecast = v
+end)
+PageV2:CreateBox("Idle Delay (detik) untuk Anti-Stuck", 10044538000, function(t)
+    local n=tonumber(t) or 3
+    state.idleDelay = clamp(n,0.3,20)
+end)
+
+PageV2:CreateToggle("Floating", "Mengambang di udara", function(v)
+    setFloating(v)
+end)
+
+-------------------- Inventory --------------------
+PageInv:CreateToggle("Auto Sell All (periodic)", "Jual semua setiap beberapa detik", function(v)
+    state.autoSellAll = v
+end)
+
+PageInv:CreateBox("Auto Sell Input Amount (angka)", 10044538000, function(t)
+    local n=tonumber(t) or 0
+    state.sellCustomAmount = math.max(0, math.floor(n))
+end)
+PageInv:CreateButton("Run: Sell Custom Amount", "Jalankan sekali", function()
+    if state.sellCustomAmount>0 then sellAnyAmount(state.sellCustomAmount) end
+end)
+
+PageInv:CreateBox("Auto Sell Cough Fish (amount)", 10044538000, function(t)
+    local n=tonumber(t) or 0
+    state.coughSellAmount = math.max(0, math.floor(n))
+end)
+PageInv:CreateButton("Run: Sell Cough Fish Amount", "Jalankan sekali", function()
+    if state.coughSellAmount>0 then sellCoughAmount(state.coughSellAmount) end
+end)
+
+PageInv:CreateButton("Sell ALL Now", "Jual semua non-favorit", function()
+    sellAll()
+end)
+
+-------------------- Shop --------------------
+PageShop:CreateButton("Traveling Merchant", "Buka prompt merchant keliling", function()
+    openShopByKeyword({"traveling","merchant","travelling"})
+end)
+PageShop:CreateButton("Bobber Shop", "Buka bobber shop", function()
+    openShopByKeyword({"bobber","shop"})
+end)
+PageShop:CreateButton("Rod Shop", "Buka rod shop", function()
+    openShopByKeyword({"rod","shop"})
+end)
+PageShop:CreateButton("Weather Shop", "Buka weather shop", function()
+    openShopByKeyword({"weather","shop"})
+end)
+
+-------------------- Teleport --------------------
+-- Full Island list
+for _,name in ipairs(tpNames) do
+    PageTP:CreateButton("Island: "..name, "Teleport ke "..name, function() tpTo(islandCoords[name]) end)
+end
+
+-- NPC tp by name (input)
+local npcTarget=""; PageTP:CreateBox("Teleport to NPC (ketik nama NPC)", 10044538000, function(txt)
+    npcTarget = tostring(txt or "")
+end)
+PageTP:CreateButton("Go to NPC", "Cari & teleport ke NPC terdekat yang cocok", function()
+    if npcTarget=="" then return end
+    local best,dist
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(npcTarget)) then
+            local part = m:FindFirstChild("HumanoidRootPart") or m:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local d=(part.Position-hrp.Position).Magnitude
+                if not dist or d<dist then best=part; dist=d end
+            end
+        end
+    end
+    if best then
+        tpTo(best.Position + Vector3.new(0,3,0))
+    end
+end)
+
+-- Player tp
+local selPlayer=""; PageTP:CreateBox("Teleport to Player (ketik nama)", 10044538000, function(txt)
+    selPlayer = tostring(txt or "")
+end)
+PageTP:CreateButton("Go to Player", "Teleport ke pemain", function()
+    if selPlayer=="" then return end
+    local target = Players:FindFirstChild(selPlayer)
+    if not target then
+        -- partial match
+        for _,pl in ipairs(Players:GetPlayers()) do
+            if string.find(string.lower(pl.Name), string.lower(selPlayer)) then target=pl; break end
+        end
+    end
+    if target and target.Character then
+        local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then tpTo(hrp.Position + Vector3.new(0,3,0)) end
+    end
+end)
+
+-------------------- Event --------------------
+PageEvent:CreateLabel("Event Options")
+PageEvent:CreateButton("Teleport to Nearest Event", "Cari prompt/event terdekat", function()
+    fireNearestPrompt(function(pp)
+        local t=(pp.ObjectText or "").." "..(pp.ActionText or "")
+        t=string.lower(t)
+        return string.find(t,"event") or string.find(t,"quest") or string.find(t,"challenge")
+    end, 300)
+end)
+
+PageEvent:CreateLabel("Halloween Event")
+PageEvent:CreateButton("Teleport to Halloween", "Cari & teleport ke area/prompt Halloween", function()
+    fireNearestPrompt(function(pp)
+        local t=(pp.ObjectText or "").." "..(pp.ActionText or "")
+        t=string.lower(t)
+        local n=(pp.Parent and pp.Parent.Name and string.lower(pp.Parent.Name)) or ""
+        return string.find(t,"halloween") or string.find(n,"halloween")
+    end, 400)
+end)
+PageEvent:CreateButton("Tricks or Treats", "Trigger prompt Trick/Treat jika ada", function()
+    fireNearestPrompt(function(pp)
+        local t=(pp.ActionText or "")
+        t=string.lower(t)
+        return string.find(t,"trick") or string.find(t,"treat")
+    end, 100)
+end)
+
+-------------------- Live HUD (label) --------------------
 RS.RenderStepped:Connect(function()
     local rod=getEquippedRodName() or "?"
     local cEff,rEff=effDelays()
     pcall(function()
         if LiveLabel and LiveLabel.UpdateLabel then
-            LiveLabel:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Spd: %dx")
-                :format(rod, rEff, cEff, state.SPEED))
+            LiveLabel:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Mode: %s")
+                :format(rod, rEff, cEff, state.blatant and "blatant" or "normal"))
         end
     end)
 end)
 
--------------------- Refresh preset saat backpack update --------------------
+-------------------- Preset refresh saat backpack berganti --------------------
 task.spawn(function()
     local pg=LocalPlayer:WaitForChild("PlayerGui")
     local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
@@ -349,50 +588,4 @@ task.spawn(function()
         end
     end)
 end)
-
-----------------------------------------------------------------
--- ========== Overlay Toggle (Neon, Draggable) ==========
-----------------------------------------------------------------
-do
-    local ToggleSG = Instance.new("ScreenGui")
-    ToggleSG.Name = "AegisHub_OverlayToggle"; ToggleSG.IgnoreGuiInset=true; ToggleSG.ResetOnSpawn=false; mount(ToggleSG)
-
-    local Btn = Instance.new("TextButton")
-    Btn.Parent = ToggleSG
-    Btn.Text = "A"
-    Btn.Font = Enum.Font.GothamBold
-    Btn.TextSize = 18
-    Btn.TextColor3 = Color3.fromRGB(10,10,10)
-    Btn.BackgroundColor3 = Color3.fromRGB(95,255,190) -- neon-ish
-    Btn.AutoButtonColor = true
-    Btn.Size = UDim2.fromOffset(40,40)
-    Btn.Position = UDim2.new(0, 18, 0.5, -20)
-    local corner = Instance.new("UICorner", Btn); corner.CornerRadius = UDim.new(1,0)
-    local stroke = Instance.new("UIStroke", Btn); stroke.Thickness=2; stroke.Color=Color3.fromRGB(20,60,50); stroke.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-
-    -- drag
-    local dragging, start, origin
-    Btn.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            dragging=true; start=i.Position; origin=Btn.Position
-            i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
-        end
-    end)
-    UIS.InputChanged:Connect(function(i)
-        if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-            local delta = i.Position - start
-            Btn.Position = UDim2.new(origin.X.Scale, origin.X.Offset + delta.X, origin.Y.Scale, origin.Y.Offset + delta.Y)
-        end
-    end)
-
-    local visible = true
-    Btn.MouseButton1Click:Connect(function()
-        visible = not visible
-        -- Vanis tidak expose ScreenGui langsung; kita sembunyikan semua descendants dari CoreGui bertema Vanis
-        for _,g in ipairs(CoreGui:GetChildren()) do
-            if g:IsA("ScreenGui") and g.Name:find("Vanis") then g.Enabled = visible end
-        end
-        Btn.Text = visible and "A" or "▶"
-    end)
-end
 -- end
