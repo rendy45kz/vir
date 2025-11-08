@@ -5,7 +5,7 @@ local function try(fn, ...)
 end
 
 local function load_cerberus()
-    local CERB_URL = "https://raw.githubusercontent.com/weakhoes/Roblox-UI-Libs/refs/heads/main/Cerberus%20Lib/Cerberus%20Lib%20Source.lua"
+    local CERB_URL = "https://raw.githubusercontent.com/Jxereas/UI-Libraries/main/cerberus.lua"
     return try(function()
         local lib = loadstring(game:HttpGet(CERB_URL, true))()
         return lib
