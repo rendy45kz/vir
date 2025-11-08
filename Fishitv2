@@ -1,19 +1,23 @@
 -- AegisHub • Glass Sidebar UI (compact + draggable + logo overlay toggle)
--- Drop-in pengganti UI sebelumnya. Kompatibel dengan StartAutoFish/StopAutoFish/state/effDelays bila ada.
+-- Versi responsif: ukuran relatif + TextScaled + UITextSizeConstraint
+-- Kompatibel dengan StartAutoFish/StopAutoFish/state/effDelays bila ada.
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
+local UIS = game:GetService("UserInputService")
 
 -- ========== CONFIG ==========
 local LOGO_ID = "rbxassetid://6031071053"  -- ganti ke logo kamu
 local THEME_ACCENT = Color3.fromRGB(170,150,255)
 local THEME_BG_GLASS = Color3.fromRGB(26,28,40)
 local THEME_PANEL = Color3.fromRGB(22,24,36)
-local SCALE = 0.55                    -- ↓ dikecilkan dari 0.9
-local PANEL_W, PANEL_H = 520, 320     -- ↓ dikecilkan dari 700, 420
+
+-- skala default kecil agar muat di semua device (bisa diubah runtime oleh kamu sendiri)
+local SCALE = 0.55            -- 0.45–1.10 (sangat kecil → besar)
+local PANEL_W, PANEL_H = 520, 320
 local FONT_MAIN = Enum.Font.Gotham
 local FONT_BOLD = Enum.Font.GothamSemibold
 
@@ -36,6 +40,15 @@ local function mk(class, props, parent)
     if props then for k,v in pairs(props) do o[k]=v end end
     if parent then o.Parent = parent end
     return o
+end
+
+-- teks auto-scale helper
+local function autoscaleText(inst, minSize, maxSize)
+    inst.TextScaled = true
+    local c = Instance.new("UITextSizeConstraint")
+    c.MinTextSize = minSize or 10
+    c.MaxTextSize = maxSize or 18
+    c.Parent = inst
 end
 
 -- ========== BLUR ==========
@@ -74,10 +87,13 @@ mk("UIGradient", {
 
 -- ========= HEADER (DRAGGABLE) =========
 local Header = mk("Frame", {Parent=Root, Size=UDim2.new(1,0,0,38), BackgroundTransparency=1})
+
 local Title = mk("TextLabel", {
     Parent=Header, Position=UDim2.new(0,12,0,7), Size=UDim2.fromOffset(360,24), BackgroundTransparency=1,
-    Text="AegisHub • Fish It", Font=FONT_BOLD, TextSize=18, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left
+    Text="AegisHub • Fish It", Font=FONT_BOLD, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left
 })
+autoscaleText(Title, 10, 18)
+
 local ActiveDot = mk("Frame", {Parent=Header, AnchorPoint=Vector2.new(1,0), Position=UDim2.new(1,-12,0,12), Size=UDim2.fromOffset(8,8), BackgroundColor3=THEME_ACCENT})
 mk("UICorner", {CornerRadius=UDim.new(1,0)}, ActiveDot)
 
@@ -93,7 +109,7 @@ Header.InputBegan:Connect(function(input)
         end)
     end
 end)
-game:GetService("UserInputService").InputChanged:Connect(function(input)
+UIS.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
         Root.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -114,9 +130,9 @@ mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.8
 -- Search kecil
 local Search = mk("TextBox", {
     Parent=Sidebar, Position=UDim2.new(0,10,0,8), Size=UDim2.fromOffset(240,30),
-    BackgroundColor3=Color3.fromRGB(30,32,46), PlaceholderText="Search", Text="", TextSize=15,
-    Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255), ClearTextOnFocus=false
+    BackgroundColor3=Color3.fromRGB(30,32,46), PlaceholderText="Search", Text="", Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255), ClearTextOnFocus=false
 })
+autoscaleText(Search, 10, 16)
 mk("UICorner", {CornerRadius=UDim.new(0,8)}, Search)
 mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, Search)
 
@@ -139,9 +155,14 @@ local buttons = {}
 
 local function makeBtn(data)
     local B = mk("TextButton", {
-        Parent=Menu, Size=UDim2.new(1,-4,0,34), BackgroundColor3=Color3.fromRGB(30,32,46),
-        Text=data.title, Font=FONT_BOLD, TextSize=15, TextColor3=Color3.fromRGB(230,235,255)
+        Parent = Menu,
+        Size = UDim2.new(1, -4, 0, 34),
+        BackgroundColor3 = Color3.fromRGB(30,32,46),
+        Text = data.title,
+        Font = FONT_BOLD,
+        TextColor3 = Color3.fromRGB(230,235,255)
     })
+    autoscaleText(B, 10, 16)
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
     local st = mk("UIStroke", {Parent=B, Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85})
     local function refresh()
@@ -165,22 +186,28 @@ local function page(id)
     return mk("Frame", {Parent=Content, Name=id, BackgroundTransparency=1, Size=UDim2.fromScale(1,1), Visible=(id==selected)})
 end
 
--- Farming
+-- ========== Farming ==========
 local PFarm = page("farm")
 local FarmTitle = mk("TextLabel", {Parent=PFarm, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
-    BackgroundTransparency=1, Text="Farming", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+    BackgroundTransparency=1, Text="Farming", Font=FONT_BOLD, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(FarmTitle, 10, 18)
 
 local function switch(parent, y, label, default, cb)
-    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 36),
+    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.new(1, -24, 0, 36),
         BackgroundColor3=Color3.fromRGB(30,32,46)})
     mk("UICorner", {CornerRadius=UDim.new(0,10)}, R)
     mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, R)
-    mk("TextLabel", {Parent=R, BackgroundTransparency=1, Position=UDim2.new(0,10,0,0), Size=UDim2.new(1,-110,1,0),
-        Text=label, Font=FONT_MAIN, TextSize=15, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+
+    local L = mk("TextLabel", {Parent=R, BackgroundTransparency=1, Position=UDim2.new(0,10,0,0), Size=UDim2.new(1,-110,1,0),
+        Text=label, Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+    autoscaleText(L, 10, 16)
+
     local B = mk("TextButton", {Parent=R, AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,-8,0.5,0), Size=UDim2.fromOffset(86,26),
         BackgroundColor3 = default and Color3.fromRGB(46,160,67) or Color3.fromRGB(110,110,120),
-        Text = default and "ON" or "OFF", Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(255,255,255)})
+        Text = default and "ON" or "OFF", Font=FONT_BOLD, TextColor3=Color3.fromRGB(255,255,255)})
+    autoscaleText(B, 10, 16)
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, B)
+
     local s = default
     B.MouseButton1Click:Connect(function()
         s = not s
@@ -192,14 +219,16 @@ local function switch(parent, y, label, default, cb)
 end
 
 local function field(parent, y, placeholder, cb)
-    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 36),
+    local R = mk("Frame", {Parent=parent, Position=UDim2.new(0,12,0,y), Size=UDim2.new(1, -24, 0, 36),
         BackgroundColor3=Color3.fromRGB(30,32,46)})
     mk("UICorner", {CornerRadius=UDim.new(0,10)}, R)
     mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, R)
-    local TB = mk("TextBox", {Parent=R, Position=UDim2.new(0,10,0,5), Size=UDim2.new(1,-20,1,-10),
-        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", TextSize=15,
-        Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255)})
+
+    local TB = mk("TextBox", {Parent=R, Position=UDim2.new(0,10,0,5), Size=UDim2.new(1, -20, 1, -10),
+        BackgroundColor3=Color3.fromRGB(34,36,52), PlaceholderText=placeholder, Text="", Font=FONT_MAIN, TextColor3=Color3.fromRGB(235,240,255), ClearTextOnFocus=false})
+    autoscaleText(TB, 10, 16)
     mk("UICorner", {CornerRadius=UDim.new(0,8)}, TB)
+
     TB.FocusLost:Connect(function(enter) if enter then pcall(cb, TB.Text) end end)
 end
 
@@ -220,14 +249,16 @@ field(PFarm, 212, "Override Complete Delay (opsional, ex: 3.2)", function(txt)
     if rawget(getfenv(),"state") then state.completeOverride = tonumber(txt) end
 end)
 
--- Inventory
+-- ========== Inventory ==========
 local PInv = page("inv")
-mk("TextLabel", {Parent=PInv, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
-    BackgroundTransparency=1, Text="Inventory", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+local InvTitle = mk("TextLabel", {Parent=PInv, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Inventory", Font=FONT_BOLD, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(InvTitle, 10, 18)
 
 local function btn(parent, x, y, w, text, cb)
-    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,x,0,y), Size=UDim2.fromOffset(w,36),
-        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FONT_BOLD, TextSize=15, TextColor3=Color3.fromRGB(235,240,255)})
+    local B = mk("TextButton", {Parent=parent, Position=UDim2.new(0,x,0,y), Size=UDim2.new(0, w, 0, 36),
+        BackgroundColor3=Color3.fromRGB(38,40,58), Text=text, Font=FONT_BOLD, TextColor3=Color3.fromRGB(235,240,255)})
+    autoscaleText(B, 10, 16)
     mk("UICorner", {CornerRadius=UDim.new(0,10)}, B)
     mk("UIStroke", {Thickness=1, Color=THEME_ACCENT, Transparency=0.45}, B)
     B.MouseButton1Click:Connect(function() pcall(cb) end)
@@ -243,29 +274,40 @@ btn(PInv, 184, 44, 160, "Sell Non-Fav", function()
     if sellAllNonFav then sellAllNonFav() end
 end)
 
--- Information (ringkas)
+-- ========== Information ==========
 local PInfo = page("info")
-mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
-    BackgroundTransparency=1, Text="Information", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
-mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,44), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24,20),
-    BackgroundTransparency=1, Text="[+] Auto timing per-rod  [+] Speed x5  [+] Compact UI", Font=FONT_MAIN, TextSize=14,
-    TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left})
+local InfoTitle = mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Information", Font=FONT_BOLD, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(InfoTitle, 10, 18)
 
--- Discord Card
+local InfoLine = mk("TextLabel", {Parent=PInfo, Position=UDim2.new(0,12,0,44), Size=UDim2.new(1,-24,0,20),
+    BackgroundTransparency=1, Text="[+] Auto timing per-rod  [+] Speed x5  [+] Compact UI", Font=FONT_MAIN, TextColor3=Color3.fromRGB(230,235,255), TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(InfoLine, 10, 16)
+
+-- ========== Discord ==========
 local PD = page("discord")
-mk("TextLabel", {Parent=PD, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
-    BackgroundTransparency=1, Text="Discord", Font=FONT_BOLD, TextSize=18, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
-local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,12,0,46), Size=UDim2.fromOffset(Content.AbsoluteSize.X-24, 108),
+local DTitle = mk("TextLabel", {Parent=PD, Position=UDim2.new(0,12,0,10), Size=UDim2.fromOffset(300,22),
+    BackgroundTransparency=1, Text="Discord", Font=FONT_BOLD, TextColor3=THEME_ACCENT, TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(DTitle, 10, 18)
+
+local Card = mk("Frame", {Parent=PD, Position=UDim2.new(0,12,0,46), Size=UDim2.new(1,-24,0,108),
     BackgroundColor3=Color3.fromRGB(30,32,46)})
 mk("UICorner", {CornerRadius=UDim.new(0,12)}, Card)
 mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.82}, Card)
+
 local Img = mk("ImageLabel", {Parent=Card, Position=UDim2.new(0,12,0,12), Size=UDim2.fromOffset(40,40), BackgroundTransparency=1, Image="rbxassetid://6034996695"})
-local DTitle = mk("TextLabel", {Parent=Card, Position=UDim2.new(0,62,0,10), Size=UDim2.fromOffset(320,22), BackgroundTransparency=1,
-    Text="Discord - AegisHub", Font=FONT_BOLD, TextSize=16, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+
+local DHeader = mk("TextLabel", {Parent=Card, Position=UDim2.new(0,62,0,10), Size=UDim2.fromOffset(320,22), BackgroundTransparency=1,
+    Text="Discord - AegisHub", Font=FONT_BOLD, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(DHeader, 10, 16)
+
 local DSub = mk("TextLabel", {Parent=Card, Position=UDim2.new(0,62,0,34), Size=UDim2.fromOffset(320,18), BackgroundTransparency=1,
-    Text="Indonesia 🇮🇩", Font=FONT_MAIN, TextSize=14, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left})
-local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(0,12,0,64), Size=UDim2.fromOffset(Content.AbsoluteSize.X-48,28),
-    BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋  Copy Link", Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255)})
+    Text="Indonesia 🇮🇩", Font=FONT_MAIN, TextColor3=Color3.fromRGB(205,210,230), TextXAlignment=Enum.TextXAlignment.Left})
+autoscaleText(DSub, 10, 14)
+
+local Copy = mk("TextButton", {Parent=Card, Position=UDim2.new(0,12,0,64), Size=UDim2.new(1,-24,0,28),
+    BackgroundColor3=Color3.fromRGB(38,40,58), Text="📋  Copy Link", Font=FONT_BOLD, TextColor3=Color3.fromRGB(235,240,255)})
+autoscaleText(Copy, 10, 16)
 mk("UICorner", {CornerRadius=UDim.new(0,8)}, Copy)
 mk("UIStroke", {Thickness=1, Color=THEME_ACCENT, Transparency=0.45}, Copy)
 local DISCORD_LINK = "https://discord.gg/your-invite"
@@ -276,8 +318,9 @@ end)
 
 -- ========= HUD kecil (pojok kanan bawah) =========
 local HUD = mk("TextLabel", {Parent=SG, AnchorPoint=Vector2.new(1,1), Position=UDim2.new(1,-10,1,-10),
-    Size=UDim2.fromOffset(380,26), BackgroundColor3=Color3.fromRGB(21,24,37), BackgroundTransparency=0.2,
-    Font=FONT_BOLD, TextSize=14, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Right, Text="AegisHub • Ready"})
+    Size=UDim2.fromOffset(360,24), BackgroundColor3=Color3.fromRGB(21,24,37), BackgroundTransparency=0.2,
+    Font=FONT_BOLD, TextColor3=Color3.fromRGB(235,240,255), TextXAlignment=Enum.TextXAlignment.Right, Text="AegisHub • Ready"})
+autoscaleText(HUD, 10, 14)
 mk("UICorner", {CornerRadius=UDim.new(0,10)}, HUD)
 mk("UIStroke", {Thickness=1, Color=Color3.fromRGB(255,255,255), Transparency=0.85}, HUD)
 
@@ -306,7 +349,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
     local rod="?"
     pcall(function()
         local pg=LocalPlayer:FindFirstChild("PlayerGui")
-        local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindChild("Display") or (pg and pg.Backpack and pg.Backpack:FindFirstChild("Display"))
+        local display=pg and pg:FindFirstChild("Backpack") and (pg.Backpack:FindFirstChild("Display") or pg.Backpack:FindChild("Display"))
         if display then
             for _,tile in ipairs(display:GetChildren()) do
                 local ok,lbl=pcall(function() return tile.Inner and tile.Inner.Tags and tile.Inner.Tags.ItemName end)
