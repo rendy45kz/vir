@@ -91,9 +91,9 @@ end
 --// Rayfield dual-source
 local Rayfield
 do
-    local ok1,lib1=pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield',true))() end)
+    local ok1,lib1=pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/hakai0fc/SiriusSoftWareLtd/main/RayfieldSource',true))() end)
     if ok1 and lib1 then Rayfield=lib1; setStatus("UI siap") else
-        local ok2,lib2=pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source',true))() end)
+        local ok2,lib2=pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/hakai0fc/SiriusSoftWareLtd/main/RayfieldSource',true))() end)
         if ok2 and lib2 then Rayfield=lib2; setStatus("UI siap") else
             setStatus("gagal memuat UI"); HUD.Text="AegisHub • UI gagal dimuat"
         end
