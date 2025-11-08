@@ -12,8 +12,8 @@ local LOGO_ID = "rbxassetid://6031071053"  -- ganti ke logo kamu
 local THEME_ACCENT = Color3.fromRGB(170,150,255)
 local THEME_BG_GLASS = Color3.fromRGB(26,28,40)
 local THEME_PANEL = Color3.fromRGB(22,24,36)
-local SCALE = 0.5                      -- 0.75–1.00 (kecil-besar)
-local PANEL_W, PANEL_H = 500, 300      -- panel lebih kecil
+local SCALE = 0.55                    -- ↓ dikecilkan dari 0.9
+local PANEL_W, PANEL_H = 520, 320     -- ↓ dikecilkan dari 700, 420
 local FONT_MAIN = Enum.Font.Gotham
 local FONT_BOLD = Enum.Font.GothamSemibold
 
