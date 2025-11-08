@@ -1,107 +1,110 @@
--- Vanis UI Library (Fixed + Dropdown Support)
--- - Auto-size scrolling pages (no clipping)
--- - New CreateDropdown + UpdateDropdown
--- - API compatible with your previous usage
+-- Vanis UI Library (Compact + Dropdown + Overlay Toggle)
+-- - Compact sizing (480x320), small fonts, slim controls
+-- - Safe auto-size pages (no clipping on Android)
+-- - Dropdown component with UpdateDropdown
+-- - Overlay ImageButton (same icon as window) to hide/show menu; draggable; stays visible
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local UIS = game:GetService("UserInputService")
 local TS  = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-local lp = game:GetService("Players").LocalPlayer
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
 
-local request = request or http_request or (identifyexecutor and identifyexecutor() == "Synapse X" and syn and syn.request) or (http and http.request)
+-- Optional instance protection (no-op if unavailable)
 local ProtectInstance = function(_) end
+local request = request or http_request or (identifyexecutor and identifyexecutor() == "Synapse X" and syn and syn.request) or (http and http.request)
 pcall(function()
     if request then
-        local src = request({Url="https://raw.githubusercontent.com/cypherdh/Script-Library/main/InstanceProtect",Method="GET"}).Body
-        local ok,fn = pcall(loadstring, src)
+        local body = request({Url="https://raw.githubusercontent.com/cypherdh/Script-Library/main/InstanceProtect",Method="GET"}).Body
+        local ok,fn = pcall(loadstring, body)
         if ok and fn then fn() end
         ProtectInstance = getfenv().ProtectInstance or ProtectInstance
     end
 end)
 
-local function rippleOn(button, color)
-    local ms = lp:GetMouse()
-    local sample = Instance.new("ImageLabel")
-    sample.Name = "Ripple"
-    sample.BackgroundTransparency = 1
-    sample.Image = "http://www.roblox.com/asset/?id=4560909609"
-    sample.ImageTransparency = 0.6
-    sample.ImageColor3 = color or Color3.fromRGB(135,255,135)
-    sample.Size = UDim2.fromOffset(0,0)
-    sample.Position = UDim2.fromOffset(ms.X - button.AbsolutePosition.X, ms.Y - button.AbsolutePosition.Y)
-    sample.ZIndex = (button.ZIndex or 1) + 1
-    sample.Parent = button
-    local len = 0.35
-    local size = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 1.5
-    sample:TweenSizeAndPosition(UDim2.fromOffset(size,size), UDim2.new(0.5, -size/2, 0.5, -size/2), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, len, true)
+-- Utils
+local function ripple(btn, color)
+    local ms = LP:GetMouse()
+    local s = Instance.new("ImageLabel")
+    s.BackgroundTransparency = 1
+    s.Image = "http://www.roblox.com/asset/?id=4560909609"
+    s.ImageTransparency = 0.6
+    s.ImageColor3 = color or Color3.fromRGB(135,255,135)
+    s.Size = UDim2.fromOffset(0,0)
+    s.ZIndex = (btn.ZIndex or 1) + 1
+    s.Parent = btn
+    s.Position = UDim2.fromOffset(ms.X - btn.AbsolutePosition.X, ms.Y - btn.AbsolutePosition.Y)
+    local len = 0.3
+    local size = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 1.35
+    s:TweenSizeAndPosition(UDim2.fromOffset(size,size), UDim2.new(0.5,-size/2,0.5,-size/2), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, len, true)
     task.spawn(function()
         for i=1,10 do
-            sample.ImageTransparency = sample.ImageTransparency + 0.05
+            s.ImageTransparency = s.ImageTransparency + 0.05
             task.wait(len/12)
         end
-        sample:Destroy()
+        s:Destroy()
     end)
 end
 
-local function makeDraggable(Frame)
-    local dragging, dragStart, startPos
-    Frame.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
+local function makeDraggable(Frame, speed)
+    local dragging, start, origin
+    Frame.InputBegan:Connect(function(i)
+        if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch)
             and UIS:GetFocusedTextBox() == nil then
-            dragging = true
-            dragStart = input.Position
-            startPos = Frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            dragging = true; start = i.Position; origin = Frame.Position
+            i.Changed:Connect(function()
+                if i.UserInputState == Enum.UserInputState.End then dragging = false end
             end)
         end
     end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            TS:Create(Frame, TweenInfo.new(0.15), {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}):Play()
+    UIS.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - start
+            TS:Create(Frame, TweenInfo.new(speed or 0.12), {
+                Position = UDim2.new(origin.X.Scale, origin.X.Offset + d.X, origin.Y.Scale, origin.Y.Offset + d.Y)
+            }):Play()
         end
     end)
 end
 
+-- Library
 local library = {}
 
-function library:CreateWindow(name, version, icon)
+function library:CreateWindow(name, version, iconId)
     name = name or "Name"
     version = version or "Version"
-    icon = icon or 0
+    iconId = iconId or 0
 
+    -- Main SG + Window (COMPACT)
     local sg = Instance.new("ScreenGui")
     ProtectInstance(sg)
-    sg.DisplayOrder = 10^6
     sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sg.DisplayOrder = 10^6
     sg.Name = "VanisUI_"..tostring(math.random(1000,9999))
     sg.Parent = (gethui and gethui()) or CoreGui
 
     local Window = Instance.new("Frame")
     Window.Name = "Window"
-    Window.Size = UDim2.fromOffset(600, 400)
-    Window.Position = UDim2.new(0.5, -300, 0.5, -200)
+    Window.Size = UDim2.fromOffset(480, 320) -- compact
+    Window.Position = UDim2.new(0.5, -240, 0.5, -160)
     Window.BackgroundColor3 = Color3.fromRGB(49,49,59)
     Window.Parent = sg
-    local wc = Instance.new("UICorner", Window)
-    wc.CornerRadius = UDim.new(0,6)
+    Instance.new("UICorner", Window).CornerRadius = UDim.new(0,6)
+    makeDraggable(Window, 0.1)
 
-    makeDraggable(Window)
-
+    -- Titlebar (COMPACT)
     local TitleBar = Instance.new("Frame")
-    TitleBar.Name = "TitleBar"
     TitleBar.BackgroundTransparency = 1
-    TitleBar.Size = UDim2.new(1,0,0,32)
+    TitleBar.Size = UDim2.new(1,0,0,28)
     TitleBar.Parent = Window
 
     local Icon = Instance.new("ImageLabel")
     Icon.BackgroundTransparency = 1
-    Icon.Size = UDim2.fromOffset(18,18)
-    Icon.Position = UDim2.new(0,8,0,7)
-    Icon.Image = "rbxassetid://"..tostring(icon)
+    Icon.Size = UDim2.fromOffset(16,16)
+    Icon.Position = UDim2.new(0,8,0,6)
+    Icon.Image = "rbxassetid://"..tostring(iconId)
     Icon.ImageColor3 = Color3.fromRGB(135,255,135)
     Icon.Parent = TitleBar
 
@@ -109,11 +112,11 @@ function library:CreateWindow(name, version, icon)
     Title.BackgroundTransparency = 1
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Font = Enum.Font.Gotham
-    Title.TextSize = 12
+    Title.TextSize = 11
     Title.TextColor3 = Color3.new(1,1,1)
     Title.Text = string.format("%s | %s", name, version)
-    Title.Size = UDim2.new(1,-40,1,0)
-    Title.Position = UDim2.new(0,32,0,0)
+    Title.Size = UDim2.new(1,-38,1,0)
+    Title.Position = UDim2.new(0,30,0,0)
     Title.Parent = TitleBar
 
     local Under = Instance.new("Frame")
@@ -123,31 +126,32 @@ function library:CreateWindow(name, version, icon)
     Under.Position = UDim2.new(0,0,1,0)
     Under.Parent = TitleBar
 
+    -- Tabs (COMPACT)
     local Tabs = Instance.new("Frame")
     Tabs.Name = "Tabs"
-    Tabs.Size = UDim2.new(0,150,1,-36)
-    Tabs.Position = UDim2.new(0,6,0,36)
+    Tabs.Size = UDim2.new(0,120,1,-34)
+    Tabs.Position = UDim2.new(0,6,0,34)
     Tabs.BackgroundColor3 = Color3.fromRGB(40,40,48)
     Tabs.Parent = Window
     Instance.new("UICorner", Tabs).CornerRadius = UDim.new(0,6)
 
-    local tabList = Instance.new("UIListLayout", Tabs)
-    tabList.SortOrder = Enum.SortOrder.LayoutOrder
-    tabList.Padding = UDim.new(0,6)
+    local tl = Instance.new("UIListLayout", Tabs)
+    tl.SortOrder = Enum.SortOrder.LayoutOrder
+    tl.Padding = UDim.new(0,4)
 
-    local tabHeader = Instance.new("TextLabel")
-    tabHeader.BackgroundTransparency = 1
-    tabHeader.TextXAlignment = Enum.TextXAlignment.Left
-    tabHeader.Font = Enum.Font.GothamBlack
-    tabHeader.TextSize = 12
-    tabHeader.TextColor3 = Color3.new(1,1,1)
-    tabHeader.Text = "Sections"
-    tabHeader.Size = UDim2.new(1,-12,0,24)
-    tabHeader.Position = UDim2.new(0,6,0,6)
-    tabHeader.Parent = Tabs
+    local header = Instance.new("TextLabel")
+    header.BackgroundTransparency = 1
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.Font = Enum.Font.GothamBold
+    header.TextSize = 11
+    header.TextColor3 = Color3.new(1,1,1)
+    header.Text = "Sections"
+    header.Size = UDim2.new(1,-10,0,20)
+    header.Position = UDim2.new(0,6,0,6)
+    header.Parent = Tabs
 
     local Indicator = Instance.new("Frame")
-    Indicator.Size = UDim2.new(0,2,0,20)
+    Indicator.Size = UDim2.new(0,2,0,16)
     Indicator.BackgroundColor3 = Color3.fromRGB(135,255,135)
     Indicator.BorderSizePixel = 0
     Indicator.Visible = false
@@ -161,24 +165,57 @@ function library:CreateWindow(name, version, icon)
         end
     end
 
+    -- OVERLAY SG: Image button with same icon; toggles Window.Visible
+    local overlaySG = Instance.new("ScreenGui")
+    ProtectInstance(overlaySG)
+    overlaySG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    overlaySG.DisplayOrder = 10^6 + 1
+    overlaySG.Name = "VanisUI_Overlay_"..tostring(math.random(1000,9999))
+    overlaySG.Parent = (gethui and gethui()) or CoreGui
+
+    local overlayBtn = Instance.new("ImageButton")
+    overlayBtn.Name = "OverlayToggle"
+    overlayBtn.Size = UDim2.fromOffset(36,36) -- compact round button
+    overlayBtn.Position = UDim2.new(0, 10, 0.5, -18)
+    overlayBtn.BackgroundColor3 = Color3.fromRGB(35,35,45)
+    overlayBtn.AutoButtonColor = true
+    overlayBtn.Image = "rbxassetid://"..tostring(iconId) -- same image
+    overlayBtn.ImageColor3 = Color3.fromRGB(135,255,135)
+    overlayBtn.Parent = overlaySG
+    Instance.new("UICorner", overlayBtn).CornerRadius = UDim.new(1,0)
+    local st = Instance.new("UIStroke", overlayBtn)
+    st.Thickness = 2
+    st.Color = Color3.fromRGB(80,140,120)
+    st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    makeDraggable(overlayBtn, 0.08)
+
+    local shown = true
+    local function toggleWindow()
+        shown = not shown
+        Window.Visible = shown
+        ripple(overlayBtn, Color3.fromRGB(135,255,135))
+    end
+    overlayBtn.MouseButton1Click:Connect(toggleWindow)
+
+    -- Window API
     local win = {}
+
     function win:CreateTab(tabName)
         tabName = tabName or "Tab"
-
         local tabObj = {}
 
         function tabObj:CreateFrame(pageName)
             pageName = pageName or "Page 1"
 
-            -- page (scrolling with autosize)
             local Page = Instance.new("ScrollingFrame")
             Page.Name = "Page"
             Page.Active = true
             Page.BackgroundColor3 = Color3.fromRGB(40,40,48)
             Page.BorderSizePixel = 0
-            Page.Position = UDim2.new(0, 160, 0, 36)
-            Page.Size = UDim2.new(1, -166, 1, -42)
-            Page.ScrollBarThickness = 6
+            Page.Position = UDim2.new(0, 128, 0, 34)
+            Page.Size = UDim2.new(1, -134, 1, -40)
+            Page.ScrollBarThickness = 5
             Page.ScrollBarImageColor3 = Color3.fromRGB(135,255,135)
             Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
             Page.CanvasSize = UDim2.new(0,0,0,0)
@@ -194,19 +231,19 @@ function library:CreateWindow(name, version, icon)
 
             local list = Instance.new("UIListLayout", Page)
             list.SortOrder = Enum.SortOrder.LayoutOrder
-            list.Padding = UDim.new(0,6)
+            list.Padding = UDim.new(0,4)
 
-            -- page button on left
+            -- Page Button
             local PageButton = Instance.new("TextButton")
             PageButton.Name = "PageButton"
             PageButton.BackgroundTransparency = 1
             PageButton.TextXAlignment = Enum.TextXAlignment.Left
             PageButton.Font = Enum.Font.Gotham
-            PageButton.TextSize = 12
+            PageButton.TextSize = 11
             PageButton.TextColor3 = Color3.new(1,1,1)
-            PageButton.TextTransparency = 0.5
+            PageButton.TextTransparency = 0.45
             PageButton.Text = pageName
-            PageButton.Size = UDim2.new(1,-12,0,20)
+            PageButton.Size = UDim2.new(1,-10,0,18)
             PageButton.Parent = Tabs
 
             PageButton.MouseButton1Click:Connect(function()
@@ -214,13 +251,14 @@ function library:CreateWindow(name, version, icon)
                 Indicator.Position = UDim2.new(0,-2,0,PageButton.AbsolutePosition.Y - Tabs.AbsolutePosition.Y + (PageButton.AbsoluteSize.Y-Indicator.AbsoluteSize.Y)/2)
                 Indicator.Parent = PageButton
                 for _,v in ipairs(Tabs:GetChildren()) do
-                    if v:IsA("TextButton") then TS:Create(v, TweenInfo.new(0.2), {TextTransparency=0.5}):Play() end
+                    if v:IsA("TextButton") then TS:Create(v, TweenInfo.new(0.15), {TextTransparency=0.45}):Play() end
                 end
-                TS:Create(PageButton, TweenInfo.new(0.2), {TextTransparency=0}):Play()
+                TS:Create(PageButton, TweenInfo.new(0.15), {TextTransparency=0}):Play()
                 hideAllPages()
                 Page.Visible = true
             end)
 
+            -- Page API (controls)
             local page = {}
 
             function page:CreateLabel(text)
@@ -229,10 +267,10 @@ function library:CreateWindow(name, version, icon)
                 Label.Name = "Label"
                 Label.BackgroundTransparency = 1
                 Label.Font = Enum.Font.Gotham
-                Label.TextSize = 12
+                Label.TextSize = 11
                 Label.TextColor3 = Color3.new(1,1,1)
                 Label.TextXAlignment = Enum.TextXAlignment.Left
-                Label.Size = UDim2.new(1,-4,0,22)
+                Label.Size = UDim2.new(1,-4,0,20)
                 Label.Text = text
                 Label.Parent = Page
                 local api = {}
@@ -241,34 +279,32 @@ function library:CreateWindow(name, version, icon)
             end
 
             function page:CreateButton(title, desc, callback)
-                title = title or "Button"
-                desc = desc or "Description"
-                callback = callback or function() end
+                title = title or "Button"; desc = desc or "Description"; callback = callback or function() end
                 local f = Instance.new("Frame")
                 f.Name = "Button"
                 f.BackgroundColor3 = Color3.fromRGB(40,40,48)
-                f.Size = UDim2.new(1,0,0,44)
+                f.Size = UDim2.new(1,0,0,36)
                 Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
                 f.Parent = Page
 
                 local Title = Instance.new("TextLabel", f)
                 Title.BackgroundTransparency = 1
                 Title.Font = Enum.Font.GothamBold
-                Title.TextSize = 12
+                Title.TextSize = 11
                 Title.TextColor3 = Color3.new(1,1,1)
                 Title.TextXAlignment = Enum.TextXAlignment.Left
                 Title.Position = UDim2.new(0,8,0,2)
-                Title.Size = UDim2.new(1,-8,0,20)
+                Title.Size = UDim2.new(1,-8,0,16)
                 Title.Text = title
 
                 local Desc = Instance.new("TextLabel", f)
                 Desc.BackgroundTransparency = 1
                 Desc.Font = Enum.Font.Gotham
-                Desc.TextSize = 12
+                Desc.TextSize = 10
                 Desc.TextColor3 = Color3.fromRGB(180,180,180)
                 Desc.TextXAlignment = Enum.TextXAlignment.Left
-                Desc.Position = UDim2.new(0,8,0,22)
-                Desc.Size = UDim2.new(1,-8,0,20)
+                Desc.Position = UDim2.new(0,8,0,18)
+                Desc.Size = UDim2.new(1,-8,0,14)
                 Desc.Text = desc
 
                 local btn = Instance.new("TextButton", f)
@@ -276,49 +312,46 @@ function library:CreateWindow(name, version, icon)
                 btn.Text = ""
                 btn.Size = UDim2.new(1,0,1,0)
                 btn.MouseButton1Click:Connect(function()
-                    rippleOn(btn, Color3.fromRGB(135,255,135))
+                    ripple(btn, Color3.fromRGB(135,255,135))
                     task.spawn(callback)
                 end)
                 local api = {}
-                function api:UpdateButton(newTitle) Title.Text = newTitle end
+                function api:UpdateButton(newTitle) Title.Text = newTitle or Title.Text end
                 return api
             end
 
             function page:CreateToggle(title, desc, callback)
-                title = title or "Toggle"
-                desc = desc or "Description"
-                callback = callback or function() end
-
+                title = title or "Toggle"; desc = desc or "Description"; callback = callback or function() end
                 local f = Instance.new("Frame")
                 f.Name = "Toggle"
                 f.BackgroundColor3 = Color3.fromRGB(40,40,48)
-                f.Size = UDim2.new(1,0,0,44)
+                f.Size = UDim2.new(1,0,0,36)
                 Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
                 f.Parent = Page
 
                 local Title = Instance.new("TextLabel", f)
                 Title.BackgroundTransparency = 1
                 Title.Font = Enum.Font.GothamBold
-                Title.TextSize = 12
+                Title.TextSize = 11
                 Title.TextColor3 = Color3.new(1,1,1)
                 Title.TextXAlignment = Enum.TextXAlignment.Left
                 Title.Position = UDim2.new(0,8,0,2)
-                Title.Size = UDim2.new(1,-40,0,20)
+                Title.Size = UDim2.new(1,-40,0,16)
                 Title.Text = title
 
                 local Desc = Instance.new("TextLabel", f)
                 Desc.BackgroundTransparency = 1
                 Desc.Font = Enum.Font.Gotham
-                Desc.TextSize = 12
+                Desc.TextSize = 10
                 Desc.TextColor3 = Color3.fromRGB(180,180,180)
                 Desc.TextXAlignment = Enum.TextXAlignment.Left
-                Desc.Position = UDim2.new(0,8,0,22)
-                Desc.Size = UDim2.new(1,-40,0,20)
+                Desc.Position = UDim2.new(0,8,0,18)
+                Desc.Size = UDim2.new(1,-40,0,14)
                 Desc.Text = desc
 
                 local circle = Instance.new("Frame", f)
-                circle.Size = UDim2.fromOffset(20,20)
-                circle.Position = UDim2.new(1,-28,0,12)
+                circle.Size = UDim2.fromOffset(18,18)
+                circle.Position = UDim2.new(1,-26,0,9)
                 circle.BackgroundColor3 = Color3.fromRGB(40,40,48)
                 circle.BorderSizePixel = 0
                 Instance.new("UICorner", circle).CornerRadius = UDim.new(0.5,0)
@@ -341,13 +374,10 @@ function library:CreateWindow(name, version, icon)
                 local on = false
                 local function set(v)
                     on = v and true or false
-                    TS:Create(dot, TweenInfo.new(0.12), {BackgroundTransparency = on and 0 or 1}):Play()
+                    TS:Create(dot, TweenInfo.new(0.1), {BackgroundTransparency = on and 0 or 1}):Play()
                     task.spawn(callback, on)
                 end
-
-                btn.MouseButton1Click:Connect(function()
-                    set(not on)
-                end)
+                btn.MouseButton1Click:Connect(function() set(not on) end)
 
                 local api = {}
                 function api:UpdateToggle(newTitle, newDesc)
@@ -358,80 +388,78 @@ function library:CreateWindow(name, version, icon)
                 return api
             end
 
-            function page:CreateBox(titleOrPlaceholder, iconId, callback)
-                local placeholder = titleOrPlaceholder or "Input..."
-                iconId = iconId or 0
+            function page:CreateBox(placeholder, icon, callback)
+                placeholder = placeholder or "Input..."
+                icon = icon or 0
                 callback = callback or function() end
 
                 local Holder = Instance.new("Frame")
                 Holder.Name = "TextBox"
                 Holder.BackgroundTransparency = 1
-                Holder.Size = UDim2.new(1,0,0,36)
+                Holder.Size = UDim2.new(1,0,0,32)
                 Holder.Parent = Page
 
-                local bar = Instance.new("Frame", Holder)
-                bar.BackgroundColor3 = Color3.fromRGB(40,40,48)
-                bar.Size = UDim2.new(1,0,1,0)
-                bar.BorderSizePixel = 0
-                Instance.new("UICorner", bar).CornerRadius = UDim.new(0,6)
+                local Bar = Instance.new("Frame", Holder)
+                Bar.BackgroundColor3 = Color3.fromRGB(40,40,48)
+                Bar.Size = UDim2.new(1,0,1,0)
+                Bar.BorderSizePixel = 0
+                Instance.new("UICorner", Bar).CornerRadius = UDim.new(0,6)
 
-                local icon = Instance.new("ImageLabel", bar)
-                icon.BackgroundTransparency = 1
-                icon.Size = UDim2.fromOffset(18,18)
-                icon.Position = UDim2.new(0,8,0,9)
-                icon.Image = "rbxassetid://"..tostring(iconId)
-                icon.ImageColor3 = Color3.fromRGB(135,255,135)
+                local I = Instance.new("ImageLabel", Bar)
+                I.BackgroundTransparency = 1
+                I.Size = UDim2.fromOffset(16,16)
+                I.Position = UDim2.new(0,8,0,8)
+                I.Image = "rbxassetid://"..tostring(icon)
+                I.ImageColor3 = Color3.fromRGB(135,255,135)
 
-                local tb = Instance.new("TextBox", bar)
-                tb.ClearTextOnFocus = false
-                tb.BackgroundTransparency = 1
-                tb.Font = Enum.Font.Gotham
-                tb.TextSize = 12
-                tb.TextXAlignment = Enum.TextXAlignment.Left
-                tb.TextColor3 = Color3.new(1,1,1)
-                tb.PlaceholderColor3 = Color3.fromRGB(215,215,215)
-                tb.PlaceholderText = placeholder
-                tb.Text = ""
-                tb.Size = UDim2.new(1,-34,1,0)
-                tb.Position = UDim2.new(0,30,0,0)
+                local TB = Instance.new("TextBox", Bar)
+                TB.ClearTextOnFocus = false
+                TB.BackgroundTransparency = 1
+                TB.Font = Enum.Font.Gotham
+                TB.TextSize = 11
+                TB.TextXAlignment = Enum.TextXAlignment.Left
+                TB.TextColor3 = Color3.new(1,1,1)
+                TB.PlaceholderColor3 = Color3.fromRGB(215,215,215)
+                TB.PlaceholderText = placeholder
+                TB.Text = ""
+                TB.Size = UDim2.new(1,-30,1,0)
+                TB.Position = UDim2.new(0,28,0,0)
 
-                tb.FocusLost:Connect(function(enter)
-                    pcall(callback, tb.Text)
+                TB.FocusLost:Connect(function()
+                    pcall(callback, TB.Text)
                 end)
 
                 local api = {}
-                function api:UpdateBox(newTitle) tb.PlaceholderText = newTitle or tb.PlaceholderText end
+                function api:UpdateBox(newTitle) TB.PlaceholderText = newTitle or TB.PlaceholderText end
                 return api
             end
 
             function page:CreateSlider(name,min,max,callback)
-                name = name or "Slider"
-                min = tonumber(min) or 0
-                max = tonumber(max) or 100
+                name = name or "Slider"; min = tonumber(min) or 0; max = tonumber(max) or 100
                 callback = callback or function() end
 
                 local f = Instance.new("Frame")
                 f.Name = "Slider"
                 f.BackgroundColor3 = Color3.fromRGB(40,40,48)
-                f.Size = UDim2.new(1,0,0,50)
+                f.Size = UDim2.new(1,0,0,42)
                 Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
                 f.Parent = Page
 
                 local Title = Instance.new("TextLabel", f)
                 Title.BackgroundTransparency = 1
                 Title.Font = Enum.Font.GothamBold
-                Title.TextSize = 12
+                Title.TextSize = 11
                 Title.TextColor3 = Color3.new(1,1,1)
                 Title.TextXAlignment = Enum.TextXAlignment.Left
-                Title.Position = UDim2.new(0,8,0,4)
-                Title.Size = UDim2.new(1,-8,0,18)
+                Title.Position = UDim2.new(0,8,0,2)
+                Title.Size = UDim2.new(1,-8,0,16)
                 Title.Text = name
 
                 local track = Instance.new("Frame", f)
                 track.BorderSizePixel = 0
                 track.BackgroundColor3 = Color3.fromRGB(30,30,36)
-                track.Size = UDim2.new(1,-16,0,3)
-                track.Position = UDim2.new(0,8,0,32)
+                track.Size = UDim2.new(1,-16,0,2)
+                track.Position = UDim2.new(0,8,0,28)
 
                 local fill = Instance.new("Frame", track)
                 fill.BorderSizePixel = 0
@@ -441,34 +469,31 @@ function library:CreateWindow(name, version, icon)
                 local knob = Instance.new("TextButton", fill)
                 knob.Text = ""
                 knob.AutoButtonColor = false
-                knob.Size = UDim2.fromOffset(10,10)
-                knob.Position = UDim2.new(1,-5,0.5,-5)
+                knob.Size = UDim2.fromOffset(9,9)
+                knob.Position = UDim2.new(1,-4,0.5,-4)
                 knob.BackgroundColor3 = Color3.fromRGB(135,255,135)
                 Instance.new("UICorner", knob).CornerRadius = UDim.new(0.5,0)
 
-                local valBox = Instance.new("TextLabel", f)
-                valBox.BackgroundTransparency = 0.83
-                valBox.BackgroundColor3 = Color3.new(0,0,0)
-                valBox.TextColor3 = Color3.fromRGB(227,225,228)
-                valBox.Font = Enum.Font.Gotham
-                valBox.TextSize = 12
-                valBox.Size = UDim2.fromOffset(48,18)
-                valBox.Position = UDim2.new(1,-56,0,4)
-                valBox.Text = tostring(min)
+                local val = Instance.new("TextLabel", f)
+                val.BackgroundTransparency = 0.83
+                val.BackgroundColor3 = Color3.new(0,0,0)
+                val.TextColor3 = Color3.fromRGB(227,225,228)
+                val.Font = Enum.Font.Gotham
+                val.TextSize = 10
+                val.Size = UDim2.fromOffset(40,16)
+                val.Position = UDim2.new(1,-46,0,2)
+                val.Text = tostring(min)
 
                 local dragging = false
                 local function setFromX(x)
-                    local alpha = math.clamp((x - track.AbsolutePosition.X)/track.AbsoluteSize.X, 0, 1)
-                    fill.Size = UDim2.new(alpha,0,1,0)
-                    local value = math.floor((min + (max - min)*alpha) * 100 + 0.5)/100
-                    valBox.Text = tostring(value)
+                    local a = math.clamp((x - track.AbsolutePosition.X)/track.AbsoluteSize.X, 0, 1)
+                    fill.Size = UDim2.new(a,0,1,0)
+                    local value = math.floor((min + (max - min)*a) * 100 + 0.5)/100
+                    val.Text = tostring(value)
                     pcall(callback, value)
                 end
                 knob.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                        dragging = true
-                        rippleOn(knob, Color3.fromRGB(135,255,135))
-                    end
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; ripple(knob) end
                 end)
                 knob.InputEnded:Connect(function(i)
                     if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
@@ -479,22 +504,18 @@ function library:CreateWindow(name, version, icon)
                     end
                 end)
                 track.InputBegan:Connect(function(i)
-                    if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                        setFromX(i.Position.X)
-                    end
+                    if i.UserInputType == Enum.UserInputType.MouseButton1 then setFromX(i.Position.X) end
                 end)
                 return {}
             end
 
             function page:CreateBind(name, defaultKey, callback)
-                name = name or "Keybind"
-                defaultKey = defaultKey or "F"
-                callback = callback or function() end
+                name = name or "Keybind"; defaultKey = defaultKey or "F"; callback = callback or function() end
 
                 local f = Instance.new("Frame")
                 f.Name = "Keybind"
                 f.BackgroundTransparency = 1
-                f.Size = UDim2.new(1,0,0,32)
+                f.Size = UDim2.new(1,0,0,28)
                 f.Parent = Page
 
                 local bar = Instance.new("Frame", f)
@@ -506,43 +527,34 @@ function library:CreateWindow(name, version, icon)
                 local Title = Instance.new("TextLabel", bar)
                 Title.BackgroundTransparency = 1
                 Title.Font = Enum.Font.GothamBold
-                Title.TextSize = 12
+                Title.TextSize = 11
                 Title.TextColor3 = Color3.new(1,1,1)
                 Title.TextXAlignment = Enum.TextXAlignment.Left
                 Title.Position = UDim2.new(0,8,0,0)
-                Title.Size = UDim2.new(1,-90,1,0)
+                Title.Size = UDim2.new(1,-86,1,0)
                 Title.Text = name
 
                 local btn = Instance.new("TextButton", bar)
                 btn.BackgroundColor3 = Color3.fromRGB(0,0,0)
                 btn.BackgroundTransparency = 0.83
                 btn.Font = Enum.Font.Gotham
-                btn.TextSize = 12
+                btn.TextSize = 10
                 btn.TextColor3 = Color3.fromRGB(227,225,228)
-                btn.Size = UDim2.fromOffset(80,22)
-                btn.Position = UDim2.new(1,-86,0.5,-11)
+                btn.Size = UDim2.fromOffset(76,20)
+                btn.Position = UDim2.new(1,-82,0.5,-10)
                 btn.Text = defaultKey
                 Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
 
                 local current = defaultKey
                 local listening = false
-
-                btn.MouseButton1Click:Connect(function()
-                    listening = true
-                    btn.Text = "..."
-                end)
-
+                btn.MouseButton1Click:Connect(function() listening = true; btn.Text = "..." end)
                 UIS.InputBegan:Connect(function(i,gp)
                     if gp then return end
                     if listening and i.UserInputType == Enum.UserInputType.Keyboard then
-                        current = i.KeyCode.Name
-                        btn.Text = current
-                        listening = false
-                        rippleOn(btn, Color3.fromRGB(135,255,135))
+                        current = i.KeyCode.Name; btn.Text = current; listening = false; ripple(btn)
                         pcall(callback, current)
                     elseif i.UserInputType == Enum.UserInputType.Keyboard and i.KeyCode.Name == current then
-                        rippleOn(btn, Color3.fromRGB(135,255,135))
-                        pcall(callback, current)
+                        ripple(btn); pcall(callback, current)
                     end
                 end)
 
@@ -551,9 +563,7 @@ function library:CreateWindow(name, version, icon)
                 return api
             end
 
-            ----------------------------------------------------------------
-            -- DROPDOWN (baru)
-            ----------------------------------------------------------------
+            -- DROPDOWN (with search + UpdateDropdown)
             function page:CreateDropdown(title, options, callback)
                 title = title or "Dropdown"
                 options = typeof(options)=="table" and options or {}
@@ -562,28 +572,28 @@ function library:CreateWindow(name, version, icon)
                 local holder = Instance.new("Frame")
                 holder.Name = "Dropdown"
                 holder.BackgroundColor3 = Color3.fromRGB(40,40,48)
-                holder.Size = UDim2.new(1,0,0,40)
+                holder.Size = UDim2.new(1,0,0,36)
                 holder.Parent = Page
                 Instance.new("UICorner", holder).CornerRadius = UDim.new(0,6)
 
                 local Title = Instance.new("TextLabel", holder)
                 Title.BackgroundTransparency = 1
                 Title.Font = Enum.Font.GothamBold
-                Title.TextSize = 12
+                Title.TextSize = 11
                 Title.TextColor3 = Color3.new(1,1,1)
                 Title.TextXAlignment = Enum.TextXAlignment.Left
                 Title.Position = UDim2.new(0,8,0,2)
-                Title.Size = UDim2.new(1,-40,0,18)
+                Title.Size = UDim2.new(1,-40,0,16)
                 Title.Text = title
 
                 local current = Instance.new("TextLabel", holder)
                 current.BackgroundTransparency = 1
                 current.Font = Enum.Font.Gotham
-                current.TextSize = 12
+                current.TextSize = 10
                 current.TextColor3 = Color3.fromRGB(200,200,200)
                 current.TextXAlignment = Enum.TextXAlignment.Left
-                current.Position = UDim2.new(0,8,0,20)
-                current.Size = UDim2.new(1,-40,0,18)
+                current.Position = UDim2.new(0,8,0,18)
+                current.Size = UDim2.new(1,-40,0,14)
                 current.Text = "-"
 
                 local openBtn = Instance.new("TextButton", holder)
@@ -597,26 +607,26 @@ function library:CreateWindow(name, version, icon)
                 listFrame.Visible = false
                 listFrame.Parent = holder
                 listFrame.Position = UDim2.new(0,0,1,2)
-                listFrame.Size = UDim2.new(1,0,0,140)
+                listFrame.Size = UDim2.new(1,0,0,120)
                 Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0,6)
 
                 local Search = Instance.new("TextBox", listFrame)
                 Search.BackgroundTransparency = 1
                 Search.Font = Enum.Font.Gotham
-                Search.TextSize = 12
+                Search.TextSize = 10
                 Search.TextColor3 = Color3.new(1,1,1)
                 Search.PlaceholderColor3 = Color3.fromRGB(215,215,215)
                 Search.PlaceholderText = "Search..."
                 Search.Text = ""
-                Search.Size = UDim2.new(1,-12,0,20)
-                Search.Position = UDim2.new(0,6,0,6)
+                Search.Size = UDim2.new(1,-10,0,18)
+                Search.Position = UDim2.new(0,5,0,6)
 
                 local scroll = Instance.new("ScrollingFrame", listFrame)
                 scroll.Active = true
                 scroll.BackgroundTransparency = 1
-                scroll.Size = UDim2.new(1,-12,1,-36)
-                scroll.Position = UDim2.new(0,6,0,30)
-                scroll.ScrollBarThickness = 6
+                scroll.Size = UDim2.new(1,-10,1,-30)
+                scroll.Position = UDim2.new(0,5,0,26)
+                scroll.ScrollBarThickness = 5
                 scroll.ScrollBarImageColor3 = Color3.fromRGB(135,255,135)
                 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
                 scroll.CanvasSize = UDim2.new(0,0,0,0)
@@ -629,57 +639,55 @@ function library:CreateWindow(name, version, icon)
                 list.SortOrder = Enum.SortOrder.LayoutOrder
                 list.Padding = UDim.new(0,4)
 
-                local optButtons = {}
+                local buttons = {}
+                local opts = {}
+                for _,v in ipairs(options) do table.insert(opts, tostring(v)) end
+                table.sort(opts)
 
-                local function rebuild(listData, filter)
-                    for _,b in ipairs(optButtons) do b:Destroy() end
-                    table.clear(optButtons)
+                local function rebuild(filter)
+                    for _,b in ipairs(buttons) do b:Destroy() end
+                    table.clear(buttons)
                     local q = string.lower(filter or "")
-                    for _,name in ipairs(listData) do
+                    for _,name in ipairs(opts) do
                         if q == "" or string.find(string.lower(name), q, 1, true) then
                             local b = Instance.new("TextButton")
                             b.BackgroundColor3 = Color3.fromRGB(40,40,48)
                             b.TextColor3 = Color3.new(1,1,1)
                             b.Font = Enum.Font.Gotham
-                            b.TextSize = 12
+                            b.TextSize = 10
                             b.TextXAlignment = Enum.TextXAlignment.Left
                             b.Text = name
-                            b.Size = UDim2.new(1, -6, 0, 26)
+                            b.Size = UDim2.new(1, -4, 0, 22)
                             b.Parent = scroll
                             Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
                             b.MouseButton1Click:Connect(function()
                                 current.Text = name
                                 listFrame.Visible = false
-                                rippleOn(b, Color3.fromRGB(135,255,135))
+                                ripple(b, Color3.fromRGB(135,255,135))
                                 task.spawn(callback, name)
                             end)
-                            table.insert(optButtons, b)
+                            table.insert(buttons, b)
                         end
                     end
                 end
-
-                local optionsList = {}
-                for _,v in ipairs(options) do table.insert(optionsList, tostring(v)) end
-                table.sort(optionsList)
-                rebuild(optionsList, "")
+                rebuild("")
 
                 openBtn.MouseButton1Click:Connect(function()
                     listFrame.Visible = not listFrame.Visible
-                    rippleOn(openBtn, Color3.fromRGB(135,255,135))
+                    ripple(openBtn, Color3.fromRGB(135,255,135))
                 end)
-
                 Search:GetPropertyChangedSignal("Text"):Connect(function()
-                    rebuild(optionsList, Search.Text)
+                    rebuild(Search.Text)
                 end)
 
                 local api = {}
                 function api:UpdateDropdown(newOptions)
-                    optionsList = {}
+                    opts = {}
                     if typeof(newOptions)=="table" then
-                        for _,v in ipairs(newOptions) do table.insert(optionsList, tostring(v)) end
+                        for _,v in ipairs(newOptions) do table.insert(opts, tostring(v)) end
                     end
-                    table.sort(optionsList)
-                    rebuild(optionsList, Search.Text)
+                    table.sort(opts)
+                    rebuild(Search.Text)
                 end
                 return api
             end
@@ -687,22 +695,15 @@ function library:CreateWindow(name, version, icon)
             return page
         end
 
-        return setmetatable({}, {
-            __index = function(_, k)
-                if k == "CreateFrame" then
-                    return tabObj.CreateFrame
-                end
-            end
-        })
+        return setmetatable({}, { __index = function(_,k)
+            if k=="CreateFrame" then return tabObj.CreateFrame end
+        end})
     end
 
-    return setmetatable({}, {
-        __index = function(_, k)
-            if k == "CreateTab" then
-                return win.CreateTab
-            end
-        end
-    })
+    -- Return window API
+    return setmetatable({}, { __index = function(_,k)
+        if k=="CreateTab" then return win.CreateTab end
+    end})
 end
 
 return library
