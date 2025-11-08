@@ -12,8 +12,8 @@ local LOGO_ID = "rbxassetid://6031071053"  -- ganti ke logo kamu
 local THEME_ACCENT = Color3.fromRGB(170,150,255)
 local THEME_BG_GLASS = Color3.fromRGB(26,28,40)
 local THEME_PANEL = Color3.fromRGB(22,24,36)
-local SCALE = 0.6                     -- ↓ dikecilkan (sebelumnya 0.9)
-local PANEL_W, PANEL_H = 520, 320     -- ↓ dikecilkan (sebelumnya 700, 420)
+local SCALE = 0.9                      -- 0.75–1.00 (kecil-besar)
+local PANEL_W, PANEL_H = 700, 420      -- panel lebih kecil
 local FONT_MAIN = Enum.Font.Gotham
 local FONT_BOLD = Enum.Font.GothamSemibold
 
@@ -306,7 +306,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
     local rod="?"
     pcall(function()
         local pg=LocalPlayer:FindFirstChild("PlayerGui")
-        local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+        local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindChild("Display") or (pg and pg.Backpack and pg.Backpack:FindFirstChild("Display"))
         if display then
             for _,tile in ipairs(display:GetChildren()) do
                 local ok,lbl=pcall(function() return tile.Inner and tile.Inner.Tags and tile.Inner.Tags.ItemName end)
