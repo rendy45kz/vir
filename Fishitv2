@@ -1,57 +1,101 @@
 --[[ 
-AegisHub • Fish It • Premium (Single File, Fixed)
-- UI Library (Blue) + Script Premium jadi satu file
-- Fix utama: CreateTab():CreateFrame() tersedia & halaman pertama auto aktif
-- Auto-size: tidak ada konten terpotong; dropdown dinamis; overlay hide/show
+AegisHub • Fish It • Premium (UI Polished)
+- UI Library (Blue, Compact, Adaptive Scale, SafeArea, Persistent Overlay)
+- Dropdown rapih, auto-size; halaman pertama auto aktif
+- Premium features: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 ----------------------------------------------------------------
--- =============== UI LIBRARY (Vanis Blue, Fixed) ==============
+-- ================== UI LIBRARY (Polished) ===================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
-local UIS = game:GetService("UserInputService")
-local TS  = game:GetService("TweenService")
-local CoreGui = game:GetService("CoreGui")
+local BG_DARK     = Color3.fromRGB(42,44,56)
+local BG_CARD     = Color3.fromRGB(30,31,41)
+local UIS         = game:GetService("UserInputService")
+local TS          = game:GetService("TweenService")
+local CoreGui     = game:GetService("CoreGui")
 
 local function protect(inst) pcall(function()
     if syn and syn.protect_gui then syn.protect_gui(inst) end
 end) end
-local function tween(o,info,props) local t=TS:Create(o,info,props); t:Play(); return t end
+local function tw(o,t,props) local a=TS:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props); a:Play(); return a end
 
 local library = {}
 function library:CreateWindow(name, version, icon)
-    name,version,icon = name or "AegisHub", version or "v1", icon or 7734053425
+    name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
 
     local Gui = Instance.new("ScreenGui")
-    protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.Parent = CoreGui
+    protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
+    Gui.Parent = CoreGui
 
-    -- Overlay hide/show (draggable)
+    -- ===== Adaptive scale =====
+    local function calcScale()
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+        local shortest = math.min(vp.X, vp.Y)
+        -- skala turun di HP kecil
+        if shortest <= 720 then return 0.85
+        elseif shortest <= 900 then return 0.92
+        else return 1 end
+    end
+    local SCALE = calcScale()
+
+    -- ===== Overlay (draggable + persistent pos) =====
     local Overlay = Instance.new("ImageButton")
-    Overlay.Parent = Gui; Overlay.Name="AegisHubOverlay"
-    Overlay.Size=UDim2.fromOffset(40,40); Overlay.Position=UDim2.new(0,12,0.5,-20)
-    Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.AutoButtonColor=true
-    Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
+    Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
+    Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
+    Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
     local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
-    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85
+    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
 
-    -- Window
-    local Window = Instance.new("Frame"); protect(Window); Window.Parent=Gui
-    Window.BackgroundColor3=Color3.fromRGB(49,49,59); Window.ClipsDescendants=false
-    Window.Size=UDim2.fromOffset(520,320); Window.Position=UDim2.new(.5,-260,.55,-160)
-    local wc=Instance.new("UICorner",Window); wc.CornerRadius=UDim.new(0,6)
+    -- restore last position if any
+    local ox = Gui:GetAttribute("ovx") or 12
+    local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
+    Overlay.Position = UDim2.fromOffset(ox, oy)
+
+    -- drag
+    do
+        local dragging, start, origin
+        Overlay.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                dragging=true; start=i.Position; origin=Overlay.Position
+                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then
+                    dragging=false
+                    Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
+                    Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
+                end end)
+            end
+        end)
+        UIS.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+                local d=i.Position-start
+                local nx = math.clamp(origin.X.Offset + d.X, 4, workspace.CurrentCamera.ViewportSize.X-44)
+                local ny = math.clamp(origin.Y.Offset + d.Y, 4, workspace.CurrentCamera.ViewportSize.Y-44)
+                Overlay.Position = UDim2.fromOffset(nx, ny)
+            end
+        end)
+    end
+
+    -- ===== Window =====
+    local Window = Instance.new("Frame")
+    protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
+    Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(320*SCALE))
+    Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
+    local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,6)
+    local uiScale = Instance.new("UIScale", Window); uiScale.Scale=1 -- ukuran diatur lewat Size di atas
 
     -- Title
-    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,32)
-    local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(18,18)
-    Icon.Position=UDim2.new(0,8,0,7); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
+    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
+    local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
+    Icon.Position=UDim2.new(0,8,0,6); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
     local TitleText=Instance.new("TextLabel",Title); TitleText.BackgroundTransparency=1
-    TitleText.Position=UDim2.new(0,32,0,0); TitleText.Size=UDim2.new(1,-32,1,0)
-    TitleText.Font=Enum.Font.GothamMedium; TitleText.TextSize=13; TitleText.TextXAlignment=Enum.TextXAlignment.Left
+    TitleText.Position=UDim2.new(0,30,0,0); TitleText.Size=UDim2.new(1,-30,1,0)
+    TitleText.Font=Enum.Font.GothamMedium; TitleText.TextSize=math.floor(12*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1); TitleText.Text=("%s • %s"):format(name,version)
-    local Under=Instance.new("Frame",Title); Under.BackgroundColor3=ACCENT; Under.BorderSizePixel=0; Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
+    local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
+    Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
     -- Drag
     do local dragging,start,origin
@@ -72,38 +116,39 @@ function library:CreateWindow(name, version, icon)
     local hidden=false
     Overlay.MouseButton1Click:Connect(function()
         hidden=not hidden; Window.Visible=not hidden
-        tween(Overlay,TweenInfo.new(.12),{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
+        tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
     end)
 
-    -- Tabs rail
-    local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(40,40,48)
-    TabsRail.Position=UDim2.new(0,6,0,38); TabsRail.Size=UDim2.new(0,136,1,-44)
+    -- ===== Tabs rail =====
+    local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
+    TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(136*SCALE),1,-math.floor(42*SCALE))
     local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,6)
-    local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-8,0,24); trlbl.Position=UDim2.new(0,8,0,0)
-    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=12; trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
-    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,4); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE)); trlbl.Position=UDim2.new(0,8,0,0)
+    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
+    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
-    -- ====== Tabs API (with CreateFrame) ======
-    local firstPageShown=false
+    -- ===== Tabs API =====
+    local firstShown=false
     local TabsAPI={}
-    function TabsAPI:CreateFrame(pageName)
-        pageName = pageName or "Page"
+    function TabsAPI:CreateFrame(title)
+        title = title or "Page"
 
         local Page=Instance.new("ScrollingFrame",Window)
-        Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=5; Page.ScrollBarImageColor3=ACCENT
+        Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
         Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.fromOffset(0,0)
-        Page.BackgroundColor3=Color3.fromRGB(40,40,48)
-        Page.Position=UDim2.new(0,150,0,38); Page.Size=UDim2.new(1,-156,1,-44)
-        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6)
-        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,6); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        Page.BackgroundColor3=BG_DARK
+        Page.Position=UDim2.new(0,math.floor(150*SCALE),0,math.floor(36*SCALE))
+        Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
         Page.Visible=false
+        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,6)
+        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(6*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(6*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
+        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(6*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
 
         local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-8,0,20); TabBtn.Text=pageName; TabBtn.Font=Enum.Font.Gotham; TabBtn.TextSize=12
-        TabBtn.TextColor3=Color3.new(1,1,1); TabBtn.TextTransparency=.5
+        TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE)); TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
+        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1); TabBtn.TextTransparency=.5
         local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,2,1,-4)
-        indicator.Position=UDim2.new(0,-10,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
+        indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
             indicator.Visible=true
@@ -112,102 +157,113 @@ function library:CreateWindow(name, version, icon)
             TabBtn.TextTransparency=0; Page.Visible=true
         end
         TabBtn.MouseButton1Click:Connect(selectThis)
-        if not firstPageShown then firstPageShown=true; selectThis() end
+        if not firstShown then firstShown=true; selectThis() end
 
-        -- Page widget helpers
-        local function Card(h) local fr=Instance.new("Frame",Page); fr.BackgroundColor3=Color3.fromRGB(30,30,36); fr.Size=UDim2.new(1,0,0,h or 40); fr.ClipsDescendants=false; local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6); return fr end
+        local function Card(h)
+            local fr=Instance.new("Frame",Page); fr.BackgroundColor3=BG_CARD; fr.Size=UDim2.new(1,0,0,math.floor((h or 40)*SCALE)); fr.ClipsDescendants=false
+            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6); return fr
+        end
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
             local fr=Card(24)
             local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
-            lb.Font=Enum.Font.Gotham; lb.TextSize=12; lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
+            lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
             return { UpdateLabel=function(_,t) lb.Text=t end }
         end
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
-            local fr=Card(44)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,20)
-            t.Font=Enum.Font.GothamBlack; t.TextSize=12; t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,22); d.Size=UDim2.new(1,-8,0,18)
-            d.Font=Enum.Font.Gotham; d.TextSize=12; d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
+            local fr=Card(42)
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
-            local fr=Card(44)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-60,0,20)
-            t.Font=Enum.Font.GothamBlack; t.TextSize=12; t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,22); d.Size=UDim2.new(1,-60,0,18)
-            d.Font=Enum.Font.Gotham; d.TextSize=12; d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
-            local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(34,18); knob.Position=UDim2.new(1,-42,0,13); knob.BackgroundColor3=Color3.fromRGB(20,20,24)
-            local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
-            local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(14,14); dot.Position=UDim2.new(0,2,0,2); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1
-            local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
+            local fr=Card(42)
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
+            local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
+            knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
+            local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
+            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
             local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
             local on=false
             btn.MouseButton1Click:Connect(function()
                 on=not on
-                tween(dot,TweenInfo.new(.12),{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-16,0,2) or UDim2.new(0,2,0,2)})
+                tw(dot,.12,{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-math.floor(16*SCALE),0,2) or UDim2.new(0,2,0,2)})
                 task.spawn(function() cb(on) end)
             end)
             return { Set=function(_,v) if v~=on then btn:MouseButton1Click() end end }
         end
         function PageAPI:CreateBox(placeholder,iconId,cb)
             cb=cb or function() end
-            local fr=Card(34)
-            local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Image="rbxassetid://"..tostring(iconId or 10045753138)
-            ic.Size=UDim2.fromOffset(18,18); ic.Position=UDim2.new(0,8,0,8); ic.ImageColor3=ACCENT
-            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,32,0,0); tb.Size=UDim2.new(1,-36,1,0)
-            tb.Font=Enum.Font.Gotham; tb.TextSize=12; tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or "Input"; tb.PlaceholderColor3=ACCENT_TEXT
+            local fr=Card(32)
+            local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
+            ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
+            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
+            tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or "Input"; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t) tb.Text=t end }
         end
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(34); fr.Name="Dropdown"
+            local fr=Card(32); fr.Name="Dropdown"
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,0)
-            t.Size=UDim2.new(1,-40,1,0); t.Font=Enum.Font.GothamBlack; t.TextSize=12; t.TextColor3=Color3.new(1,1,1); t.Text=title
-            local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(16,16); caret.Position=UDim2.new(1,-22,0,9)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=12; caret.TextColor3=ACCENT
-            local listHolder=Instance.new("Frame",fr); listHolder.BackgroundColor3=Color3.fromRGB(26,26,32); listHolder.Visible=false
-            listHolder.Position=UDim2.new(0,0,1,4); listHolder.Size=UDim2.new(1,0,0,0); listHolder.ClipsDescendants=true
-            local lc=Instance.new("UICorner",listHolder); lc.CornerRadius=UDim.new(0,6)
-            local lv=Instance.new("UIListLayout",listHolder); lv.Padding=UDim.new(0,2)
-            local pad=Instance.new("UIPadding",listHolder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
-            local current=nil
+            t.Size=UDim2.new(1,-40,1,0); t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title
+            local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32); holder.Visible=false
+            holder.Position=UDim2.new(0,0,1,4); holder.Size=UDim2.new(1,0,0,0); holder.ClipsDescendants=true
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
+
+            local current,nilGuard=nil,false
             local function rebuild(list)
-                for _,c in ipairs(listHolder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                local count=0
                 for _,opt in ipairs(list) do
-                    local b=Instance.new("TextButton",listHolder); b.Size=UDim2.new(1,0,0,22); b.BackgroundColor3=Color3.fromRGB(40,40,48)
-                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=12; b.TextColor3=Color3.new(1,1,1); local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
+                    count+=1
+                    local b=Instance.new("TextButton",holder); b.Size=UDim2.new(1,0,0,math.floor(22*SCALE)); b.BackgroundColor3=BG_CARD
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
                         current=opt; t.Text=("%s : %s"):format(title,opt); onChanged(opt)
-                        tween(listHolder,TweenInfo.new(.12),{Size=UDim2.new(1,0,0,0)}).Completed:Wait(); listHolder.Visible=false
+                        tw(holder,.12,{Size=UDim2.new(1,0,0,0)}).Completed:Wait(); holder.Visible=false
                     end)
                 end
-                listHolder.Size=UDim2.new(1,0,0,#list*24+10)
+                local targetH = math.clamp(count*math.floor(24*SCALE)+8, 0, math.floor(160*SCALE))
+                holder.Size=UDim2.new(1,0,0,targetH)
             end
             rebuild(options)
+
             fr.InputBegan:Connect(function(i)
                 if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                    listHolder.Visible=not listHolder.Visible
-                    tween(listHolder,TweenInfo.new(.12),{Size=listHolder.Visible and UDim2.new(1,0,0,(#listHolder:GetChildren()-2)*24+10) or UDim2.new(1,0,0,0)})
+                    local open = not holder.Visible
+                    holder.Visible = open
+                    local count=0 for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then count+=1 end end
+                    local targetH = open and math.clamp(count*math.floor(24*SCALE)+8,0,math.floor(160*SCALE)) or 0
+                    tw(holder,.12,{Size=UDim2.new(1,0,0,targetH)})
                 end
             end)
-            return { SetValue=function(_,v) current=v; t.Text=("%s : %s"):format(title,tostring(v)) end,
-                     GetValue=function() return current end,
-                     SetOptions=function(_,opts) rebuild(opts or {}) end }
+
+            return {
+                SetValue=function(_,v) current=v; t.Text=("%s : %s"):format(title,tostring(v)) end,
+                GetValue=function() return current end,
+                SetOptions=function(_,opts) rebuild(opts or {}) end
+            }
         end
         return PageAPI
     end
 
-    -- Top-level returns obj dengan CreateTab() yang punya CreateFrame() (alias ke TabsAPI)
     local winAPI={}
-    function winAPI:CreateTab(_)  -- satu rail saja (“Sections”)
-        return setmetatable({}, { __index = TabsAPI })
-    end
+    function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
     return winAPI
 end
 
@@ -230,18 +286,20 @@ LocalPlayer.Idled:Connect(function()
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- ========= State =========
+-- ========== State ==========
 local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
              floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
              reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
              sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock()}
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
-local function effDelays() if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
+local function effDelays()
+    if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
     local c=(state.completeOverride or state.completePreset)/state.SPEED
     local r=(state.reelOverride or state.reelPreset)/state.SPEED
-    return clamp(c,.35,12),clamp(r,.15,6) end
+    return clamp(c,.35,12),clamp(r,.15,6)
+end
 
--- ========= Remotes / modules =========
+-- ========== Remotes / modules ==========
 local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHotbar,RE_RepText,RF_SellAll
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
@@ -269,7 +327,7 @@ task.spawn(function()
     if okU then ItemUtility=modU end
 end)
 
--- Rod names (HUD)
+-- Rod helper
 local RodDelays={["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},["Ghostfinn Rod"]={custom=1.12,bypass=1.45},
 ["Astral Rod"]={custom=1.90,bypass=1.45},["Chrome Rod"]={custom=2.30,bypass=2.00},["Steampunk Rod"]={custom=2.50,bypass=2.30},
 ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},["Demascus Rod"]={custom=3.90,bypass=3.80},
@@ -336,7 +394,7 @@ function StartAutoFish()
 end
 function StopAutoFish() state.AFon=false; state.AFfishing=false; pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end) end
 
--- Inventory (SellAll helpers)
+-- Inventory
 local function eachInventory(fn)
     if not Replion then return end
     local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
@@ -457,9 +515,9 @@ local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(
 local function scanNPC()
     local s={} for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") then
-            local hasHum=m:FindFirstChildOfClass("Humanoid")
-            local hasPrompt=false; for _,d in ipairs(m:GetDescendants()) do if d:IsA("ProximityPrompt") then hasPrompt=true break end end
-            if hasHum or hasPrompt then local nm=m.Name; if #nm>=3 then s[nm]=true end end
+            local hasHum=m:FindFirstChildOfClass("Humanoid"); local hasPrompt=false
+            for _,d in ipairs(m:GetDescendants()) do if d:IsA("ProximityPrompt") then hasPrompt=true break end end
+            if (hasHum or hasPrompt) and #m.Name>=3 then s[m.Name]=true end
         end
     end
     local t={} for k in pairs(s) do table.insert(t,k) end table.sort(t); return t
@@ -513,5 +571,5 @@ end)
 -- Refresh preset on backpack change
 task.spawn(function()
     local pg=LocalPlayer:WaitForChild("PlayerGui"); local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
-    display.ChildAdded:Connect(function() task.wait(.05); refreshRodDelays() end)
+    display.ChildAdded:Connect(function() task.wait(.05) refreshRodDelays() end)
 end)
