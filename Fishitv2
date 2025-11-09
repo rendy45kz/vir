@@ -1,7 +1,7 @@
 --[[ 
 AegisHub • Fish It • Premium (UI Polished v2)
 - Dropdown auto-size (tanpa scrollbar), halaman pertama auto aktif
-- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event (Multi-Select + Auto Teleport)
 - Live Coordinates: tampil langsung di tab Teleport
 ]]
 
@@ -171,7 +171,7 @@ function library:CreateWindow(name, version, icon)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc atau ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
@@ -181,7 +181,7 @@ function library:CreateWindow(name, version, icon)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc atau ""; d.TextXAlignment=Enum.TextXAlignment.Left
             local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
             knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
@@ -265,6 +265,109 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
+        -- >>> Multi-Select (pilih banyak opsi)
+        function PageAPI:CreateMultiSelect(title, options, onChanged)
+            options = options or {}
+            onChanged = onChanged or function() end
+
+            local fr=Card(32); fr.Name="MultiSelect"
+
+            local header=Instance.new("TextButton",fr)
+            header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""
+            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
+
+            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
+            ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE)
+            ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title.." (0)"
+
+            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
+            caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+
+            local holder=Instance.new("Frame",fr)
+            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE))
+            holder.Size=UDim2.new(1,0,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible=false
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
+
+            local selected = {}
+            local totalSelected = 0
+            local function updateHeader() ttl.Text = ("%s (%d)"):format(title, totalSelected) end
+
+            local function rebuild(list)
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                selected = {}; totalSelected = 0; updateHeader()
+
+                for _,opt in ipairs(list) do
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,math.floor(24*SCALE))
+                    b.BackgroundColor3=BG_CARD
+                    b.Text="   "..opt; b.TextXAlignment=Enum.TextXAlignment.Left
+                    b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
+
+                    local dot=Instance.new("Frame",b)
+                    dot.Size=UDim2.fromOffset(math.floor(10*SCALE), math.floor(10*SCALE))
+                    dot.Position=UDim2.new(0,6,0,.5*math.floor(24*SCALE)-math.floor(5*SCALE))
+                    dot.BackgroundColor3=Color3.fromRGB(70,70,78)
+                    local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
+
+                    local function setOn(on)
+                        local had = selected[opt] and true or false
+                        if on and not had then totalSelected = totalSelected + 1 end
+                        if (not on) and had then totalSelected = math.max(0, totalSelected - 1) end
+                        selected[opt] = on or nil
+                        dot.BackgroundColor3 = on and ACCENT or Color3.fromRGB(70,70,78)
+                        updateHeader()
+                        task.spawn(function()
+                            local arr={} for k,v in pairs(selected) do if v then table.insert(arr,k) end end
+                            table.sort(arr); onChanged(arr)
+                        end)
+                    end
+
+                    b.MouseButton1Click:Connect(function() setOn(not selected[opt]) end)
+                end
+            end
+            rebuild(options)
+
+            local open=false
+            header.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret,.12,{Rotation=open and 180 or 0})
+            end)
+
+            return {
+                GetSelected = function()
+                    local arr={} for k,v in pairs(selected) do if v then table.insert(arr,k) end end
+                    table.sort(arr); return arr
+                end,
+                SetSelected = function(_,names)
+                    selected = {}; totalSelected = 0
+                    local lookup = {}; for _,n in ipairs(names or {}) do lookup[n]=true end
+                    for _,btn in ipairs(holder:GetChildren()) do
+                        if btn:IsA("TextButton") then
+                            local name = string.sub(btn.Text,4)
+                            local dot = btn:FindFirstChildOfClass("Frame")
+                            local on = lookup[name] or false
+                            if on then selected[name]=true; totalSelected=totalSelected+1 end
+                            if dot then dot.BackgroundColor3 = on and ACCENT or Color3.fromRGB(70,70,78) end
+                        end
+                    end
+                    updateHeader()
+                    onChanged(_.GetSelected())
+                end,
+                SetOptions = function(_,opts) rebuild(opts or {}) end
+            }
+        end
+        -- <<< end Multi-Select
+
         return PageAPI
     end
 
@@ -310,7 +413,7 @@ local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHot
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
 task.spawn(function()
-    local function gw(o,n,t) return o:FindFirstChild(n) or o:WaitForChild(n,t or 10) end
+    local function gw(o,n,t) return o:FindFirstChild(n) atau o:WaitForChild(n,t or 10) end
     local okNet,mod=pcall(function() local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10) end)
     if okNet then net=mod
         RF_ChargeFishingRod=net:FindFirstChild("RF/ChargeFishingRod")
@@ -432,9 +535,7 @@ local function sellCoughAmount(n)
 end
 
 -- ===================== Teleport data =====================
--- Nama Island mengacu ke daftar yang kamu kirim. Isi/ubah koordinat mudah pakai "Live Coordinates" di menu Teleport.
 local islands = {
-    -- Koordinat sudah tersedia
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
     ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
@@ -449,7 +550,7 @@ local islands = {
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
 
-    -- Placeholder (isi dari Live Coordinates)
+    -- Tambahan dari screenshot (boleh kamu koreksi via Live Coordinates)
     ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
     ["Halloween"]                 = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
@@ -460,7 +561,7 @@ local islands = {
 local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
 local function tpTo(pos)
-    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end -- aman: abaikan placeholder
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
     local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
@@ -468,8 +569,8 @@ end
 
 -- Prompt helpers (Shop/Event)
 local function fireNearestPrompt(filterFn,maxDist)
-    maxDist=maxDist or 120
-    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+    maxDist=maxDist atau 120
+    local char=LocalPlayer.Character atau LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
     local best,dist
     for _,d in ipairs(Workspace:GetDescendants()) do
         if d:IsA("ProximityPrompt") then
@@ -542,7 +643,7 @@ local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
 -- 2) Dropdown Island
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
     local pos = islands[choice]
-    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end -- block placeholder
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
     tpTo(pos)
 end)
 
@@ -583,14 +684,76 @@ if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
--- Event
-PageEvent:CreateLabel("Event Options")
-PageEvent:CreateButton("Teleport to Nearest Event","",function()
-    fireNearestPrompt(function(pp) local t=(pp.ObjectText or "").." "..(pp.ActionText or ""); t=string.lower(t); return string.find(t,"event") or string.find(t,"quest") or string.find(t,"challenge") end,300)
+-- ===================== EVENT (Multi-Select + Auto TP) =====================
+local EVENT_LIST = {
+    "Megalodon Hunt","Admin Event","Ghost Worm","Worm Hunt","Shark Hunt","Ghost Shark Hunt",
+    "Shocked","Black Hole","Meteor Rain"
+}
+
+local function matchEventOnPrompt(pp, selectedLookup)
+    local txt = ((pp.ObjectText or "").." "..(pp.ActionText or "")):lower()
+    local parentName = (pp.Parent and pp.Parent.Name or ""):lower()
+    for name,_ in pairs(selectedLookup) do
+        local k = name:lower()
+        if txt:find(k,1,true) or parentName:find(k,1,true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function teleportToNearestSelectedEvent(selected, maxDist)
+    maxDist = maxDist or 600
+    if #selected == 0 then return false end
+    local lookup = {} for _,n in ipairs(selected) do lookup[n]=true end
+
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+
+    local best,dist
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") and matchEventOnPrompt(d, lookup) then
+            local p
+            if d.Parent and d.Parent:IsA("BasePart") then p=d.Parent.Position
+            elseif d.Parent and d.Parent.Parent and d.Parent.Parent:IsA("BasePart") then p=d.Parent.Parent.Position end
+            if p then
+                local dd = (p - hrp.Position).Magnitude
+                if dd <= maxDist and (not dist or dd < dist) then best=d; dist=dd end
+            end
+        end
+    end
+
+    if best then pcall(function() fireproximityprompt(best, 5) end); return true end
+    return false
+end
+
+PageEvent:CreateLabel("Event Options (pilih beberapa)")
+local selectedEvents = {}
+local msEvents = PageEvent:CreateMultiSelect("Select Event", EVENT_LIST, function(arr) selectedEvents = arr end)
+
+PageEvent:CreateButton("Teleport: Select Event Now","Cari prompt event terdekat dan eksekusi", function()
+    teleportToNearestSelectedEvent(selectedEvents, 800)
 end)
+
+local autoEvt = false
+PageEvent:CreateToggle("Auto Teleport Selected Events","Otomatis teleport ke event yang sedang spawn sesuai pilihan", function(v)
+    autoEvt = v
+end)
+
+task.spawn(function()
+    local lastTry = 0
+    while true do
+        task.wait(1.25)
+        if autoEvt and os.clock() - lastTry > 1.0 then
+            lastTry = os.clock()
+            teleportToNearestSelectedEvent(selectedEvents, 900)
+        end
+    end
+end)
+
 PageEvent:CreateLabel("Halloween Event")
 PageEvent:CreateButton("Teleport to Halloween","",function()
-    fireNearestPrompt(function(pp) local t=(pp.ObjectText or "").." "..(pp.ActionText or ""); t=string.lower(t); local n=(pp.Parent and pp.Parent.Name and string.lower(pp.Parent.Name)) or ""; return string.find(t,"halloween") or string.find(n,"halloween") end,400)
+    teleportToNearestSelectedEvent({"Halloween"}, 900)
 end)
 PageEvent:CreateButton("Tricks or Treats","",function()
     fireNearestPrompt(function(pp) local t=string.lower(pp.ActionText or ""); return string.find(t,"trick") or string.find(t,"treat") end,100)
