@@ -1,9 +1,8 @@
 --[[ 
-AegisHub • Fish It • Premium (UI Polished)
-- UI Library (Blue, Compact, Adaptive Scale, SafeArea, Persistent Overlay)
-- Dropdown rapi, auto-size; halaman pertama auto aktif
-- Premium features: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
-- NEW: Live Coordinates toggle (teks X/Y/Z real-time)
+AegisHub • Fish It • Premium (UI Polished v2)
+- Dropdown auto-size (tanpa scrollbar), halaman pertama auto aktif
+- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+- Live Coordinates: tampil langsung di tab Teleport
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -28,10 +27,8 @@ function library:CreateWindow(name, version, icon)
 
     local Gui = Instance.new("ScreenGui")
     protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
-    Gui.ResetOnSpawn = false
     Gui.Parent = CoreGui
 
-    -- ===== Adaptive scale =====
     local function calcScale()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
         local shortest = math.min(vp.X, vp.Y)
@@ -39,7 +36,7 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- ===== Overlay =====
+    -- Overlay (toggle open/close & draggable)
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
@@ -71,14 +68,14 @@ function library:CreateWindow(name, version, icon)
         end)
     end
 
-    -- ===== Window =====
+    -- Window
     local Window = Instance.new("Frame")
     protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
     Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(320*SCALE))
     Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
     local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,6)
 
-    -- Title
+    -- Title bar
     local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
     local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
     Icon.Position=UDim2.new(0,8,0,6); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
@@ -89,7 +86,7 @@ function library:CreateWindow(name, version, icon)
     local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
     Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
-    -- Drag
+    -- Drag window
     do local dragging,start,origin
         Title.InputBegan:Connect(function(i)
             if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
@@ -111,7 +108,7 @@ function library:CreateWindow(name, version, icon)
         tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
     end)
 
-    -- ===== Tabs rail =====
+    -- Tabs rail
     local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
     TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(136*SCALE),1,-math.floor(42*SCALE))
     local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,6)
@@ -119,7 +116,7 @@ function library:CreateWindow(name, version, icon)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
     local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
-    -- ===== Tabs/Page API =====
+    -- Tabs API
     local firstShown=false
     local TabsAPI={}
     function TabsAPI:CreateFrame(title)
@@ -151,7 +148,6 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
-        -- ---------- Card helper (AUTO-SIZE!) ----------
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
@@ -167,7 +163,7 @@ function library:CreateWindow(name, version, icon)
             local fr=Card(24)
             local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
             lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
-            return { UpdateLabel=function(_,t) lb.Text=t end }
+            return { UpdateLabel=function(_,t) lb.Text=t end, _raw=lb }
         end
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
@@ -205,24 +201,19 @@ function library:CreateWindow(name, version, icon)
             local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
             ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
             local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
-            tb.ClearTextOnFocus = false
-            tb.Text = ""
+            tb.ClearTextOnFocus=false; tb.Text=""
             tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
             tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t) tb.Text=t or "" end }
         end
-
-        -- >>>>>>> Dropdown yang mendorong layout (tanpa scrollbar) <<<<<<<
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
             local fr=Card(32); fr.Name="Dropdown"
 
             local header=Instance.new("TextButton",fr)
-            header.BackgroundColor3 = BG_CARD
-            header.AutoButtonColor  = true
-            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE))
-            header.Text=""
+            header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""
             local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
 
             local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
@@ -244,20 +235,17 @@ function library:CreateWindow(name, version, icon)
             local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
 
             local current=nil
-            local ROWH = math.floor(22*SCALE)
-
             local function rebuild(list)
                 for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
                 for _,opt in ipairs(list) do
                     local b=Instance.new("TextButton",holder)
-                    b.Size=UDim2.new(1,0,0,ROWH)
+                    b.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
                     b.BackgroundColor3=BG_CARD
                     b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
                     local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
                         current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt)
-                        holder.Visible=false
-                        tw(caret,.12,{Rotation=0})
+                        holder.Visible=false; tw(caret,.12,{Rotation=0})
                     end)
                 end
             end
@@ -276,7 +264,6 @@ function library:CreateWindow(name, version, icon)
                 SetOptions = function(_,opts) rebuild(opts or {}) end
             }
         end
-        -- ---------- end dropdown ----------
 
         return PageAPI
     end
@@ -285,7 +272,6 @@ function library:CreateWindow(name, version, icon)
     function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
     return winAPI
 end
-
 
 ----------------------------------------------------------------
 -- ======================= PREMIUM SCRIPT ======================
@@ -306,13 +292,11 @@ LocalPlayer.Idled:Connect(function()
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- ========== State ==========
+-- State
 local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
              floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
              reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
-             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
-             showCoords=false} -- NEW: live coordinates toggle
-
+             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock()}
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function effDelays()
     if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
@@ -321,11 +305,10 @@ local function effDelays()
     return clamp(c,.35,12),clamp(r,.15,6)
 end
 
--- ========== Remotes / modules ==========
+-- Net / anim / modules
 local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHotbar,RE_RepText,RF_SellAll
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
-
 task.spawn(function()
     local function gw(o,n,t) return o:FindFirstChild(n) or o:WaitForChild(n,t or 10) end
     local okNet,mod=pcall(function() local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10) end)
@@ -373,7 +356,7 @@ local function setFloating(on)
     else if floatBV then floatBV:Destroy(); floatBV=nil end end
 end
 
--- Auto-finish
+-- Auto-finish fishing (V1/V2)
 task.spawn(function()
     repeat task.wait() until RE_RepText
     if not RE_RepText then return end
@@ -416,7 +399,7 @@ function StartAutoFish()
 end
 function StopAutoFish() state.AFon=false; state.AFfishing=false; pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end) end
 
--- Inventory
+-- Inventory utils
 local function eachInventory(fn)
     if not Replion then return end
     local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
@@ -448,10 +431,10 @@ local function sellCoughAmount(n)
     SellAll(); setFavByPredicate(function() return true end,true)
 end
 
--- Teleport data (STATIC list seperti semula)
--- Teleport data (pakai nama-nama island versi kamu)
+-- ===================== Teleport data =====================
+-- Nama Island mengacu ke daftar yang kamu kirim. Isi/ubah koordinat mudah pakai "Live Coordinates" di menu Teleport.
 local islands = {
-    -- ✅ sudah ada koordinat dari versi sebelumnya
+    -- Koordinat sudah tersedia
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
     ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
@@ -461,85 +444,29 @@ local islands = {
     ["Crater Island"]     = Vector3.new(968,1,4854),
     ["Kohana"]            = Vector3.new(-658,3,719),
     ["Winter Fest"]       = Vector3.new(1611,4,3280),
-    ["Esoteric Island"]   = Vector3.new(1987,4,1400),   -- (dulu tertulis "Isoteric Island")
-    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558), -- (dulu "Treasure Hall")
+    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
+    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
-    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),   -- (dulu "Sishypus Statue")
+    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
 
-    -- 🟣 nama baru dari kamu (ISI KOORDINAT pakai Live Coordinates)
-    ["Crystal Cavern"]            = Vector3.new(0,0,0),  -- ISI KOORDINAT
-    ["Halloween"]                 = Vector3.new(0,0,0),  -- ISI KOORDINAT (event area)
-    ["Ancient Underground Cave"]  = Vector3.new(0,0,0),  -- ISI KOORDINAT
-    ["Ancient Inside Temple"]     = Vector3.new(0,0,0),  -- ISI KOORDINAT
-    ["Ancient Jungle"]            = Vector3.new(0,0,0),  -- ISI KOORDINAT
-    ["Fisherman Island"]          = Vector3.new(0,0,0),  -- ISI KOORDINAT
+    -- Placeholder (isi dari Live Coordinates)
+    ["Crystal Cavern"]            = Vector3.new(0,0,0),
+    ["Halloween"]                 = Vector3.new(0,0,0),
+    ["Ancient Underground Cave"]  = Vector3.new(0,0,0),
+    ["Ancient Inside Temple"]     = Vector3.new(0,0,0),
+    ["Ancient Jungle"]            = Vector3.new(0,0,0),
+    ["Fisherman Island"]          = Vector3.new(0,0,0),
 }
--- daftar dropdown
-local islandList = {}
-for n,_ in pairs(islands) do table.insert(islandList, n) end
-table.sort(islandList)
-
+local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
 local function tpTo(pos)
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end -- aman: abaikan placeholder
     local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
-    if hrp and pos then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
+    if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
--- ====== Live Coordinates Overlay (NEW) ======
-local CoordGui, CoordText, coordConn
-local function ensureCoordGui()
-    if CoordGui then return end
-    CoordGui = Instance.new("ScreenGui")
-    CoordGui.Name = "AegisHub_Coord"
-    protect(CoordGui)
-    CoordGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    CoordGui.IgnoreGuiInset = true
-    CoordGui.ResetOnSpawn = false
-    CoordGui.Parent = CoreGui
-
-    local bg = Instance.new("Frame", CoordGui)
-    bg.Name = "Panel"
-    bg.BackgroundColor3 = Color3.fromRGB(30,31,41)
-    bg.BackgroundTransparency = 0.15
-    bg.BorderSizePixel = 0
-    bg.Position = UDim2.fromOffset(10, 10)      -- ubah posisi di sini bila perlu
-    bg.Size = UDim2.fromOffset(210, 28)
-    local c = Instance.new("UICorner", bg) c.CornerRadius = UDim.new(0, 6)
-
-    CoordText = Instance.new("TextLabel", bg)
-    CoordText.BackgroundTransparency = 1
-    CoordText.Size = UDim2.new(1, -8, 1, 0)
-    CoordText.Position = UDim2.new(0, 8, 0, 0)
-    CoordText.Font = Enum.Font.Gotham
-    CoordText.TextSize = 12
-    CoordText.TextXAlignment = Enum.TextXAlignment.Left
-    CoordText.TextColor3 = Color3.fromRGB(235, 240, 255)
-    CoordText.Text = "X: 0  Y: 0  Z: 0"
-end
-
-local function setLiveCoords(on)
-    state.showCoords = on and true or false
-    if state.showCoords then
-        ensureCoordGui()
-        CoordGui.Enabled = true
-        if coordConn then coordConn:Disconnect() end
-        coordConn = RS.RenderStepped:Connect(function()
-            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp and CoordText then
-                local p = hrp.Position
-                local function r(v) return math.floor(v*10+0.5)/10 end -- 1 desimal
-                CoordText.Text = ("X: %s   Y: %s   Z: %s"):format(r(p.X), r(p.Y), r(p.Z))
-            end
-        end)
-    else
-        if coordConn then coordConn:Disconnect(); coordConn = nil end
-        if CoordGui then CoordGui.Enabled = false end
-    end
-end
-
--- Prompt helpers
+-- Prompt helpers (Shop/Event)
 local function fireNearestPrompt(filterFn,maxDist)
     maxDist=maxDist or 120
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
@@ -579,7 +506,7 @@ local PageShop  = Tab:CreateFrame("Shop")
 local PageTP    = Tab:CreateFrame("Teleport")
 local PageEvent = Tab:CreateFrame("Event")
 
--- V1
+-- Fishing V1
 local Live = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: normal")
 PageV1:CreateToggle("Blatant Mode","Very fast fishing mode",function(v) state.blatant=v end)
 PageV1:CreateBox("Reel Delay (seconds)",10044538000,function(t) state.reelOverride=tonumber(t) end)
@@ -587,7 +514,7 @@ PageV1:CreateBox("Custom Complete Delay (seconds)",10044538000,function(t) state
 PageV1:CreateToggle("Start / Stop","Mulai / hentikan loop",function(v) if v then StartAutoFish() else StopAutoFish() end end)
 PageV1:CreateButton("Cancel Fishing","Batalkan siklus",function() StopAutoFish() end)
 
--- V2
+-- Fishing V2
 PageV2:CreateToggle("Instant Fishing","Selesaikan segera saat bite",function(v) state.instant=v end)
 PageV2:CreateToggle("Perfect Cast","Akurasi maksimal",function(v) state.perfectCast=v end)
 PageV2:CreateToggle("Auto Recast / Anti Stuck","Recast saat idle lama",function(v) state.autoRecast=v end)
@@ -608,17 +535,18 @@ PageShop:CreateButton("Bobber Shop","",function() openShopByKeyword({"bobber","s
 PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"}) end)
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
--- Teleport (Dropdowns)
+-- Teleport
+-- 1) Live coordinates label (langsung di menu)
+local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
+
+-- 2) Dropdown Island
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos=islands[choice]; if pos then tpTo(pos) end
+    local pos = islands[choice]
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end -- block placeholder
+    tpTo(pos)
 end)
 
--- NEW: Toggle Live Coordinates
-PageTP:CreateToggle("Live Coordinates","Tampilkan teks X/Y/Z posisi karakter",function(v)
-    setLiveCoords(v)
-end)
-
--- NPC dynamic
+-- 3) NPC dynamic
 local function scanNPC()
     local s={} for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") then
@@ -643,7 +571,7 @@ end
 local npcDD = PageTP:CreateDropdown("Teleport NPC", scanNPC(), function(nm) if nm then tpNearestModel(nm) end end)
 task.spawn(function() while true do task.wait(8) npcDD:SetOptions(scanNPC()) end end)
 
--- Players dynamic
+-- 4) Players dynamic
 local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
@@ -668,11 +596,21 @@ PageEvent:CreateButton("Tricks or Treats","",function()
     fireNearestPrompt(function(pp) local t=string.lower(pp.ActionText or ""); return string.find(t,"trick") or string.find(t,"treat") end,100)
 end)
 
--- Live HUD (V1 info)
+-- Live HUD (Fishing V1)
 RS.RenderStepped:Connect(function()
     local rod=getEquippedRodName() or "?"
     local c,r=effDelays()
     pcall(function() if Live and Live.UpdateLabel then Live:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Mode: %s"):format(rod,r,c,state.blatant and "blatant" or "normal")) end end)
+end)
+
+-- Live Coordinates updater (menu Teleport)
+RS.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and CoordLabel and CoordLabel.UpdateLabel then
+        local p = hrp.Position
+        CoordLabel:UpdateLabel(("Coordinates • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z))
+    end
 end)
 
 -- Refresh preset on backpack change
