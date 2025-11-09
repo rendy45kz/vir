@@ -1,24 +1,27 @@
 --[[ 
-AegisHub • Fish It • Premium (UI Polished v2)
-- Dropdown Island (single) & Event (multi-select) dengan auto-size (tanpa scrollbar)
-- Halaman pertama auto aktif
-- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
-- Live Coordinates: tampil langsung di tab Teleport
-- Auto Teleport Active Events (toggle ON/OFF + pilih beberapa event)
+AegisHub • Fish It • Premium (UI Polished v3)
+- UI refinement: labels no-bg (bold & UPPERCASE), controls compact, spacing rapi
+- Dropdown open downward (ZIndex tinggi, shadow), animasi halus
+- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event (multi-select + auto-teleport)
+- Live Coordinates tampil langsung di Teleport
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2) =================
+-- ================== UI LIBRARY (Polished v3) =================
 ----------------------------------------------------------------
-local ACCENT      = Color3.fromRGB(110,175,255)
-local ACCENT_TEXT = Color3.fromRGB(227,229,255)
-local BG_DARK     = Color3.fromRGB(42,44,56)
-local BG_CARD     = Color3.fromRGB(30,31,41)
-local UIS         = game:GetService("UserInputService")
-local TS          = game:GetService("TweenService")
-local CoreGui     = game:GetService("CoreGui")
+local ACCENT       = Color3.fromRGB(110,175,255)
+local ACCENT_TEXT  = Color3.fromRGB(212,220,255)
+local FG_TEXT      = Color3.fromRGB(240,242,250)
+local FG_MUTED     = Color3.fromRGB(176,182,200)
+local BG_DARK      = Color3.fromRGB(36,38,48)
+local BG_CARD      = Color3.fromRGB(26,27,35)
+local BG_ELEVATED  = Color3.fromRGB(21,22,30)
+
+local UIS          = game:GetService("UserInputService")
+local TS           = game:GetService("TweenService")
+local CoreGui      = game:GetService("CoreGui")
 
 local function protect(inst) pcall(function() if syn and syn.protect_gui then syn.protect_gui(inst) end end) end
 local function tw(o,t,props) local a=TS:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props); a:Play(); return a end
@@ -34,7 +37,7 @@ function library:CreateWindow(name, version, icon)
     local function calcScale()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
         local shortest = math.min(vp.X, vp.Y)
-        if shortest <= 720 then return 0.85 elseif shortest <= 900 then return 0.92 else return 1 end
+        if shortest <= 720 then return 0.88 elseif shortest <= 900 then return 0.94 else return 1 end
     end
     local SCALE = calcScale()
 
@@ -42,9 +45,9 @@ function library:CreateWindow(name, version, icon)
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
-    Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
+    Overlay.BackgroundColor3=BG_ELEVATED; Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
     local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
-    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
+    local os=Instance.new("UIStroke",Overlay); os.Transparency=.75; os.Color=Color3.fromRGB(255,255,255)
     local ox = Gui:GetAttribute("ovx") or 12
     local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
     Overlay.Position = UDim2.fromOffset(ox, oy)
@@ -73,18 +76,18 @@ function library:CreateWindow(name, version, icon)
     -- Window
     local Window = Instance.new("Frame")
     protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
-    Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(320*SCALE))
+    Window.Size=UDim2.fromOffset(math.floor(540*SCALE), math.floor(340*SCALE))
     Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
-    local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,6)
+    local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,8)
 
     -- Title bar
-    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
+    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(36*SCALE))
     local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-    Icon.Position=UDim2.new(0,8,0,6); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
+    Icon.Position=UDim2.new(0,10,0,9); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
     local TitleText=Instance.new("TextLabel",Title); TitleText.BackgroundTransparency=1
-    TitleText.Position=UDim2.new(0,30,0,0); TitleText.Size=UDim2.new(1,-30,1,0)
-    TitleText.Font=Enum.Font.GothamMedium; TitleText.TextSize=math.floor(12*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
-    TitleText.TextColor3=Color3.new(1,1,1); TitleText.Text=("%s • %s"):format(name,version)
+    TitleText.Position=UDim2.new(0,34,0,0); TitleText.Size=UDim2.new(1,-34,1,0)
+    TitleText.Font=Enum.Font.GothamBold; TitleText.TextSize=math.floor(13*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
+    TitleText.TextColor3=FG_TEXT; TitleText.Text=string.upper(("%s • %s"):format(name,version))
     local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
     Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
@@ -111,12 +114,14 @@ function library:CreateWindow(name, version, icon)
     end)
 
     -- Tabs rail
-    local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
-    TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(136*SCALE),1,-math.floor(42*SCALE))
-    local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,6)
-    local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE)); trlbl.Position=UDim2.new(0,8,0,0)
-    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
-    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=BG_CARD
+    TabsRail.Position=UDim2.new(0,8,0,math.floor(44*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(150*SCALE),1,-math.floor(52*SCALE))
+    local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,8)
+    local trpad=Instance.new("UIPadding",TabsRail); trpad.PaddingTop=UDim.new(0,8); trpad.PaddingLeft=UDim.new(0,8); trpad.PaddingRight=UDim.new(0,8)
+    local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,0,0,20)
+    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text=string.upper("Sections"); trlbl.TextSize=math.floor(11*SCALE)
+    trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=FG_TEXT
+    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,6); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
     -- Tabs API
     local firstShown=false
@@ -127,19 +132,19 @@ function library:CreateWindow(name, version, icon)
         local Page=Instance.new("ScrollingFrame",Window)
         Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
         Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.fromOffset(0,0)
-        Page.BackgroundColor3=BG_DARK
-        Page.Position=UDim2.new(0,math.floor(150*SCALE),0,math.floor(36*SCALE))
-        Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
-        Page.Visible=false
-        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(6*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(6*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
-        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(6*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        Page.BackgroundColor3=BG_DARK; Page.ClipsDescendants=false
+        Page.Position=UDim2.new(0,math.floor(170*SCALE),0,math.floor(44*SCALE))
+        Page.Size=UDim2.new(1,-math.floor(178*SCALE),1,-math.floor(52*SCALE))
+        Page.ZIndex = 5
+        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,8)
+        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6)
+        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,8); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Left
 
         local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE)); TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1); TabBtn.TextTransparency=.5
-        local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,2,1,-4)
-        indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
+        TabBtn.Size=UDim2.new(1,0,0,18); TabBtn.Text=string.upper(title); TabBtn.Font=Enum.Font.Gotham
+        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=FG_TEXT; TabBtn.TextTransparency=.5
+        local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,3,1,0)
+        indicator.Position=UDim2.new(0,-8,0,0); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
             indicator.Visible=true
@@ -150,108 +155,151 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
-        local function Card(baseH)
+        local function SectionSpacer(h) -- transparan spacer (no-bg)
+            local fr=Instance.new("Frame",Page)
+            fr.BackgroundTransparency=1
+            fr.Size=UDim2.new(1,0,0,math.floor((h or 2)*SCALE))
+            return fr
+        end
+
+        local function Card(baseH) -- elevated container untuk control (elegan & kompak)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
-            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 40)*SCALE))
+            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 46)*SCALE))
             fr.AutomaticSize = Enum.AutomaticSize.Y
-            fr.ClipsDescendants=false
-            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6)
-            local p=Instance.new("UIPadding",fr); p.PaddingTop=UDim.new(0,6); p.PaddingBottom=UDim.new(0,6); p.PaddingLeft=UDim.new(0,6); p.PaddingRight=UDim.new(0,6)
-            local l=Instance.new("UIListLayout",fr); l.Padding=UDim.new(0,4)
+            fr.ZIndex = 6
+            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,8)
+            local s=Instance.new("UIStroke",fr); s.Thickness = 1; s.Color = Color3.fromRGB(58,62,78); s.Transparency=0.35
+            local p=Instance.new("UIPadding",fr); p.PaddingTop=UDim.new(0,8); p.PaddingBottom=UDim.new(0,8); p.PaddingLeft=UDim.new(0,10); p.PaddingRight=UDim.new(0,10)
+            local l=Instance.new("UIListLayout",fr); l.Padding=UDim.new(0,6); l.FillDirection=Enum.FillDirection.Vertical; l.SortOrder=Enum.SortOrder.LayoutOrder; l.HorizontalAlignment=Enum.HorizontalAlignment.Left
             return fr
         end
 
         local PageAPI={}
+        -- Label (no BG, bold, uppercase, rata kiri)
         function PageAPI:CreateLabel(text)
-            local fr=Card(28)
-            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Size=UDim2.new(1,0,0,20)
-            lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
-            return { UpdateLabel=function(_,t) lb.Text=t end, _raw=lb }
+            local fr=Instance.new("Frame",Page)
+            fr.BackgroundTransparency=1; fr.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
+            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,2,0,0); lb.Size=UDim2.new(1,-2,1,0)
+            lb.Font=Enum.Font.GothamBlack; lb.TextSize=math.floor(12*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=FG_TEXT; lb.Text=string.upper(text or "LABEL")
+            return { UpdateLabel=function(_,t) lb.Text=string.upper(t) end, _raw=lb }
         end
+        -- Button (lebih compact)
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
-            local fr=Card(52)
+            local fr=Card(54)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Size=UDim2.new(1,0,0,18)
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=FG_TEXT; t.Text=string.upper(name or "Button"); t.TextXAlignment=Enum.TextXAlignment.Left
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Size=UDim2.new(1,0,0,16)
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=FG_MUTED; d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,0,0); hit.AutomaticSize=Enum.AutomaticSize.Y; hit.Text=""
             hit.MouseButton1Click:Connect(cb)
             return {}
         end
+        -- Toggle (lebih kecil, rata kiri)
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
-            local fr=Card(52)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Size=UDim2.new(1,-52,0,18)
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Size=UDim2.new(1,-52,0,16)
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,2)
-            knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
-            local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
-            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
+            local fr=Card(48)
+            local row=Instance.new("Frame",fr); row.BackgroundTransparency=1; row.Size=UDim2.new(1,0,0,24)
+            local rowlist=Instance.new("UIListLayout",row); rowlist.FillDirection=Enum.FillDirection.Horizontal; rowlist.Padding=UDim.new(0,10)
+
+            local t=Instance.new("TextLabel",row); t.BackgroundTransparency=1; t.Size=UDim2.new(1,-90,1,0)
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=FG_TEXT; t.Text=string.upper(title or "Toggle"); t.TextXAlignment=Enum.TextXAlignment.Left
+
+            local knob=Instance.new("Frame",row); knob.Size=UDim2.fromOffset(math.floor(36*SCALE),math.floor(20*SCALE))
+            knob.BackgroundColor3=Color3.fromRGB(45,47,60); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
+            knob.ZIndex=8; local ks=Instance.new("UIStroke",knob); ks.Color=Color3.fromRGB(62,66,82); ks.Transparency=.3
+
+            local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,3,0,3)
+            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0); dot.ZIndex=9
+
+            if desc and #desc>0 then
+                local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Size=UDim2.new(1,0,0,16)
+                d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=FG_MUTED; d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc
+            end
+
             local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,0,0); btn.AutomaticSize=Enum.AutomaticSize.Y; btn.Text=""
+            btn.ZIndex=10
             local on=false
-            btn.MouseButton1Click:Connect(function()
-                on=not on
-                tw(dot,.12,{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-math.floor(16*SCALE),0,2) or UDim2.new(0,2,0,2)})
+            local function set(v)
+                on=v and true or false
+                tw(dot,.12,{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-math.floor(17*SCALE),0,3) or UDim2.new(0,3,0,3)})
+                tw(knob,.12,{BackgroundColor3 = on and Color3.fromRGB(54,58,76) or Color3.fromRGB(45,47,60)})
                 task.spawn(function() cb(on) end)
-            end)
-            return { Set=function(_,v) if v~=on then btn:MouseButton1Click() end end }
+            end
+            btn.MouseButton1Click:Connect(function() set(not on) end)
+            return { Set=function(_,v) set(v) end }
         end
+        -- TextBox (rata kiri, compact)
         function PageAPI:CreateBox(placeholder,iconId,cb)
             cb=cb or function() end
-            local fr=Card(40)
-            local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
+            local fr=Card(44)
+            local row=Instance.new("Frame",fr); row.BackgroundTransparency=1; row.Size=UDim2.new(1,0,0,24)
+            local rowlist=Instance.new("UIListLayout",row); rowlist.FillDirection=Enum.FillDirection.Horizontal; rowlist.Padding=UDim.new(0,8)
+
+            local ic=Instance.new("ImageLabel",row); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); ic.Position=UDim2.new(0,0,0,3)
             ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
-            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Size=UDim2.new(1,-26,0,22); tb.Position=UDim2.new(0,26,0,0)
+
+            local tb=Instance.new("TextBox",row); tb.BackgroundTransparency=0; tb.BackgroundColor3=BG_ELEVATED; tb.Size=UDim2.new(1,-26,1,0)
+            local tc=Instance.new("UICorner",tb); tc.CornerRadius=UDim.new(0,6)
+            local ts=Instance.new("UIStroke",tb); ts.Color=Color3.fromRGB(62,66,82); ts.Transparency=.35
             tb.ClearTextOnFocus=false; tb.Text=""
-            tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
+            tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=FG_TEXT
             tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t) tb.Text=t or "" end }
         end
 
-        -- Single Dropdown (klik = pilih 1 & tutup)
+        -- Single Dropdown (open downward, high ZIndex, shadow)
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(40); fr.Name="Dropdown"
+            local fr=Card(44); fr.Name="Dropdown"
 
             local header=Instance.new("TextButton",fr)
-            header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
-            header.Size=UDim2.new(1,0,0,26); header.Text=""
+            header.BackgroundColor3=BG_ELEVATED; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,26); header.Text=""; header.ZIndex=20
             local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
+            local hs=Instance.new("UIStroke",header); hs.Color=Color3.fromRGB(62,66,82); hs.Transparency=.35
 
             local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
-            ttl.Size=UDim2.new(1,-24,1,0); ttl.Position=UDim2.new(0,8,0,0)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
+            ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=FG_TEXT; ttl.Text=string.upper(title); ttl.ZIndex=21; ttl.TextXAlignment=Enum.TextXAlignment.Left
 
             local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
             caret.Size=UDim2.fromOffset(16,16); caret.Position=UDim2.new(1,-20,0,5)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT; caret.ZIndex=21
 
             local holder=Instance.new("Frame",fr)
-            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.BackgroundColor3=BG_ELEVATED; holder.ZIndex=25
             holder.Position=UDim2.new(0,0,0,30)
             holder.Size=UDim2.new(1,0,0,0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
             holder.Visible=false
             local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
-            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
-            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
+            local ls=Instance.new("UIStroke",holder); ls.Color=Color3.fromRGB(62,66,82); ls.Transparency=.25
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,3)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
+
+            -- drop shadow
+            local shadow=Instance.new("ImageLabel",holder)
+            shadow.Image="rbxassetid://1316045217"; shadow.ScaleType=Enum.ScaleType.Slice; shadow.SliceCenter=Rect.new(10,10,118,118)
+            shadow.BackgroundTransparency=1; shadow.ImageTransparency=.7; shadow.Size=UDim2.new(1,16,1,16); shadow.Position=UDim2.new(0,-8,0,-8); shadow.ZIndex=24
 
             local current=nil
             local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy()
+                    elseif c:IsA("ImageLabel") and c~=shadow then c:Destroy() end
+                end
+                shadow.Parent = holder
                 for _,opt in ipairs(list) do
                     local b=Instance.new("TextButton",holder)
                     b.Size=UDim2.new(1,0,0,22)
-                    b.BackgroundColor3=BG_CARD
-                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    b.BackgroundColor3=BG_CARD; b.AutoButtonColor=true; b.ZIndex=26
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=FG_TEXT
                     local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
-                        current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt)
+                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt)); onChanged(opt)
                         holder.Visible=false; tw(caret,.12,{Rotation=0})
                     end)
                 end
@@ -266,7 +314,7 @@ function library:CreateWindow(name, version, icon)
             end)
 
             return {
-                SetValue   = function(_,v) current=v; ttl.Text=("%s : %s"):format(title,tostring(v)) end,
+                SetValue   = function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end,
                 GetValue   = function() return current end,
                 SetOptions = function(_,opts) rebuild(opts or {}) end
             }
@@ -275,37 +323,42 @@ function library:CreateWindow(name, version, icon)
         -- Multi Dropdown (pilih banyak; header menampilkan jumlah terpilih)
         function PageAPI:CreateMultiDropdown(title, options, onChangedList)
             options=options or {}; onChangedList=onChangedList or function() end
-            local fr=Card(40); fr.Name="MultiDropdown"
+            local fr=Card(44); fr.Name="MultiDropdown"
 
             local header=Instance.new("TextButton",fr)
-            header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
-            header.Size=UDim2.new(1,0,0,26); header.Text=""
+            header.BackgroundColor3=BG_ELEVATED; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,26); header.Text=""; header.ZIndex=20
             local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
+            local hs=Instance.new("UIStroke",header); hs.Color=Color3.fromRGB(62,66,82); hs.Transparency=.35
 
             local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
             ttl.Size=UDim2.new(1,-24,1,0); ttl.Position=UDim2.new(0,8,0,0)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=FG_TEXT; ttl.Text=string.upper(title); ttl.ZIndex=21; ttl.TextXAlignment=Enum.TextXAlignment.Left
 
             local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
             caret.Size=UDim2.fromOffset(16,16); caret.Position=UDim2.new(1,-20,0,5)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT; caret.ZIndex=21
 
             local holder=Instance.new("Frame",fr)
-            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.BackgroundColor3=BG_ELEVATED; holder.ZIndex=25
             holder.Position=UDim2.new(0,0,0,30)
             holder.Size=UDim2.new(1,0,0,0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
             holder.Visible=false
             local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
-            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
-            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
+            local ls=Instance.new("UIStroke",holder); ls.Color=Color3.fromRGB(62,66,82); ls.Transparency=.25
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,3)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
+
+            local shadow=Instance.new("ImageLabel",holder)
+            shadow.Image="rbxassetid://1316045217"; shadow.ScaleType=Enum.ScaleType.Slice; shadow.SliceCenter=Rect.new(10,10,118,118)
+            shadow.BackgroundTransparency=1; shadow.ImageTransparency=.7; shadow.Size=UDim2.new(1,16,1,16); shadow.Position=UDim2.new(0,-8,0,-8); shadow.ZIndex=24
 
             local selected = {}  -- set: name -> true
-            local order = {}     -- keep display order
 
             local function updateHeader()
                 local cnt=0 for _ in pairs(selected) do cnt+=1 end
-                if cnt>0 then ttl.Text=("%s (%d selected)"):format(title,cnt) else ttl.Text=title end
+                ttl.Text = cnt>0 and string.upper(("%s (%d selected)"):format(title,cnt)) or string.upper(title)
             end
 
             local function emit()
@@ -319,19 +372,18 @@ function library:CreateWindow(name, version, icon)
                 row.Size=UDim2.new(1,0,0,22)
                 row.BackgroundColor3=BG_CARD
                 row.AutoButtonColor=true
+                row.ZIndex=26
                 local bc=Instance.new("UICorner",row); bc.CornerRadius=UDim.new(0,6)
 
                 local mark=Instance.new("TextLabel",row)
                 mark.BackgroundTransparency=1; mark.Size=UDim2.new(0,18,1,0); mark.Position=UDim2.new(0,4,0,0)
-                mark.Font=Enum.Font.GothamBlack; mark.TextSize=math.floor(11*SCALE); mark.TextColor3=ACCENT; mark.Text="○"
+                mark.Font=Enum.Font.GothamBlack; mark.TextSize=math.floor(11*SCALE); mark.TextColor3=ACCENT; mark.Text="○"; mark.ZIndex=27
 
                 local txt=Instance.new("TextLabel",row)
                 txt.BackgroundTransparency=1; txt.Size=UDim2.new(1,-28,1,0); txt.Position=UDim2.new(0,24,0,0)
-                txt.Font=Enum.Font.Gotham; txt.TextSize=math.floor(11*SCALE); txt.TextColor3=Color3.new(1,1,1); txt.Text=opt; txt.TextXAlignment=Enum.TextXAlignment.Left
+                txt.Font=Enum.Font.Gotham; txt.TextSize=math.floor(11*SCALE); txt.TextColor3=FG_TEXT; txt.Text=opt; txt.TextXAlignment=Enum.TextXAlignment.Left; txt.ZIndex=27
 
-                local function refresh()
-                    mark.Text = selected[opt] and "●" or "○"
-                end
+                local function refresh() mark.Text = selected[opt] and "●" or "○" end
                 row.MouseButton1Click:Connect(function()
                     if selected[opt] then selected[opt]=nil else selected[opt]=true end
                     refresh(); updateHeader(); emit()
@@ -340,9 +392,12 @@ function library:CreateWindow(name, version, icon)
             end
 
             local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-                table.clear(order)
-                for _,opt in ipairs(list) do table.insert(order,opt); addRow(opt) end
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy()
+                    elseif c:IsA("ImageLabel") and c~=shadow then c:Destroy() end
+                end
+                shadow.Parent = holder
+                for _,opt in ipairs(list) do addRow(opt) end
             end
             rebuild(options)
 
@@ -536,7 +591,6 @@ local function sellCoughAmount(n)
 end
 
 -- ===================== Teleport data =====================
--- Island list (sesuai yang kamu kirim; mudah diubah)
 local islands = {
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
@@ -551,8 +605,6 @@ local islands = {
     ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-
-    -- Tambahan sesuai gambar kamu (boleh diubah dari Live Coordinates)
     ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
     ["Halloween"]                 = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
@@ -603,7 +655,6 @@ local function findPropsContainer()
     return Workspace:FindFirstChild("Props") or Workspace:FindFirstChild("props") or Workspace:FindFirstChild("PROPS")
 end
 
--- Cari child dengan nama fleksibel (case-insensitive, ignore spasi/underscore/dash)
 local function findChildFlexible(parent, name)
     if not (parent and name) then return nil end
     local function norm(s) return string.lower((s:gsub("[%s_%-]", ""))) end
@@ -614,15 +665,11 @@ local function findChildFlexible(parent, name)
     return nil
 end
 
--- List prioritas dari kamu + auto-append dari Props
 local eventsPriority = { "Admin Event", "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
 local function listEventsInGame()
     local props = findPropsContainer()
-    local seen = {}
-    local arr = {}
-    -- a) prioritas (urutan tetap)
+    local seen, arr = {}, {}
     for _,nm in ipairs(eventsPriority) do table.insert(arr,nm); seen[string.lower(nm)]=true end
-    -- b) append dari Props (auto update)
     if props then
         for _,m in ipairs(props:GetChildren()) do
             if (m:IsA("Model") or m:IsA("Folder")) and #m.Name >= 3 then
@@ -634,21 +681,17 @@ local function listEventsInGame()
     return arr
 end
 
--- Dapatkan target CFrame dari sebuah event
 local function findEventTargetCFrame(evName)
     local props = findPropsContainer(); if not props then return nil end
     local m = findChildFlexible(props, evName); if not m then return nil end
-    local candidates = { "Fishing Boat","Boat","Target","Teleport","Portal","Spawn","Center" }
-
-    -- Attribute "Active" sering dipakai; kalau ada & false, anggap tidak aktif
+    -- cek aktif
     local isActive = true
     pcall(function()
         if m:GetAttribute("Active") == false then isActive=false end
         if m:FindFirstChild("Active") and m.Active:IsA("BoolValue") and m.Active.Value==false then isActive=false end
     end)
     if not isActive then return nil end
-
-    -- Cari node kandidat
+    local candidates = { "Fishing Boat","Boat","Target","Teleport","Portal","Spawn","Center" }
     for _,wanted in ipairs(candidates) do
         local node = m:FindFirstChild(wanted) or m:FindFirstChild(wanted, true)
         if node then
@@ -657,7 +700,6 @@ local function findEventTargetCFrame(evName)
             if bp then return bp.CFrame end
         end
     end
-    -- Fallback: basepart atau pivot model
     local bp = m:FindFirstChildWhichIsA("BasePart", true)
     if bp then return bp.CFrame end
     if m.GetPivot then return m:GetPivot() end
@@ -705,16 +747,13 @@ PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"})
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
 -- Teleport
--- 1) Live coordinates label (langsung di menu)
 local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
-
--- 2) Dropdown Island (single)
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
     local pos = islands[choice]
     if pos then tpTo(pos) end
 end)
 
--- 3) NPC dynamic
+-- NPC dynamic
 local function scanNPC()
     local s={} for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") then
@@ -739,7 +778,7 @@ end
 local npcDD = PageTP:CreateDropdown("Teleport NPC", scanNPC(), function(nm) if nm then tpNearestModel(nm) end end)
 task.spawn(function() while true do task.wait(8) npcDD:SetOptions(scanNPC()) end end)
 
--- 4) Players dynamic
+-- Players dynamic
 local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
@@ -753,28 +792,38 @@ end
 
 -- ===================== Event =====================
 local EventStatus = PageEvent:CreateLabel("Events: scanning...")
+local function listEventsInGame() -- re-declare to capture newest props
+    local props = Workspace:FindFirstChild("Props") or Workspace:FindFirstChild("props") or Workspace:FindFirstChild("PROPS")
+    local seen, arr = {}, {}
+    for _,nm in ipairs(eventsPriority) do table.insert(arr,nm); seen[string.lower(nm)]=true end
+    if props then
+        for _,m in ipairs(props:GetChildren()) do
+            if (m:IsA("Model") or m:IsA("Folder")) and #m.Name >= 3 then
+                local key=string.lower(m.Name)
+                if not seen[key] then table.insert(arr, m.Name); seen[key]=true end
+            end
+        end
+    end
+    return arr
+end
+
 local eventsDDMulti = PageEvent:CreateMultiDropdown("Select Events (multi)", listEventsInGame(), function(selectedArr, selectedSet)
-    -- update status count
     EventStatus:UpdateLabel(("Events selected: %d • Available: %d"):format(#selectedArr, #listEventsInGame()))
 end)
--- awalnya pilih semuanya dari prioritas
 eventsDDMulti:SetSelected(eventsPriority)
 
-local toggleAuto = PageEvent:CreateToggle("Auto Teleport Active Events","Akan teleport ke event yang aktif dari daftar pilihanmu.", function(v)
+local toggleAuto = PageEvent:CreateToggle("Auto Teleport Active Events","Teleport otomatis ke event aktif dari daftar pilihan.", function(v)
     state.autoEventTP = v
 end)
 
--- Loop Auto Teleport
 task.spawn(function()
     while true do
         if state.autoEventTP then
             local now=os.clock()
             if now - state.lastEventTP >= state.eventCooldown then
                 local selectedArr, selectedSet = eventsDDMulti:GetSelected()
-                -- refresh available list (auto update UI pilihan kalau ada tambahan)
-                local avail = listEventsInGame()
-                -- jika ada event baru, tambahkan ke opsi (tidak otomatis dipilih)
-                eventsDDMulti:SetOptions(avail)
+                -- sync opsi jika ada event baru
+                eventsDDMulti.SetOptions(eventsDDMulti, listEventsInGame())
 
                 local teleported=false
                 for _,evName in ipairs(selectedArr) do
