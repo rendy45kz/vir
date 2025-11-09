@@ -1,11 +1,16 @@
 --[[ 
-AegisHub • Fish It • Premium (UI Polished + Icons + AUTO-ISLANDS GRID)
+AegisHub • Fish It • Premium (UI Polished v3)
+- UI Library (Blue, Compact, Adaptive Scale, SafeArea, Persistent Overlay)
+- Dropdown rapih, auto-size; halaman pertama auto aktif
+- Premium features: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+- NEW: Teleport Island = manual list (kembali seperti semula)
+      + Coordinate Manager (edit/ambil-pos/save/load/export/import)
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v4) =================
+-- ================== UI LIBRARY (Polished v3) =================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -26,6 +31,7 @@ function library:CreateWindow(name, version, icon)
     protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
     Gui.Parent = CoreGui
 
+    -- ===== Adaptive scale =====
     local function calcScale()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
         local shortest = math.min(vp.X, vp.Y)
@@ -33,11 +39,13 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
+    -- ===== Overlay =====
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
-    Overlay.Size=UDim2.fromOffset(40,40)
+    Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
     Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
-    Instance.new("UICorner",Overlay).CornerRadius=UDim.new(1,0)
+    local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
+    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
     local ox = Gui:GetAttribute("ovx") or 12
     local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
     Overlay.Position = UDim2.fromOffset(ox, oy)
@@ -63,22 +71,25 @@ function library:CreateWindow(name, version, icon)
         end)
     end
 
+    -- ===== Window =====
     local Window = Instance.new("Frame")
     protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
-    Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(330*SCALE))
+    Window.Size=UDim2.fromOffset(math.floor(560*SCALE), math.floor(360*SCALE))
     Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
-    Instance.new("UICorner",Window).CornerRadius=UDim.new(0,6)
+    local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,8)
 
-    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
+    -- Title
+    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(32*SCALE))
     local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
     Icon.Position=UDim2.new(0,8,0,6); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
     local TitleText=Instance.new("TextLabel",Title); TitleText.BackgroundTransparency=1
     TitleText.Position=UDim2.new(0,30,0,0); TitleText.Size=UDim2.new(1,-30,1,0)
-    TitleText.Font=Enum.Font.GothamMedium; TitleText.TextSize=math.floor(12*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
+    TitleText.Font=Enum.Font.GothamMedium; TitleText.TextSize=math.floor(13*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1); TitleText.Text=("%s • %s"):format(name,version)
     local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
     Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
+    -- Drag
     do local dragging,start,origin
         Title.InputBegan:Connect(function(i)
             if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
@@ -93,19 +104,22 @@ function library:CreateWindow(name, version, icon)
         end)
     end
 
+    -- Overlay toggle
     local hidden=false
     Overlay.MouseButton1Click:Connect(function()
         hidden=not hidden; Window.Visible=not hidden
         tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
     end)
 
+    -- ===== Tabs rail (dengan ikon) =====
     local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
-    TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(145*SCALE),1,-math.floor(42*SCALE))
-    Instance.new("UICorner",TabsRail).CornerRadius=UDim.new(0,6)
+    TabsRail.Position=UDim2.new(0,8,0,math.floor(38*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(160*SCALE),1,-math.floor(46*SCALE))
+    local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,8)
     local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE)); trlbl.Position=UDim2.new(0,8,0,0)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
-    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(6*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
+    -- ===== Tabs/Page API =====
     local firstShown=false
     local TabsAPI={}
     function TabsAPI:CreateFrame(title, iconId)
@@ -115,82 +129,71 @@ function library:CreateWindow(name, version, icon)
         Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
         Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.fromOffset(0,0)
         Page.BackgroundColor3=BG_DARK
-        Page.Position=UDim2.new(0,math.floor(160*SCALE),0,math.floor(36*SCALE))
-        Page.Size=UDim2.new(1,-math.floor(166*SCALE),1,-math.floor(42*SCALE))
+        Page.Position=UDim2.new(0,math.floor(176*SCALE),0,math.floor(38*SCALE))
+        Page.Size=UDim2.new(1,-math.floor(184*SCALE),1,-math.floor(46*SCALE))
         Page.Visible=false
-        Instance.new("UICorner",Page).CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(6*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(6*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
-        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(6*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,8)
+        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(8*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(8*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(8*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(8*SCALE))
+        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(8*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
 
-        local TabBtn=Instance.new("TextButton",TabsRail)
-        TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-10,0,math.floor(20*SCALE))
-        TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(11*SCALE)
-        TabBtn.TextColor3=Color3.new(1,1,1)
-        TabBtn.TextTransparency=.5
-        TabBtn.TextXAlignment = Enum.TextXAlignment.Left
-        TabBtn.Text = "      "..title
-
-        local IconImg = Instance.new("ImageLabel", TabBtn)
-        IconImg.BackgroundTransparency = 1
-        IconImg.Size = UDim2.fromOffset(math.floor(14*SCALE), math.floor(14*SCALE))
-        IconImg.Position = UDim2.new(0, 2, 0, math.floor(3*SCALE))
-        IconImg.Image = "rbxassetid://"..tostring(iconId or 10044538000)
-        IconImg.ImageColor3 = ACCENT
-
+        local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
+        TabBtn.Size=UDim2.new(1,-10,0,math.floor(20*SCALE)); TabBtn.Text=""; TabBtn.AutoButtonColor=true
+        local hb=Instance.new("Frame",TabBtn); hb.BackgroundTransparency=1; hb.Size=UDim2.new(1,0,1,0)
+        local icon=Instance.new("ImageLabel",hb); icon.BackgroundTransparency=1; icon.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE))
+        icon.Position=UDim2.new(0,0,0,.5*(-math.floor(14*SCALE))+2); icon.Image="rbxassetid://"..tostring(iconId or 10045753138); icon.ImageColor3=ACCENT
+        local text=Instance.new("TextLabel",hb); text.BackgroundTransparency=1; text.Position=UDim2.new(0,18,0,0); text.Size=UDim2.new(1,-18,1,0)
+        text.Text=title; text.Font=Enum.Font.Gotham; text.TextSize=math.floor(11*SCALE); text.TextColor3=Color3.new(1,1,1); text.TextXAlignment=Enum.TextXAlignment.Left; text.TextTransparency=.5
         local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,2,1,-4)
         indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
             indicator.Visible=true
             for _,v in ipairs(Window:GetChildren()) do if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end end
-            for _,v in ipairs(TabsRail:GetChildren()) do if v:IsA("TextButton") then v.TextTransparency=.5 end end
-            TabBtn.TextTransparency=0; Page.Visible=true
+            for _,v in ipairs(TabsRail:GetChildren()) do if v:IsA("TextButton") then v.TextTransparency=.5; local t=v:FindFirstChildOfClass("Frame"); if t then local tt=t:FindFirstChildOfClass("TextLabel"); if tt then tt.TextTransparency=.5 end end end end
+            text.TextTransparency=0; Page.Visible=true
         end
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
+        -- ---------- Card helper (AUTO-SIZE) ----------
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
-            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 40)*SCALE))
+            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 44)*SCALE))
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.ClipsDescendants=false
-            Instance.new("UICorner",fr).CornerRadius=UDim.new(0,6)
+            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,8)
             return fr
         end
 
         local PageAPI={}
-        PageAPI._root = Page  -- <== dipakai oleh fitur custom
-
         function PageAPI:CreateLabel(text)
-            local fr=Card(24)
+            local fr=Card(26)
             local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
             lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
             return { UpdateLabel=function(_,t) lb.Text=t end }
         end
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
-            local fr=Card(42)
+            local fr=Card(46)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(22*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
-            local fr=Card(42)
+            local fr=Card(46)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(22*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
             local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
-            knob.BackgroundColor3=Color3.fromRGB(20,20,24); Instance.new("UICorner",knob).CornerRadius=UDim.new(1,0)
+            knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
-            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
+            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
             local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
             local on=false
             btn.MouseButton1Click:Connect(function()
@@ -202,60 +205,73 @@ function library:CreateWindow(name, version, icon)
         end
         function PageAPI:CreateBox(placeholder,iconId,cb)
             cb=cb or function() end
-            local fr=Card(32)
+            local fr=Card(34)
             local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
             ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
             local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
-            tb.ClearTextOnFocus = false; tb.Text = ""
+            tb.ClearTextOnFocus = false
+            tb.Text = ""
             tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
             tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
-            return { SetText=function(_,t) tb.Text=t or "" end }
+            return { SetText=function(_,t) tb.Text=t or "" end, GetText=function() return tb.Text end }
         end
 
-        -- SECTION GRID (untuk Island list)
-        function PageAPI:CreateGridSection(title)
-            local fr=Card(60)
-            local titleLbl = Instance.new("TextLabel", fr)
-            titleLbl.BackgroundTransparency=1
-            titleLbl.Size = UDim2.new(1,-8,0,26)
-            titleLbl.Position = UDim2.new(0,8,0,4)
-            titleLbl.Font = Enum.Font.GothamBlack
-            titleLbl.TextSize = math.floor(12*SCALE)
-            titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-            titleLbl.TextColor3 = Color3.new(1,1,1)
-            titleLbl.Text = title or "Section"
+        -- Dropdown mendorong layout (tanpa scrollbar)
+        function PageAPI:CreateDropdown(title, options, onChanged)
+            options=options or {}; onChanged=onChanged or function() end
+            local fr=Card(34); fr.Name="Dropdown"
 
-            local wrap = Instance.new("Frame", fr)
-            wrap.BackgroundTransparency = 1
-            wrap.Position = UDim2.new(0,8,0,30)
-            wrap.Size = UDim2.new(1,-16,0,0)
-            wrap.AutomaticSize = Enum.AutomaticSize.Y
+            local header=Instance.new("TextButton",fr)
+            header.BackgroundColor3 = BG_CARD; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""
+            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,8)
 
-            local grid = Instance.new("UIGridLayout", wrap)
-            grid.SortOrder = Enum.SortOrder.LayoutOrder
-            grid.CellPadding = UDim2.fromOffset(6,6)
-            grid.CellSize = UDim2.fromOffset(160,28)
+            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
+            ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
+
+            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
+            caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+
+            local holder=Instance.new("Frame",fr)
+            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE))
+            holder.Size=UDim2.new(1,0,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible=false
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,8)
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
+
+            local current=nil
+            local function rebuild(list)
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                for _,opt in ipairs(list) do
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
+                    b.BackgroundColor3=BG_CARD
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,8)
+                    b.MouseButton1Click:Connect(function()
+                        current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt)
+                        holder.Visible=false; tw(caret,.12,{Rotation=0})
+                    end)
+                end
+            end
+            rebuild(options)
+
+            local open=false
+            header.MouseButton1Click:Connect(function()
+                open = not open; holder.Visible = open
+                tw(caret,.12,{Rotation=open and 180 or 0})
+            end)
 
             return {
-                SetTitle=function(_,t) titleLbl.Text=t end,
-                SetCellSize=function(_,w,h) grid.CellSize=UDim2.fromOffset(w,h) end,
-                Clear=function()
-                    for _,c in ipairs(wrap:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-                end,
-                AddButton=function(_,label,cb)
-                    local b = Instance.new("TextButton")
-                    b.Size = UDim2.fromOffset(160,28)
-                    b.BackgroundColor3 = BG_DARK
-                    b.Text = tostring(label)
-                    b.Font = Enum.Font.Gotham
-                    b.TextSize = math.floor(11*SCALE)
-                    b.TextColor3 = Color3.new(1,1,1)
-                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-                    b.Parent = wrap
-                    if cb then b.MouseButton1Click:Connect(cb) end
-                    return b
-                end,
+                SetValue   = function(_,v) current=v; ttl.Text=("%s : %s"):format(title,tostring(v)) end,
+                GetValue   = function() return current end,
+                SetOptions = function(_,opts) rebuild(opts or {}) end
             }
         end
 
@@ -266,6 +282,7 @@ function library:CreateWindow(name, version, icon)
     function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
     return winAPI
 end
+
 
 ----------------------------------------------------------------
 -- ======================= PREMIUM SCRIPT ======================
@@ -286,7 +303,7 @@ LocalPlayer.Idled:Connect(function()
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- State/delays
+-- ========== State ==========
 local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
              floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
              reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
@@ -299,7 +316,7 @@ local function effDelays()
     return clamp(c,.35,12),clamp(r,.15,6)
 end
 
--- Remotes/modules
+-- ========== Remotes / modules ==========
 local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHotbar,RE_RepText,RF_SellAll
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
@@ -327,13 +344,12 @@ task.spawn(function()
     if okU then ItemUtility=modU end
 end)
 
--- Rod helpers
+-- Rod helper
 local RodDelays={["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},["Ghostfinn Rod"]={custom=1.12,bypass=1.45},
 ["Astral Rod"]={custom=1.90,bypass=1.45},["Chrome Rod"]={custom=2.30,bypass=2.00},["Steampunk Rod"]={custom=2.50,bypass=2.30},
 ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},["Demascus Rod"]={custom=3.90,bypass=3.80},
 ["Grass Rod"]={custom=3.80,bypass=3.90},["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
 ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},}
-local LocalPlayer = Players.LocalPlayer
 local function getEquippedRodName()
     local pg=LocalPlayer:FindFirstChild("PlayerGui"); local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
     if not display then return nil end
@@ -352,7 +368,7 @@ local function setFloating(on)
     else if floatBV then floatBV:Destroy(); floatBV=nil end end
 end
 
--- Auto-finish hook
+-- Auto-finish
 task.spawn(function()
     repeat task.wait() until RE_RepText
     if not RE_RepText then return end
@@ -364,7 +380,7 @@ task.spawn(function()
     end)
 end)
 
--- Fishing loop
+-- Fishing core
 local function castOnce()
     state.AFfishing=true
     if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
@@ -427,161 +443,83 @@ local function sellCoughAmount(n)
     SellAll(); setFavByPredicate(function() return true end,true)
 end
 
--- Teleport util
-local function tpTo(pos)
-    local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
-    local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
-    if hrp and pos then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
-end
+-- ================= Teleport: ISLANDS (manual + manager) =================
+-- Nama-nama island dari kamu (beberapa sudah ada koordinat)
+local Islands = {
+    ["Crystal Cavern"]      = Vector3.new(0,0,0),
+    ["Halloween"]           = Vector3.new(0,0,0),
+    ["Ancient Underground"] = Vector3.new(0,0,0),
+    ["Ancient Inside Temple"]=Vector3.new(0,0,0),
+    ["Ancient Jungle"]      = Vector3.new(0,0,0),
 
-----------------------------------------------------------------
--- ============ AUTO-DETECT ISLANDS (semua) + UI GRID ==========
-----------------------------------------------------------------
-local NAME_FOLDERS = {"Islands","Island","World","Map","Areas","Locations","Teleports","Teleport","Docks"}
+    ["Coral Reefs"]         = Vector3.new(-3095,1,2177),
+    ["Kohana"]              = Vector3.new(-658,3,719),
+    ["Kohana Volcano"]      = Vector3.new(-519,24,189),
+    ["Winter Fest"]         = Vector3.new(1611,4,3280),
+    ["Sisyphus"]            = Vector3.new(-3792,-135,-986),  -- patung Sisyphus
 
-local function _titlecase(s) s=tostring(s or ""); return (s:gsub("(%a)([%w_']*)", function(a,b) return a:upper()..b:lower() end)) end
-local function _similar(a,b) a=string.lower(a); b=string.lower(b); if a==b then return true end; return a:gsub("%s+","")==b:gsub("%s+","") end
+    ["Esoteric Island"]     = Vector3.new(1987,4,1400),
+    ["Esoteric Depths"]     = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]      = Vector3.new(-2038,3,3650),
+    ["Fisherman Island"]    = Vector3.new(0,0,0),
 
-local function _tryModuleIslands(acc)
-    for _,desc in ipairs(ReplicatedStorage:GetDescendants()) do
-        if desc:IsA("ModuleScript") and string.find(string.lower(desc.Name), "island") then
-            local ok,tab = pcall(require, desc)
-            if ok and type(tab)=="table" then
-                for k,v in pairs(tab) do
-                    local nm, pos
-                    if typeof(v)=="Vector3" then nm = _titlecase(tostring(k)); pos = v
-                    elseif type(v)=="table" then
-                        nm = _titlecase(tostring(v.Name or k))
-                        local p = v.Position or v.Pos or v.CFrame
-                        if typeof(p)=="CFrame" then pos=p.Position elseif typeof(p)=="Vector3" then pos=p end
-                    end
-                    if nm and pos then acc[#acc+1] = {name=nm, pos=pos} end
-                end
-            end
-        end
-    end
-end
+    ["Treasure Room"]       = Vector3.new(-3600,-267,-1558), -- dulu "Treasure Hall"
+    ["Lost Shore"]          = Vector3.new(-3663,38,-989),
+    ["Weather Machine"]     = Vector3.new(-1471,-3,1929),
+    ["Crater Island"]       = Vector3.new(968,1,4854),
 
-local function _tryFolderIslands(acc)
-    local function consumeFolder(folder)
-        for _,ch in ipairs(folder:GetChildren()) do
-            if ch:IsA("Model") or ch:IsA("Folder") then
-                if ch:IsA("Model") then
-                    local cf,size = ch:GetBoundingBox()
-                    if size.Magnitude > 120 then
-                        acc[#acc+1] = {name=_titlecase(ch.Name), pos=cf.Position}
-                    end
-                else
-                    consumeFolder(ch)
-                end
-            elseif ch:IsA("BasePart") then
-                acc[#acc+1] = {name=_titlecase(ch.Name), pos=ch.Position}
-            end
-        end
-    end
-    for _,root in ipairs({Workspace, Workspace:FindFirstChild("World"), Workspace:FindFirstChild("Map")}) do
-        if root then
-            for _,fname in ipairs(NAME_FOLDERS) do
-                local f = root:FindFirstChild(fname)
-                if f then consumeFolder(f) end
-            end
-        end
-    end
-end
-
-local function _tryPromptIslands(acc)
-    for _,pp in ipairs(Workspace:GetDescendants()) do
-        if pp:IsA("ProximityPrompt") then
-            local txt = ((pp.ObjectText or "").." "..(pp.ActionText or "")):gsub("%p","")
-            local guess = _titlecase((txt ~= "" and txt) or (pp.Parent and pp.Parent.Name) or "Location")
-            local part = pp.Parent and (pp.Parent:IsA("BasePart") and pp.Parent or pp.Parent:FindFirstChildWhichIsA("BasePart"))
-            if not part and pp.Parent and pp.Parent.Parent then
-                local p2 = pp.Parent.Parent
-                if p2:IsA("BasePart") then part = p2 else part = p2:FindFirstChildWhichIsA("BasePart") end
-            end
-            if part and #guess >= 3 then
-                acc[#acc+1] = {name=guess, pos=part.Position}
-            end
-        end
-    end
-end
-
-local function _mergeIslands(raw)
-    local merged = {}
-    for _,item in ipairs(raw) do
-        local found = false
-        for _,m in ipairs(merged) do
-            if _similar(m.name, item.name) and (m.pos - item.pos).Magnitude < 60 then
-                found = true; break
-            end
-        end
-        if not found then table.insert(merged, item) end
-    end
-    table.sort(merged, function(a,b) return a.name < b.name end)
-    return merged
-end
-
-local function scanAllIslands()
-    local raw = {}
-    _tryModuleIslands(raw)
-    _tryFolderIslands(raw)
-    _tryPromptIslands(raw)
-
-    local merged = _mergeIslands(raw)
-    local names, map = {}, {}
-    for _,it in ipairs(merged) do
-        names[#names+1] = it.name
-        map[it.name] = it.pos
-    end
-    return names, map
-end
-
-----------------------------------------------------------------
--- ========================= UI BUILD ==========================
-----------------------------------------------------------------
-local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
-local Tab = UI:CreateTab("Sections")
-
-local ICONS = {
-  ["Fishing V1"] = 6031091002,
-  ["Fishing V2"] = 6031091002,
-  ["Inventory"]  = 6031068429,
-  ["Shop"]       = 6031265976,
-  ["Teleport"]   = 6035190846,
-  ["Event"]      = 6034509993,
+    -- Tambahan yang lama (kalau mau dipakai)
+    ["Stingray Shores"]     = Vector3.new(-32,4,2773),
 }
 
-local PageV1    = Tab:CreateFrame("Fishing V1", ICONS["Fishing V1"])
-local PageV2    = Tab:CreateFrame("Fishing V2", ICONS["Fishing V2"])
-local PageInv   = Tab:CreateFrame("Inventory",  ICONS["Inventory"])
-local PageShop  = Tab:CreateFrame("Shop",       ICONS["Shop"])
-local PageTP    = Tab:CreateFrame("Teleport",   ICONS["Teleport"])
-local PageEvent = Tab:CreateFrame("Event",      ICONS["Event"])
+-- ====== Persistence (optional, tergantung executor) ======
+local FILE = "aegishub_fishit_islands.json"
+local function canFS() return (isfile and writefile and readfile) ~= nil end
+local function islandsToJSON(tbl)
+    local arr = {}
+    for name,pos in pairs(tbl) do
+        table.insert(arr,{name=name,x=pos.X,y=pos.Y,z=pos.Z})
+    end
+    table.sort(arr,function(a,b) return a.name<b.name end)
+    return game:GetService("HttpService"):JSONEncode(arr)
+end
+local function jsonToIslands(json)
+    local ok,arr = pcall(function() return game:GetService("HttpService"):JSONDecode(json) end)
+    if not ok or type(arr)~="table" then return false end
+    for _,it in ipairs(arr) do
+        if it.name and it.x and it.y and it.z then
+            Islands[it.name] = Vector3.new(tonumber(it.x),tonumber(it.y),tonumber(it.z))
+        end
+    end
+    return true
+end
+local function saveIslands()
+    if canFS() then
+        local ok,err=pcall(function() writefile(FILE, islandsToJSON(Islands)) end)
+        return ok,err
+    end
+    return false,"filesystem not available"
+end
+local function loadIslands()
+    if canFS() and isfile(FILE) then
+        local ok,err=pcall(function() jsonToIslands(readfile(FILE)) end)
+        return ok,err
+    end
+    return false,"no file"
+end
+loadIslands()  -- coba load kalau ada
 
--- V1
-local Live = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: normal")
-PageV1:CreateToggle("Blatant Mode","Very fast fishing mode",function(v) state.blatant=v end)
-PageV1:CreateBox("Reel Delay (seconds)",10044538000,function(t) state.reelOverride=tonumber(t) end)
-PageV1:CreateBox("Custom Complete Delay (seconds)",10044538000,function(t) state.completeOverride=tonumber(t) end)
-PageV1:CreateToggle("Start / Stop","Mulai / hentikan loop",function(v) if v then StartAutoFish() else StopAutoFish() end end)
-PageV1:CreateButton("Cancel Fishing","Batalkan siklus",function() StopAutoFish() end)
+local function sortedIslandNames()
+    local t={} for n,_ in pairs(Islands) do table.insert(t,n) end table.sort(t); return t end
 
--- V2
-PageV2:CreateToggle("Instant Fishing","Selesaikan segera saat bite",function(v) state.instant=v end)
-PageV2:CreateToggle("Perfect Cast","Akurasi maksimal",function(v) state.perfectCast=v end)
-PageV2:CreateToggle("Auto Recast / Anti Stuck","Recast saat idle lama",function(v) state.autoRecast=v end)
-PageV2:CreateBox("Idle Delay (detik)",10044538000,function(t) state.idleDelay = clamp(tonumber(t) or 3,0.3,20) end)
-PageV2:CreateToggle("Floating","Mengambang di udara",function(v) setFloating(v) end)
+local function tpTo(vec)
+    local cf=Workspace:FindFirstChild("Characters")
+    local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
+    local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
+    if hrp and vec then hrp.CFrame=CFrame.new(vec + Vector3.new(0,4,0)) end
+end
 
--- Inventory
-PageInv:CreateToggle("Auto Sell All (periodic)","Jual semua berkala",function(v) state.autoSellAll=v end)
-PageInv:CreateBox("Auto Sell Input Amount",10044538000,function(t) state.sellCustomAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
-PageInv:CreateButton("Run: Sell Custom Amount","",function() if state.sellCustomAmount>0 then sellAnyAmount(state.sellCustomAmount) end end)
-PageInv:CreateBox("Auto Sell Cough Fish (amount)",10044538000,function(t) state.coughSellAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
-PageInv:CreateButton("Run: Sell Cough Fish Amount","",function() if state.coughSellAmount>0 then sellCoughAmount(state.coughSellAmount) end end)
-PageInv:CreateButton("Sell ALL Now","",function() SellAll() end)
-
--- Shop
+-- Prompt helpers (Shop/Event)
 local function fireNearestPrompt(filterFn,maxDist)
     maxDist=maxDist or 120
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
@@ -609,43 +547,58 @@ local function openShopByKeyword(keys)
         return false
     end,200)
 end
+
+-- ================= UI BUILD =================
+local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
+local Tab = UI:CreateTab("Sections")
+
+local PageV1    = Tab:CreateFrame("Fishing V1", 17576606629)   -- icon ID contoh
+local PageV2    = Tab:CreateFrame("Fishing V2", 17576606629)
+local PageInv   = Tab:CreateFrame("Inventory", 17576611971)
+local PageShop  = Tab:CreateFrame("Shop", 17576609184)
+local PageTP    = Tab:CreateFrame("Teleport", 17576608063)
+local PageEvent = Tab:CreateFrame("Event", 17576610134)
+
+-- V1
+local Live = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: normal")
+PageV1:CreateToggle("Blatant Mode","Very fast fishing mode",function(v) state.blatant=v end)
+PageV1:CreateBox("Reel Delay (seconds)",10044538000,function(t) state.reelOverride=tonumber(t) end)
+PageV1:CreateBox("Custom Complete Delay (seconds)",10044538000,function(t) state.completeOverride=tonumber(t) end)
+PageV1:CreateToggle("Start / Stop","Mulai / hentikan loop",function(v) if v then StartAutoFish() else StopAutoFish() end end)
+PageV1:CreateButton("Cancel Fishing","Batalkan siklus",function() StopAutoFish() end)
+
+-- V2
+PageV2:CreateToggle("Instant Fishing","Selesaikan segera saat bite",function(v) state.instant=v end)
+PageV2:CreateToggle("Perfect Cast","Akurasi maksimal",function(v) state.perfectCast=v end)
+PageV2:CreateToggle("Auto Recast / Anti Stuck","Recast saat idle lama",function(v) state.autoRecast=v end)
+PageV2:CreateBox("Idle Delay (detik)",10044538000,function(t) state.idleDelay = clamp(tonumber(t) or 3,0.3,20) end)
+PageV2:CreateToggle("Floating","Mengambang di udara",function(v) setFloating(v) end)
+
+-- Inventory
+PageInv:CreateToggle("Auto Sell All (periodic)","Jual semua berkala",function(v) state.autoSellAll=v end)
+PageInv:CreateBox("Auto Sell Input Amount",10044538000,function(t) state.sellCustomAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
+PageInv:CreateButton("Run: Sell Custom Amount","",function() if state.sellCustomAmount>0 then sellAnyAmount(state.sellCustomAmount) end end)
+PageInv:CreateBox("Auto Sell Cough Fish (amount)",10044538000,function(t) state.coughSellAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
+PageInv:CreateButton("Run: Sell Cough Fish Amount","",function() if state.coughSellAmount>0 then sellCoughAmount(state.coughSellAmount) end end)
+PageInv:CreateButton("Sell ALL Now","",function() SellAll() end)
+
+-- Shop
 PageShop:CreateButton("Traveling Merchant","Open merchant",function() openShopByKeyword({"traveling","merchant","travelling"}) end)
 PageShop:CreateButton("Bobber Shop","",function() openShopByKeyword({"bobber","shop"}) end)
 PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"}) end)
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
--- =================== TELEPORT: ISLAND LIST (AUTO, GRID) ===================
-local IslandGrid = PageTP:CreateGridSection("Teleport Island • Auto")
-IslandGrid:SetCellSize(160,28)
-
-local function rebuildIslandsUI()
-    local ok, names, map = pcall(function()
-        local n,m = scanAllIslands(); return n,m
-    end)
-    if not ok then return end
-    IslandGrid:Clear()
-    for _,nm in ipairs(names) do
-        local pos = map[nm]
-        IslandGrid:AddButton(nm, function() tpTo(pos) end)
-    end
-    IslandGrid:SetTitle(("Teleport Island • %d found (Auto)"):format(#names))
-end
-
-rebuildIslandsUI()
-task.spawn(function()
-    local lastKey=""
-    while true do
-        task.wait(12)
-        local names = select(1, scanAllIslands())
-        local key = table.concat(names, "|")
-        if key ~= lastKey then
-            lastKey = key
-            rebuildIslandsUI()
-        end
+-- Teleport (Dropdowns)
+local currentIslandName=nil
+local islandsDD = PageTP:CreateDropdown("Teleport Island", sortedIslandNames(), function(choice)
+    currentIslandName = choice
+    local pos = Islands[choice]
+    if pos and typeof(pos)=="Vector3" and (pos.X~=0 or pos.Y~=0 or pos.Z~=0) then
+        tpTo(pos)
     end
 end)
 
--- Teleport NPC (dropdown dinamis)
+-- NPC dynamic
 local function tpNearestModel(partial)
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
     local best,dist
@@ -657,6 +610,7 @@ local function tpNearestModel(partial)
     end
     if best then tpTo(best.Position) end
 end
+
 local function scanNPC()
     local s={} for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") then
@@ -667,10 +621,11 @@ local function scanNPC()
     end
     local t={} for k in pairs(s) do table.insert(t,k) end table.sort(t); return t
 end
+
 local npcDD = PageTP:CreateDropdown("Teleport NPC", scanNPC(), function(nm) if nm then tpNearestModel(nm) end end)
 task.spawn(function() while true do task.wait(8) npcDD:SetOptions(scanNPC()) end end)
 
--- Teleport Player (dropdown dinamis)
+-- Players dynamic
 local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
@@ -681,6 +636,68 @@ Players.PlayerRemoving:Connect(function() plDD:SetOptions(playersList()) end)
 if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
+
+-- ===== Coordinate Manager (di tab Teleport) =====
+PageTP:CreateLabel("Coordinate Manager")
+local cm_island = PageTP:CreateDropdown("Select Island", sortedIslandNames(), function(nm) currentIslandName=nm end)
+cm_island:SetValue(sortedIslandNames()[1])
+
+local boxX = PageTP:CreateBox("X", 10044538000, function() end)
+local boxY = PageTP:CreateBox("Y", 10044538000, function() end)
+local boxZ = PageTP:CreateBox("Z", 10044538000, function() end)
+
+local function refreshXYZFromData()
+    local nm = currentIslandName or cm_island:GetValue()
+    if not nm then return end
+    local p = Islands[nm] or Vector3.new(0,0,0)
+    boxX:SetText(tostring(math.floor(p.X)))
+    boxY:SetText(tostring(math.floor(p.Y)))
+    boxZ:SetText(tostring(math.floor(p.Z)))
+end
+refreshXYZFromData()
+
+PageTP:CreateButton("Use Current Position","Ambil koordinat posisi kamu sekarang",function()
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp=char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        boxX:SetText(string.format("%.0f", hrp.Position.X))
+        boxY:SetText(string.format("%.0f", hrp.Position.Y))
+        boxZ:SetText(string.format("%.0f", hrp.Position.Z))
+    end
+end)
+
+PageTP:CreateButton("Save / Update Island","Simpan ke memory (+ file bila ada)",function()
+    local nm = currentIslandName or cm_island:GetValue(); if not nm then return end
+    local x=tonumber(boxX:GetText() or "0") or 0
+    local y=tonumber(boxY:GetText() or "0") or 0
+    local z=tonumber(boxZ:GetText() or "0") or 0
+    Islands[nm] = Vector3.new(x,y,z)
+    islandsDD:SetOptions(sortedIslandNames())
+    cm_island:SetOptions(sortedIslandNames()); cm_island:SetValue(nm)
+    saveIslands()
+end)
+
+PageTP:CreateButton("Teleport (from boxes)","Teleport pakai X/Y/Z di atas",function()
+    local x=tonumber(boxX:GetText() or "0") or 0
+    local y=tonumber(boxY:GetText() or "0") or 0
+    local z=tonumber(boxZ:GetText() or "0") or 0
+    tpTo(Vector3.new(x,y,z))
+end)
+
+PageTP:CreateButton("Export JSON to Clipboard","Copy JSON islands",function()
+    if setclipboard then setclipboard(islandsToJSON(Islands)) end
+end)
+local importBox = PageTP:CreateBox("Paste JSON here lalu enter", 10044538000, function(txt)
+    if txt and #txt>0 then
+        if jsonToIslands(txt) then
+            saveIslands()
+            islandsDD:SetOptions(sortedIslandNames())
+            cm_island:SetOptions(sortedIslandNames())
+            refreshXYZFromData()
+        end
+    end
+end)
+PageTP:CreateButton("Reload From File","Muat ulang dari file (jika ada)",function() loadIslands(); islandsDD:SetOptions(sortedIslandNames()); cm_island:SetOptions(sortedIslandNames()); refreshXYZFromData() end)
 
 -- Event
 PageEvent:CreateLabel("Event Options")
@@ -706,4 +723,12 @@ end)
 task.spawn(function()
     local pg=LocalPlayer:WaitForChild("PlayerGui"); local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
     display.ChildAdded:Connect(function() task.wait(.05) refreshRodDelays() end)
+end)
+
+-- Refresh Coordinate Manager saat ganti pilihan island
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        refreshXYZFromData()
+    end
 end)
