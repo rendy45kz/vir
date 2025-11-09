@@ -596,7 +596,7 @@ end
 -- Kata kunci event agar deteksi kuat
 local EVENT_KEYWORDS = {
     "megalodon","admin event","ghost worm","worm hunt","shark hunt",
-    "ghost shark","shocked","black hole","meteor rain","meteor","worm","megalodon hunt"
+    "GHOST Shark Hunt","shocked","black hole","meteor rain","meteor","worm","megalodon hunt"
 }
 
 -- Status label dan toggle tunggal
