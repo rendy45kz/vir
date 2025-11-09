@@ -171,7 +171,7 @@ function library:CreateWindow(name, version, icon)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc atau ""
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
@@ -181,7 +181,7 @@ function library:CreateWindow(name, version, icon)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc atau ""; d.TextXAlignment=Enum.TextXAlignment.Left
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
             local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
             knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
@@ -265,7 +265,7 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
-        -- >>> Multi-Select (pilih banyak opsi)
+        -- >>> Multi-Select
         function PageAPI:CreateMultiSelect(title, options, onChanged)
             options = options or {}
             onChanged = onChanged or function() end
@@ -361,7 +361,8 @@ function library:CreateWindow(name, version, icon)
                         end
                     end
                     updateHeader()
-                    onChanged(_.GetSelected())
+                    local arr={} for k,v in pairs(selected) do if v then table.insert(arr,k) end end
+                    table.sort(arr); onChanged(arr)
                 end,
                 SetOptions = function(_,opts) rebuild(opts or {}) end
             }
@@ -413,7 +414,7 @@ local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHot
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
 task.spawn(function()
-    local function gw(o,n,t) return o:FindFirstChild(n) atau o:WaitForChild(n,t or 10) end
+    local function gw(o,n,t) return o:FindFirstChild(n) or o:WaitForChild(n,t or 10) end
     local okNet,mod=pcall(function() local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10) end)
     if okNet then net=mod
         RF_ChargeFishingRod=net:FindFirstChild("RF/ChargeFishingRod")
@@ -550,7 +551,7 @@ local islands = {
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
 
-    -- Tambahan dari screenshot (boleh kamu koreksi via Live Coordinates)
+    -- Tambahan (boleh koreksi via Live Coordinates)
     ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
     ["Halloween"]                 = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
@@ -569,8 +570,8 @@ end
 
 -- Prompt helpers (Shop/Event)
 local function fireNearestPrompt(filterFn,maxDist)
-    maxDist=maxDist atau 120
-    local char=LocalPlayer.Character atau LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+    maxDist=maxDist or 120
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
     local best,dist
     for _,d in ipairs(Workspace:GetDescendants()) do
         if d:IsA("ProximityPrompt") then
