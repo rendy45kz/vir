@@ -449,22 +449,36 @@ local function sellCoughAmount(n)
 end
 
 -- Teleport data (STATIC list seperti semula)
-local islands={
-    ["Weather Machine"]=Vector3.new(-1471,-3,1929),
-    ["Esoteric Depths"]=Vector3.new(3157,-1303,1439),
-    ["Tropical Grove"]=Vector3.new(-2038,3,3650),
-    ["Stingray Shores"]=Vector3.new(-32,4,2773),
-    ["Kohana Volcano"]=Vector3.new(-519,24,189),
-    ["Coral Reefs"]=Vector3.new(-3095,1,2177),
-    ["Crater Island"]=Vector3.new(968,1,4854),
-    ["Kohana"]=Vector3.new(-658,3,719),
-    ["Winter Fest"]=Vector3.new(1611,4,3280),
-    ["Isoteric Island"]=Vector3.new(1987,4,1400),
-    ["Treasure Hall"]=Vector3.new(-3600,-267,-1558),
-    ["Lost Shore"]=Vector3.new(-3663,38,-989),
-    ["Sishypus Statue"]=Vector3.new(-3792,-135,-986),
+-- Teleport data (pakai nama-nama island versi kamu)
+local islands = {
+    -- ✅ sudah ada koordinat dari versi sebelumnya
+    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
+    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
+    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
+    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
+    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
+    ["Crater Island"]     = Vector3.new(968,1,4854),
+    ["Kohana"]            = Vector3.new(-658,3,719),
+    ["Winter Fest"]       = Vector3.new(1611,4,3280),
+    ["Esoteric Island"]   = Vector3.new(1987,4,1400),   -- (dulu tertulis "Isoteric Island")
+    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558), -- (dulu "Treasure Hall")
+    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
+    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),   -- (dulu "Sishypus Statue")
+
+    -- 🟣 nama baru dari kamu (ISI KOORDINAT pakai Live Coordinates)
+    ["Crystal Cavern"]            = Vector3.new(0,0,0),  -- ISI KOORDINAT
+    ["Halloween"]                 = Vector3.new(0,0,0),  -- ISI KOORDINAT (event area)
+    ["Ancient Underground Cave"]  = Vector3.new(0,0,0),  -- ISI KOORDINAT
+    ["Ancient Inside Temple"]     = Vector3.new(0,0,0),  -- ISI KOORDINAT
+    ["Ancient Jungle"]            = Vector3.new(0,0,0),  -- ISI KOORDINAT
+    ["Fisherman Island"]          = Vector3.new(0,0,0),  -- ISI KOORDINAT
 }
-local islandList={} for n,_ in pairs(islands) do table.insert(islandList,n) end table.sort(islandList)
+-- daftar dropdown
+local islandList = {}
+for n,_ in pairs(islands) do table.insert(islandList, n) end
+table.sort(islandList)
+
 
 local function tpTo(pos)
     local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
