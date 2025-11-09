@@ -3,7 +3,6 @@ AegisHub • Fish It • Premium (UI Polished v2)
 - Dropdown auto-size (tanpa scrollbar), halaman pertama auto aktif
 - Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
 - Live Coordinates: tampil langsung di tab Teleport
-- Event: AUTO-DETECT (tanpa daftar), auto-teleport saat toggle ON
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -287,7 +286,7 @@ local Workspace          = game:GetService("Workspace")
 
 local TARGET_PLACE = 121864768012064
 
--- Anti AFK ON
+-- Anti AFK
 LocalPlayer.Idled:Connect(function()
     VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
@@ -357,7 +356,7 @@ local function setFloating(on)
     else if floatBV then floatBV:Destroy(); floatBV=nil end end
 end
 
--- Auto-finish fishing (V1/V2)
+-- Auto-finish fishing
 task.spawn(function()
     repeat task.wait() until RE_RepText
     if not RE_RepText then return end
@@ -433,7 +432,6 @@ local function sellCoughAmount(n)
 end
 
 -- ===================== Teleport data =====================
--- Nama Island sesuai daftar yang kamu kirim (stabil, tidak kosong).
 local islands = {
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
@@ -448,8 +446,6 @@ local islands = {
     ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-
-    -- Tambahan dari screenshot (placeholder sudah diisi default wajar)
     ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
     ["Halloween"]                 = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
@@ -466,7 +462,7 @@ local function tpTo(pos)
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
--- Prompt helpers (Shop/Event)
+-- Prompt helpers (Shop/Event generic)
 local function fireNearestPrompt(filterFn,maxDist)
     maxDist=maxDist or 120
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
@@ -578,101 +574,29 @@ if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
--- ===================== EVENT (AUTO-DETECT) =====================
--- Warmup baseline: catat prompt "statis" (shop/NPC).
-local function promptPosition(pp)
-    if pp.Parent and pp.Parent:IsA("BasePart") then
-        return pp.Parent.Position
-    elseif pp.Parent and pp.Parent.Parent and pp.Parent.Parent:IsA("BasePart") then
-        return pp.Parent.Parent.Position
-    end
-end
-local function promptSignature(pp)
-    local t1 = string.lower(tostring(pp.ObjectText or ""))
-    local t2 = string.lower(tostring(pp.ActionText or ""))
-    local host = string.lower((pp.Parent and pp.Parent.Name) or "")
-    return t1.."|"..t2.."|"..host
-end
-local function collectPrompts()
-    local out = {}
-    for _,d in ipairs(Workspace:GetDescendants()) do
-        if d:IsA("ProximityPrompt") then
-            local pos = promptPosition(d)
-            if pos then table.insert(out, {pp=d, sig=promptSignature(d), pos=pos}) end
-        end
-    end
-    return out
+-- ===================== Event (Dropdown) =====================
+local eventsList = {
+    "Shark Hunt","Ghost Shark Hunt","Worm Hunt","Black Hole",
+    "Shocked","Ghost Worm","Meteor Rain","Megalodon Hunt","Admin Event"
+}
+local EventStatus = PageEvent:CreateLabel("Select Event (Dropdown)")
+
+local function teleportToEvent(eventName)
+    local props = workspace:FindFirstChild("Props")
+    if not props then EventStatus:UpdateLabel("Event: container 'Props' tidak ditemukan"); return end
+    local ev = props:FindFirstChild(eventName)
+    if not ev then EventStatus:UpdateLabel(("Event '%s' tidak ditemukan"):format(eventName)); return end
+    local fishingBoat = ev:FindFirstChild("Fishing Boat")
+    local pivotCF
+    if fishingBoat and fishingBoat.GetPivot then pivotCF = fishingBoat:GetPivot()
+    elseif ev.GetPivot then pivotCF = ev:GetPivot() end
+    if not pivotCF then EventStatus:UpdateLabel(("Event '%s' tidak punya pivot"):format(eventName)); return end
+    tpTo(pivotCF.Position + Vector3.new(0,15,0))
+    EventStatus:UpdateLabel(("Teleported • %s"):format(eventName))
 end
 
-local BASELINE_WARMUP = 8.0
-local BASELINE_MIN_SEEN = 5
-local baselineSet = {}
-
-local function buildBaseline()
-    local seen = {}
-    local t0 = os.clock()
-    while os.clock() - t0 < BASELINE_WARMUP do
-        for _,it in ipairs(collectPrompts()) do
-            seen[it.sig] = (seen[it.sig] or 0) + 1
-        end
-        task.wait(0.4)
-    end
-    for sig,c in pairs(seen) do
-        if c >= BASELINE_MIN_SEEN then baselineSet[sig] = true end
-    end
-end
-
-local SCAN_INTERVAL = 1.6
-local TP_COOLDOWN   = 3.0
-state.autoEvent = false
-state.lastEventTeleportT = 0
-
-local EventStatus = PageEvent:CreateLabel("Event Status • preparing baseline...")
-PageEvent:CreateToggle("Auto Teleport to Event","Otomatis teleport ke event yang sedang spawn", function(on)
-    state.autoEvent = on
-    EventStatus:UpdateLabel(on and "Event Status • scanning..." or "Event Status • idle")
-end)
-
--- Siapkan baseline (sekali saat start)
-task.spawn(function()
-    buildBaseline()
-    if not state.autoEvent then
-        EventStatus:UpdateLabel("Event Status • idle (baseline ready)")
-    end
-end)
-
--- Scanner loop
-task.spawn(function()
-    while true do
-        task.wait(SCAN_INTERVAL)
-        if not state.autoEvent then continue end
-        if next(baselineSet) == nil then
-            EventStatus:UpdateLabel("Event Status • preparing baseline...")
-            continue
-        end
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if not hrp then continue end
-
-        local best, bestDist
-        for _,it in ipairs(collectPrompts()) do
-            if not baselineSet[it.sig] then
-                local dist = (it.pos - hrp.Position).Magnitude
-                if not bestDist or dist < bestDist then best, bestDist = it, dist end
-            end
-        end
-
-        if best then
-            EventStatus:UpdateLabel(("Event Status • found (%.0fm)"):format(bestDist or 0))
-            if os.clock() - state.lastEventTeleportT > TP_COOLDOWN then
-                state.lastEventTeleportT = os.clock()
-                tpTo(best.pos)
-                pcall(function() fireproximityprompt(best.pp, 3) end)
-            end
-        else
-            EventStatus:UpdateLabel("Event Status • scanning...")
-        end
-    end
+PageEvent:CreateDropdown("Event Teleport", eventsList, function(option)
+    if option then teleportToEvent(option) end
 end)
 
 -- Live HUD (Fishing V1)
