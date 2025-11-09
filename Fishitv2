@@ -1,16 +1,11 @@
 --[[ 
-AegisHub • Fish It • Premium (UI Polished + Menu Icons + AUTO-ISLANDS FULL LIST)
-- UI Library (Blue, Compact, Adaptive Scale, Persistent Overlay)
-- Rail “Sections” pakai ikon
-- Dropdown rapi (no scrollbar) untuk NPC/Player; ISLANDS tampil SEMUA sebagai tombol (auto-generate)
-- Island scanner: ambil SEMUA pulau secara otomatis dari ReplicatedStorage/Workspace (multi-strategy)
-- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+AegisHub • Fish It • Premium (UI Polished + Icons + AUTO-ISLANDS GRID)
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v3) =================
+-- ================== UI LIBRARY (Polished v4) =================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -167,6 +162,8 @@ function library:CreateWindow(name, version, icon)
         end
 
         local PageAPI={}
+        PageAPI._root = Page  -- <== dipakai oleh fitur custom
+
         function PageAPI:CreateLabel(text)
             local fr=Card(24)
             local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
@@ -215,42 +212,51 @@ function library:CreateWindow(name, version, icon)
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t) tb.Text=t or "" end }
         end
-        -- Dropdown compact (dipakai untuk NPC/Player)
-        function PageAPI:CreateDropdown(title, options, onChanged)
-            options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(32)
-            local header=Instance.new("TextButton",fr)
-            header.BackgroundColor3=BG_CARD; header.Text=""; header.Size=UDim2.new(1,0,0,math.floor(32*SCALE))
-            Instance.new("UICorner",header).CornerRadius=UDim.new(0,6)
-            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
-            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
-            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32); holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE)); holder.Size=UDim2.new(1,0,0,0); holder.AutomaticSize=Enum.AutomaticSize.Y; holder.Visible=false
-            Instance.new("UICorner",holder).CornerRadius=UDim.New(0,6)
-            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
-            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
 
-            local current=nil
-            local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-                for _,opt in ipairs(list) do
-                    local b=Instance.new("TextButton",holder); b.Size=UDim2.new(1,0,0,math.floor(22*SCALE)); b.BackgroundColor3=BG_CARD
-                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
-                    Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
-                    b.MouseButton1Click:Connect(function()
-                        current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt); holder.Visible=false; tw(caret,.12,{Rotation=0})
-                    end)
-                end
-            end
-            rebuild(options)
+        -- SECTION GRID (untuk Island list)
+        function PageAPI:CreateGridSection(title)
+            local fr=Card(60)
+            local titleLbl = Instance.new("TextLabel", fr)
+            titleLbl.BackgroundTransparency=1
+            titleLbl.Size = UDim2.new(1,-8,0,26)
+            titleLbl.Position = UDim2.new(0,8,0,4)
+            titleLbl.Font = Enum.Font.GothamBlack
+            titleLbl.TextSize = math.floor(12*SCALE)
+            titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+            titleLbl.TextColor3 = Color3.new(1,1,1)
+            titleLbl.Text = title or "Section"
 
-            local open=false
-            header.MouseButton1Click:Connect(function() open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0}) end)
+            local wrap = Instance.new("Frame", fr)
+            wrap.BackgroundTransparency = 1
+            wrap.Position = UDim2.new(0,8,0,30)
+            wrap.Size = UDim2.new(1,-16,0,0)
+            wrap.AutomaticSize = Enum.AutomaticSize.Y
 
-            return { SetValue=function(_,v) current=v; ttl.Text=("%s : %s"):format(title,tostring(v)) end,
-                     GetValue=function() return current end,
-                     SetOptions=function(_,opts) rebuild(opts or {}) end }
+            local grid = Instance.new("UIGridLayout", wrap)
+            grid.SortOrder = Enum.SortOrder.LayoutOrder
+            grid.CellPadding = UDim2.fromOffset(6,6)
+            grid.CellSize = UDim2.fromOffset(160,28)
+
+            return {
+                SetTitle=function(_,t) titleLbl.Text=t end,
+                SetCellSize=function(_,w,h) grid.CellSize=UDim2.fromOffset(w,h) end,
+                Clear=function()
+                    for _,c in ipairs(wrap:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                end,
+                AddButton=function(_,label,cb)
+                    local b = Instance.new("TextButton")
+                    b.Size = UDim2.fromOffset(160,28)
+                    b.BackgroundColor3 = BG_DARK
+                    b.Text = tostring(label)
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = math.floor(11*SCALE)
+                    b.TextColor3 = Color3.new(1,1,1)
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+                    b.Parent = wrap
+                    if cb then b.MouseButton1Click:Connect(cb) end
+                    return b
+                end,
+            }
         end
 
         return PageAPI
@@ -327,6 +333,7 @@ local RodDelays={["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1
 ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},["Demascus Rod"]={custom=3.90,bypass=3.80},
 ["Grass Rod"]={custom=3.80,bypass=3.90},["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
 ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},}
+local LocalPlayer = Players.LocalPlayer
 local function getEquippedRodName()
     local pg=LocalPlayer:FindFirstChild("PlayerGui"); local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
     if not display then return nil end
@@ -428,26 +435,12 @@ local function tpTo(pos)
 end
 
 ----------------------------------------------------------------
--- ============ AUTO-DETECT: AMBIL SEMUA ISLAND SECARA OTOMATIS ============
+-- ============ AUTO-DETECT ISLANDS (semua) + UI GRID ==========
 ----------------------------------------------------------------
--- Strategi:
--- (1) Cek ReplicatedStorage untuk Module/Folder “Islands/Locations/Areas/Teleport*” → baca nama & posisi (kalau ada)
--- (2) Cek Workspace untuk Folder “Islands/Island/World/Map/Areas/Locations/Teleports” → ambil child Model/BasePart (pakai bounding box)
--- (3) Cek semua ProximityPrompt (travel/teleport/boat dll) → ambil parent BasePart sebagai posisi
--- Hasil di-de-duplicate dengan menggabungkan yang berjarak < 60 stud & nama sama/serupa.
-
 local NAME_FOLDERS = {"Islands","Island","World","Map","Areas","Locations","Teleports","Teleport","Docks"}
 
-local function _titlecase(s)
-    s = tostring(s or "")
-    return (s:gsub("(%a)([%w_']*)", function(a,b) return a:upper()..b:lower() end))
-end
-
-local function _similar(a,b)
-    a=string.lower(a); b=string.lower(b)
-    if a==b then return true end
-    return a:gsub("%s+","")==b:gsub("%s+","")
-end
+local function _titlecase(s) s=tostring(s or ""); return (s:gsub("(%a)([%w_']*)", function(a,b) return a:upper()..b:lower() end)) end
+local function _similar(a,b) a=string.lower(a); b=string.lower(b); if a==b then return true end; return a:gsub("%s+","")==b:gsub("%s+","") end
 
 local function _tryModuleIslands(acc)
     for _,desc in ipairs(ReplicatedStorage:GetDescendants()) do
@@ -550,12 +543,12 @@ local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
 local Tab = UI:CreateTab("Sections")
 
 local ICONS = {
-  ["Fishing V1"] = 6031091002,
-  ["Fishing V2"] = 6031091002,
-  ["Inventory"]  = 6031068429,
-  ["Shop"]       = 6031265976,
-  ["Teleport"]   = 6035190846,
-  ["Event"]      = 6034509993,
+  ["Fishing V1"] = ,
+  ["Fishing V2"] = ,
+  ["Inventory"]  = ,
+  ["Shop"]       = ,
+  ["Teleport"]   = ,
+  ["Event"]      = ,
 }
 
 local PageV1    = Tab:CreateFrame("Fishing V1", ICONS["Fishing V1"])
@@ -621,76 +614,33 @@ PageShop:CreateButton("Bobber Shop","",function() openShopByKeyword({"bobber","s
 PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"}) end)
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
--- =================== TELEPORT: ISLAND LIST (FULL, AUTO) ===================
--- Build a card berisi grid tombol untuk SEMUA island
-local IslandCard = Instance.new("Frame", PageTP._root or PageTP) -- PageAPI gak expose root; fallback ke parent argumen direct
-IslandCard.BackgroundColor3 = BG_CARD
-IslandCard.Size = UDim2.new(1,0,0,60)
-IslandCard.AutomaticSize = Enum.AutomaticSize.Y
-IslandCard.Name = "IslandsGridCard"
-Instance.new("UICorner", IslandCard).CornerRadius = UDim.new(0,6)
-
-local titleLbl = Instance.new("TextLabel", IslandCard)
-titleLbl.BackgroundTransparency = 1
-titleLbl.Size = UDim2.new(1, -8, 0, 26)
-titleLbl.Position = UDim2.new(0, 8, 0, 4)
-titleLbl.Font = Enum.Font.GothamBlack
-titleLbl.TextSize = 12
-titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-titleLbl.TextColor3 = Color3.new(1,1,1)
-titleLbl.Text = "Teleport Island • Auto"
-
-local gridWrap = Instance.new("Frame", IslandCard)
-gridWrap.BackgroundTransparency = 1
-gridWrap.Position = UDim2.new(0,8,0,30)
-gridWrap.Size = UDim2.new(1,-16,0,0)
-gridWrap.AutomaticSize = Enum.AutomaticSize.Y
-
-local grid = Instance.new("UIGridLayout", gridWrap)
-grid.SortOrder = Enum.SortOrder.LayoutOrder
-grid.CellPadding = UDim2.fromOffset(6,6)
-grid.CellSize = UDim2.fromOffset(160,28)
-
-local function makeIslandButton(name, pos)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.fromOffset(160,28)
-    b.BackgroundColor3 = BG_DARK
-    b.Text = name
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 11
-    b.TextColor3 = Color3.new(1,1,1)
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-    b.MouseButton1Click:Connect(function() tpTo(pos) end)
-    return b
-end
-
-local currentIslandNames = {}
+-- =================== TELEPORT: ISLAND LIST (AUTO, GRID) ===================
+local IslandGrid = PageTP:CreateGridSection("Teleport Island • Auto")
+IslandGrid:SetCellSize(160,28)
 
 local function rebuildIslandsUI()
-    local names, map = scanAllIslands()
-    -- hapus lama
-    for _,c in ipairs(gridWrap:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-    -- tambah semua
+    local ok, names, map = pcall(function()
+        local n,m = scanAllIslands(); return n,m
+    end)
+    if not ok then return end
+    IslandGrid:Clear()
     for _,nm in ipairs(names) do
         local pos = map[nm]
-        local btn = makeIslandButton(nm, pos)
-        btn.Parent = gridWrap
+        IslandGrid:AddButton(nm, function() tpTo(pos) end)
     end
-    currentIslandNames = names
-    titleLbl.Text = ("Teleport Island • %d found (Auto)"):format(#names)
+    IslandGrid:SetTitle(("Teleport Island • %d found (Auto)"):format(#names))
 end
 
 rebuildIslandsUI()
-
--- refresh otomatis setiap 12s; rebuild jika berubah
 task.spawn(function()
+    local lastKey=""
     while true do
         task.wait(12)
         local names = select(1, scanAllIslands())
-        if #names ~= #currentIslandNames then
+        local key = table.concat(names, "|")
+        if key ~= lastKey then
+            lastKey = key
             rebuildIslandsUI()
-        else
-            for i,nm in ipairs(names) do if nm ~= currentIslandNames[i] then rebuildIslandsUI(); break end end
         end
     end
 end)
