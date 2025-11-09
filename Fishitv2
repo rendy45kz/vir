@@ -450,12 +450,12 @@ local islands = {
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
 
     -- Placeholder (isi dari Live Coordinates)
-    ["Crystal Cavern"]            = Vector3.new(0,0,0),
-    ["Halloween"]                 = Vector3.new(0,0,0),
-    ["Ancient Underground Cave"]  = Vector3.new(0,0,0),
-    ["Ancient Inside Temple"]     = Vector3.new(0,0,0),
-    ["Ancient Jungle"]            = Vector3.new(0,0,0),
-    ["Fisherman Island"]          = Vector3.new(0,0,0),
+    ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
+    ["Halloween"]                 = Vector3.new(2127,78,3334),
+    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
+    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
+    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
+    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
 }
 local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
