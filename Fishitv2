@@ -543,12 +543,12 @@ local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
 local Tab = UI:CreateTab("Sections")
 
 local ICONS = {
-  ["Fishing V1"] = ,
-  ["Fishing V2"] = ,
-  ["Inventory"]  = ,
-  ["Shop"]       = ,
-  ["Teleport"]   = ,
-  ["Event"]      = ,
+  ["Fishing V1"] = 6031091002,
+  ["Fishing V2"] = 6031091002,
+  ["Inventory"]  = 6031068429,
+  ["Shop"]       = 6031265976,
+  ["Teleport"]   = 6035190846,
+  ["Event"]      = 6034509993,
 }
 
 local PageV1    = Tab:CreateFrame("Fishing V1", ICONS["Fishing V1"])
