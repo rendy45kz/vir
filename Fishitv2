@@ -670,11 +670,6 @@ local SELECTED_EVENTS = {}
 -- sumber awal
 local currentEvents = discoverEvents()
 
--- Dropdown SINGLE (Teleport Now)
-local ddEventSingle = TabEvent:CreateDropdown("Event Teleport", currentEvents, function(opt)
-  tpToEventByName(opt)
-end)
-
 -- Multi-select + toggle auto
 local multi = TabEvent:CreateDropdownMulti("Select Events (Auto)", currentEvents, function(map)
   SELECTED_EVENTS = map or {}
