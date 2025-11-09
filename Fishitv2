@@ -1,8 +1,9 @@
 --[[ 
 AegisHub • Fish It • Premium (UI Polished v2)
-- Dropdown & MultiSelect auto-size (tanpa scrollbar page), mobile-friendly
-- Tabs: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player + Live Coordinates), Event (Auto Teleport)
-- Event list auto-detect dari workspace.Props (auto update)
+- Dropdown auto-size (tanpa scrollbar), halaman pertama auto aktif
+- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+- Live Coordinates: tampil langsung di tab Teleport
+- NEW: Event Multi-Select + Auto Teleport ON/OFF (scan otomatis dari workspace.Props)
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -27,7 +28,6 @@ function library:CreateWindow(name, version, icon)
 
     local Gui = Instance.new("ScreenGui")
     protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
-    Gui.ResetOnSpawn = false
     Gui.Parent = CoreGui
 
     local function calcScale()
@@ -115,7 +115,7 @@ function library:CreateWindow(name, version, icon)
     local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,6)
     local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE)); trlbl.Position=UDim2.new(0,8,0,0)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
-    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(6*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
     -- Tabs API
     local firstShown=false
@@ -131,14 +131,14 @@ function library:CreateWindow(name, version, icon)
         Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
         Page.Visible=false
         local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(8*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(8*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(8*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(8*SCALE))
-        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(8*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(6*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(6*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
+        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(6*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
 
         local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-8,0,math.floor(20*SCALE)); TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
+        TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE)); TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
         TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1); TabBtn.TextTransparency=.5
-        local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,2,1,-6)
-        indicator.Position=UDim2.new(0,-8,0,3); indicator.BorderSizePixel=0; indicator.Visible=false
+        local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,2,1,-4)
+        indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
             indicator.Visible=true
@@ -156,35 +156,33 @@ function library:CreateWindow(name, version, icon)
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.ClipsDescendants=false
             local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6)
-            local pad=Instance.new("UIPadding",fr); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
             return fr
         end
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
-            local fr=Card(32)
-            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,0,0,0); lb.Size=UDim2.new(1,0,1,0)
+            local fr=Card(24)
+            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
             lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
-            lb.TextWrapped = true
             return { UpdateLabel=function(_,t) lb.Text=t end, _raw=lb }
         end
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
-            local fr=Card(48)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,0,0,0); t.Size=UDim2.new(1,0,0,math.floor(20*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"; t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,0,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,0,0,math.floor(18*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""; d.TextWrapped=true
+            local fr=Card(42)
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
-            local fr=Card(48)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,0,0,0); t.Size=UDim2.new(1,-52,0,math.floor(20*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"; t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,0,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left; d.TextWrapped=true
+            local fr=Card(42)
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
             local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
             knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
@@ -200,83 +198,67 @@ function library:CreateWindow(name, version, icon)
         end
         function PageAPI:CreateBox(placeholder,iconId,cb)
             cb=cb or function() end
-            local fr=Card(36)
+            local fr=Card(32)
             local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-            ic.Position=UDim2.new(0,0,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
-            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,24,0,0); tb.Size=UDim2.new(1,-28,1,0)
+            ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
+            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
             tb.ClearTextOnFocus=false; tb.Text=""
             tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
             tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t) tb.Text=t or "" end }
         end
-
-        -- >>> DROPDOWN (robust; matikan scroll saat open; ZIndex tinggi)
+        -- Single-select dropdown (dipakai Teleport) + Multi-select (Event)
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(32); fr.Name="Dropdown"; fr.ZIndex=3
+            local fr=Card(32); fr.Name="Dropdown"
 
             local header=Instance.new("TextButton",fr)
             header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
             header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""
-            header.ZIndex = 4
             local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
 
             local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
             ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
             ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
-            ttl.ZIndex = 4
 
             local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
             caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
             caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
-            caret.ZIndex = 4
 
             local holder=Instance.new("Frame",fr)
             holder.BackgroundColor3=Color3.fromRGB(26,26,32)
             holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE))
+            holder.Size=UDim2.new(1,0,0,0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
             holder.Visible=false
-            holder.ZIndex = 5
             local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
             local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
             local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
 
             local current=nil
             local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do
-                    if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end
-                end
-                if #list==0 then
-                    local empty=Instance.new("TextLabel",holder)
-                    empty.Size=UDim2.new(1,0,0,math.floor(22*SCALE)); empty.BackgroundTransparency=1
-                    empty.Font=Enum.Font.Gotham; empty.TextSize=math.floor(11*SCALE)
-                    empty.TextColor3=ACCENT_TEXT; empty.Text="(no options)"; empty.ZIndex=5
-                    return
-                end
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
                 for _,opt in ipairs(list) do
                     local b=Instance.new("TextButton",holder)
                     b.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
-                    b.BackgroundColor3=BG_CARD; b.Text=opt; b.Font=Enum.Font.Gotham
-                    b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1); b.ZIndex=5
+                    b.BackgroundColor3=BG_CARD
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
                     local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
                         current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt)
-                        holder.Visible=false; tw(caret,.12,{Rotation=0}); Page.ScrollingEnabled=true
+                        holder.Visible=false; tw(caret,.12,{Rotation=0})
                     end)
                 end
             end
             rebuild(options)
 
             local open=false
-            local function toggle()
+            header.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
                 tw(caret,.12,{Rotation=open and 180 or 0})
-                Page.ScrollingEnabled = not open
-            end
-            header.MouseButton1Click:Connect(toggle)
-            ttl.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then toggle() end end)
+            end)
 
             return {
                 SetValue   = function(_,v) current=v; ttl.Text=("%s : %s"):format(title,tostring(v)) end,
@@ -285,104 +267,82 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
-        -- >>> MULTI-SELECT (untuk Event)
         function PageAPI:CreateMultiSelect(title, options, onChanged)
-            options = options or {}
-            onChanged = onChanged or function() end
-            local fr=Card(32); fr.Name="MultiSelect"; fr.ZIndex=3
+            options=options or {}; onChanged=onChanged or function() end
+            local fr=Card(32); fr.Name="MultiSelect"
 
             local header=Instance.new("TextButton",fr)
             header.BackgroundColor3=BG_CARD; header.AutoButtonColor=true
-            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""; header.ZIndex=4
-            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
+            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE)); header.Text=""
+            Instance.new("UICorner",header).CornerRadius=UDim.new(0,6)
 
             local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
             ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title; ttl.ZIndex=4
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
 
             local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
             caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT; caret.ZIndex=4
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
 
             local holder=Instance.new("Frame",fr)
             holder.BackgroundColor3=Color3.fromRGB(26,26,32)
             holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE))
+            holder.Size=UDim2.new(1,0,0,0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
-            holder.Visible=false; holder.ZIndex=5
-            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
+            holder.Visible=false
+            Instance.new("UICorner",holder).CornerRadius=UDim.new(0,6)
             local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
             local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
 
-            local selected = {} -- [name]=true
-            local function updateTitle()
-                local n=0 for _ in pairs(selected) do n+=1 end
-                ttl.Text = ("%s : %d selected"):format(title, n)
+            local selected = {}
+            local function countSel() local c=0 for _ in pairs(selected) do c=c+1 end return c end
+            local function emit()
+                local arr={} for k,v in pairs(selected) do if v then table.insert(arr,k) end end
+                onChanged(arr)
             end
 
-            local function build(list)
-                for _,c in ipairs(holder:GetChildren()) do
-                    if c:IsA("TextButton") or c:IsA("TextLabel") or c:IsA("Frame") then c:Destroy() end
-                end
-                if #list==0 then
-                    local empty=Instance.new("TextLabel",holder)
-                    empty.Size=UDim2.new(1,0,0,math.floor(22*SCALE)); empty.BackgroundTransparency=1
-                    empty.Font=Enum.Font.Gotham; empty.TextSize=math.floor(11*SCALE)
-                    empty.TextColor3=ACCENT_TEXT; empty.Text="(no options)"; empty.ZIndex=5
-                    updateTitle(); return
-                end
+            local function rebuild(list)
+                local keep = {}
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
                 for _,opt in ipairs(list) do
-                    local row = Instance.new("TextButton", holder)
-                    row.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
-                    row.BackgroundColor3=BG_CARD; row.AutoButtonColor=true; row.Text=""; row.ZIndex=5
-                    local rc=Instance.new("UICorner",row); rc.CornerRadius=UDim.new(0,6)
-
-                    local dot = Instance.new("Frame",row)
-                    dot.Size=UDim2.fromOffset(math.floor(12*SCALE),math.floor(12*SCALE))
-                    dot.Position=UDim2.new(0,6,0,math.floor(5*SCALE))
-                    dot.BackgroundColor3=ACCENT; dot.ZIndex=6
-                    local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
-                    dot.Visible = selected[opt] and true or false
-
-                    local txt = Instance.new("TextLabel",row)
-                    txt.BackgroundTransparency=1; txt.TextXAlignment=Enum.TextXAlignment.Left
-                    txt.Position=UDim2.new(0,math.floor(24*SCALE),0,0); txt.Size=UDim2.new(1,-math.floor(28*SCALE),1,0)
-                    txt.Font=Enum.Font.Gotham; txt.TextSize=math.floor(11*SCALE); txt.TextColor3=Color3.new(1,1,1); txt.Text=opt; txt.ZIndex=6
-
-                    row.MouseButton1Click:Connect(function()
-                        selected[opt] = not selected[opt] or nil
-                        dot.Visible = selected[opt] and true or false
-                        updateTitle()
-                        task.spawn(function() onChanged(selected) end)
+                    if selected[opt] then keep[opt]=true end
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,math.floor(22*SCALE))
+                    b.BackgroundColor3=BG_CARD
+                    b.Text=(selected[opt] and "● " or "○ ")..opt
+                    b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
+                    b.MouseButton1Click:Connect(function()
+                        selected[opt]=not selected[opt]
+                        b.Text=(selected[opt] and "● " or "○ ")..opt
+                        ttl.Text=("%s : (%d)"):format(title,countSel())
+                        emit()
                     end)
                 end
-                updateTitle()
+                -- bersihkan selection yang hilang dari list
+                for k in pairs(selected) do if not keep[k] and not table.find(list,k) then selected[k]=nil end end
+                ttl.Text=("%s : (%d)"):format(title,countSel())
             end
-            build(options)
+            rebuild(options)
 
             local open=false
-            local function toggle()
+            header.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
                 tw(caret,.12,{Rotation=open and 180 or 0})
-                Page.ScrollingEnabled = not open
-            end
-            header.MouseButton1Click:Connect(toggle)
-            ttl.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then toggle() end end)
+            end)
 
             return {
                 GetSelected = function()
-                    local t={} for k,v in pairs(selected) do if v then table.insert(t,k) end end
-                    table.sort(t); return t
+                    local arr={} for k,v in pairs(selected) do if v then table.insert(arr,k) end end
+                    table.sort(arr); return arr
                 end,
                 SetSelected = function(_,arr)
-                    selected = {}
+                    selected={}
                     for _,v in ipairs(arr or {}) do selected[v]=true end
-                    build(options)
+                    rebuild(options)
                 end,
-                SetOptions = function(_,opts)
-                    options = opts or {}
-                    build(options)
-                end
+                SetOptions = function(_,opts) options=opts or {}; rebuild(options) end
             }
         end
 
@@ -414,12 +374,13 @@ LocalPlayer.Idled:Connect(function()
 end)
 
 -- State
-local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
-             floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
-             reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
-             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
-             autoEvent=false, selectedEvents = {}}
-
+local state={
+    AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
+    floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
+    reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
+    sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
+    autoEvent=false,lastEventTp=0
+}
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function effDelays()
     if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
@@ -555,7 +516,6 @@ local function sellCoughAmount(n)
 end
 
 -- ===================== Teleport data =====================
--- Nama Island (bisa kamu update manual kapanpun)
 local islands = {
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
@@ -571,7 +531,7 @@ local islands = {
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
 
-    -- contoh tambahan (boleh ubah dari live coordinate):
+    -- Placeholder (isi dari Live Coordinates ketika kamu catat)
     ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
     ["Halloween"]                 = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
@@ -582,13 +542,13 @@ local islands = {
 local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
 local function tpTo(pos)
-    if not pos then return end
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
     local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
--- Prompt helpers (Shop/Event)
+-- Prompt helpers (Shop/Event Fallback)
 local function fireNearestPrompt(filterFn,maxDist)
     maxDist=maxDist or 120
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
@@ -658,12 +618,17 @@ PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"})
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
 -- Teleport
+-- 1) Live coordinates label (langsung di menu)
 local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
+
+-- 2) Dropdown Island
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos = islands[choice]; if pos then tpTo(pos) end
+    local pos = islands[choice]
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end -- block placeholder
+    tpTo(pos)
 end)
 
--- NPC dynamic
+-- 3) NPC dynamic
 local function scanNPC()
     local s={} for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") then
@@ -686,9 +651,9 @@ local function tpNearestModel(partial)
     if best then tpTo(best.Position) end
 end
 local npcDD = PageTP:CreateDropdown("Teleport NPC", scanNPC(), function(nm) if nm then tpNearestModel(nm) end end)
-task.spawn(function() while true do task.wait(8) pcall(function() npcDD:SetOptions(scanNPC()) end) end end)
+task.spawn(function() while true do task.wait(8) npcDD:SetOptions(scanNPC()) end end)
 
--- Players dynamic
+-- 4) Players dynamic
 local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
@@ -700,74 +665,91 @@ if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
--- =============== EVENT (Auto detect + auto teleport) ===============
-local EventStatus = PageEvent:CreateLabel("Select Event (0)")
--- multi select event (auto detect list)
-local evMulti = PageEvent:CreateMultiSelect("Select Event", {}, function(selMap)
-    -- convert map to array for state
-    local arr = {}
-    for k,v in pairs(selMap) do if v then table.insert(arr,k) end end
-    table.sort(arr)
-    state.selectedEvents = arr
-    EventStatus:UpdateLabel(("Select Event (%d)"):format(#arr))
-end)
-
--- toggle auto teleport
-PageEvent:CreateToggle("Auto Teleport Selected Events","Otomatis teleport ke event yang sedang spawn sesuai pilihan",
-function(v) state.autoEvent = v end)
-
--- util: scan events from workspace.Props (children with "Fishing Boat")
-local function getProps()
-    return Workspace:FindFirstChild("Props") or Workspace:FindFirstChild("props") or Workspace:FindFirstChild("PROPS")
+-- ===================== EVENT (Multi-select + Auto) =====================
+local function findPropsContainer()
+    local props = Workspace:FindFirstChild("Props") or Workspace:FindFirstChild("props") or Workspace:FindFirstChild("PROPS")
+    return props
 end
-local function scanEvents()
-    local list={}
-    local props = getProps()
-    if not props then return list end
-    for _,ch in ipairs(props:GetChildren()) do
-        if ch:IsA("Model") or ch:IsA("Folder") then
-            local okBoat = ch:FindFirstChild("Fishing Boat") or ch:FindFirstChild("FishingBoat") or ch:FindFirstChild("Boat")
-            if okBoat then table.insert(list, ch.Name) end
+
+local function listEventsInGame()
+    local props = findPropsContainer()
+    if not props then return {}, "Event: container 'Props' tidak ditemukan" end
+    local set = {}
+    for _,m in ipairs(props:GetChildren()) do
+        if m:IsA("Model") or m:IsA("Folder") then
+            if #m.Name >= 3 then set[m.Name] = true end
         end
     end
-    table.sort(list)
-    return list
+    local arr = {}
+    for k in pairs(set) do table.insert(arr,k) end
+    table.sort(arr)
+    return arr, ("Events terdeteksi: %d"):format(#arr)
 end
 
--- refresh event list berkala
+local function findEventTargetCFrame(evName)
+    local props = findPropsContainer(); if not props then return nil end
+    local m = props:FindFirstChild(evName); if not m then return nil end
+    local target = (m:IsA("Model") and m:FindFirstChild("Fishing Boat")) or m:FindFirstChild("Fishing Boat", true)
+    if target and target.GetPivot then return target:GetPivot() end
+    -- fallback: cari BasePart terdekat
+    local bp = m:FindFirstChildWhichIsA("BasePart", true)
+    if bp then return bp.CFrame end
+    if m.GetPivot then return m:GetPivot() end
+    return nil
+end
+
+-- UI: status + multiselect + toggle
+local statusLbl = PageEvent:CreateLabel("Memindai events...")
+local evList, _status = listEventsInGame()
+statusLbl:UpdateLabel(_status or "Siap.")
+
+local selectedEvents = {}
+local multiDD = PageEvent:CreateMultiSelect("Select Events", evList, function(list)
+    selectedEvents = {}
+    for _,nm in ipairs(list) do selectedEvents[nm] = true end
+end)
+
+-- refresh daftar event berkala
 task.spawn(function()
     while true do
-        local found = scanEvents()
-        evMulti:SetOptions(found)
-        EventStatus:UpdateLabel(("Select Event (%d)"):format(#(state.selectedEvents or {})))
-        task.wait(6)
+        task.wait(7)
+        local l, st = listEventsInGame()
+        statusLbl:UpdateLabel(st or "")
+        multiDD:SetOptions(l)
     end
 end)
 
--- auto-teleport loop
+-- Toggle Auto Teleport
+PageEvent:CreateToggle("Auto Teleport Active Events","Otomatis TP ke event yang muncul dari pilihanmu",function(v)
+    state.autoEvent = v
+end)
+
+-- Loop Auto Teleport
 task.spawn(function()
     while true do
-        if state.autoEvent and #state.selectedEvents>0 then
-            local props = getProps()
-            if props then
-                for _,evName in ipairs(state.selectedEvents) do
-                    local node = props:FindFirstChild(evName)
-                    if node then
-                        local boat = node:FindFirstChild("Fishing Boat") or node:FindFirstChild("FishingBoat") or node:FindFirstChild("Boat")
-                        if boat and boat.GetPivot then
-                            local cf = boat:GetPivot()
-                            local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                            if hrp then hrp.CFrame = cf + Vector3.new(0,15,0) end
+        task.wait(1.5)
+        if state.autoEvent then
+            local now = os.clock()
+            if now - (state.lastEventTp or 0) >= 8 then
+                -- cari event yang tersedia dari pilihan user
+                for ev,_ in pairs(selectedEvents) do
+                    local cf = findEventTargetCFrame(ev)
+                    if cf then
+                        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                        local hrp = char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.CFrame = cf + Vector3.new(0,15,0)
+                            state.lastEventTp = now
                             break
                         end
                     end
                 end
             end
         end
-        task.wait(2.5)
     end
 end)
+
+-- Fallback tombol manual (tetap disembunyikan? -> tidak ditambahkan agar bersih)
 
 -- Live HUD (Fishing V1)
 RS.RenderStepped:Connect(function()
