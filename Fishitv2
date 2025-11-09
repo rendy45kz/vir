@@ -1,11 +1,11 @@
 --[[ 
 AegisHub • Fish It • Premium (UI Polished v3)
-- Label: bold/uppercase, tanpa background, rata kiri
-- Toggle ramping: teks kiri, saklar kanan
-- Button ramping
-- Dropdown buka ke bawah, stabil saat scroll (restore CanvasPosition), ZIndex tinggi
-- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event (dropdown + Auto)
-- Live Coordinates tampil di tab Teleport
+- Label polos, huruf besar, bold, rata kiri
+- Toggle ramping (teks kiri, switch kanan), tidak melompat
+- Dropdown single & multi: expand KE BAWAH, mendorong konten di bawahnya
+- Scrollbar/Autosize rapi; semua layout presisi
+- Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
+- Live Coordinates tampil langsung di tab Teleport
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -14,312 +14,347 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 -- ================== UI LIBRARY (Polished v3) =================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
-local TXT_MAIN    = Color3.fromRGB(236,239,255)
-local TXT_DIM     = Color3.fromRGB(170,176,195)
+local ACCENT_TEXT = Color3.fromRGB(206,211,235)
 local BG_DARK     = Color3.fromRGB(42,44,56)
-local BG_CARD     = Color3.fromRGB(28,30,40)
-local BG_ELEV     = Color3.fromRGB(22,23,31)
+local BG_CARD     = Color3.fromRGB(30,31,41)
+local BG_FIELD    = Color3.fromRGB(24,25,32)
+local TXT         = Color3.fromRGB(235,238,255)
+
 local UIS         = game:GetService("UserInputService")
 local TS          = game:GetService("TweenService")
 local CoreGui     = game:GetService("CoreGui")
 
 local function protect(inst) pcall(function() if syn and syn.protect_gui then syn.protect_gui(inst) end end) end
 local function tw(o,t,props) local a=TS:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props); a:Play(); return a end
-local function setZAll(root,z)
-	for _,d in ipairs(root:GetDescendants()) do pcall(function() d.ZIndex=z end) end
-	pcall(function() root.ZIndex=z end)
-end
 
 local library = {}
 function library:CreateWindow(name, version, icon)
-	name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
+    name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
 
-	local Gui = Instance.new("ScreenGui")
-	protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
-	Gui.Parent = CoreGui
+    local Gui = Instance.new("ScreenGui")
+    protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
+    Gui.Parent = CoreGui
 
-	local function calcScale()
-		local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
-		local shortest = math.min(vp.X, vp.Y)
-		if shortest <= 720 then return 0.88 elseif shortest <= 900 then return 0.94 else return 1 end
-	end
-	local SCALE = calcScale()
+    local function calcScale()
+        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+        local shortest = math.min(vp.X, vp.Y)
+        if shortest <= 720 then return 0.9 elseif shortest <= 900 then return 0.96 else return 1 end
+    end
+    local SCALE = calcScale()
 
-	-- Overlay (toggle open/close & draggable)
-	local Overlay = Instance.new("ImageButton")
-	Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
-	Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
-	Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
-	local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
-	local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
-	local ox = Gui:GetAttribute("ovx") or 12
-	local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
-	Overlay.Position = UDim2.fromOffset(ox, oy)
-	do
-		local dragging, start, origin
-		Overlay.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-				dragging=true; start=i.Position; origin=Overlay.Position
-				i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then
-					dragging=false
-					Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
-					Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
-				end end)
-			end
-		end)
-		UIS.InputChanged:Connect(function(i)
-			if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-				local d=i.Position-start
-				local nx = math.clamp(origin.X.Offset + d.X, 4, workspace.CurrentCamera.ViewportSize.X-44)
-				local ny = math.clamp(origin.Y.Offset + d.Y, 4, workspace.CurrentCamera.ViewportSize.Y-44)
-				Overlay.Position = UDim2.fromOffset(nx, ny)
-			end
-		end)
-	end
+    -- Overlay (toggle open/close & draggable)
+    local Overlay = Instance.new("ImageButton")
+    Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
+    Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
+    Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
+    local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
+    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
+    local ox = Gui:GetAttribute("ovx") or 12
+    local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
+    Overlay.Position = UDim2.fromOffset(ox, oy)
+    do
+        local dragging, start, origin
+        Overlay.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                dragging=true; start=i.Position; origin=Overlay.Position
+                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then
+                    dragging=false
+                    Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
+                    Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
+                end end)
+            end
+        end)
+        UIS.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+                local d=i.Position-start
+                local nx = math.clamp(origin.X.Offset + d.X, 4, workspace.CurrentCamera.ViewportSize.X-44)
+                local ny = math.clamp(origin.Y.Offset + d.Y, 4, workspace.CurrentCamera.ViewportSize.Y-44)
+                Overlay.Position = UDim2.fromOffset(nx, ny)
+            end
+        end)
+    end
 
-	-- Window
-	local Window = Instance.new("Frame")
-	protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
-	Window.Size=UDim2.fromOffset(math.floor(560*SCALE), math.floor(360*SCALE))
-	Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
-	local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,8)
-	local wStroke=Instance.new("UIStroke",Window); wStroke.Thickness=1; wStroke.Color=Color3.fromRGB(60,66,84); wStroke.Transparency=.3
+    -- Window
+    local Window = Instance.new("Frame")
+    protect(Window); Window.Parent=Gui; Window.BackgroundColor3=BG_DARK; Window.ClipsDescendants=false
+    Window.Size=UDim2.fromOffset(math.floor(560*SCALE), math.floor(340*SCALE))
+    Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
+    local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,10)
 
-	-- Title bar
-	local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(36*SCALE))
-	local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-	Icon.Position=UDim2.new(0,10,0,9); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
-	local TitleText=Instance.new("TextLabel",Title); TitleText.BackgroundTransparency=1
-	TitleText.Position=UDim2.new(0,34,0,0); TitleText.Size=UDim2.new(1,-30,1,0)
-	TitleText.Font=Enum.Font.GothamBold; TitleText.TextSize=math.floor(13*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
-	TitleText.TextColor3=TXT_MAIN; TitleText.Text=string.upper(("%s  •  %s"):format(name,version))
-	local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
-	Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
+    -- Title bar
+    local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(34*SCALE))
+    local Icon=Instance.new("ImageLabel",Title); Icon.BackgroundTransparency=1; Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
+    Icon.Position=UDim2.new(0,10,0,8); Icon.Image="rbxassetid://"..tostring(icon); Icon.ImageColor3=ACCENT
+    local TitleText=Instance.new("TextLabel",Title); TitleText.BackgroundTransparency=1
+    TitleText.Position=UDim2.new(0,34,0,0); TitleText.Size=UDim2.new(1,-34,1,0)
+    TitleText.Font=Enum.Font.GothamSemibold; TitleText.TextSize=math.floor(13*SCALE); TitleText.TextXAlignment=Enum.TextXAlignment.Left
+    TitleText.TextColor3=TXT; TitleText.Text=string.upper(("%s • %s"):format(name,version))
+    local Under=Instance.new("Frame",Title); Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
+    Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
-	-- Drag window
-	do local dragging,start,origin
-		Title.InputBegan:Connect(function(i)
-			if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
-				dragging=true; start=i.Position; origin=Window.Position
-				i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
-			end
-		end)
-		UIS.InputChanged:Connect(function(i)
-			if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-				local d=i.Position-start; Window.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
-			end
-		end)
-	end
+    -- Drag window
+    do local dragging,start,origin
+        Title.InputBegan:Connect(function(i)
+            if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
+                dragging=true; start=i.Position; origin=Window.Position
+                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
+            end
+        end)
+        UIS.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+                local d=i.Position-start; Window.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
+            end
+        end)
+    end
 
-	-- Overlay toggle
-	local hidden=false
-	Overlay.MouseButton1Click:Connect(function()
-		hidden=not hidden; Window.Visible=not hidden
-		tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
-	end)
+    -- Overlay toggle
+    local hidden=false
+    Overlay.MouseButton1Click:Connect(function()
+        hidden=not hidden; Window.Visible=not hidden
+        tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
+    end)
 
-	-- Tabs rail
-	local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=BG_ELEV
-	TabsRail.Position=UDim2.new(0,10,0,math.floor(40*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(150*SCALE),1,-math.floor(50*SCALE))
-	local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,8)
-	local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-12,0,math.floor(22*SCALE)); trlbl.Position=UDim2.new(0,12,0,0)
-	trlbl.Font=Enum.Font.GothamBlack; trlbl.Text=string.upper("Sections"); trlbl.TextSize=math.floor(12*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=TXT_MAIN
-	local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(6*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    -- Tabs rail
+    local TabsRail=Instance.new("Frame",Window); TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
+    TabsRail.Position=UDim2.new(0,8,0,math.floor(40*SCALE)); TabsRail.Size=UDim2.new(0,math.floor(148*SCALE),1,-math.floor(48*SCALE))
+    local trc=Instance.new("UICorner",TabsRail); trc.CornerRadius=UDim.new(0,10)
+    local trlbl=Instance.new("TextLabel",TabsRail); trlbl.BackgroundTransparency=1; trlbl.Size=UDim2.new(1,-12,0,math.floor(24*SCALE)); trlbl.Position=UDim2.new(0,12,0,0)
+    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text=string.upper("Sections"); trlbl.TextSize=math.floor(12*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=TXT
+    local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(6*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
-	-- Tabs API
-	local firstShown=false
-	local TabsAPI={}
-	function TabsAPI:CreateFrame(title)
-		title = title or "Page"
+    -- Tabs API
+    local firstShown=false
+    local TabsAPI={}
+    function TabsAPI:CreateFrame(title)
+        title = title or "Page"
 
-		local Page=Instance.new("ScrollingFrame",Window)
-		Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=6; Page.ScrollBarImageColor3=Color3.fromRGB(95,101,122)
-		Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.fromOffset(0,0)
-		Page.BackgroundColor3=BG_DARK; Page.ClipsDescendants=false
-		Page.Position=UDim2.new(0,math.floor(170*SCALE),0,math.floor(40*SCALE))
-		Page.Size=UDim2.new(1,-math.floor(186*SCALE),1,-math.floor(50*SCALE))
-		Page.Visible=false
-		local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,8)
-		local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(8*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(8*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(8*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(8*SCALE))
-		local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(8*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        local Page=Instance.new("ScrollingFrame",Window)
+        Page.Name="Page"
+        Page.Active=true
+        Page.ScrollBarThickness=5
+        Page.ScrollBarImageColor3=ACCENT
+        Page.AutomaticCanvasSize=Enum.AutomaticSize.Y
+        Page.CanvasSize=UDim2.fromOffset(0,0)
+        Page.BackgroundColor3=BG_DARK
+        Page.Position=UDim2.new(0,math.floor(164*SCALE),0,math.floor(40*SCALE))
+        Page.Size=UDim2.new(1,-math.floor(172*SCALE),1,-math.floor(48*SCALE))
+        Page.Visible=false
+        local pc=Instance.new("UICorner",Page); pc.CornerRadius=UDim.new(0,10)
+        local pad=Instance.new("UIPadding",Page); pad.PaddingTop=UDim.new(0,math.floor(8*SCALE)); pad.PaddingLeft=UDim.new(0,math.floor(8*SCALE)); pad.PaddingRight=UDim.new(0,math.floor(8*SCALE)); pad.PaddingBottom=UDim.new(0,math.floor(8*SCALE))
+        local vlist=Instance.new("UIListLayout",Page); vlist.Padding=UDim.new(0,math.floor(8*SCALE)); vlist.SortOrder=Enum.SortOrder.LayoutOrder; vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
 
-		local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
-		TabBtn.Size=UDim2.new(1,-12,0,math.floor(22*SCALE)); TabBtn.Text=string.upper(title); TabBtn.Font=Enum.Font.GothamSemibold
-		TabBtn.TextSize=math.floor(12*SCALE); TabBtn.TextColor3=TXT_DIM; TabBtn.TextTransparency=.15
-		local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,3,1,0)
-		indicator.Position=UDim2.new(0,-8,0,0); indicator.BorderSizePixel=0; indicator.Visible=false
+        local TabBtn=Instance.new("TextButton",TabsRail); TabBtn.BackgroundTransparency=1
+        TabBtn.Size=UDim2.new(1,-12,0,math.floor(20*SCALE)); TabBtn.Text=string.upper(title)
+        TabBtn.Font=Enum.Font.Gotham; TabBtn.TextSize=math.floor(12*SCALE); TabBtn.TextColor3=Color3.fromRGB(190,193,210); TabBtn.TextXAlignment=Enum.TextXAlignment.Left
+        local indicator=Instance.new("Frame",TabBtn); indicator.BackgroundColor3=ACCENT; indicator.Size=UDim2.new(0,3,1,0)
+        indicator.Position=UDim2.new(0,-6,0,0); indicator.BorderSizePixel=0; indicator.Visible=false
 
-		local function selectThis()
-			indicator.Visible=true
-			for _,v in ipairs(Window:GetChildren()) do if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end end
-			for _,v in ipairs(TabsRail:GetChildren()) do if v:IsA("TextButton") then v.TextColor3=TXT_DIM end end
-			TabBtn.TextColor3=TXT_MAIN; Page.Visible=true
-		end
-		TabBtn.MouseButton1Click:Connect(selectThis)
-		if not firstShown then firstShown=true; selectThis() end
+        local function selectThis()
+            indicator.Visible=true
+            for _,v in ipairs(Window:GetChildren()) do if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end end
+            for _,v in ipairs(TabsRail:GetChildren()) do if v:IsA("TextButton") then v.TextColor3=Color3.fromRGB(160,163,182) end end
+            TabBtn.TextColor3=TXT; Page.Visible=true
+        end
+        TabBtn.MouseButton1Click:Connect(selectThis)
+        if not firstShown then firstShown=true; selectThis() end
 
-		-- row helpers
-		local function RowBase(h)
-			local fr=Instance.new("Frame",Page)
-			fr.BackgroundColor3=BG_CARD
-			fr.Size=UDim2.new(1,0,0,math.floor((h or 46)*SCALE))
-			fr.AutomaticSize = Enum.AutomaticSize.None
-			fr.ClipsDescendants=false
-			local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,10)
-			local s=Instance.new("UIStroke",fr); s.Color=Color3.fromRGB(70,75,96); s.Transparency=.35
-			return fr
-		end
-		local function TitleLeft(parent,text)
-			local t=Instance.new("TextLabel",parent); t.BackgroundTransparency=1
-			t.Position=UDim2.new(0,12,0,0); t.Size=UDim2.new(1,-24,1,0)
-			t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE)
-			t.TextXAlignment=Enum.TextXAlignment.Left; t.TextColor3=TXT_MAIN
-			t.Text=string.upper(text or "LABEL")
-			return t
-		end
-		local function SubLeft(parent,text)
-			local s=Instance.new("TextLabel",parent); s.BackgroundTransparency=1
-			s.Position=UDim2.new(0,12,0,math.floor(22*SCALE)); s.Size=UDim2.new(1,-24,1,-math.floor(22*SCALE))
-			s.Font=Enum.Font.Gotham; s.TextSize=math.floor(11*SCALE)
-			s.TextXAlignment=Enum.TextXAlignment.Left; s.TextColor3=TXT_DIM
-			s.Text=text or ""
-			return s
-		end
+        local function SectionCard()
+            local fr=Instance.new("Frame",Page)
+            fr.BackgroundColor3=BG_CARD
+            fr.Size=UDim2.new(1,0,0,math.floor(70*SCALE))
+            fr.AutomaticSize = Enum.AutomaticSize.Y
+            fr.ClipsDescendants=false
+            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,12)
+            local stroke=Instance.new("UIStroke",fr); stroke.Color=Color3.fromRGB(56,60,78); stroke.Thickness=1.1; stroke.Transparency=.2
+            local pad=Instance.new("UIPadding",fr); pad.PaddingTop=UDim.new(0,10); pad.PaddingBottom=UDim.new(0,10); pad.PaddingLeft=UDim.new(0,14); pad.PaddingRight=UDim.new(0,14)
+            local stack=Instance.new("UIListLayout",fr); stack.Padding=UDim.new(0,8); stack.SortOrder=Enum.SortOrder.LayoutOrder
+            return fr
+        end
 
-		local PageAPI={}
+        local PageAPI={}
+        function PageAPI:CreateLabel(text)
+            local fr=SectionCard()
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Size=UDim2.new(1,0,0,18)
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextXAlignment=Enum.TextXAlignment.Left; t.TextColor3=TXT
+            t.Text = string.upper(text or "LABEL")
+            return { UpdateLabel=function(_,s) t.Text=string.upper(s or "") end, _raw=t }
+        end
 
-		-- Label: tanpa background
-		function PageAPI:CreateLabel(text)
-			local lb = Instance.new("TextLabel",Page)
-			lb.BackgroundTransparency=1
-			lb.TextXAlignment=Enum.TextXAlignment.Left
-			lb.Size=UDim2.new(1, -8, 0, math.floor(20*SCALE))
-			lb.Font=Enum.Font.GothamBlack; lb.TextSize=math.floor(12*SCALE); lb.TextColor3=TXT_MAIN
-			lb.Text=string.upper(text or "LABEL")
-			return { UpdateLabel=function(_,t) lb.Text=string.upper(t) end, _raw=lb }
-		end
+        function PageAPI:CreateButton(title,desc,cb)
+            cb = cb or function() end
+            local fr=SectionCard()
+            local line=Instance.new("Frame",fr); line.BackgroundTransparency=1; line.Size=UDim2.new(1,0,0,22)
+            local name=Instance.new("TextLabel",line); name.BackgroundTransparency=1; name.TextXAlignment=Enum.TextXAlignment.Left
+            name.Size=UDim2.new(1,-90,1,0); name.Font=Enum.Font.GothamBlack; name.TextSize=math.floor(12*SCALE); name.TextColor3=TXT; name.Text = string.upper(title or "BUTTON")
+            local descL=Instance.new("TextLabel",fr); descL.BackgroundTransparency=1; descL.TextXAlignment=Enum.TextXAlignment.Left
+            descL.Size=UDim2.new(1,0,0,16); descL.Font=Enum.Font.Gotham; descL.TextSize=math.floor(11*SCALE); descL.TextColor3=ACCENT_TEXT; descL.Text = desc or ""
+            local btn=Instance.new("TextButton",line); btn.Size=UDim2.new(0,84,1,0); btn.Position=UDim2.new(1,-84,0,0); btn.Text=""
+            btn.BackgroundColor3=BG_FIELD; local bc=Instance.new("UICorner",btn); bc.CornerRadius=UDim.new(0,8)
+            local cap=Instance.new("TextLabel",btn); cap.BackgroundTransparency=1; cap.Size=UDim2.new(1,0,1,0); cap.Text="Run"; cap.Font=Enum.Font.GothamSemibold; cap.TextSize=math.floor(11*SCALE); cap.TextColor3=TXT
+            btn.AutoButtonColor=true
+            btn.MouseButton1Click:Connect(cb)
+            return {}
+        end
 
-		-- Button ramping
-		function PageAPI:CreateButton(name,desc,cb)
-			cb=cb or function() end
-			local fr=RowBase(44)
-			local t=TitleLeft(fr, name or "BUTTON")
-			if desc and #desc>0 then SubLeft(fr, desc) end
-			local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""
-			hit.MouseEnter:Connect(function() tw(fr,.08,{BackgroundColor3=Color3.fromRGB(33,35,46)}) end)
-			hit.MouseLeave:Connect(function() tw(fr,.10,{BackgroundColor3=BG_CARD}) end)
-			hit.MouseButton1Click:Connect(cb)
-			return {}
-		end
+        function PageAPI:CreateToggle(title,desc,cb)
+            cb = cb or function() end
+            local fr=SectionCard()
 
-		-- Toggle ramping: text kiri, saklar kanan
-		function PageAPI:CreateToggle(title,desc,cb)
-			cb=cb or function() end
-			local fr=RowBase(desc and 56 or 44)
-			TitleLeft(fr, title or "TOGGLE"); if desc and #desc>0 then SubLeft(fr, desc) end
+            -- baris judul + switch di kanan
+            local row=Instance.new("Frame",fr); row.BackgroundTransparency=1; row.Size=UDim2.new(1,0,0,22)
+            local name=Instance.new("TextLabel",row); name.BackgroundTransparency=1; name.Size=UDim2.new(1,-64,1,0)
+            name.TextXAlignment=Enum.TextXAlignment.Left; name.Font=Enum.Font.GothamBlack; name.TextSize=math.floor(12*SCALE); name.TextColor3=TXT; name.Text=string.upper(title or "TOGGLE")
 
-			local knob=Instance.new("Frame",fr)
-			knob.Size=UDim2.fromOffset(math.floor(38*SCALE),math.floor(20*SCALE))
-			knob.Position=UDim2.new(1,-math.floor(52*SCALE),0,.5); knob.AnchorPoint=Vector2.new(0,0.5)
-			knob.BackgroundColor3=Color3.fromRGB(24,26,34); knob.BorderSizePixel=0
-			local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
-			local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); dot.Position=UDim2.new(0,2,0,2)
-			dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
-			setZAll(knob, 3)
+            local knob=Instance.new("Frame",row); knob.AnchorPoint=Vector2.new(1,0.5); knob.Position=UDim2.new(1,0,0.5,0)
+            knob.Size=UDim2.fromOffset(math.floor(48*SCALE),math.floor(22*SCALE))
+            knob.BackgroundColor3=BG_FIELD; local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
+            local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,2,0,2)
+            dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
 
-			local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
-			local on=false
-			local function set(v)
-				on=v
-				tw(dot,.12,{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-math.floor(18*SCALE),0,2) or UDim2.new(0,2,0,2)})
-				tw(knob,.12,{BackgroundColor3=on and Color3.fromRGB(30,34,46) or Color3.fromRGB(24,26,34)})
-			end
-			btn.MouseButton1Click:Connect(function()
-				set(not on); task.spawn(function() cb(on) end)
-			end)
-			return { Set=function(_,v) if v~=on then set(v) end end }
-		end
+            local sub=Instance.new("TextLabel",fr); sub.BackgroundTransparency=1; sub.TextXAlignment=Enum.TextXAlignment.Left
+            sub.Size=UDim2.new(1,0,0,16); sub.Font=Enum.Font.Gotham; sub.TextSize=math.floor(11*SCALE); sub.TextColor3=ACCENT_TEXT; sub.Text = desc or ""
 
-		-- Input box ramping (label kiri)
-		function PageAPI:CreateBox(placeholder,iconId,cb)
-			cb=cb or function() end
-			local fr=RowBase(44)
-			local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,12,0,0); tb.Size=UDim2.new(1,-24,1,0)
-			tb.ClearTextOnFocus=false; tb.Text=""
-			tb.Font=Enum.Font.GothamSemibold; tb.TextSize=math.floor(12*SCALE); tb.TextColor3=TXT_MAIN
-			tb.PlaceholderText=string.upper(placeholder or "INPUT"); tb.PlaceholderColor3=TXT_DIM
-			tb.TextXAlignment=Enum.TextXAlignment.Left
-			tb.FocusLost:Connect(function() cb(tb.Text) end)
-			return { SetText=function(_,t) tb.Text=t or "" end }
-		end
+            local btn=Instance.new("TextButton",row); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
+            local on=false
+            local function set(v)
+                on=v
+                tw(dot,.12,{BackgroundTransparency=on and 0 or 1, Position=on and UDim2.new(1,-math.floor(20*SCALE),0,2) or UDim2.new(0,2,0,2)})
+                tw(knob,.12,{BackgroundColor3 = on and Color3.fromRGB(34,38,54) or BG_FIELD})
+            end
+            btn.MouseButton1Click:Connect(function() set(not on); task.spawn(function() cb(on) end) end)
+            set(false)
+            return { Set=function(_,v) if v~=on then set(v); task.spawn(function() cb(on) end) end end }
+        end
 
-		-- Dropdown (buka ke bawah + stabil scroll)
-		function PageAPI:CreateDropdown(title, options, onChanged)
-			options=options or {}; onChanged=onChanged or function() end
-			local fr=RowBase(44); fr.Name="Dropdown"; fr.ClipsDescendants=false
+        -- SINGLE DROPDOWN (mendorong konten di bawah)
+        function PageAPI:CreateDropdown(title, options, onChanged)
+            options=options or {}; onChanged=onChanged or function() end
+            local fr=SectionCard(); fr.Name="DropdownCard"
 
-			local ttl=TitleLeft(fr, title)
+            -- header
+            local header=Instance.new("TextButton",fr)
+            header.BackgroundColor3=BG_FIELD; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,30); header.Text=""
+            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,10)
+            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
+            ttl.Position=UDim2.new(0,12,0,0); ttl.Size=UDim2.new(1,-44,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=TXT; ttl.Text=string.upper(title)
+            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
+            caret.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); caret.Position=UDim2.new(1,-22,0,8)
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(12*SCALE); caret.TextColor3=ACCENT
 
-			local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1
-			caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),.5,0)
-			caret.AnchorPoint=Vector2.new(0,0.5)
-			caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(12*SCALE); caret.TextColor3=ACCENT
+            -- holder (MENYUSUT/MENGEMBANG; tidak overlay)
+            local holder=Instance.new("Frame",fr)
+            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Size=UDim2.new(1,0,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible=false
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,10)
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,6); lv.SortOrder=Enum.SortOrder.LayoutOrder
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,8); pad.PaddingBottom=UDim.new(0,8); pad.PaddingLeft=UDim.new(0,8); pad.PaddingRight=UDim.new(0,8)
 
-			local holder=Instance.new("Frame",fr)
-			holder.Name="Holder"; holder.BackgroundColor3=Color3.fromRGB(26,27,36)
-			holder.Position=UDim2.new(0,0,1,6) -- SELALU KE BAWAH
-			holder.Size=UDim2.new(1,0,0,0)
-			holder.AutomaticSize = Enum.AutomaticSize.Y
-			holder.Visible=false; holder.ClipsDescendants=false
-			local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,10)
-			local ls=Instance.new("UIStroke",holder); ls.Color=Color3.fromRGB(70,75,96); ls.Transparency=.35
-			local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,4); lv.SortOrder=Enum.SortOrder.LayoutOrder
-			local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
-			setZAll(holder, 6)
+            local current=nil
+            local function rebuild(list)
+                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                for _,opt in ipairs(list) do
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,24)
+                    b.BackgroundColor3=BG_CARD
+                    local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,8)
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=TXT
+                    b.MouseButton1Click:Connect(function()
+                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt)); onChanged(opt)
+                        holder.Visible=false; tw(caret,.12,{Rotation=0})
+                    end)
+                end
+            end
+            rebuild(options)
 
-			local current=nil
-			local function rebuild(list)
-				for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-				for _,opt in ipairs(list) do
-					local b=Instance.new("TextButton",holder)
-					b.Size=UDim2.new(1,0,0,math.floor(28*SCALE))
-					b.BackgroundColor3=BG_CARD
-					b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(12*SCALE); b.TextColor3=TXT_MAIN; b.AutoButtonColor=true
-					local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,8)
-					local bs=Instance.new("UIStroke",b); bs.Color=Color3.fromRGB(60,64,84); bs.Transparency=.5
-					b.MouseEnter:Connect(function() tw(b,.08,{BackgroundColor3=Color3.fromRGB(33,35,46)}) end)
-					b.MouseLeave:Connect(function() tw(b,.10,{BackgroundColor3=BG_CARD}) end)
-					b.MouseButton1Click:Connect(function()
-						current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt)); onChanged(opt)
-						holder.Visible=false; tw(caret,.12,{Rotation=0})
-					end)
-				end
-			end
-			rebuild(options)
+            local open=false
+            header.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret,.12,{Rotation=open and 180 or 0})
+            end)
 
-			local open=false
-			local headerBtn=Instance.new("TextButton",fr); headerBtn.BackgroundTransparency=1; headerBtn.Size=UDim2.new(1,0,1,0); headerBtn.Text=""
-			headerBtn.MouseButton1Click:Connect(function()
-				-- simpan lalu pulihkan posisi scroll agar tidak jump to top
-				local sc = Page.CanvasPosition
-				open = not open; holder.Visible = open
-				tw(caret,.12,{Rotation=open and 180 or 0})
-				task.delay(0.01, function() Page.CanvasPosition = sc end)
-			end)
+            return {
+                SetValue   = function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end,
+                GetValue   = function() return current end,
+                SetOptions = function(_,opts) rebuild(opts or {}) end
+            }
+        end
 
-			return {
-				SetValue   = function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v or ""))) end,
-				GetValue   = function() return current end,
-				SetOptions = function(_,opts) rebuild(opts or {}) end
-			}
-		end
+        -- MULTI SELECT DROPDOWN (checkbox style; mendorong konten)
+        function PageAPI:CreateDropdownMulti(title, options, onChanged)
+            options=options or {}; onChanged=onChanged or function() end
+            local fr=SectionCard(); fr.Name="DropdownMulti"
 
-		return PageAPI
-	end
+            local header=Instance.new("TextButton",fr)
+            header.BackgroundColor3=BG_FIELD; header.AutoButtonColor=true
+            header.Size=UDim2.new(1,0,0,30); header.Text=""
+            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,10)
+            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
+            ttl.Position=UDim2.new(0,12,0,0); ttl.Size=UDim2.new(1,-44,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=TXT; ttl.Text=string.upper(title)
+            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
+            caret.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); caret.Position=UDim2.new(1,-22,0,8)
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(12*SCALE); caret.TextColor3=ACCENT
 
-	local winAPI={}
-	function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
-	return winAPI
+            local holder=Instance.new("Frame",fr)
+            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Size=UDim2.new(1,0,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible=false
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,10)
+            local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,6)
+            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,8); pad.PaddingBottom=UDim.new(0,8); pad.PaddingLeft=UDim.new(0,8); pad.PaddingRight=UDim.new(0,8)
+
+            local selected = {} -- set
+            local function refreshTitle()
+                local n=0 for _ in pairs(selected) do n=n+1 end
+                if n>0 then ttl.Text = string.upper(("%s : %d selected"):format(title,n)) else ttl.Text=string.upper(title) end
+            end
+            local function rebuild(list)
+                holder:ClearAllChildren(); selected={}
+                for _,name in ipairs(list) do
+                    local row=Instance.new("Frame",holder); row.Size=UDim2.new(1,0,0,24); row.BackgroundColor3=BG_CARD
+                    local rc=Instance.new("UICorner",row); rc.CornerRadius=UDim.new(0,8)
+                    local txt=Instance.new("TextLabel",row); txt.BackgroundTransparency=1; txt.TextXAlignment=Enum.TextXAlignment.Left
+                    txt.Position=UDim2.new(0,8,0,0); txt.Size=UDim2.new(1,-40,1,0); txt.Font=Enum.Font.Gotham; txt.TextSize=math.floor(11*SCALE); txt.TextColor3=TXT; txt.Text=name
+                    local chk=Instance.new("TextButton",row); chk.Text=""; chk.Size=UDim2.new(0,20,0,20); chk.Position=UDim2.new(1,-26,0,2); chk.BackgroundColor3=BG_FIELD
+                    local cc=Instance.new("UICorner",chk); cc.CornerRadius=UDim.new(0,6)
+                    local dot=Instance.new("Frame",chk); dot.Size=UDim2.new(1,-6,1,-6); dot.Position=UDim2.new(0,3,0,3); dot.BackgroundColor3=ACCENT; dot.Visible=false
+                    local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(0,4)
+                    chk.MouseButton1Click:Connect(function()
+                        selected[name] = not selected[name]
+                        dot.Visible = selected[name] and true or false
+                        onChanged(selected)
+                        refreshTitle()
+                    end)
+                end
+                refreshTitle()
+            end
+            rebuild(options)
+
+            local open=false
+            header.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret,.12,{Rotation=open and 180 or 0})
+            end)
+
+            return {
+                GetSelected = function() return selected end,
+                SetOptions  = function(_,opts) rebuild(opts or {}) end
+            }
+        end
+
+        return PageAPI
+    end
+
+    local winAPI={}
+    function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
+    return winAPI
 end
 
 ----------------------------------------------------------------
@@ -337,24 +372,22 @@ local TARGET_PLACE = 121864768012064
 
 -- Anti AFK ON
 LocalPlayer.Idled:Connect(function()
-	VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-	task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
 -- State
-local state={
-	AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
-	floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
-	reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
-	sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
-	autoEvent=false,lastEventTP=0
-}
+local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
+             floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
+             reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
+             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
+             autoEvent=false}
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function effDelays()
-	if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
-	local c=(state.completeOverride or state.completePreset)/state.SPEED
-	local r=(state.reelOverride or state.reelPreset)/state.SPEED
-	return clamp(c,.35,12),clamp(r,.15,6)
+    if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
+    local c=(state.completeOverride or state.completePreset)/state.SPEED
+    local r=(state.reelOverride or state.reelPreset)/state.SPEED
+    return clamp(c,.35,12),clamp(r,.15,6)
 end
 
 -- Net / anim / modules
@@ -362,26 +395,26 @@ local net,RF_ChargeFishingRod,RF_RequestMinigame,RE_FishingCompleted,RE_EquipHot
 local animator,AIdle,AReel,AShake
 local Replion,ItemUtility
 task.spawn(function()
-	local function gw(o,n,t) return o:FindFirstChild(n) or o:WaitForChild(n,t or 10) end
-	local okNet,mod=pcall(function() local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10) end)
-	if okNet then net=mod
-		RF_ChargeFishingRod=net:FindFirstChild("RF/ChargeFishingRod")
-		RF_RequestMinigame=net:FindFirstChild("RF/RequestFishingMinigameStarted")
-		RE_FishingCompleted=net:FindFirstChild("RE/FishingCompleted")
-		RE_EquipHotbar=net:FindFirstChild("RE/EquipToolFromHotbar")
-		RE_RepText=net:FindFirstChild("RE/ReplicateTextEffect")
-		RF_SellAll=net:FindFirstChild("RF/SellAllItems")
-	end
-	local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local hum=char:WaitForChild("Humanoid"); animator=hum:FindFirstChildOfClass("Animator") or Instance.new("Animator",hum)
-	local okI,I=pcall(function() return ReplicatedStorage.Modules.Animations.FishingRodReelIdle end)
-	local okR,R=pcall(function() return ReplicatedStorage.Modules.Animations.EasyFishReelStart end)
-	local okS,S=pcall(function() return ReplicatedStorage.Modules.Animations.CastFromFullChargePosition1Hand end)
-	AIdle=okI and animator:LoadAnimation(I) or nil; AReel=okR and animator:LoadAnimation(R) or nil; AShake=okS and animator:LoadAnimation(S) or nil
-	local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
-	if okRp then Replion=modRp end
-	local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
-	if okU then ItemUtility=modU end
+    local function gw(o,n,t) return o:FindFirstChild(n) or o:WaitForChild(n,t or 10) end
+    local okNet,mod=pcall(function() local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10) end)
+    if okNet then net=mod
+        RF_ChargeFishingRod=net:FindFirstChild("RF/ChargeFishingRod")
+        RF_RequestMinigame=net:FindFirstChild("RF/RequestFishingMinigameStarted")
+        RE_FishingCompleted=net:FindFirstChild("RE/FishingCompleted")
+        RE_EquipHotbar=net:FindFirstChild("RE/EquipToolFromHotbar")
+        RE_RepText=net:FindFirstChild("RE/ReplicateTextEffect")
+        RF_SellAll=net:FindFirstChild("RF/SellAllItems")
+    end
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum=char:WaitForChild("Humanoid"); animator=hum:FindFirstChildOfClass("Animator") or Instance.new("Animator",hum)
+    local okI,I=pcall(function() return ReplicatedStorage.Modules.Animations.FishingRodReelIdle end)
+    local okR,R=pcall(function() return ReplicatedStorage.Modules.Animations.EasyFishReelStart end)
+    local okS,S=pcall(function() return ReplicatedStorage.Modules.Animations.CastFromFullChargePosition1Hand end)
+    AIdle=okI and animator:LoadAnimation(I) or nil; AReel=okR and animator:LoadAnimation(R) or nil; AShake=okS and animator:LoadAnimation(S) or nil
+    local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
+    if okRp then Replion=modRp end
+    local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
+    if okU then ItemUtility=modU end
 end)
 
 -- Rod helper
@@ -391,157 +424,158 @@ local RodDelays={["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1
 ["Grass Rod"]={custom=3.80,bypass=3.90},["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
 ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},}
 local function getEquippedRodName()
-	local pg=LocalPlayer:FindFirstChild("PlayerGui"); local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
-	if not display then return nil end
-	for _,tile in ipairs(display:GetChildren()) do local ok,lbl=pcall(function() return tile.Inner.Tags.ItemName end)
-		if ok and lbl and lbl:IsA("TextLabel") and RodDelays[lbl.Text] then return lbl.Text end end
-	return nil
+    local pg=LocalPlayer:FindFirstChild("PlayerGui"); local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
+    if not display then return nil end
+    for _,tile in ipairs(display:GetChildren()) do local ok,lbl=pcall(function() return tile.Inner.Tags.ItemName end)
+        if ok and lbl and lbl:IsA("TextLabel") and RodDelays[lbl.Text] then return lbl.Text end end
+    return nil
 end
 local function refreshRodDelays() local rod=getEquippedRodName()
-	if rod and RodDelays[rod] then state.completePreset=RodDelays[rod].custom; state.reelPreset=RodDelays[rod].bypass else state.completePreset=10; state.reelPreset=1 end end
+    if rod and RodDelays[rod] then state.completePreset=RodDelays[rod].custom; state.reelPreset=RodDelays[rod].bypass else state.completePreset=10; state.reelPreset=1 end end
 
 -- Floating
 local floatBV
 local function setFloating(on)
-	state.floating=on; local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart")
-	if on and hrp then floatBV=floatBV or Instance.new("BodyVelocity"); floatBV.MaxForce=Vector3.new(0,1e5,0); floatBV.Velocity=state.floatForce; floatBV.Parent=hrp
-	else if floatBV then floatBV:Destroy(); floatBV=nil end end
+    state.floating=on; local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart")
+    if on and hrp then floatBV=floatBV or Instance.new("BodyVelocity"); floatBV.MaxForce=Vector3.new(0,1e5,0); floatBV.Velocity=state.floatForce; floatBV.Parent=hrp
+    else if floatBV then floatBV:Destroy(); floatBV=nil end end
 end
 
 -- Auto-finish fishing (V1/V2)
 task.spawn(function()
-	repeat task.wait() until RE_RepText
-	if not RE_RepText then return end
-	RE_RepText.OnClientEvent:Connect(function(d)
-		if not (state.AFon and state.AFfishing) then return end
-		if not (d and d.TextData and d.TextData.EffectType=="Exclaim") then return end
-		if state.instant then pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end); return end
-		task.spawn(function() local _,r=effDelays(); task.wait(r); pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end) end)
-	end)
+    repeat task.wait() until RE_RepText
+    if not RE_RepText then return end
+    RE_RepText.OnClientEvent:Connect(function(d)
+        if not (state.AFon and state.AFfishing) then return end
+        if not (d and d.TextData and d.TextData.EffectType=="Exclaim") then return end
+        if state.instant then pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end); return end
+        task.spawn(function() local _,r=effDelays(); task.wait(r); pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end) end)
+    end)
 end)
 
 -- Fishing core
 local function castOnce()
-	state.AFfishing=true
-	if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
-	task.wait(.02); if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end
-	task.wait(state.blatant and .05 or .20); if AShake then AShake:Play() end
-	pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
-	local bx,by=-0.7499996423721313,1; local x,y
-	if state.perfectCast then x=bx+(math.random(-500,500)/1e7); y=by+(math.random(-500,500)/1e7) else x=math.random(-1000,1000)/1000; y=math.random(0,1000)/1000 end
-	if AIdle then AIdle:Play() end; if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
-	state.lastAction=os.clock()
+    state.AFfishing=true
+    if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
+    task.wait(.02); if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end
+    task.wait(state.blatant and .05 or .20); if AShake then AShake:Play() end
+    pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
+    local bx,by=-0.7499996423721313,1; local x,y
+    if state.perfectCast then x=bx+(math.random(-500,500)/1e7); y=by+(math.random(-500,500)/1e7) else x=math.random(-1000,1000)/1000; y=math.random(0,1000)/1000 end
+    if AIdle then AIdle:Play() end; if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
+    state.lastAction=os.clock()
 end
 function StartAutoFish()
-	if state.AFon then return end; state.AFon=true; refreshRodDelays()
-	task.spawn(function()
-		while state.AFon do
-			pcall(function()
-				castOnce(); local c,r=effDelays(); local waitTime = state.instant and .05 or c
-				local t0=os.clock()
-				while os.clock()-t0<waitTime do
-					if state.autoRecast and (os.clock()-state.lastAction)>state.idleDelay then castOnce(); t0=os.clock() end
-					task.wait(.02)
-				end
-				task.wait(state.instant and .03 or r); state.AFfishing=false; refreshRodDelays()
-			end)
-			task.wait(state.blatant and .01 or .05)
-		end
-	end)
+    if state.AFon then return end; state.AFon=true; refreshRodDelays()
+    task.spawn(function()
+        while state.AFon do
+            pcall(function()
+                castOnce(); local c,r=effDelays(); local waitTime = state.instant and .05 or c
+                local t0=os.clock()
+                while os.clock()-t0<waitTime do
+                    if state.autoRecast and (os.clock()-state.lastAction)>state.idleDelay then castOnce(); t0=os.clock() end
+                    task.wait(.02)
+                end
+                task.wait(state.instant and .03 or r); state.AFfishing=false; refreshRodDelays()
+            end)
+            task.wait(state.blatant and .01 or .05)
+        end
+    end)
 end
 function StopAutoFish() state.AFon=false; state.AFfishing=false; pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end) end
 
 -- Inventory utils
 local function eachInventory(fn)
-	if not Replion then return end
-	local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
-	if type(items)~="table" then return end; for _,it in ipairs(items) do fn(it) end
+    if not Replion then return end
+    local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
+    if type(items)~="table" then return end; for _,it in ipairs(items) do fn(it) end
 end
 local function setFavByPredicate(pred,fav)
-	if not (Replion and ItemUtility) then return end
-	eachInventory(function(it)
-		local base=ItemUtility:GetItemData(it.Id); local name=(base and base.Data and tostring(base.Data.Name)) or ""
-		if pred(it,name) then it.Favorited=fav end
-	end)
+    if not (Replion and ItemUtility) then return end
+    eachInventory(function(it)
+        local base=ItemUtility:GetItemData(it.Id); local name=(base and base.Data and tostring(base.Data.Name)) or ""
+        if pred(it,name) then it.Favorited=fav end
+    end)
 end
 local function SellAll() if RF_SellAll then pcall(function() RF_SellAll:InvokeServer() end) end end
 task.spawn(function() while true do if state.autoSellAll and (os.time()-state.lastSell)>=state.autoSellEvery then SellAll(); state.lastSell=os.time() end task.wait(3) end end)
 local function sellAnyAmount(n)
-	if n<=0 then return end; setFavByPredicate(function() return true end,true)
-	local left=n; eachInventory(function(it) if left>0 and it.Favorited then it.Favorited=false; left=left-(it.Count or 1) end end)
-	SellAll(); setFavByPredicate(function() return true end,true)
+    if n<=0 then return end; setFavByPredicate(function() return true end,true)
+    local left=n; eachInventory(function(it) if left>0 and it.Favorited then it.Favorited=false; left=left-(it.Count or 1) end end)
+    SellAll(); setFavByPredicate(function() return true end,true)
 end
 local function sellCoughAmount(n)
-	if n<=0 then return end
-	setFavByPredicate(function(_,name) return not string.find(string.lower(name),"cough") end,true)
-	local left=n
-	setFavByPredicate(function(it,name)
-		if left<=0 then return false end
-		if string.find(string.lower(name),"cough") and it.Favorited then it.Favorited=false; left=left-(it.Count or 1); return true end
-		return false
-	end,false)
-	SellAll(); setFavByPredicate(function() return true end,true)
+    if n<=0 then return end
+    setFavByPredicate(function(_,name) return not string.find(string.lower(name),"cough") end,true)
+    local left=n
+    setFavByPredicate(function(it,name)
+        if left<=0 then return false end
+        if string.find(string.lower(name),"cough") and it.Favorited then it.Favorited=false; left=left-(it.Count or 1); return true end
+        return false
+    end,false)
+    SellAll(); setFavByPredicate(function() return true end,true)
 end
 
 -- ===================== Teleport data =====================
 local islands = {
-	["Weather Machine"]   = Vector3.new(-1471,-3,1929),
-	["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
-	["Tropical Grove"]    = Vector3.new(-2038,3,3650),
-	["Stingray Shores"]   = Vector3.new(-32,4,2773),
-	["Kohana Volcano"]    = Vector3.new(-519,24,189),
-	["Coral Reefs"]       = Vector3.new(-3095,1,2177),
-	["Crater Island"]     = Vector3.new(968,1,4854),
-	["Kohana"]            = Vector3.new(-658,3,719),
-	["Winter Fest"]       = Vector3.new(1611,4,3280),
-	["Esoteric Island"]   = Vector3.new(1987,4,1400),
-	["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
-	["Lost Shore"]        = Vector3.new(-3663,38,-989),
-	["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-	-- Placeholder (isi via Live Coordinates)
-	["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
-	["Halloween"]                 = Vector3.new(2127,78,3334),
-	["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
-	["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
-	["Ancient Jungle"]            = Vector3.new(1268,78,-183),
-	["Fisherman Island"]          = Vector3.new(-3,17,2840),
+    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
+    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
+    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
+    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
+    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
+    ["Crater Island"]     = Vector3.new(968,1,4854),
+    ["Kohana"]            = Vector3.new(-658,3,719),
+    ["Winter Fest"]       = Vector3.new(1611,4,3280),
+    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
+    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
+    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
+    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
+
+    -- Placeholder (isi dari Live Coordinates)
+    ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
+    ["Halloween"]                 = Vector3.new(2127,78,3334),
+    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
+    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
+    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
+    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
 }
 local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
 local function tpTo(pos)
-	if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
-	local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
-	local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
-	if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
+    local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
+    local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
+    if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
 -- Prompt helpers (Shop/Event)
 local function fireNearestPrompt(filterFn,maxDist)
-	maxDist=maxDist or 120
-	local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
-	local best,dist
-	for _,d in ipairs(Workspace:GetDescendants()) do
-		if d:IsA("ProximityPrompt") then
-			local ok,use=pcall(function() return filterFn(d) end)
-			if ok and use then
-				local p; if d.Parent and d.Parent:IsA("BasePart") then p=d.Parent.Position end
-				if not p and d.Parent and d.Parent.Parent and d.Parent.Parent:IsA("BasePart") then p=d.Parent.Parent.Position end
-				if p then local dd=(p-hrp.Position).Magnitude; if dd<=maxDist and (not dist or dd<dist) then best=d; dist=dd end end
-			end
-		end
-	end
-	if best then pcall(function() fireproximityprompt(best,5) end); return true end
-	return false
+    maxDist=maxDist or 120
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+    local best,dist
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            local ok,use=pcall(function() return filterFn(d) end)
+            if ok and use then
+                local p; if d.Parent and d.Parent:IsA("BasePart") then p=d.Parent.Position end
+                if not p and d.Parent and d.Parent.Parent and d.Parent.Parent:IsA("BasePart") then p=d.Parent.Parent.Position end
+                if p then local dd=(p-hrp.Position).Magnitude; if dd<=maxDist and (not dist or dd<dist) then best=d; dist=dd end end
+            end
+        end
+    end
+    if best then pcall(function() fireproximityprompt(best,5) end); return true end
+    return false
 end
 local function openShopByKeyword(keys)
-	keys=keys or {}
-	return fireNearestPrompt(function(pp)
-		local t=(pp.ObjectText or "").." "..(pp.ActionText or ""); t=string.lower(t)
-		for _,k in ipairs(keys) do if string.find(t,string.lower(k)) then return true end end
-		local n=(pp.Parent and pp.Parent.Name or ""); n=string.lower(n)
-		for _,k in ipairs(keys) do if string.find(n,string.lower(k)) then return true end end
-		return false
-	end,200)
+    keys=keys or {}
+    return fireNearestPrompt(function(pp)
+        local t=(pp.ObjectText or "").." "..(pp.ActionText or ""); t=string.lower(t)
+        for _,k in ipairs(keys) do if string.find(t,string.lower(k)) then return true end end
+        local n=(pp.Parent and pp.Parent.Name or ""); n=string.lower(n)
+        for _,k in ipairs(keys) do if string.find(n,string.lower(k)) then return true end end
+        return false
+    end,200)
 end
 
 -- ================= UI BUILD =================
@@ -556,26 +590,23 @@ local PageTP    = Tab:CreateFrame("Teleport")
 local PageEvent = Tab:CreateFrame("Event")
 
 -- Fishing V1
-local Live = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: NORMAL")
+local Live = PageV1:CreateLabel("Rod: ?  • Reel: -  • Cmpl: -  • Mode: normal")
 PageV1:CreateToggle("Blatant Mode","Very fast fishing mode",function(v) state.blatant=v end)
-PageV1:CreateBox("Reel Delay (seconds)",10044538000,function(t) state.reelOverride=tonumber(t) end)
-PageV1:CreateBox("Custom Complete Delay (seconds)",10044538000,function(t) state.completeOverride=tonumber(t) end)
+PageV1:CreateButton("Reel Delay (SECONDS)","Set custom 'Reel' delay via chat: /reel 1.2",function() end)
+PageV1:CreateButton("Custom Complete Delay (SECONDS)","Set custom 'Complete' delay via chat: /complete 2.5",function() end)
 PageV1:CreateToggle("Start / Stop","Mulai / hentikan loop",function(v) if v then StartAutoFish() else StopAutoFish() end end)
-PageV1:CreateButton("Cancel Fishing","Batalkan siklus",function() StopAutoFish() end)
 
 -- Fishing V2
 PageV2:CreateToggle("Instant Fishing","Selesaikan segera saat bite",function(v) state.instant=v end)
 PageV2:CreateToggle("Perfect Cast","Akurasi maksimal",function(v) state.perfectCast=v end)
 PageV2:CreateToggle("Auto Recast / Anti Stuck","Recast saat idle lama",function(v) state.autoRecast=v end)
-PageV2:CreateBox("Idle Delay (detik)",10044538000,function(t) state.idleDelay = clamp(tonumber(t) or 3,0.3,20) end)
+PageV2:CreateButton("Idle Delay (DETIK)","Set via chat: /idle 3",function() end)
 PageV2:CreateToggle("Floating","Mengambang di udara",function(v) setFloating(v) end)
 
 -- Inventory
-PageInv:CreateToggle("Auto Sell All (periodic)","Jual semua berkala",function(v) state.autoSellAll=v end)
-PageInv:CreateBox("Auto Sell Input Amount",10044538000,function(t) state.sellCustomAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
-PageInv:CreateButton("Run: Sell Custom Amount","",function() if state.sellCustomAmount>0 then sellAnyAmount(state.sellCustomAmount) end end)
-PageInv:CreateBox("Auto Sell Cough Fish (amount)",10044538000,function(t) state.coughSellAmount=math.max(0,math.floor(tonumber(t) or 0)) end)
-PageInv:CreateButton("Run: Sell Cough Fish Amount","",function() if state.coughSellAmount>0 then sellCoughAmount(state.coughSellAmount) end end)
+PageInv:CreateToggle("Auto Sell All (PERIODIC)","Jual semua berkala",function(v) state.autoSellAll=v end)
+PageInv:CreateButton("Sell Custom Amount","Set via chat: /sell 10",function() end)
+PageInv:CreateButton("Sell Cough Fish Amount","Set via chat: /cough 10",function() end)
 PageInv:CreateButton("Sell ALL Now","",function() SellAll() end)
 
 -- Shop
@@ -585,120 +616,114 @@ PageShop:CreateButton("Rod Shop","",function() openShopByKeyword({"rod","shop"})
 PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather","shop"}) end)
 
 -- Teleport
-local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
+local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
 
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-	local pos = islands[choice]
-	if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
-	tpTo(pos)
+    local pos = islands[choice]
+    if not pos or (pos.X==0 and pos.Y==0 and pos.Z==0) then return end
+    tpTo(pos)
 end)
 
 local function scanNPC()
-	local s={} for _,m in ipairs(Workspace:GetDescendants()) do
-		if m:IsA("Model") then
-			local hasHum=m:FindFirstChildOfClass("Humanoid"); local hasPrompt=false
-			for _,d in ipairs(m:GetDescendants()) do if d:IsA("ProximityPrompt") then hasPrompt=true break end end
-			if (hasHum or hasPrompt) and #m.Name>=3 then s[m.Name]=true end
-		end
-	end
-	local t={} for k in pairs(s) do table.insert(t,k) end table.sort(t); return t
+    local s={} for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") then
+            local hasHum=m:FindFirstChildOfClass("Humanoid"); local hasPrompt=false
+            for _,d in ipairs(m:GetDescendants()) do if d:IsA("ProximityPrompt") then hasPrompt=true break end end
+            if (hasHum or hasPrompt) and #m.Name>=3 then s[m.Name]=true end
+        end
+    end
+    local t={} for k in pairs(s) do table.insert(t,k) end table.sort(t); return t
 end
 local function tpNearestModel(partial)
-	local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
-	local best,dist
-	for _,m in ipairs(Workspace:GetDescendants()) do
-		if m:IsA("Model") and string.find(string.lower(m.Name),string.lower(partial)) then
-			local p=m:FindFirstChild("HumanoidRootPart") or m:FindFirstChildWhichIsA("BasePart")
-			if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
-		end
-	end
-	if best then tpTo(best.Position) end
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+    local best,dist
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name),string.lower(partial)) then
+            local p=m:FindFirstChild("HumanoidRootPart") or m:FindFirstChildWhichIsA("BasePart")
+            if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
+        end
+    end
+    if best then tpTo(best.Position) end
 end
 local npcDD = PageTP:CreateDropdown("Teleport NPC", scanNPC(), function(nm) if nm then tpNearestModel(nm) end end)
 task.spawn(function() while true do task.wait(8) npcDD:SetOptions(scanNPC()) end end)
 
 local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
-	local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
+    local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
 end)
 Players.PlayerAdded:Connect(function() plDD:SetOptions(playersList()) end)
 Players.PlayerRemoving:Connect(function() plDD:SetOptions(playersList()) end)
 
 if game.PlaceId ~= TARGET_PLACE then
-	PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
+    PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
--- ================= Event =================
-local eventsList = { "Admin Event", "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
+-- Event (manual list + auto toggle)
+local eventsList = { "Admin Event","Shark Hunt","Ghost Shark Hunt","Worm Hunt","Black Hole","Shocked","Ghost Worm","Meteor Rain" }
 
-local function findEventPivotByName(name)
-	local props = Workspace:FindFirstChild("Props")
-	if not props then return nil end
-	local evt = props:FindFirstChild(name)
-	if not evt then return nil end
-	-- Prefer boat pivot kalau ada
-	local boat = evt:FindFirstChild("Fishing Boat")
-	if boat and boat.GetPivot then return boat:GetPivot() end
-	if evt.GetPivot then return evt:GetPivot() end
-	local part = evt:FindFirstChildWhichIsA("BasePart", true)
-	return part and part.CFrame or nil
+local selectedEvents = {}
+local evMulti = PageEvent:CreateDropdownMulti("Select Events (Multi)", eventsList, function(sel) selectedEvents=sel end)
+PageEvent:CreateToggle("Auto Teleport Selected Events","Otomatis ke event yang sedang berlangsung sesuai pilihan",function(v) state.autoEvent=v end)
+
+-- event watcher
+local function getActiveEventName()
+    local props = Workspace:FindFirstChild("Props")
+    if not props then return nil end
+    for _,ev in ipairs(eventsList) do
+        local node = props:FindFirstChild(ev)
+        if node and node:FindFirstChild("Fishing Boat") then
+            return ev, node["Fishing Boat"]
+        end
+    end
+    return nil
 end
-
-local function tpToEvent(name)
-	local cf = findEventPivotByName(name)
-	if not cf then return false end
-	local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
-	hrp.CFrame = cf + Vector3.new(0,15,0)
-	return true
-end
-
-local chosenEvent = nil
-local evtDD = PageEvent:CreateDropdown("Event Teleport", eventsList, function(opt)
-	chosenEvent = opt
-	tpToEvent(opt)
-end)
-
-PageEvent:CreateToggle("Auto Teleport Active Events","Otomatis teleport ke event yang sedang spawn",function(v)
-	state.autoEvent = v
-end)
-
--- Auto event watcher
 task.spawn(function()
-	while true do
-		if state.autoEvent and (os.clock()-state.lastEventTP>4) then
-			local props = Workspace:FindFirstChild("Props")
-			if props then
-				for _,nm in ipairs(eventsList) do
-					if props:FindFirstChild(nm) then
-						if tpToEvent(nm) then state.lastEventTP=os.clock() break end
-					end
-				end
-			end
-		end
-		task.wait(1.0)
-	end
+    while true do
+        if state.autoEvent then
+            local name, boat = getActiveEventName()
+            if name and selectedEvents[name] then
+                local hrp = (Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()):FindFirstChild("HumanoidRootPart")
+                if hrp and boat then hrp.CFrame = boat:GetPivot() + Vector3.new(0,15,0) end
+            end
+        end
+        task.wait(1.2)
+    end
 end)
 
 -- Live HUD (Fishing V1)
 RS.RenderStepped:Connect(function()
-	local rod=getEquippedRodName() or "?"
-	local c,r=effDelays()
-	pcall(function() if Live and Live.UpdateLabel then Live:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Mode: %s"):format(rod,r,c,state.blatant and "BLATANT" or "NORMAL")) end end)
+    local rod=getEquippedRodName() or "?"
+    local c,r=effDelays()
+    pcall(function() if Live and Live.UpdateLabel then Live:UpdateLabel(("Rod: %s  • Reel: %.2fs  • Cmpl: %.2fs  • Mode: %s"):format(rod,r,c,state.blatant and "blatant" or "normal")) end end)
 end)
 
 -- Live Coordinates updater (menu Teleport)
 RS.RenderStepped:Connect(function()
-	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if hrp and CoordLabel and CoordLabel.UpdateLabel then
-		local p = hrp.Position
-		CoordLabel:UpdateLabel(("Coordinates • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z))
-	end
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and CoordLabel and CoordLabel.UpdateLabel then
+        local p = hrp.Position
+        CoordLabel:UpdateLabel(("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z))
+    end
 end)
 
 -- Refresh preset on backpack change
 task.spawn(function()
-	local pg=LocalPlayer:WaitForChild("PlayerGui"); local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
-	display.ChildAdded:Connect(function() task.wait(.05) refreshRodDelays() end)
+    local pg=LocalPlayer:WaitForChild("PlayerGui"); local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
+    display.ChildAdded:Connect(function() task.wait(.05) refreshRodDelays() end)
+end)
+
+-- Simple chat setters (opsional, biar tombol setting ringkas di V1/V2 tetap berguna)
+game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
+    local v=tonumber(msg:match("^/reel%s+(%S+)") or "")
+    if v then state.reelOverride=v end
+    v=tonumber(msg:match("^/complete%s+(%S+)") or "")
+    if v then state.completeOverride=v end
+    v=tonumber(msg:match("^/idle%s+(%S+)") or "")
+    if v then state.idleDelay=clamp(v,0.3,20) end
+    v=tonumber(msg:match("^/sell%s+(%S+)") or "")
+    if v then state.sellCustomAmount=math.max(0,math.floor(v)); if v>0 then SellAll() end end
+    v=tonumber(msg:match("^/cough%s+(%S+)") or "")
+    if v then state.coughSellAmount=math.max(0,math.floor(v)); if v>0 then sellCoughAmount(state.coughSellAmount) end end
 end)
