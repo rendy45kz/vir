@@ -3,6 +3,7 @@ AegisHub • Fish It • Premium (UI Polished v2)
 - Dropdown auto-size (tanpa scrollbar), halaman pertama auto aktif
 - Fitur: Fishing V1/V2, Inventory, Shop, Teleport (Island/NPC/Player), Event
 - Live Coordinates: tampil langsung di tab Teleport
+- Event: AUTO-DETECT (tanpa daftar), auto-teleport saat toggle ON
 ]]
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -155,52 +156,38 @@ function library:CreateWindow(name, version, icon)
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.ClipsDescendants=false
             local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6)
-            local pad=Instance.new("UIPadding",fr)
-            pad.PaddingTop = UDim.new(0, math.floor(8*SCALE))
-            pad.PaddingBottom = UDim.new(0, math.floor(8*SCALE))
-            pad.PaddingLeft = UDim.new(0, math.floor(8*SCALE))
-            pad.PaddingRight= UDim.new(0, math.floor(8*SCALE))
-            local list=Instance.new("UIListLayout",fr)
-            list.Padding=UDim.new(0, math.floor(6*SCALE)) -- ruang antar elemen di dalam kartu
-            list.SortOrder=Enum.SortOrder.LayoutOrder
             return fr
         end
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
             local fr=Card(24)
-            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Size=UDim2.new(1,0,0,math.floor(18*SCALE))
+            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=1; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
             lb.Font=Enum.Font.Gotham; lb.TextSize=math.floor(11*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=text or "Label"
             return { UpdateLabel=function(_,t) lb.Text=t end, _raw=lb }
         end
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
             local fr=Card(42)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Size=UDim2.new(1,0,0,math.floor(18*SCALE))
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=name or "Button"
-            if desc and desc~="" then
-                local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Size=UDim2.new(1,0,0,math.floor(16*SCALE))
-                d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc
-            end
-            local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,0,1); hit.Text=""; hit.MouseButton1Click:Connect(cb)
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-8,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
+            local hit=Instance.new("TextButton",fr); hit.BackgroundTransparency=1; hit.Size=UDim2.new(1,0,1,0); hit.Text=""; hit.MouseButton1Click:Connect(cb)
             return {}
         end
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
             local fr=Card(42)
-            local header=Instance.new("Frame",fr); header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,math.floor(18*SCALE))
-            local t=Instance.new("TextLabel",header); t.BackgroundTransparency=1; t.AnchorPoint=Vector2.new(0,0); t.Position=UDim2.new(0,0,0,0); 
-            t.Size=UDim2.new(1,-math.floor(52*SCALE),1,0)
+            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-52,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title or "Toggle"
-            local knob=Instance.new("Frame",header); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(38*SCALE),0,0)
+            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-52,0,math.floor(16*SCALE))
+            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.Text=desc or ""; d.TextXAlignment=Enum.TextXAlignment.Left
+            local knob=Instance.new("Frame",fr); knob.Size=UDim2.fromOffset(math.floor(34*SCALE),math.floor(18*SCALE)); knob.Position=UDim2.new(1,-math.floor(42*SCALE),0,math.floor(12*SCALE))
             knob.BackgroundColor3=Color3.fromRGB(20,20,24); local kc=Instance.new("UICorner",knob); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",knob); dot.Size=UDim2.fromOffset(math.floor(14*SCALE),math.floor(14*SCALE)); dot.Position=UDim2.new(0,2,0,2)
             dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=1; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
-            local btn=Instance.new("TextButton",header); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
-            if desc and desc~="" then
-                local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Size=UDim2.new(1,0,0,math.floor(16*SCALE))
-                d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc
-            end
+            local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
             local on=false
             btn.MouseButton1Click:Connect(function()
                 on=not on
@@ -213,8 +200,8 @@ function library:CreateWindow(name, version, icon)
             cb=cb or function() end
             local fr=Card(32)
             local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-            ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
-            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Size=UDim2.new(1,-34,0,math.floor(18*SCALE))
+            ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
+            local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
             tb.ClearTextOnFocus=false; tb.Text=""
             tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
             tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
@@ -310,8 +297,7 @@ end)
 local state={AFon=false,AFfishing=false,blatant=false,instant=false,perfectCast=true,autoRecast=true,idleDelay=3,
              floating=false,floatForce=Vector3.new(0,35,0),SPEED=5,reelPreset=1.2,completePreset=2.5,
              reelOverride=nil,completeOverride=nil,autoSellAll=false,lastSell=0,autoSellEvery=45,
-             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock(),
-             autoEvent=false,lastEventTeleportT=0}
+             sellCustomAmount=0,coughSellAmount=0,lastAction=os.clock()}
 local function clamp(n,a,b) return math.max(a,math.min(b,n)) end
 local function effDelays()
     if state.blatant then local c=(state.completeOverride or .4); local r=(state.reelOverride or .18); return clamp(c,.15,12),clamp(r,.10,6) end
@@ -447,23 +433,31 @@ local function sellCoughAmount(n)
 end
 
 -- ===================== Teleport data =====================
+-- Nama Island sesuai daftar yang kamu kirim (stabil, tidak kosong).
 local islands = {
-    ["Weather Machine"]=Vector3.new(-1471,-3,1929), ["Esoteric Depths"]=Vector3.new(3157,-1303,1439),
-    ["Tropical Grove"]=Vector3.new(-2038,3,3650),    ["Stingray Shores"]=Vector3.new(-32,4,2773),
-    ["Kohana Volcano"]=Vector3.new(-519,24,189),     ["Coral Reefs"]=Vector3.new(-3095,1,2177),
-    ["Crater Island"]=Vector3.new(968,1,4854),       ["Kohana"]=Vector3.new(-658,3,719),
-    ["Winter Fest"]=Vector3.new(1611,4,3280),        ["Esoteric Island"]=Vector3.new(1987,4,1400),
-    ["Treasure Room"]=Vector3.new(-3600,-267,-1558), ["Lost Shore"]=Vector3.new(-3663,38,-989),
-    ["Sisyphus"]=Vector3.new(-3792,-135,-986),
-    -- dari daftar tambahan
-    ["Crystal Cavern"]=Vector3.new(-2026,-440,7428),
-    ["Halloween"]=Vector3.new(2127,78,3334),
-    ["Ancient Underground Cave"]=Vector3.new(2102,-91,-709),
-    ["Ancient Inside Temple"]=Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"]=Vector3.new(1268,78,-183),
-    ["Fisherman Island"]=Vector3.new(-3,17,2840),
+    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
+    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
+    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
+    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
+    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
+    ["Crater Island"]     = Vector3.new(968,1,4854),
+    ["Kohana"]            = Vector3.new(-658,3,719),
+    ["Winter Fest"]       = Vector3.new(1611,4,3280),
+    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
+    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
+    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
+    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
+
+    -- Tambahan dari screenshot (placeholder sudah diisi default wajar)
+    ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
+    ["Halloween"]                 = Vector3.new(2127,78,3334),
+    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
+    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
+    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
+    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
 }
-local islandList={} for n,_ in pairs(islands) do table.insert(islandList,n) end table.sort(islandList)
+local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
 
 local function tpTo(pos)
     if not pos then return end
@@ -476,26 +470,19 @@ end
 local function fireNearestPrompt(filterFn,maxDist)
     maxDist=maxDist or 120
     local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(); local hrp=char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
-    local best,bestPos,dist
+    local best,dist
     for _,d in ipairs(Workspace:GetDescendants()) do
         if d:IsA("ProximityPrompt") then
             local ok,use=pcall(function() return filterFn(d) end)
             if ok and use then
-                local p
-                if d.Parent and d.Parent:IsA("BasePart") then p=d.Parent.Position end
+                local p; if d.Parent and d.Parent:IsA("BasePart") then p=d.Parent.Position end
                 if not p and d.Parent and d.Parent.Parent and d.Parent.Parent:IsA("BasePart") then p=d.Parent.Parent.Position end
-                if p then
-                    local dd=(p-hrp.Position).Magnitude
-                    if dd<=maxDist and (not dist or dd<dist) then best=d; bestPos=p; dist=dd end
-                end
+                if p then local dd=(p-hrp.Position).Magnitude; if dd<=maxDist and (not dist or dd<dist) then best=d; dist=dd end end
             end
         end
     end
-    if best then
-        pcall(function() fireproximityprompt(best,5) end)
-        return true,bestPos,dist
-    end
-    return false,nil,nil
+    if best then pcall(function() fireproximityprompt(best,5) end); return true end
+    return false
 end
 local function openShopByKeyword(keys)
     keys=keys or {}
@@ -551,8 +538,7 @@ PageShop:CreateButton("Weather Shop","",function() openShopByKeyword({"weather",
 -- Teleport
 local CoordLabel = PageTP:CreateLabel("Coordinates • X: 0.0  Y: 0.0  Z: 0.0")
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos = islands[choice]
-    if pos then tpTo(pos) end
+    local pos = islands[choice]; if pos then tpTo(pos) end
 end)
 
 -- NPC dynamic
@@ -592,38 +578,96 @@ if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
--- ===================== EVENT (rapih + auto) =====================
--- Kata kunci event agar deteksi kuat
-local EVENT_KEYWORDS = {
-    "megalodon","admin event","ghost worm","worm hunt","shark hunt",
-    "GHOST Shark Hunt","shocked","black hole","meteor rain","meteor","worm","megalodon hunt"
-}
+-- ===================== EVENT (AUTO-DETECT) =====================
+-- Warmup baseline: catat prompt "statis" (shop/NPC).
+local function promptPosition(pp)
+    if pp.Parent and pp.Parent:IsA("BasePart") then
+        return pp.Parent.Position
+    elseif pp.Parent and pp.Parent.Parent and pp.Parent.Parent:IsA("BasePart") then
+        return pp.Parent.Parent.Position
+    end
+end
+local function promptSignature(pp)
+    local t1 = string.lower(tostring(pp.ObjectText or ""))
+    local t2 = string.lower(tostring(pp.ActionText or ""))
+    local host = string.lower((pp.Parent and pp.Parent.Name) or "")
+    return t1.."|"..t2.."|"..host
+end
+local function collectPrompts()
+    local out = {}
+    for _,d in ipairs(Workspace:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            local pos = promptPosition(d)
+            if pos then table.insert(out, {pp=d, sig=promptSignature(d), pos=pos}) end
+        end
+    end
+    return out
+end
 
--- Status label dan toggle tunggal
-local EventStatus = PageEvent:CreateLabel("Event Status • idle")
+local BASELINE_WARMUP = 8.0
+local BASELINE_MIN_SEEN = 5
+local baselineSet = {}
+
+local function buildBaseline()
+    local seen = {}
+    local t0 = os.clock()
+    while os.clock() - t0 < BASELINE_WARMUP do
+        for _,it in ipairs(collectPrompts()) do
+            seen[it.sig] = (seen[it.sig] or 0) + 1
+        end
+        task.wait(0.4)
+    end
+    for sig,c in pairs(seen) do
+        if c >= BASELINE_MIN_SEEN then baselineSet[sig] = true end
+    end
+end
+
+local SCAN_INTERVAL = 1.6
+local TP_COOLDOWN   = 3.0
+state.autoEvent = false
+state.lastEventTeleportT = 0
+
+local EventStatus = PageEvent:CreateLabel("Event Status • preparing baseline...")
 PageEvent:CreateToggle("Auto Teleport to Event","Otomatis teleport ke event yang sedang spawn", function(on)
     state.autoEvent = on
     EventStatus:UpdateLabel(on and "Event Status • scanning..." or "Event Status • idle")
 end)
 
--- Worker: scan & teleport
+-- Siapkan baseline (sekali saat start)
+task.spawn(function()
+    buildBaseline()
+    if not state.autoEvent then
+        EventStatus:UpdateLabel("Event Status • idle (baseline ready)")
+    end
+end)
+
+-- Scanner loop
 task.spawn(function()
     while true do
-        task.wait(1.5)
+        task.wait(SCAN_INTERVAL)
         if not state.autoEvent then continue end
-        local ok,pos,dist = fireNearestPrompt(function(pp)
-            local t=((pp.ObjectText or "").." "..(pp.ActionText or "").." "..(pp.Parent and pp.Parent.Name or "")):lower()
-            for _,k in ipairs(EVENT_KEYWORDS) do
-                if t:find(k) then return true end
+        if next(baselineSet) == nil then
+            EventStatus:UpdateLabel("Event Status • preparing baseline...")
+            continue
+        end
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+
+        local best, bestDist
+        for _,it in ipairs(collectPrompts()) do
+            if not baselineSet[it.sig] then
+                local dist = (it.pos - hrp.Position).Magnitude
+                if not bestDist or dist < bestDist then best, bestDist = it, dist end
             end
-            return false
-        end, 1e6) -- scan seluruh map
-        if ok and pos then
-            EventStatus:UpdateLabel(("Event Status • found (%.0fm), teleporting..."):format(dist or 0))
-            -- throttle supaya tidak spam tp
-            if os.clock() - state.lastEventTeleportT > 3 then
+        end
+
+        if best then
+            EventStatus:UpdateLabel(("Event Status • found (%.0fm)"):format(bestDist or 0))
+            if os.clock() - state.lastEventTeleportT > TP_COOLDOWN then
                 state.lastEventTeleportT = os.clock()
-                tpTo(pos)
+                tpTo(best.pos)
+                pcall(function() fireproximityprompt(best.pp, 3) end)
             end
         else
             EventStatus:UpdateLabel("Event Status • scanning...")
