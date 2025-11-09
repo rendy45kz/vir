@@ -8,7 +8,7 @@ AegisHub • Fish It • Premium (UI Polished)
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished) ===================
+-- ================== UI LIBRARY (Polished v2) =================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -18,9 +18,7 @@ local UIS         = game:GetService("UserInputService")
 local TS          = game:GetService("TweenService")
 local CoreGui     = game:GetService("CoreGui")
 
-local function protect(inst) pcall(function()
-    if syn and syn.protect_gui then syn.protect_gui(inst) end
-end) end
+local function protect(inst) pcall(function() if syn and syn.protect_gui then syn.protect_gui(inst) end end) end
 local function tw(o,t,props) local a=TS:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props); a:Play(); return a end
 
 local library = {}
@@ -35,27 +33,20 @@ function library:CreateWindow(name, version, icon)
     local function calcScale()
         local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
         local shortest = math.min(vp.X, vp.Y)
-        -- skala turun di HP kecil
-        if shortest <= 720 then return 0.85
-        elseif shortest <= 900 then return 0.92
-        else return 1 end
+        if shortest <= 720 then return 0.85 elseif shortest <= 900 then return 0.92 else return 1 end
     end
     local SCALE = calcScale()
 
-    -- ===== Overlay (draggable + persistent pos) =====
+    -- ===== Overlay =====
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
     Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
     local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
     local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
-
-    -- restore last position if any
     local ox = Gui:GetAttribute("ovx") or 12
     local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
     Overlay.Position = UDim2.fromOffset(ox, oy)
-
-    -- drag
     do
         local dragging, start, origin
         Overlay.InputBegan:Connect(function(i)
@@ -84,7 +75,6 @@ function library:CreateWindow(name, version, icon)
     Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(320*SCALE))
     Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
     local wCorner=Instance.new("UICorner",Window); wCorner.CornerRadius=UDim.new(0,6)
-    local uiScale = Instance.new("UIScale", Window); uiScale.Scale=1 -- ukuran diatur lewat Size di atas
 
     -- Title
     local Title=Instance.new("Frame",Window); Title.BackgroundTransparency=1; Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
@@ -127,7 +117,7 @@ function library:CreateWindow(name, version, icon)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"; trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left; trlbl.TextColor3=Color3.new(1,1,1)
     local trlist=Instance.new("UIListLayout",TabsRail); trlist.Padding=UDim.new(0,math.floor(4*SCALE)); trlist.SortOrder=Enum.SortOrder.LayoutOrder; trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
-    -- ===== Tabs API =====
+    -- ===== Tabs/Page API =====
     local firstShown=false
     local TabsAPI={}
     function TabsAPI:CreateFrame(title)
@@ -159,9 +149,15 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
-        local function Card(h)
-            local fr=Instance.new("Frame",Page); fr.BackgroundColor3=BG_CARD; fr.Size=UDim2.new(1,0,0,math.floor((h or 40)*SCALE)); fr.ClipsDescendants=false
-            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6); return fr
+        -- ---------- Card helper (AUTO-SIZE!) ----------
+        local function Card(baseH)
+            local fr=Instance.new("Frame",Page)
+            fr.BackgroundColor3=BG_CARD
+            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 40)*SCALE))
+            fr.AutomaticSize = Enum.AutomaticSize.Y       -- kunci: kontainer bisa mengembang saat dropdown buka
+            fr.ClipsDescendants=false
+            local c=Instance.new("UICorner",fr); c.CornerRadius=UDim.new(0,6)
+            return fr
         end
 
         local PageAPI={}
@@ -207,58 +203,79 @@ function library:CreateWindow(name, version, icon)
             local ic=Instance.new("ImageLabel",fr); ic.BackgroundTransparency=1; ic.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
             ic.Position=UDim2.new(0,8,0,7); ic.Image="rbxassetid://"..tostring(iconId or 10045753138); ic.ImageColor3=ACCENT
             local tb=Instance.new("TextBox",fr); tb.BackgroundTransparency=1; tb.Position=UDim2.new(0,30,0,0); tb.Size=UDim2.new(1,-34,1,0)
-            tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or "Input"; tb.PlaceholderColor3=ACCENT_TEXT
+            tb.ClearTextOnFocus = false
+            tb.Text = ""                          -- hilangkan “TextBox” bawaan
+            tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1)
+            tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             tb.FocusLost:Connect(function() cb(tb.Text) end)
-            return { SetText=function(_,t) tb.Text=t end }
+            return { SetText=function(_,t) tb.Text=t or "" end }
         end
+
+        -- >>>>>>> Dropdown yang mendorong layout (tanpa scrollbar) <<<<<<<
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
             local fr=Card(32); fr.Name="Dropdown"
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,0)
-            t.Size=UDim2.new(1,-40,1,0); t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(11*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=title
-            local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
+
+            local header=Instance.new("TextButton",fr)  -- header clickable
+            header.BackgroundColor3 = BG_CARD
+            header.AutoButtonColor  = true
+            header.Size=UDim2.new(1,0,0,math.floor(32*SCALE))
+            header.Text=""
+            local hc=Instance.new("UICorner",header); hc.CornerRadius=UDim.new(0,6)
+
+            local ttl=Instance.new("TextLabel",header); ttl.BackgroundTransparency=1
+            ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,1,0)
+            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(11*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=title
+
+            local caret=Instance.new("TextLabel",header); caret.BackgroundTransparency=1
+            caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(22*SCALE),0,math.floor(8*SCALE))
             caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
-            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32); holder.Visible=false
-            holder.Position=UDim2.new(0,0,1,4); holder.Size=UDim2.new(1,0,0,0); holder.ClipsDescendants=true
+
+            local holder=Instance.new("Frame",fr)       -- container opsi
+            holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Position=UDim2.new(0,0,0,math.floor(36*SCALE))
+            holder.Size=UDim2.new(1,0,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y  -- kunci: tinggi mengikuti isi
+            holder.Visible=false
             local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,6)
             local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,2)
             local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,4); pad.PaddingBottom=UDim.new(0,4); pad.PaddingLeft=UDim.new(0,4); pad.PaddingRight=UDim.new(0,4)
 
-            local current,nilGuard=nil,false
+            local current=nil
+            local ROWH = math.floor(22*SCALE)
+
             local function rebuild(list)
                 for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-                local count=0
                 for _,opt in ipairs(list) do
-                    count+=1
-                    local b=Instance.new("TextButton",holder); b.Size=UDim2.new(1,0,0,math.floor(22*SCALE)); b.BackgroundColor3=BG_CARD
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,ROWH)
+                    b.BackgroundColor3=BG_CARD
                     b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
                     local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
-                        current=opt; t.Text=("%s : %s"):format(title,opt); onChanged(opt)
-                        tw(holder,.12,{Size=UDim2.new(1,0,0,0)}).Completed:Wait(); holder.Visible=false
+                        current=opt; ttl.Text=("%s : %s"):format(title,opt); onChanged(opt)
+                        holder.Visible=false
+                        tw(caret,.12,{Rotation=0})
                     end)
                 end
-                local targetH = math.clamp(count*math.floor(24*SCALE)+8, 0, math.floor(160*SCALE))
-                holder.Size=UDim2.new(1,0,0,targetH)
             end
             rebuild(options)
 
-            fr.InputBegan:Connect(function(i)
-                if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                    local open = not holder.Visible
-                    holder.Visible = open
-                    local count=0 for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then count+=1 end end
-                    local targetH = open and math.clamp(count*math.floor(24*SCALE)+8,0,math.floor(160*SCALE)) or 0
-                    tw(holder,.12,{Size=UDim2.new(1,0,0,targetH)})
-                end
+            local open=false
+            header.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret,.12,{Rotation=open and 180 or 0})
             end)
 
             return {
-                SetValue=function(_,v) current=v; t.Text=("%s : %s"):format(title,tostring(v)) end,
-                GetValue=function() return current end,
-                SetOptions=function(_,opts) rebuild(opts or {}) end
+                SetValue   = function(_,v) current=v; ttl.Text=("%s : %s"):format(title,tostring(v)) end,
+                GetValue   = function() return current end,
+                SetOptions = function(_,opts) rebuild(opts or {}) end
             }
         end
+        -- ---------- end dropdown ----------
+
         return PageAPI
     end
 
@@ -266,6 +283,7 @@ function library:CreateWindow(name, version, icon)
     function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
     return winAPI
 end
+
 
 ----------------------------------------------------------------
 -- ======================= PREMIUM SCRIPT ======================
@@ -433,6 +451,7 @@ local islands={["Weather Machine"]=Vector3.new(-1471,-3,1929),["Esoteric Depths"
 ["Winter Fest"]=Vector3.new(1611,4,3280),["Isoteric Island"]=Vector3.new(1987,4,1400),["Treasure Hall"]=Vector3.new(-3600,-267,-1558),
 ["Lost Shore"]=Vector3.new(-3663,38,-989),["Sishypus Statue"]=Vector3.new(-3792,-135,-986),}
 local islandList={} for n,_ in pairs(islands) do table.insert(islandList,n) end table.sort(islandList)
+
 local function tpTo(pos)
     local cf=Workspace:FindFirstChild("Characters"); local ch=cf and cf:FindFirstChild(LocalPlayer.Name)
     local hrp=ch and (ch:FindFirstChild("HumanoidRootPart") or ch:WaitForChild("HumanoidRootPart",2))
