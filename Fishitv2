@@ -153,25 +153,19 @@ function library:CreateWindow(name, version, icon)
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
-    local parent = self._raw or self            -- dukung object wrapper atau frame langsung
-    local lb = Instance.new("TextLabel")
-    lb.Parent = parent                          -- PENTING: tempel ke halaman
-    lb.BackgroundTransparency = 1               -- hilangkan background
-    lb.Position = UDim2.new(0, 8, 0, 0)
-    lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE)) -- tinggi fixed agar rapi (opsional)
-    lb.Font = Enum.Font.GothamBlack
-    lb.TextSize = math.floor(12 * SCALE)
-    lb.TextXAlignment = Enum.TextXAlignment.Left
-    lb.TextColor3 = Color3.new(1, 1, 1)
-    lb.Text = string.upper(text or "Label")
-
-    return {
-        UpdateLabel = function(_, t)
-            lb.Text = string.upper(t or "")
-        end,
-        _raw = lb
-    }
-end
+            local parent = self._raw or self
+            local lb = Instance.new("TextLabel")
+            lb.Parent = parent
+            lb.BackgroundTransparency = 1
+            lb.Position = UDim2.new(0, 8, 0, 0)
+            lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
+            lb.Font = Enum.Font.GothamBlack
+            lb.TextSize = math.floor(12 * SCALE)
+            lb.TextXAlignment = Enum.TextXAlignment.Left
+            lb.TextColor3 = Color3.new(1, 1, 1)
+            lb.Text = string.upper(text or "Label")
+            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end, _raw=lb }
+        end
 
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
@@ -255,6 +249,7 @@ local TeleportService    = game:GetService("TeleportService")
 local VirtualUser        = game:GetService("VirtualUser")
 local ReplicatedStorage  = game:GetService("ReplicatedStorage")
 local Workspace          = game:GetService("Workspace")
+local VIM                = game:GetService("VirtualInputManager")
 
 local TARGET_PLACE = 121864768012064
 
@@ -294,8 +289,8 @@ local islands = {
     ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
     ["Lost Shore"]        = Vector3.new(-3663,38,-989),
     ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-    ["Crystal Cavern"]            = Vector3.new(-2026,-440,7428),
-    ["Halloween"]                 = Vector3.new(2127,78,3334),
+    ["Crystal Cavern"]    = Vector3.new(-2026,-440,7428),
+    ["Halloween"]         = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
     ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
     ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
@@ -314,15 +309,14 @@ end
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
 local Tab = UI:CreateTab("Sections")
 
--- Buat halaman
+-- Halaman YANG DIPAKAI
 local PageInv   = Tab:CreateFrame("Inventory")
 local PageShop  = Tab:CreateFrame("Shop")
 local PageTP    = Tab:CreateFrame("Teleport")
-local PageEvent = Tab:CreateFrame("Event")
+local PageFarm  = Tab:CreateFrame("Farm")      -- <--- BARU
 
--- Inventory (contoh ringkas)
+-- Inventory (placeholder)
 PageInv:CreateLabel("INVENTORY")
--- (Isi fungsi inventory custommu di sini bila diperlukan)
 
 -- Shop
 PageShop:CreateButton("Traveling Merchant","Open merchant",function() end)
@@ -332,7 +326,6 @@ PageShop:CreateButton("Weather Shop","",function() end)
 
 -- Teleport
 local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
-
 local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
     local pos = islands[choice]
     if pos then tpTo(pos) end
@@ -385,109 +378,255 @@ RS.RenderStepped:Connect(function()
 end)
 
 ----------------------------------------------------------------
--- ========================= EVENT ============================
+-- ========================== FARM ============================
 ----------------------------------------------------------------
 
--- Helper notify: gunakan WindUI jika ada, fallback ke print agar tidak error
-local function Notify(title, content, icon, duration)
-    local ok, ui = pcall(function() return WindUI end)
-    if ok and ui and typeof(ui)=="table" and typeof(ui.Notify)=="function" then
-        ui:Notify({ Title = title or "Info", Content = content or "", Icon = icon or "info", Duration = duration or 3 })
-    else
-        print(("[Notify] %s | %s"):format(title or "Info", content or ""))
-    end
+-- FLAGS
+local Flags = {
+    AutoFish = false,
+    PerfectCast = false,
+    AutoFavorite = false,
+    AutoSell = false,
+}
+
+-- SAFE HELPERS
+
+local function safeFindFirst(desc, pred)
+    for _,d in ipairs(desc) do if pred(d) then return d end end
 end
 
--- List static sesuai contohmu
-local eventsList = { "Admin Event", "Shark Hunt", "Ghost Shark Hunt", "Worm Hunt", "Black Hole", "Shocked", "Ghost Worm", "Meteor Rain" }
+local function clickAtCenter(guiObj)
+    if not guiObj or not guiObj:IsA("GuiObject") then return end
+    local absPos, absSize = guiObj.AbsolutePosition, guiObj.AbsoluteSize
+    local cx, cy = absPos.X + absSize.X/2, absPos.Y + absSize.Y/2
+    VIM:SendMouseButtonEvent(cx, cy, 0, true, game, 0)
+    task.wait()
+    VIM:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+end
 
--- (Opsional) merge auto dari workspace.Props agar ikut event baru
-local function discoverEventsMergeStatic()
-    local set = {}
-    for _,n in ipairs(eventsList) do set[n]=true end
-    local props = workspace:FindFirstChild("Props")
-    if props then
-        for _,child in ipairs(props:GetChildren()) do
-            if (child:IsA("Folder") or child:IsA("Model")) and #child.Name >= 3 then
-                set[child.Name] = true
+local function pressKey(enumKey, t)
+    VIM:SendKeyEvent(true, enumKey, false, game); task.wait(t or 0.03); VIM:SendKeyEvent(false, enumKey, false, game)
+end
+
+-- Cari GUI fishing (heuristik umum)
+local function getFishingGui()
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not pg then return nil end
+    -- Pola umum: nama mengandung "Fish", "Cast", "Reel", "Bar"
+    for _,g in ipairs(pg:GetDescendants()) do
+        if g:IsA("ScreenGui") or g:IsA("Frame") then
+            local n = string.lower(g.Name)
+            if n:find("fish") or n:find("cast") or n:find("reel") or n:find("bar") then
+                return g
             end
         end
     end
-    local list = {}
-    for k in pairs(set) do table.insert(list, k) end
-    table.sort(list)
-    return list
+    return nil
 end
 
--- Fallback pencarian posisi event bila "Fishing Boat" tak ada
-local function getEventCFrame(evName)
-    local props = workspace:FindFirstChild("Props")
-    if not props then return nil, "Props not found" end
-    local node = props:FindFirstChild(evName)
-    if not node then return nil, "Event not found" end
-
-    local boat = node:FindFirstChild("Fishing Boat")
-    if boat and boat.GetPivot then
-        local ok, cf = pcall(function() return boat:GetPivot() end)
-        if ok and cf then return cf end
-    end
-    if node:IsA("Model") then
-        local ok2, cf2 = pcall(function() return node:GetPivot() end)
-        if ok2 and cf2 then return cf2 end
-        if node.PrimaryPart then return node.PrimaryPart.CFrame end
-    end
-    local hrp = (Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()):FindFirstChild("HumanoidRootPart")
-    local nearest; local best
-    for _,d in ipairs(node:GetDescendants()) do
-        if d:IsA("BasePart") then
-            if hrp then
-                local dist = (d.Position - hrp.Position).Magnitude
-                if not best or dist < best then best = dist; nearest = d end
-            else nearest = d; break end
-        end
-    end
-    if nearest then return nearest.CFrame end
-    return nil, "No position found"
-end
-
--- Dropdown single: Event Teleport (sesuai snippetmu)
-local ddEventTeleport = PageEvent:CreateDropdown("Event Teleport", discoverEventsMergeStatic(), function(option)
-    local props = workspace:FindFirstChild("Props")
-    if props and props:FindFirstChild(option) and props[option]:FindFirstChild("Fishing Boat") then
-        local fishingBoat = props[option]["Fishing Boat"]
-        local ok, boatCFrame = pcall(function() return fishingBoat:GetPivot() end)
-        if ok and boatCFrame then
-            local hrp = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = boatCFrame + Vector3.new(0, 15, 0)
-                Notify("Event Available!", "Teleported To " .. option, "circle-check", 3)
-                return
+-- Trigger ProximityPrompt (untuk Sell/NPC jika perlu)
+local function triggerNearestPrompt(filterText, maxDist)
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp=char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local best, bestD, bestPrompt
+    for _,p in ipairs(Workspace:GetDescendants()) do
+        if p:IsA("ProximityPrompt") then
+            local ok, part = pcall(function() return p.Parent:IsA("BasePart") and p.Parent or p.Parent:FindFirstChildWhichIsA("BasePart") end)
+            local pos = ok and part and part.Position
+            if pos then
+                local d=(pos-hrp.Position).Magnitude
+                if (not maxDist or d<=maxDist) then
+                    local name = (p.ObjectText or p.Name or ""):lower()
+                    if (not filterText) or name:find(filterText:lower()) then
+                        if not bestD or d < bestD then best, bestD, bestPrompt = part, d, p end
+                    end
+                end
             end
         end
     end
-    -- fallback bila boat tidak ada
-    local cf = select(1, getEventCFrame(option))
-    if cf then
-        local hrp = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = cf + Vector3.new(0,15,0)
-            Notify("Event Available!", "Teleported To " .. option, "circle-check", 3)
-            return
-        end
+    if bestPrompt then
+        pcall(function() fireproximityprompt(bestPrompt, 1, true) end)
+        return true
     end
-    Notify("Event Not Found", option .. " Not Found!", "ban", 3)
-end)
+    return false
+end
 
--- Auto-refresh daftar event agar dropdown ikut update jika server spawn event baru
+-- Remote heuristik (favorit/sell) – diam jika tak ditemukan
+local function fireRemoteByName(partial, ...)
+    local args={...}
+    local function tryContainer(container)
+        for _,v in ipairs(container:GetDescendants()) do
+            if (v:IsA("RemoteEvent") or v:IsA("RemoteFunction")) and v.Name:lower():find(partial:lower()) then
+                local ok
+                if v:IsA("RemoteEvent") then ok=pcall(function() v:FireServer(unpack(args)) end)
+                else ok=pcall(function() v:InvokeServer(unpack(args)) end) end
+                if ok then return true end
+            end
+        end
+        return false
+    end
+    return tryContainer(ReplicatedStorage) or tryContainer(game:GetService("StarterGui")) or false
+end
+
+----------------------------------------------------------------
+-- ============== IMPLEMENTASI FITUR FARMING ==================
+----------------------------------------------------------------
+
+-- 1) AUTO FISH (cast -> mini game -> reel)
 task.spawn(function()
     while true do
-        task.wait(8)
-        local fresh = discoverEventsMergeStatic()
-        ddEventTeleport:SetOptions(fresh)
+        if Flags.AutoFish then
+            -- 1. Cari tombol/GUI cast atau gunakan key/mouse umum
+            local ui = getFishingGui()
+            local castButton
+            if ui then
+                castButton = safeFindFirst(ui:GetDescendants(), function(o)
+                    return o:IsA("TextButton") and (o.Text and o.Text:lower():find("cast"))
+                        or (o:IsA("ImageButton") and o.Name:lower():find("cast"))
+                end)
+            end
+
+            if castButton then
+                clickAtCenter(castButton)
+            else
+                -- fallback: klik tengah layar / tekan spasi
+                local cam = workspace.CurrentCamera
+                if cam then
+                    local vp = cam.ViewportSize
+                    VIM:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, true, game, 0)
+                    task.wait(0.02)
+                    VIM:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, false, game, 0)
+                end
+                pressKey(Enum.KeyCode.Space, 0.02)
+            end
+
+            -- 2. Tunggu indikator "bite" / progress bar
+            local biteDetected=false
+            for i=1,100 do
+                task.wait(0.05)
+                local gui = getFishingGui()
+                if gui then
+                    local lbl = safeFindFirst(gui:GetDescendants(), function(o)
+                        return o:IsA("TextLabel") and ((o.Text or ""):lower():find("bite") or (o.Text or ""):lower():find("reel"))
+                    end)
+                    local bar = safeFindFirst(gui:GetDescendants(), function(o)
+                        return o:IsA("Frame") and (o.Name:lower():find("bar") or o.Name:lower():find("progress"))
+                    end)
+                    if lbl or bar then biteDetected=true break end
+                end
+            end
+
+            -- 3. Reel (spam klik / spasi secukupnya)
+            if biteDetected then
+                for k=1,40 do
+                    if not Flags.AutoFish then break end
+                    pressKey(Enum.KeyCode.Space, 0.01)
+                    local cam = workspace.CurrentCamera
+                    if cam then
+                        local vp = cam.ViewportSize
+                        VIM:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, true, game, 0)
+                        VIM:SendMouseButtonEvent(vp.X/2, vp.Y/2, 0, false, game, 0)
+                    end
+                    task.wait(0.06)
+                end
+            end
+        end
+        task.wait(0.25)
     end
 end)
 
--- Auto-refresh daftar NPC & Players di menu Teleport
+-- 2) PERFECT CASTING (bidik zona hijau saat bar muncul)
+task.spawn(function()
+    while true do
+        if Flags.PerfectCast then
+            local gui = getFishingGui()
+            if gui then
+                local bar = safeFindFirst(gui:GetDescendants(), function(o)
+                    return o:IsA("Frame") and (o.Name:lower():find("bar") or o.Name:lower():find("cast"))
+                end)
+                if bar then
+                    -- coba cari "Perfect"/"Green" zone
+                    local targetZone = safeFindFirst(bar:GetDescendants(), function(o)
+                        if not o:IsA("GuiObject") then return false end
+                        local n = o.Name:lower()
+                        if n:find("perfect") or n:find("green") or n:find("sweet") then return true end
+                        if o:IsA("TextLabel") and (o.Text or ""):lower():find("perfect") then return true end
+                        return false
+                    end)
+                    if targetZone then
+                        clickAtCenter(targetZone)
+                    else
+                        -- fallback: klik di tengah bar
+                        clickAtCenter(bar)
+                    end
+                end
+            end
+        end
+        task.wait(0.08)
+    end
+end)
+
+-- 3) AUTO FAVORITE FISH (heuristik: cari item bertipe fish dan favoritkan via remote/flag yg tersedia)
+task.spawn(function()
+    while true do
+        if Flags.AutoFavorite then
+            pcall(function()
+                eachInventory(function(it)
+                    -- Heuristik penentuan item ikan
+                    local name = (it.Name or it.ItemName or ""):lower()
+                    local typeName = (it.Type or it.Category or ""):lower()
+                    local isFish = typeName:find("fish") or name:find("fish") or name:find("shark") or name:find("ray") or name:find("worm")
+                    local fav = it.Favorite or it.Favourite or it.favorite or it.favourite
+                    if isFish and not fav then
+                        -- Coba berbagai bentuk argumen umum: (uuid) atau (name)
+                        local uuid = it.UUID or it.Uuid or it.Id or it.ID
+                        local ok = false
+                        if uuid then ok = fireRemoteByName("favor", uuid) end
+                        if not ok then ok = fireRemoteByName("favor", name) end
+                        -- diam jika gagal (server mungkin berbeda)
+                    end
+                end)
+            end)
+        end
+        task.wait(2.0)
+    end
+end)
+
+-- 4) AUTO SELL FISH (heuristik: remote atau ProximityPrompt "Sell")
+task.spawn(function()
+    while true do
+        if Flags.AutoSell then
+            local sold = false
+            -- 4a. coba remote "sell"
+            pcall(function()
+                eachInventory(function(it)
+                    local name = (it.Name or it.ItemName or ""):lower()
+                    local typeName = (it.Type or it.Category or ""):lower()
+                    local isFish = typeName:find("fish") or name:find("fish") or name:find("shark") or name:find("ray") or name:find("worm")
+                    if isFish then
+                        local uuid = it.UUID or it.Uuid or it.Id or it.ID
+                        if uuid and fireRemoteByName("sell", uuid) then sold = true end
+                    end
+                end)
+            end)
+            -- 4b. jika remote tak ada, coba prompt terdekat bertuliskan Sell
+            if not sold then
+                triggerNearestPrompt("sell", 50) -- jarak 50 stud
+            end
+        end
+        task.wait(3.0)
+    end
+end)
+
+-- ====================== UI FARM =======================
+PageFarm:CreateLabel("FARMING")
+PageFarm:CreateToggle("Auto Fish","Otomatis memancing & menarik reel", function(on) Flags.AutoFish = on end)
+PageFarm:CreateToggle("Perfect Casting","Coba klik tepat di zona 'perfect' saat bar muncul", function(on) Flags.PerfectCast = on end)
+PageFarm:CreateToggle("Auto Favorite Fish","Tandai ikan di inventory sebagai favorit (heuristik)", function(on) Flags.AutoFavorite = on end)
+PageFarm:CreateToggle("Auto Sell Fish","Jual ikan via remote/prompt terdekat (heuristik)", function(on) Flags.AutoSell = on end)
+
+-- ================== REFRESH LIST DINAMIS =================
 task.spawn(function()
     while true do
         task.wait(8)
