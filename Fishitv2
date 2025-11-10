@@ -252,13 +252,13 @@ local Workspace          = game:GetService("Workspace")
 
 local TARGET_PLACE = 121864768012064
 
--- Anti AFK (sekali saja)
+-- Anti AFK
 LocalPlayer.Idled:Connect(function()
     VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- Inventory utils
+-- Replion & ItemUtility
 local Replion,ItemUtility
 task.spawn(function()
     local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
@@ -266,13 +266,8 @@ task.spawn(function()
     local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
     if okU then ItemUtility=modU end
 end)
-local function eachInventory(fn)
-    if not Replion then return end
-    local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
-    if type(items)~="table" then return end; for _,it in ipairs(items) do fn(it) end
-end
 
--- ===================== Teleport data =====================
+-- Teleport data
 local islands = {
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
@@ -303,34 +298,34 @@ local function tpTo(pos)
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
--- ================= UI BUILD =================
+-- UI
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
 local Tab = UI:CreateTab("Sections")
 
--- Halaman
 local PageInv   = Tab:CreateFrame("Inventory")
 local PageShop  = Tab:CreateFrame("Shop")
 local PageTP    = Tab:CreateFrame("Teleport")
-local PageFarm  = Tab:CreateFrame("Farm")      -- <--- BARU (semua fitur pindah ke sini)
+local PageFarm  = Tab:CreateFrame("Farm")
 
--- Inventory placeholder
+-- Inventory
 PageInv:CreateLabel("INVENTORY")
 
--- Shop placeholder
+-- Shop (placeholder)
 PageShop:CreateButton("Traveling Merchant","Open merchant",function() end)
 PageShop:CreateButton("Bobber Shop","",function() end)
 PageShop:CreateButton("Rod Shop","",function() end)
 PageShop:CreateButton("Weather Shop","",function() end)
 
--- Teleport
+-- Teleport page
 local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
-local islandsDD = PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos = islands[choice]
-    if pos then tpTo(pos) end
+PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
+    local pos = islands[choice]; if pos then tpTo(pos) end
 end)
 
--- Dynamic players/NPC (ringkas & aman)
-local function playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
+local function playersList()
+    local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
+    table.sort(t); return t
+end
 local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
 end)
@@ -353,15 +348,15 @@ end)
 ----------------------------------------------------------------
 -- ========================== FARM ============================
 ----------------------------------------------------------------
-local net -- sleitnick/net folder (dipakai oleh fitur dari skrip WindUI)
-pcall(function()
+-- net (sleitnick)
+local net; pcall(function()
     net = ReplicatedStorage:WaitForChild("Packages")
         :WaitForChild("_Index")
         :WaitForChild("sleitnick_net@0.2.0")
         :WaitForChild("net")
 end)
 
--- ====== Remotes/Anim yang dibutuhkan (aman bila tidak ada) ======
+-- Remotes
 local rodRemote, miniGameRemote, finishRemote
 pcall(function()
     rodRemote       = net:WaitForChild("RF/ChargeFishingRod",5)
@@ -369,6 +364,7 @@ pcall(function()
     finishRemote    = net:WaitForChild("RE/FishingCompleted",5)
 end)
 
+-- Animations
 local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
 local humanoid  = character:WaitForChild("Humanoid")
 local animator  = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
@@ -383,14 +379,13 @@ pcall(function()
     RodReelAnim  = animator:LoadAnimation(RodReel)
 end)
 
--- ====== State & Delay mapping (diambil dari skrip sumber) ======
+-- State & delays
 local Flags = {
     AutoFishV2 = false,
     PerfectCast = true,
     AutoSell = false,
     AutoFavourite = false,
 }
-
 local RodDelaysV2 = {
     ["Ares Rod"] = {custom = 1.12, bypass = 1.45},
     ["Angler Rod"] = {custom = 1.12, bypass = 1.45},
@@ -407,10 +402,8 @@ local RodDelaysV2 = {
     ["Lava Rod"]   = {custom = 4.2,  bypass = 4.10},
     ["Starter Rod"]= {custom = 4.3,  bypass = 4.20},
 }
-local customDelayV2   = 1
-local BypassDelayV2   = 0.5
-local fishingActiveV2 = false
-local delayInitializedV2 = false
+local customDelayV2, BypassDelayV2 = 1, 0.5
+local fishingActiveV2, delayInitializedV2 = false, false
 
 local function getValidRodNameV2()
     local ok, display = pcall(function()
@@ -440,11 +433,10 @@ local function updateDelayBasedOnRodV2()
     delayInitializedV2 = true
 end
 
--- ====== Auto Sell (threshold non-favorited) ======
+-- Auto Sell
 local lastSellTime = 0
-local AUTO_SELL_THRESHOLD = 60       -- kamu bisa ubah di UI
+local AUTO_SELL_THRESHOLD = 60
 local AUTO_SELL_DELAY     = 60
-
 local function startAutoSell()
     task.spawn(function()
         while Flags.AutoSell do
@@ -453,14 +445,12 @@ local function startAutoSell()
                 local DataReplion = Replion.Client:WaitReplion("Data")
                 local items = DataReplion and DataReplion:Get({"Inventory","Items"})
                 if type(items) ~= "table" then return end
-
                 local unfavoritedCount = 0
                 for _, item in ipairs(items) do
                     if not item.Favorited then
                         unfavoritedCount = unfavoritedCount + (item.Count or 1)
                     end
                 end
-
                 if unfavoritedCount >= AUTO_SELL_THRESHOLD and os.time() - lastSellTime >= AUTO_SELL_DELAY then
                     if net then
                         local sellFunc = net:FindFirstChild("RF/SellAllItems")
@@ -476,9 +466,8 @@ local function startAutoSell()
     end)
 end
 
--- ====== Auto Favourite (tier Secret/Mythic/Legendary) ======
+-- Auto Favourite (tier)
 local allowedTiers = { Secret=true, Mythic=true, Legendary=true }
-
 local function startAutoFavourite()
     task.spawn(function()
         while Flags.AutoFavourite do
@@ -490,7 +479,6 @@ local function startAutoFavourite()
                 for _, item in ipairs(items) do
                     local base = ItemUtility:GetItemData(item.Id)
                     if base and base.Data and allowedTiers[base.Data.Tier] and not item.Favorited then
-                        -- tandai lokal; jika game butuh remote khusus, tinggal ganti di sini
                         item.Favorited = true
                     end
                 end
@@ -500,8 +488,7 @@ local function startAutoFavourite()
     end)
 end
 
--- ====== Auto Fish V2 (porting dari skrip sumber) ======
--- event “RE/ReplicateTextEffect” -> cepat selesaikan minigame (spam finish)
+-- Fast-finish minigame by text effect
 pcall(function()
     local textEffect = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ReplicateTextEffect"]
     textEffect.OnClientEvent:Connect(function(data)
@@ -520,6 +507,7 @@ pcall(function()
     end)
 end)
 
+-- Auto Fish V2
 local function StartAutoFishV2()
     if Flags.AutoFishV2 then return end
     Flags.AutoFishV2 = true
@@ -530,18 +518,14 @@ local function StartAutoFishV2()
         while Flags.AutoFishV2 do
             pcall(function()
                 fishingActiveV2 = true
-
-                -- equip rod slot 1 (sesuai skrip sumber)
                 local equipRemote = net and net:FindFirstChild("RE/EquipToolFromHotbar")
                 if equipRemote then equipRemote:FireServer(1) end
                 task.wait(0.1)
 
-                -- charge
                 local timestamp = workspace:GetServerTimeNow()
                 if RodShakeAnim then RodShakeAnim:Play() end
                 if rodRemote then rodRemote:InvokeServer(timestamp) end
 
-                -- perfect cast koordinat
                 local baseX, baseY = -0.7499996423721313, 1
                 local x,y
                 if Flags.PerfectCast then
@@ -572,39 +556,103 @@ local function StopAutoFishV2()
     pcall(function() if RodReelAnim then RodReelAnim:Stop() end end)
 end
 
+-- ======= Helpers untuk Teleport NPC di Farm =======
+local function scanNPC_Models()
+    local found = {}
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and #m.Name >= 3 then
+            local hasHum = m:FindFirstChildOfClass("Humanoid")
+            local hasPrompt = false
+            for _,d in ipairs(m:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then hasPrompt = true break end
+            end
+            if hasHum or hasPrompt then found[m.Name] = true end
+        end
+    end
+    local list = {}; for name in pairs(found) do table.insert(list,name) end
+    table.sort(list); return list
+end
+
+local function tpNearestModelByName(partial)
+    if not partial or partial == "" then return end
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local bestPart, bestDist
+    local q = string.lower(partial)
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name), q) then
+            local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+            if p then
+                local d = (p.Position - hrp.Position).Magnitude
+                if not bestDist or d < bestDist then bestDist = d; bestPart = p end
+            end
+        end
+    end
+    if bestPart then tpTo(bestPart.Position) end
+end
+
+local function playersList_Farm()
+    local t={}
+    for _,pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then table.insert(t, pl.Name) end
+    end
+    table.sort(t); return t
+end
+
 -- ====================== UI: FARM =======================
 PageFarm:CreateLabel("FARMING")
+
 local tgAutoFish = PageFarm:CreateToggle("Auto Fish V2 (Optimized)","Otomatis memancing dengan timing rod", function(on)
     if on then StartAutoFishV2() else StopAutoFishV2() end
 end)
+
 local tgPerfect  = PageFarm:CreateToggle("Auto Perfect Cast","Usahakan selalu perfect", function(on)
     Flags.PerfectCast = on
 end)
 
 local boxBypass  = PageFarm:CreateBox("Bypass Delay (ex: 1.45)", nil, function(txt)
-    local n = tonumber(txt)
-    if n then BypassDelayV2 = n end
+    local n = tonumber(txt); if n then BypassDelayV2 = n end
 end)
 
 local tgAutoSell = PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis saat jumlah non-favorite >= threshold", function(on)
-    Flags.AutoSell = on
-    if on then startAutoSell() end
+    Flags.AutoSell = on; if on then startAutoSell() end
 end)
 
 local boxThreshold = PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt)
-    if n then AUTO_SELL_THRESHOLD = math.max(1, math.floor(n)) end
+    local n = tonumber(txt); if n then AUTO_SELL_THRESHOLD = math.max(1, math.floor(n)) end
 end)
 
 local tgAutoFav  = PageFarm:CreateToggle("Auto Favorite Fish","Favoritkan Secret/Mythic/Legendary", function(on)
-    Flags.AutoFavourite = on
-    if on then startAutoFavourite() end
+    Flags.AutoFavourite = on; if on then startAutoFavourite() end
 end)
 
--- ================== REFRESH DINAMIS (players list) =================
+-- QUICK TELEPORT di FARM
+PageFarm:CreateLabel("QUICK TELEPORT")
+
+local ddNPCFarm = PageFarm:CreateDropdown("Teleport NPC", scanNPC_Models(), function(chosen)
+    if chosen and chosen ~= "" then tpNearestModelByName(chosen) end
+end)
+
+local ddPlayerFarm = PageFarm:CreateDropdown("Teleport Player", playersList_Farm(), function(nm)
+    local p = Players:FindFirstChild(nm)
+    if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+        tpTo(p.Character.HumanoidRootPart.Position)
+    end
+end)
+
+local islands_names_farm = {}
+for n,_ in pairs(islands) do table.insert(islands_names_farm, n) end
+table.sort(islands_names_farm)
+PageFarm:CreateDropdown("Teleport Island", islands_names_farm, function(choice)
+    local pos = islands[choice]; if pos then tpTo(pos) end
+end)
+
+-- Refresh NPC & Player list (Farm)
 task.spawn(function()
     while true do
         task.wait(8)
-        plDD:SetOptions(playersList())
+        if ddNPCFarm and ddNPCFarm.SetOptions then ddNPCFarm:SetOptions(scanNPC_Models()) end
+        if ddPlayerFarm and ddPlayerFarm.SetOptions then ddPlayerFarm:SetOptions(playersList_Farm()) end
     end
 end)
