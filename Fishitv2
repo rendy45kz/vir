@@ -153,11 +153,24 @@ function library:CreateWindow(name, version, icon)
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
-            local fr=Card(24)
-            local lb=Instance.new("TextLabel",fr); lb.BackgroundTransparency=0; lb.Position=UDim2.new(0,8,0,0); lb.Size=UDim2.new(1,-8,1,0)
-            lb.Font=Enum.Font.GothamBlack; lb.TextSize=math.floor(12*SCALE); lb.TextXAlignment=Enum.TextXAlignment.Left; lb.TextColor3=Color3.new(1,1,1); lb.Text=string.upper(text or "Label")
-            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end, _raw=lb }
-        end
+    local lb = Instance.new("TextLabel")
+    lb.BackgroundTransparency = 1 -- Hilangkan background
+    lb.Position = UDim2.new(0, 8, 0, 0)
+    lb.Size = UDim2.new(1, -8, 1, 0)
+    lb.Font = Enum.Font.GothamBlack
+    lb.TextSize = math.floor(12 * SCALE)
+    lb.TextXAlignment = Enum.TextXAlignment.Left
+    lb.TextColor3 = Color3.new(1, 1, 1)
+    lb.Text = string.upper(text or "Label")
+
+    return {
+        UpdateLabel = function(_, t)
+            lb.Text = string.upper(t or "")
+        end,
+        _raw = lb
+    }
+end
+
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
             local fr=Card(40)
