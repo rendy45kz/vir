@@ -153,10 +153,12 @@ function library:CreateWindow(name, version, icon)
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
+    local parent = self._raw or self            -- dukung object wrapper atau frame langsung
     local lb = Instance.new("TextLabel")
-    lb.BackgroundTransparency = 1 -- Hilangkan background
+    lb.Parent = parent                          -- PENTING: tempel ke halaman
+    lb.BackgroundTransparency = 1               -- hilangkan background
     lb.Position = UDim2.new(0, 8, 0, 0)
-    lb.Size = UDim2.new(1, -8, 1, 0)
+    lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE)) -- tinggi fixed agar rapi (opsional)
     lb.Font = Enum.Font.GothamBlack
     lb.TextSize = math.floor(12 * SCALE)
     lb.TextXAlignment = Enum.TextXAlignment.Left
