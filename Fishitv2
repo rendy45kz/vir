@@ -29,7 +29,7 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- Overlay (toggle open/close & draggable)
+    -- Overlay
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
@@ -153,9 +153,8 @@ function library:CreateWindow(name, version, icon)
 
         local PageAPI={}
         function PageAPI:CreateLabel(text)
-            local parent = Page
             local lb = Instance.new("TextLabel")
-            lb.Parent = parent
+            lb.Parent = Page
             lb.BackgroundTransparency = 1
             lb.Position = UDim2.new(0, 8, 0, 0)
             lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
@@ -163,15 +162,15 @@ function library:CreateWindow(name, version, icon)
             lb.TextSize = math.floor(12 * SCALE)
             lb.TextXAlignment = Enum.TextXAlignment.Left
             lb.TextColor3 = Color3.new(1, 1, 1)
-            lb.Text = string.upper(text or "Label")
-            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end, _raw=lb }
+            lb.Text = string.upper(text or "LABEL")
+            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end }
         end
 
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
             local fr=Card(40)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-100,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(name or "Button"); t.TextXAlignment=Enum.TextXAlignment.Left
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(name or "BUTTON"); t.TextXAlignment=Enum.TextXAlignment.Left
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-100,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local run=Instance.new("TextButton",fr); run.BackgroundColor3=Color3.fromRGB(24,25,32); run.Size=UDim2.new(0,84,0,24); run.Position=UDim2.new(1,-100,0,6)
@@ -179,21 +178,26 @@ function library:CreateWindow(name, version, icon)
             run.MouseButton1Click:Connect(cb)
             return {}
         end
+
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
             local fr=Card(40)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-70,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(title or "Toggle"); t.TextXAlignment=Enum.TextXAlignment.Left
+            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(title or "TOGGLE"); t.TextXAlignment=Enum.TextXAlignment.Left
             local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-70,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
             local track=Instance.new("Frame",fr); track.BackgroundColor3=Color3.fromRGB(24,25,32); track.Size=UDim2.fromOffset(math.floor(50*SCALE),math.floor(22*SCALE)); track.Position=UDim2.new(1,-math.floor(62*SCALE),0,math.floor(8*SCALE)); local kc=Instance.new("UICorner",track); kc.CornerRadius=UDim.new(1,0)
             local dot=Instance.new("Frame",track); dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=.6; local dc=Instance.new("UICorner",dot); dc.CornerRadius=UDim.new(1,0)
             local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
             local on=false
-            local function apply() tw(dot,.12,{Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE)) or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)), BackgroundTransparency=on and 0 or .6}); cb(on) end
+            local function apply()
+                tw(dot,.12,{Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE)) or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)), BackgroundTransparency=on and 0 or .6})
+                cb(on)
+            end
             btn.MouseButton1Click:Connect(function() on=not on; apply() end)
             return { Set=function(_,v) if v~=on then on=v; apply() end end }
         end
+
         function PageAPI:CreateBox(placeholder,iconId,cb)
             cb=cb or function() end
             local fr=Card(32)
@@ -204,6 +208,7 @@ function library:CreateWindow(name, version, icon)
             tb.FocusLost:Connect(function() cb(tb.Text) end)
             return { SetText=function(_,t2) tb.Text=t2 or "" end }
         end
+
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
             local fr=Card(28); fr.Name="Dropdown"
@@ -240,7 +245,7 @@ function library:CreateWindow(name, version, icon)
 end
 
 ----------------------------------------------------------------
--- ======================= PREMIUM SCRIPT ======================
+-- ======================= CORE / GAME =========================
 ----------------------------------------------------------------
 local Players            = game:GetService("Players")
 local LocalPlayer        = Players.LocalPlayer
@@ -298,7 +303,9 @@ local function tpTo(pos)
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
--- UI
+----------------------------------------------------------------
+-- ========================= UI PAGES ==========================
+----------------------------------------------------------------
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
 local Tab = UI:CreateTab("Sections")
 
@@ -316,26 +323,62 @@ PageShop:CreateButton("Bobber Shop","",function() end)
 PageShop:CreateButton("Rod Shop","",function() end)
 PageShop:CreateButton("Weather Shop","",function() end)
 
--- Teleport page
+-- ======================= TELEPORT PAGE =======================
 local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
+
+-- Island
 PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
     local pos = islands[choice]; if pos then tpTo(pos) end
 end)
 
+-- NPC (scan dari world)
+local function scanNPC_Models()
+    local found = {}
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and #m.Name >= 3 then
+            local hasHum = m:FindFirstChildOfClass("Humanoid")
+            local hasPrompt = false
+            for _,d in ipairs(m:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then hasPrompt = true break end
+            end
+            if hasHum or hasPrompt then found[m.Name] = true end
+        end
+    end
+    local list = {}; for name in pairs(found) do table.insert(list,name) end
+    table.sort(list); return list
+end
+
+local ddNPC = PageTP:CreateDropdown("Teleport NPC", scanNPC_Models(), function(nm)
+    if not nm or nm=="" then return end
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp=char and char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+    local best,dist
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm)) then
+            local p=m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+            if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
+        end
+    end
+    if best then tpTo(best.Position) end
+end)
+
+-- Player
 local function playersList()
     local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
     table.sort(t); return t
 end
-local plDD = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
+local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
 end)
-Players.PlayerAdded:Connect(function() plDD:SetOptions(playersList()) end)
-Players.PlayerRemoving:Connect(function() plDD:SetOptions(playersList()) end)
+Players.PlayerAdded:Connect(function() ddPlayer:SetOptions(playersList()) end)
+Players.PlayerRemoving:Connect(function() ddPlayer:SetOptions(playersList()) end)
 
+-- Button masuk ke place target
 if game.PlaceId ~= TARGET_PLACE then
     PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
 end
 
+-- Live coordinate
 RS.RenderStepped:Connect(function()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -345,8 +388,17 @@ RS.RenderStepped:Connect(function()
     end
 end)
 
+-- Auto-refresh Teleport lists
+task.spawn(function()
+    while true do
+        task.wait(8)
+        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
+        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+    end
+end)
+
 ----------------------------------------------------------------
--- ========================== FARM ============================
+-- =========================== FARM ============================
 ----------------------------------------------------------------
 -- net (sleitnick)
 local net; pcall(function()
@@ -379,7 +431,7 @@ pcall(function()
     RodReelAnim  = animator:LoadAnimation(RodReel)
 end)
 
--- State & delays
+-- State & delay map
 local Flags = {
     AutoFishV2 = false,
     PerfectCast = true,
@@ -488,7 +540,7 @@ local function startAutoFavourite()
     end)
 end
 
--- Fast-finish minigame by text effect
+-- Fast-finish minigame via text effect
 pcall(function()
     local textEffect = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ReplicateTextEffect"]
     textEffect.OnClientEvent:Connect(function(data)
@@ -556,103 +608,31 @@ local function StopAutoFishV2()
     pcall(function() if RodReelAnim then RodReelAnim:Stop() end end)
 end
 
--- ======= Helpers untuk Teleport NPC di Farm =======
-local function scanNPC_Models()
-    local found = {}
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and #m.Name >= 3 then
-            local hasHum = m:FindFirstChildOfClass("Humanoid")
-            local hasPrompt = false
-            for _,d in ipairs(m:GetDescendants()) do
-                if d:IsA("ProximityPrompt") then hasPrompt = true break end
-            end
-            if hasHum or hasPrompt then found[m.Name] = true end
-        end
-    end
-    local list = {}; for name in pairs(found) do table.insert(list,name) end
-    table.sort(list); return list
-end
-
-local function tpNearestModelByName(partial)
-    if not partial or partial == "" then return end
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local bestPart, bestDist
-    local q = string.lower(partial)
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and string.find(string.lower(m.Name), q) then
-            local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-            if p then
-                local d = (p.Position - hrp.Position).Magnitude
-                if not bestDist or d < bestDist then bestDist = d; bestPart = p end
-            end
-        end
-    end
-    if bestPart then tpTo(bestPart.Position) end
-end
-
-local function playersList_Farm()
-    local t={}
-    for _,pl in ipairs(Players:GetPlayers()) do
-        if pl ~= LocalPlayer then table.insert(t, pl.Name) end
-    end
-    table.sort(t); return t
-end
-
--- ====================== UI: FARM =======================
+-- ======================= FARM PAGE UI =======================
 PageFarm:CreateLabel("FARMING")
 
-local tgAutoFish = PageFarm:CreateToggle("Auto Fish V2 (Optimized)","Otomatis memancing dengan timing rod", function(on)
+PageFarm:CreateToggle("Auto Fish V2 (Optimized)","Otomatis memancing dengan timing rod", function(on)
     if on then StartAutoFishV2() else StopAutoFishV2() end
 end)
 
-local tgPerfect  = PageFarm:CreateToggle("Auto Perfect Cast","Usahakan selalu perfect", function(on)
+PageFarm:CreateToggle("Auto Perfect Cast","Usahakan selalu perfect", function(on)
     Flags.PerfectCast = on
 end)
 
-local boxBypass  = PageFarm:CreateBox("Bypass Delay (ex: 1.45)", nil, function(txt)
+PageFarm:CreateBox("Bypass Delay (ex: 1.45)", nil, function(txt)
     local n = tonumber(txt); if n then BypassDelayV2 = n end
 end)
 
-local tgAutoSell = PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis saat jumlah non-favorite >= threshold", function(on)
+PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis saat jumlah non-favorite >= threshold", function(on)
     Flags.AutoSell = on; if on then startAutoSell() end
 end)
 
-local boxThreshold = PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt); if n then AUTO_SELL_THRESHOLD = math.max(1, math.floor(n)) end
+PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
+    local n = tonumber(txt); if n then
+        AUTO_SELL_THRESHOLD = math.max(1, math.floor(n))
+    end
 end)
 
-local tgAutoFav  = PageFarm:CreateToggle("Auto Favorite Fish","Favoritkan Secret/Mythic/Legendary", function(on)
+PageFarm:CreateToggle("Auto Favorite Fish","Favoritkan Secret/Mythic/Legendary", function(on)
     Flags.AutoFavourite = on; if on then startAutoFavourite() end
-end)
-
--- QUICK TELEPORT di FARM
-PageFarm:CreateLabel("QUICK TELEPORT")
-
-local ddNPCFarm = PageFarm:CreateDropdown("Teleport NPC", scanNPC_Models(), function(chosen)
-    if chosen and chosen ~= "" then tpNearestModelByName(chosen) end
-end)
-
-local ddPlayerFarm = PageFarm:CreateDropdown("Teleport Player", playersList_Farm(), function(nm)
-    local p = Players:FindFirstChild(nm)
-    if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-        tpTo(p.Character.HumanoidRootPart.Position)
-    end
-end)
-
-local islands_names_farm = {}
-for n,_ in pairs(islands) do table.insert(islands_names_farm, n) end
-table.sort(islands_names_farm)
-PageFarm:CreateDropdown("Teleport Island", islands_names_farm, function(choice)
-    local pos = islands[choice]; if pos then tpTo(pos) end
-end)
-
--- Refresh NPC & Player list (Farm)
-task.spawn(function()
-    while true do
-        task.wait(8)
-        if ddNPCFarm and ddNPCFarm.SetOptions then ddNPCFarm:SetOptions(scanNPC_Models()) end
-        if ddPlayerFarm and ddPlayerFarm.SetOptions then ddPlayerFarm:SetOptions(playersList_Farm()) end
-    end
 end)
