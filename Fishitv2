@@ -204,7 +204,8 @@ function lib:Window(name, version, icon)
     end
 
     function P:CreateLabel(text)
-      local t = Heading(text or "LABEL")
+      local f = Card()
+      local t = Heading(f, text or "LABEL")
       return { UpdateLabel = function(_,s) t.Text = string.upper(s or "") end }
     end
 
