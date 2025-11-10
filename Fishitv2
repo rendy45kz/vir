@@ -1,7 +1,10 @@
+-- ✅ Selalu tunggu game & kamera siap
 if not game:IsLoaded() then game.Loaded:Wait() end
+local Workspace = game:GetService("Workspace")
+while not Workspace.CurrentCamera do task.wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2) =================
+-- ================== UI LIBRARY (Polished v2 • FIX) ===========
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -19,11 +22,17 @@ function library:CreateWindow(name, version, icon)
     name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
 
     local Gui = Instance.new("ScreenGui")
-    protect(Gui); Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; Gui.IgnoreGuiInset = false
+    Gui.Name = "AegisHub_UIv2"
+    Gui.IgnoreGuiInset = false
+    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    Gui.ResetOnSpawn = false
+    Gui.DisplayOrder = 9999
+    protect(Gui)
     Gui.Parent = CoreGui
 
     local function calcScale()
-        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+        local cam = Workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(1280,720)
         local shortest = math.min(vp.X, vp.Y)
         if shortest <= 720 then return 0.85 elseif shortest <= 900 then return 0.92 else return 1 end
     end
@@ -36,8 +45,9 @@ function library:CreateWindow(name, version, icon)
     Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
     local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
     local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
+    local cam = Workspace.CurrentCamera
     local ox = Gui:GetAttribute("ovx") or 12
-    local oy = Gui:GetAttribute("ovy") or math.floor((workspace.CurrentCamera.ViewportSize.Y/2)-20)
+    local oy = Gui:GetAttribute("ovy") or math.floor((cam.ViewportSize.Y/2)-20)
     Overlay.Position = UDim2.fromOffset(ox, oy)
     do
         local dragging, start, origin
@@ -54,8 +64,9 @@ function library:CreateWindow(name, version, icon)
         UIS.InputChanged:Connect(function(i)
             if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
                 local d=i.Position-start
-                local nx = math.clamp(origin.X.Offset + d.X, 4, workspace.CurrentCamera.ViewportSize.X-44)
-                local ny = math.clamp(origin.Y.Offset + d.Y, 4, workspace.CurrentCamera.ViewportSize.Y-44)
+                local vp=Workspace.CurrentCamera.ViewportSize
+                local nx = math.clamp(origin.X.Offset + d.X, 4, vp.X-44)
+                local ny = math.clamp(origin.Y.Offset + d.Y, 4, vp.Y-44)
                 Overlay.Position = UDim2.fromOffset(nx, ny)
             end
         end)
@@ -117,7 +128,7 @@ function library:CreateWindow(name, version, icon)
 
         local Page=Instance.new("ScrollingFrame",Window)
         Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
-        Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.fromOffset(0,0)
+        Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.new(0,0,0,0)
         Page.BackgroundColor3=BG_DARK
         Page.Position=UDim2.new(0,math.floor(150*SCALE),0,math.floor(36*SCALE))
         Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
@@ -133,14 +144,26 @@ function library:CreateWindow(name, version, icon)
         indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
+            -- sembunyikan semua page & indikator
+            for _,v in ipairs(Window:GetChildren()) do
+                if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end
+            end
+            for _,btn in ipairs(TabsRail:GetChildren()) do
+                if btn:IsA("TextButton") then
+                    btn.TextTransparency = .5
+                    local ind = btn:FindFirstChildWhichIsA("Frame")
+                    if ind then ind.Visible=false end
+                end
+            end
+            -- tampilkan yang ini
+            TabBtn.TextTransparency=0
+            Page.Visible=true
             indicator.Visible=true
-            for _,v in ipairs(Window:GetChildren()) do if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end end
-            for _,v in ipairs(TabsRail:GetChildren()) do if v:IsA("TextButton") then v.TextTransparency=.5 end end
-            TabBtn.TextTransparency=0; Page.Visible=true
         end
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
+        -- COMP: Card helper (untuk elemen berbaris rapi, otomatis memanjang ke bawah)
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
@@ -156,8 +179,8 @@ function library:CreateWindow(name, version, icon)
             local lb = Instance.new("TextLabel")
             lb.Parent = Page
             lb.BackgroundTransparency = 1
-            lb.Position = UDim2.new(0, 8, 0, 0)
             lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
+            lb.Position = UDim2.new(0, 8, 0, 0)
             lb.Font = Enum.Font.GothamBlack
             lb.TextSize = math.floor(12 * SCALE)
             lb.TextXAlignment = Enum.TextXAlignment.Left
@@ -198,7 +221,7 @@ function library:CreateWindow(name, version, icon)
             return { Set=function(_,v) if v~=on then on=v; apply() end end }
         end
 
-        function PageAPI:CreateBox(placeholder,iconId,cb)
+        function PageAPI:CreateBox(placeholder,_,cb)
             cb=cb or function() end
             local fr=Card(32)
             local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.fromRGB(200,205,230)
@@ -216,421 +239,88 @@ function library:CreateWindow(name, version, icon)
             ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
             local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
             caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
-            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32); holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0); holder.AutomaticSize=Enum.AutomaticSize.Y; holder.Visible=false; local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,8)
+
+            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
+            holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
+            holder.AutomaticSize=Enum.AutomaticSize.Y; holder.Visible=false
+            local lc=Instance.new("UICorner",holder); lc.CornerRadius=UDim.new(0,8)
             local lv=Instance.new("UIListLayout",holder); lv.Padding=UDim.new(0,4)
             local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
+
             local current=nil
             local function rebuild(list)
                 for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
                 for _,opt in ipairs(list) do
-                    local b=Instance.new("TextButton",holder); b.Size=UDim2.new(1,0,0,24); b.BackgroundColor3=BG_CARD; b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
+                    local b=Instance.new("TextButton",holder)
+                    b.Size=UDim2.new(1,0,0,24); b.BackgroundColor3=BG_CARD
+                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
                     local bc=Instance.new("UICorner",b); bc.CornerRadius=UDim.new(0,8)
                     b.MouseButton1Click:Connect(function()
-                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt)); holder.Visible=false; tw(caret,.12,{Rotation=0}); onChanged(opt)
+                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt))
+                        holder.Visible=false; tw(caret,.12,{Rotation=0})
+                        onChanged(opt)
                     end)
                 end
             end
             rebuild(options)
+
             local open=false
             local header=Instance.new("TextButton",fr); header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,20); header.Position=UDim2.new(0,0,0,0); header.Text=""
-            header.MouseButton1Click:Connect(function() open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0}) end)
-            return { SetValue=function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end, GetValue=function() return current end, SetOptions=function(_,opts) rebuild(opts or {}) end }
+            header.MouseButton1Click:Connect(function()
+                open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0})
+            end)
+
+            return {
+                SetValue=function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end,
+                GetValue=function() return current end,
+                SetOptions=function(_,opts) rebuild(opts or {}) end
+            }
         end
+
         return PageAPI
     end
 
     local winAPI={}
-    function winAPI:CreateTab(_) return setmetatable({}, { __index = TabsAPI }) end
-    return winAPI
-end
-
-----------------------------------------------------------------
--- ======================= CORE / GAME =========================
-----------------------------------------------------------------
-local Players            = game:GetService("Players")
-local LocalPlayer        = Players.LocalPlayer
-local RS                 = game:GetService("RunService")
-local TeleportService    = game:GetService("TeleportService")
-local VirtualUser        = game:GetService("VirtualUser")
-local ReplicatedStorage  = game:GetService("ReplicatedStorage")
-local Workspace          = game:GetService("Workspace")
-
-local TARGET_PLACE = 121864768012064
-
--- Anti AFK
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-    task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-end)
-
--- Modules
-local Replion,ItemUtility
-task.spawn(function()
-    local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
-    if okRp then Replion=modRp end
-    local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
-    if okU then ItemUtility=modU end
-end)
-
-----------------------------------------------------------------
--- ========================= TELEPORT ==========================
-----------------------------------------------------------------
-local islands = {
-    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
-    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
-    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
-    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
-    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
-    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
-    ["Crater Island"]     = Vector3.new(968,1,4854),
-    ["Kohana"]            = Vector3.new(-658,3,719),
-    ["Winter Fest"]       = Vector3.new(1611,4,3280),
-    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
-    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
-    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
-    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-    ["Crystal Cavern"]    = Vector3.new(-2026,-440,7428),
-    ["Halloween"]         = Vector3.new(2127,78,3334),
-    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
-    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
-    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
-}
-local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
-
-local function tpTo(pos)
-    if not pos then return end
-    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp=char:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
-end
-
-local function playersList()
-    local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
-    table.sort(t); return t
-end
-
-local function scanNPC_Models()
-    local found = {}
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and #m.Name >= 3 then
-            local hasHum = m:FindFirstChildOfClass("Humanoid")
-            local hasPrompt = false
-            for _,d in ipairs(m:GetDescendants()) do
-                if d:IsA("ProximityPrompt") then hasPrompt = true break end
-            end
-            if hasHum or hasPrompt then found[m.Name] = true end
-        end
+    function winAPI:CreateTab(title)
+        -- return objek dengan method CreateFrame
+        return setmetatable({}, { __index = TabsAPI }):CreateFrame(title or "Page")
     end
-    local list = {}; for name in pairs(found) do table.insert(list,name) end
-    table.sort(list); return list
+
+    return setmetatable({}, { __index = winAPI })
 end
 
 ----------------------------------------------------------------
--- ============================ FARM ===========================
-----------------------------------------------------------------
--- net (sleitnick)
-local net; pcall(function()
-    net = ReplicatedStorage:WaitForChild("Packages")
-        :WaitForChild("_Index")
-        :WaitForChild("sleitnick_net@0.2.0")
-        :WaitForChild("net")
-end)
-
--- Remotes
-local rodRemote, miniGameRemote, finishRemote
-pcall(function()
-    rodRemote       = net:WaitForChild("RF/ChargeFishingRod",5)
-    miniGameRemote  = net:WaitForChild("RF/RequestFishingMinigameStarted",5)
-    finishRemote    = net:WaitForChild("RE/FishingCompleted",5)
-end)
-
--- Animations
-local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
-local humanoid  = character:WaitForChild("Humanoid")
-local animator  = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
-
-local RodIdleAnim, RodReelAnim, RodShakeAnim
-pcall(function()
-    local RodIdle = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("FishingRodReelIdle")
-    local RodReel = ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("EasyFishReelStart")
-    local RodShake= ReplicatedStorage:WaitForChild("Modules"):WaitForChild("Animations"):WaitForChild("CastFromFullChargePosition1Hand")
-    RodShakeAnim = animator:LoadAnimation(RodShake)
-    RodIdleAnim  = animator:LoadAnimation(RodIdle)
-    RodReelAnim  = animator:LoadAnimation(RodReel)
-end)
-
--- State & delay map
-local Flags = {
-    AutoFishV2 = false,
-    PerfectCast = true,
-    AutoSell = false,
-    AutoFavourite = false,
-}
-local RodDelaysV2 = {
-    ["Ares Rod"] = {custom = 1.12, bypass = 1.45},
-    ["Angler Rod"] = {custom = 1.12, bypass = 1.45},
-    ["Ghostfinn Rod"] = {custom = 1.12, bypass = 1.45},
-    ["Astral Rod"] = {custom = 1.9,  bypass = 1.45},
-    ["Chrome Rod"] = {custom = 2.3,  bypass = 2.00},
-    ["Steampunk Rod"] = {custom = 2.5,  bypass = 2.30},
-    ["Lucky Rod"] = {custom = 3.5,  bypass = 3.60},
-    ["Midnight Rod"]= {custom = 3.3,  bypass = 3.40},
-    ["Demascus Rod"]= {custom = 3.9,  bypass = 3.80},
-    ["Grass Rod"]  = {custom = 3.8,  bypass = 3.90},
-    ["Luck Rod"]   = {custom = 4.2,  bypass = 4.10},
-    ["Carbon Rod"] = {custom = 4.0,  bypass = 3.80},
-    ["Lava Rod"]   = {custom = 4.2,  bypass = 4.10},
-    ["Starter Rod"]= {custom = 4.3,  bypass = 4.20},
-}
-local customDelayV2, BypassDelayV2 = 1, 0.5
-local fishingActiveV2, delayInitializedV2 = false, false
-
-local function getValidRodNameV2()
-    local ok, display = pcall(function()
-        return Players.LocalPlayer.PlayerGui:WaitForChild("Backpack",5):WaitForChild("Display",5)
-    end)
-    if not ok or not display then return nil end
-    for _, tile in ipairs(display:GetChildren()) do
-        local success, label = pcall(function() return tile.Inner.Tags.ItemName end)
-        if success and label and label:IsA("TextLabel") then
-            local name = label.Text
-            if RodDelaysV2[name] then return name end
-        end
-    end
-    return nil
-end
-
-local function updateDelayBasedOnRodV2()
-    if delayInitializedV2 then return end
-    local rodName = getValidRodNameV2()
-    if rodName and RodDelaysV2[rodName] then
-        customDelayV2 = RodDelaysV2[rodName].custom
-        BypassDelayV2 = RodDelaysV2[rodName].bypass
-    else
-        customDelayV2 = 10
-        BypassDelayV2 = 1
-    end
-    delayInitializedV2 = true
-end
-
--- Auto Sell
-local lastSellTime = 0
-local AUTO_SELL_THRESHOLD = 60
-local AUTO_SELL_DELAY     = 60
-local function startAutoSell()
-    task.spawn(function()
-        while Flags.AutoSell do
-            pcall(function()
-                if not Replion then return end
-                local DataReplion = Replion.Client:WaitReplion("Data")
-                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
-                if type(items) ~= "table" then return end
-                local unfavoritedCount = 0
-                for _, item in ipairs(items) do
-                    if not item.Favorited then
-                        unfavoritedCount = unfavoritedCount + (item.Count or 1)
-                    end
-                end
-                if unfavoritedCount >= AUTO_SELL_THRESHOLD and os.time() - lastSellTime >= AUTO_SELL_DELAY then
-                    if net then
-                        local sellFunc = net:FindFirstChild("RF/SellAllItems")
-                        if sellFunc then
-                            pcall(function() sellFunc:InvokeServer() end)
-                            lastSellTime = os.time()
-                        end
-                    end
-                end
-            end)
-            task.wait(10)
-        end
-    end)
-end
-
--- Auto Favourite (tier)
-local allowedTiers = { Secret=true, Mythic=true, Legendary=true }
-local function startAutoFavourite()
-    task.spawn(function()
-        while Flags.AutoFavourite do
-            pcall(function()
-                if not Replion or not ItemUtility then return end
-                local DataReplion = Replion.Client:WaitReplion("Data")
-                local items = DataReplion and DataReplion:Get({"Inventory","Items"})
-                if type(items) ~= "table" then return end
-                for _, item in ipairs(items) do
-                    local base = ItemUtility:GetItemData(item.Id)
-                    if base and base.Data and allowedTiers[base.Data.Tier] and not item.Favorited then
-                        item.Favorited = true
-                    end
-                end
-            end)
-            task.wait(5)
-        end
-    end)
-end
-
--- Fast finish via text effect
-pcall(function()
-    local textEffect = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ReplicateTextEffect"]
-    textEffect.OnClientEvent:Connect(function(data)
-        if Flags.AutoFishV2 and fishingActiveV2
-        and data and data.TextData and data.TextData.EffectType == "Exclaim" then
-            local head = Players.LocalPlayer.Character and Players.LocalPlayer.Character:FindFirstChild("Head")
-            if head and data.Container == head and finishRemote then
-                task.spawn(function()
-                    for _ = 1, 3 do
-                        task.wait(BypassDelayV2)
-                        pcall(function() finishRemote:FireServer() end)
-                    end
-                end)
-            end
-        end
-    end)
-end)
-
--- Auto Fish V2
-local function StartAutoFishV2()
-    if Flags.AutoFishV2 then return end
-    Flags.AutoFishV2 = true
-    delayInitializedV2 = false
-    updateDelayBasedOnRodV2()
-
-    task.spawn(function()
-        while Flags.AutoFishV2 do
-            pcall(function()
-                fishingActiveV2 = true
-                local equipRemote = net and net:FindFirstChild("RE/EquipToolFromHotbar")
-                if equipRemote then equipRemote:FireServer(1) end
-                task.wait(0.1)
-
-                local timestamp = workspace:GetServerTimeNow()
-                if RodShakeAnim then RodShakeAnim:Play() end
-                if rodRemote then rodRemote:InvokeServer(timestamp) end
-
-                local baseX, baseY = -0.7499996423721313, 1
-                local x,y
-                if Flags.PerfectCast then
-                    x = baseX + (math.random(-500, 500) / 10000000)
-                    y = baseY + (math.random(-500, 500) / 10000000)
-                else
-                    x = math.random(-1000, 1000) / 1000
-                    y = math.random(0, 1000) / 1000
-                end
-
-                if RodIdleAnim then RodIdleAnim:Play() end
-                if miniGameRemote then miniGameRemote:InvokeServer(x, y) end
-
-                task.wait(customDelayV2)
-                fishingActiveV2 = false
-            end)
-            task.wait(0.05)
-        end
-    end)
-end
-
-local function StopAutoFishV2()
-    Flags.AutoFishV2 = false
-    fishingActiveV2 = false
-    delayInitializedV2 = false
-    pcall(function() if RodIdleAnim then RodIdleAnim:Stop() end end)
-    pcall(function() if RodShakeAnim then RodShakeAnim:Stop() end end)
-    pcall(function() if RodReelAnim then RodReelAnim:Stop() end end)
-end
-
-----------------------------------------------------------------
--- ========================= BUILD UI ==========================
+-- =============== DEMO: BIAR MENU PASTI MUNCUL ================
 ----------------------------------------------------------------
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
-local Tab = UI:CreateTab("Sections")
 
-local PageInv   = Tab:CreateFrame("Inventory")
-local PageShop  = Tab:CreateFrame("Shop")
-local PageTP    = Tab:CreateFrame("Teleport")
-local PageFarm  = Tab:CreateFrame("Farm")
+-- Buat dua tab contoh. Kamu bisa ganti/lanjutkan sesuai kebutuhan
+local PageTP = UI -- CreateTab mengembalikan Page langsung (disederhanakan)
+:CreateTab("Teleport")
 
--- Inventory
-PageInv:CreateLabel("INVENTORY")
+local PageEvent = UI:CreateTab("Event")
 
--- Shop
-PageShop:CreateButton("Traveling Merchant","Open merchant",function() end)
-PageShop:CreateButton("Bobber Shop","",function() end)
-PageShop:CreateButton("Rod Shop","",function() end)
-PageShop:CreateButton("Weather Shop","",function() end)
-
--- TELEPORT PAGE
-local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
-
-PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos = islands[choice]; if pos then tpTo(pos) end
+-- Isi contoh komponen agar kelihatan
+local coord = PageTP:CreateLabel("COORDINATES • X: 0  Y: 0  Z: 0")
+PageTP:CreateDropdown("Teleport Island", {"Kohana","Coral Reefs","Crater Island"}, function(opt)
+    print("Teleport to:", opt)
 end)
 
-local ddNPC = PageTP:CreateDropdown("Teleport NPC", scanNPC_Models(), function(nm)
-    if not nm or nm=="" then return end
-    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp=char and char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
-    local best,dist
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm)) then
-            local p=m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-            if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
-        end
-    end
-    if best then tpTo(best.Position) end
+PageEvent:CreateDropdown("Event Teleport", {"Shark Hunt","Worm Hunt","Meteor Rain"}, function(opt)
+    print("Event:", opt)
 end)
 
-local function _playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
-local ddPlayer = PageTP:CreateDropdown("Teleport Player", _playersList(), function(nm)
-    local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
-end)
-Players.PlayerAdded:Connect(function() ddPlayer:SetOptions(_playersList()) end)
-Players.PlayerRemoving:Connect(function() ddPlayer:SetOptions(_playersList()) end)
-
-if game.PlaceId ~= TARGET_PLACE then
-    PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
-end
-
+-- (Opsional) Update label posisi biar kelihatan hidup
+local Players = game:GetService("Players")
+local RS = game:GetService("RunService")
 RS.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp and CoordLabel and CoordLabel.UpdateLabel then
+    local plr = Players.LocalPlayer
+    local ch = plr and plr.Character
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if hrp and coord and coord.UpdateLabel then
         local p = hrp.Position
-        CoordLabel:UpdateLabel(("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper())
+        coord:UpdateLabel(
+            ("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper()
+        )
     end
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(8)
-        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
-        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(_playersList()) end
-    end
-end)
-
--- FARM PAGE (semua fungsi sudah ada di atas, jadi pasti muncul)
-PageFarm:CreateLabel("FARMING")
-
-PageFarm:CreateToggle("Auto Fish V2 (Optimized)","Otomatis memancing dengan timing rod", function(on)
-    if on then StartAutoFishV2() else StopAutoFishV2() end
-end)
-
-PageFarm:CreateToggle("Auto Perfect Cast","Usahakan selalu perfect", function(on)
-    Flags.PerfectCast = on
-end)
-
-PageFarm:CreateBox("Bypass Delay (ex: 1.45)", nil, function(txt)
-    local n = tonumber(txt); if n then BypassDelayV2 = n end
-end)
-
-PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis saat jumlah non-favorite >= threshold", function(on)
-    Flags.AutoSell = on; if on then startAutoSell() end
-end)
-
-PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt); if n then
-        AUTO_SELL_THRESHOLD = math.max(1, math.floor(n))
-    end
-end)
-
-PageFarm:CreateToggle("Auto Favorite Fish","Favoritkan Secret/Mythic/Legendary", function(on)
-    Flags.AutoFavourite = on; if on then startAutoFavourite() end
 end)
