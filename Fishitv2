@@ -29,7 +29,7 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- Overlay
+    -- Overlay (toggle + draggable)
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
@@ -263,7 +263,7 @@ LocalPlayer.Idled:Connect(function()
     task.wait(.7); VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- Replion & ItemUtility
+-- Modules
 local Replion,ItemUtility
 task.spawn(function()
     local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
@@ -272,7 +272,9 @@ task.spawn(function()
     if okU then ItemUtility=modU end
 end)
 
--- Teleport data
+----------------------------------------------------------------
+-- ========================= TELEPORT ==========================
+----------------------------------------------------------------
 local islands = {
     ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
@@ -303,35 +305,11 @@ local function tpTo(pos)
     if hrp then hrp.CFrame=CFrame.new(pos+Vector3.new(0,4,0)) end
 end
 
-----------------------------------------------------------------
--- ========================= UI PAGES ==========================
-----------------------------------------------------------------
-local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
-local Tab = UI:CreateTab("Sections")
+local function playersList()
+    local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
+    table.sort(t); return t
+end
 
-local PageInv   = Tab:CreateFrame("Inventory")
-local PageShop  = Tab:CreateFrame("Shop")
-local PageTP    = Tab:CreateFrame("Teleport")
-local PageFarm  = Tab:CreateFrame("Farm")
-
--- Inventory
-PageInv:CreateLabel("INVENTORY")
-
--- Shop (placeholder)
-PageShop:CreateButton("Traveling Merchant","Open merchant",function() end)
-PageShop:CreateButton("Bobber Shop","",function() end)
-PageShop:CreateButton("Rod Shop","",function() end)
-PageShop:CreateButton("Weather Shop","",function() end)
-
--- ======================= TELEPORT PAGE =======================
-local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
-
--- Island
-PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
-    local pos = islands[choice]; if pos then tpTo(pos) end
-end)
-
--- NPC (scan dari world)
 local function scanNPC_Models()
     local found = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
@@ -348,57 +326,8 @@ local function scanNPC_Models()
     table.sort(list); return list
 end
 
-local ddNPC = PageTP:CreateDropdown("Teleport NPC", scanNPC_Models(), function(nm)
-    if not nm or nm=="" then return end
-    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp=char and char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
-    local best,dist
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm)) then
-            local p=m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-            if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
-        end
-    end
-    if best then tpTo(best.Position) end
-end)
-
--- Player
-local function playersList()
-    local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
-    table.sort(t); return t
-end
-local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
-    local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
-end)
-Players.PlayerAdded:Connect(function() ddPlayer:SetOptions(playersList()) end)
-Players.PlayerRemoving:Connect(function() ddPlayer:SetOptions(playersList()) end)
-
--- Button masuk ke place target
-if game.PlaceId ~= TARGET_PLACE then
-    PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
-end
-
--- Live coordinate
-RS.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp and CoordLabel and CoordLabel.UpdateLabel then
-        local p = hrp.Position
-        CoordLabel:UpdateLabel(("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper())
-    end
-end)
-
--- Auto-refresh Teleport lists
-task.spawn(function()
-    while true do
-        task.wait(8)
-        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
-        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
-    end
-end)
-
 ----------------------------------------------------------------
--- =========================== FARM ============================
+-- ============================ FARM ===========================
 ----------------------------------------------------------------
 -- net (sleitnick)
 local net; pcall(function()
@@ -540,7 +469,7 @@ local function startAutoFavourite()
     end)
 end
 
--- Fast-finish minigame via text effect
+-- Fast finish via text effect
 pcall(function()
     local textEffect = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ReplicateTextEffect"]
     textEffect.OnClientEvent:Connect(function(data)
@@ -608,7 +537,76 @@ local function StopAutoFishV2()
     pcall(function() if RodReelAnim then RodReelAnim:Stop() end end)
 end
 
--- ======================= FARM PAGE UI =======================
+----------------------------------------------------------------
+-- ========================= BUILD UI ==========================
+----------------------------------------------------------------
+local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
+local Tab = UI:CreateTab("Sections")
+
+local PageInv   = Tab:CreateFrame("Inventory")
+local PageShop  = Tab:CreateFrame("Shop")
+local PageTP    = Tab:CreateFrame("Teleport")
+local PageFarm  = Tab:CreateFrame("Farm")
+
+-- Inventory
+PageInv:CreateLabel("INVENTORY")
+
+-- Shop
+PageShop:CreateButton("Traveling Merchant","Open merchant",function() end)
+PageShop:CreateButton("Bobber Shop","",function() end)
+PageShop:CreateButton("Rod Shop","",function() end)
+PageShop:CreateButton("Weather Shop","",function() end)
+
+-- TELEPORT PAGE
+local CoordLabel = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
+
+PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
+    local pos = islands[choice]; if pos then tpTo(pos) end
+end)
+
+local ddNPC = PageTP:CreateDropdown("Teleport NPC", scanNPC_Models(), function(nm)
+    if not nm or nm=="" then return end
+    local char=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp=char and char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+    local best,dist
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm)) then
+            local p=m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+            if p then local d=(p.Position-hrp.Position).Magnitude; if not dist or d<dist then best=p; dist=d end end
+        end
+    end
+    if best then tpTo(best.Position) end
+end)
+
+local function _playersList() local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end table.sort(t); return t end
+local ddPlayer = PageTP:CreateDropdown("Teleport Player", _playersList(), function(nm)
+    local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
+end)
+Players.PlayerAdded:Connect(function() ddPlayer:SetOptions(_playersList()) end)
+Players.PlayerRemoving:Connect(function() ddPlayer:SetOptions(_playersList()) end)
+
+if game.PlaceId ~= TARGET_PLACE then
+    PageTP:CreateButton("Teleport ke Fish It","Masuk ke game Fish It",function() TeleportService:Teleport(TARGET_PLACE,LocalPlayer) end)
+end
+
+RS.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and CoordLabel and CoordLabel.UpdateLabel then
+        local p = hrp.Position
+        CoordLabel:UpdateLabel(("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper())
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(8)
+        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
+        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(_playersList()) end
+    end
+end)
+
+-- FARM PAGE (semua fungsi sudah ada di atas, jadi pasti muncul)
 PageFarm:CreateLabel("FARMING")
 
 PageFarm:CreateToggle("Auto Fish V2 (Optimized)","Otomatis memancing dengan timing rod", function(on)
