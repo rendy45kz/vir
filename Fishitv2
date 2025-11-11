@@ -293,24 +293,34 @@ end
 -- =============== DEMO: BIAR MENU PASTI MUNCUL ================
 ----------------------------------------------------------------
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
-
--- Buat dua tab contoh. Kamu bisa ganti/lanjutkan sesuai kebutuhan
-local PageTP = UI -- CreateTab mengembalikan Page langsung (disederhanakan)
-:CreateTab("Teleport")
-
+local PageFarm = UI:CreateTab("Farm")
+local PageTP = UI:CreateTab("Teleport")
 local PageEvent = UI:CreateTab("Event")
 
--- (Tambahan tab Farm – tetap ADD, tidak mengubah yang di atas)
-local PageFarm = UI:CreateTab("Farm")
 
--- Isi contoh komponen agar kelihatan
-local coord = PageTP:CreateLabel("COORDINATES • X: 0  Y: 0  Z: 0")
-PageTP:CreateDropdown("Teleport Island", {"Kohana","Coral Reefs","Crater Island"}, function(opt)
-    print("Teleport to:", opt)
+-- ---------- UI: FARM MENU ----------
+PageFarm:CreateToggle("Auto Fishing","Loop otomatis memancing (rod auto-detect delay)", function(on)
+    if on then StartAutoFish() else StopAutoFish() end
 end)
 
-PageEvent:CreateDropdown("Event Teleport", {"Shark Hunt","Worm Hunt","Meteor Rain"}, function(opt)
-    print("Event:", opt)
+PageFarm:CreateToggle("Perfect Cast","Akurasi lemparan sangat presisi", function(on)
+    Flags.PerfectCast = on
+end)
+
+PageFarm:CreateBox("Bypass Delay Override (ex: 1.45)", nil, function(txt)
+    local n = tonumber(txt); if n then BypassDelay = math.max(0.05, n) end
+end)
+
+PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis non-favorite saat jumlah banyak", function(on)
+    Flags.AutoSell = on; if on then startAutoSell() end
+end)
+
+PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
+    local n = tonumber(txt); if n then SELL_THRESHOLD = math.max(1, math.floor(n)) end
+end)
+
+PageFarm:CreateToggle("Auto Favorite (Secret/Mythic/Legendary)","Favorit agar tidak terjual", function(on)
+    Flags.AutoFav = on; if on then startAutoFavorite() end
 end)
 
 -- (Opsional) Update label posisi biar kelihatan hidup
@@ -738,28 +748,3 @@ local function startAutoFavorite()
         end
     end)
 end
-
--- ---------- UI: FARM MENU ----------
-PageFarm:CreateToggle("Auto Fishing","Loop otomatis memancing (rod auto-detect delay)", function(on)
-    if on then StartAutoFish() else StopAutoFish() end
-end)
-
-PageFarm:CreateToggle("Perfect Cast","Akurasi lemparan sangat presisi", function(on)
-    Flags.PerfectCast = on
-end)
-
-PageFarm:CreateBox("Bypass Delay Override (ex: 1.45)", nil, function(txt)
-    local n = tonumber(txt); if n then BypassDelay = math.max(0.05, n) end
-end)
-
-PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis non-favorite saat jumlah banyak", function(on)
-    Flags.AutoSell = on; if on then startAutoSell() end
-end)
-
-PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt); if n then SELL_THRESHOLD = math.max(1, math.floor(n)) end
-end)
-
-PageFarm:CreateToggle("Auto Favorite (Secret/Mythic/Legendary)","Favorit agar tidak terjual", function(on)
-    Flags.AutoFav = on; if on then startAutoFavorite() end
-end)
