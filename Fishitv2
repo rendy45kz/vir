@@ -769,39 +769,3 @@ task.spawn(function()
     end
 end)
 
--- ===== Farm =====
-PageFarm:CreateToggle("Auto Fishing","Loop otomatis memancing (rod auto-detect delay)", function(on)
-    if on then StartAutoFish() else StopAutoFish() end
-end)
-
-PageFarm:CreateToggle("Perfect Cast","Akurasi lemparan sangat presisi", function(on)
-    Flags.PerfectCast = on
-end)
-
-PageFarm:CreateBox("Bypass Delay Override (ex: 1.45)", nil, function(txt)
-    local n = tonumber(txt); if n then BypassDelay = math.max(0.05, n) end
-end)
-
-PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis non-favorite saat jumlah banyak", function(on)
-    Flags.AutoSell = on; if on then startAutoSell() end
-end)
-
-PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt); if n then SELL_THRESHOLD = math.max(1, math.floor(n)) end
-end)
-
-PageFarm:CreateToggle("Auto Favorite (Secret/Mythic/Legendary)","Favorit agar tidak terjual", function(on)
-    Flags.AutoFav = on; if on then startAutoFavorite() end
-end)
-
--- ===== Shop / Inventory =====
-PageShop:CreateButton("Traveling Merchant","Buka merchant terdekat",function() end)
-PageShop:CreateButton("Bobber Shop","",function() end)
-PageShop:CreateButton("Rod Shop","",function() end)
-PageShop:CreateButton("Weather Shop","",function() end)
-
-PageInv:CreateLabel("INVENTORY • UTILITIES")
-PageInv:CreateButton("Sell ALL Now","Menjual semua item non-favorite", function()
-    local SellAll = net and net:FindFirstChild("RF/SellAllItems")
-    if SellAll then pcall(function() SellAll:InvokeServer() end) end
-end)
