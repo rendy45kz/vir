@@ -38,27 +38,31 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- Overlay
+    -- Overlay (toggle + draggable)
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
     Overlay.BackgroundColor3=Color3.fromRGB(32,34,46); Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
     local oc=Instance.new("UICorner",Overlay); oc.CornerRadius=UDim.new(1,0)
     local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
+
     local cam = Workspace.CurrentCamera
     local ox = Gui:GetAttribute("ovx") or 12
     local oy = Gui:GetAttribute("ovy") or math.floor((cam.ViewportSize.Y/2)-20)
     Overlay.Position = UDim2.fromOffset(ox, oy)
+
     do
         local dragging, start, origin
         Overlay.InputBegan:Connect(function(i)
             if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
                 dragging=true; start=i.Position; origin=Overlay.Position
-                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then
-                    dragging=false
-                    Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
-                    Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
-                end end)
+                i.Changed:Connect(function()
+                    if i.UserInputState==Enum.UserInputState.End then
+                        dragging=false
+                        Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
+                        Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
+                    end
+                end)
             end
         end)
         UIS.InputChanged:Connect(function(i)
@@ -161,6 +165,7 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
+        -- Card helper
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
@@ -279,6 +284,7 @@ function library:CreateWindow(name, version, icon)
 
     local winAPI={}
     function winAPI:CreateTab(title)
+        -- KEMBALIKAN PageAPI langsung (punya CreateToggle/Box/Dropdown/Label)
         return setmetatable({}, { __index = TabsAPI }):CreateFrame(title or "Page")
     end
     return setmetatable({}, { __index = winAPI })
@@ -401,6 +407,7 @@ local function castOnce()
     fishingActive=true
     if RE_Equip then RE_Equip:FireServer(1) end
     task.wait(0.05)
+
     local tNow = Workspace:GetServerTimeNow()
     if ACast then ACast:Play() end
     if RF_Charge then RF_Charge:InvokeServer(tNow) end
@@ -428,9 +435,7 @@ local function StartAutoFish()
     Flags.AutoFish = true
     task.spawn(function()
         while Flags.AutoFish do
-            pcall(function()
-                castOnce()
-            end)
+            pcall(function() castOnce() end)
             task.wait(0.05)
         end
     end)
@@ -557,6 +562,8 @@ end
 -- ============================ BUILD UI =======================
 ----------------------------------------------------------------
 local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
+
+-- Penting: bangun semua fitur dulu, baru UI ✔
 local PageFarm = UI:CreateTab("Farm")
 local PageTP   = UI:CreateTab("Teleport")
 
@@ -616,7 +623,7 @@ local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), functio
     local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
 end)
 
--- Live updates
+-- Live updates (koord + dropdown dinamis)
 RS.RenderStepped:Connect(function()
     local ch = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
