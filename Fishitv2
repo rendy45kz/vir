@@ -1,10 +1,10 @@
--- ✅ Selalu tunggu game & kamera siap
+-- ✅ Pastikan game & kamera siap
 if not game:IsLoaded() then game.Loaded:Wait() end
 local Workspace = game:GetService("Workspace")
 while not Workspace.CurrentCamera do task.wait() end
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2 • FIX) ===========
+-- ================== UI LIBRARY (Polished v2 • ORI) ==========
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -38,7 +38,7 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- Overlay (toggle + draggable)
+    -- Overlay
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
@@ -144,7 +144,6 @@ function library:CreateWindow(name, version, icon)
         indicator.Position=UDim2.new(0,-8,0,2); indicator.BorderSizePixel=0; indicator.Visible=false
 
         local function selectThis()
-            -- sembunyikan semua page & indikator
             for _,v in ipairs(Window:GetChildren()) do
                 if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end
             end
@@ -155,7 +154,6 @@ function library:CreateWindow(name, version, icon)
                     if ind then ind.Visible=false end
                 end
             end
-            -- tampilkan yang ini
             TabBtn.TextTransparency=0
             Page.Visible=true
             indicator.Visible=true
@@ -163,7 +161,6 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
-        -- COMP: Card helper (untuk elemen berbaris rapi, otomatis memanjang ke bawah)
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
@@ -282,279 +279,28 @@ function library:CreateWindow(name, version, icon)
 
     local winAPI={}
     function winAPI:CreateTab(title)
-        -- return objek dengan method CreateFrame
         return setmetatable({}, { __index = TabsAPI }):CreateFrame(title or "Page")
     end
-
     return setmetatable({}, { __index = winAPI })
 end
 
 ----------------------------------------------------------------
--- =============== DEMO: BIAR MENU PASTI MUNCUL ================
+-- ======================= GAME LOGIC (ORI) ====================
 ----------------------------------------------------------------
-local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
-local PageFarm = UI:CreateTab("Farm")
-local PageTP = UI:CreateTab("Teleport")
-local PageEvent = UI:CreateTab("Event")
-
-
--- ---------- UI: FARM MENU ----------
-PageFarm:CreateToggle("Auto Fishing","Loop otomatis memancing (rod auto-detect delay)", function(on)
-    if on then StartAutoFish() else StopAutoFish() end
-end)
-
-PageFarm:CreateToggle("Perfect Cast","Akurasi lemparan sangat presisi", function(on)
-    Flags.PerfectCast = on
-end)
-
-PageFarm:CreateBox("Bypass Delay Override (ex: 1.45)", nil, function(txt)
-    local n = tonumber(txt); if n then BypassDelay = math.max(0.05, n) end
-end)
-
-PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis non-favorite saat jumlah banyak", function(on)
-    Flags.AutoSell = on; if on then startAutoSell() end
-end)
-
-PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
-    local n = tonumber(txt); if n then SELL_THRESHOLD = math.max(1, math.floor(n)) end
-end)
-
-PageFarm:CreateToggle("Auto Favorite (Secret/Mythic/Legendary)","Favorit agar tidak terjual", function(on)
-    Flags.AutoFav = on; if on then startAutoFavorite() end
-end)
-
--- (Opsional) Update label posisi biar kelihatan hidup
-local Players = game:GetService("Players")
-local RS = game:GetService("RunService")
-RS.RenderStepped:Connect(function()
-    local plr = Players.LocalPlayer
-    local ch = plr and plr.Character
-    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-    if hrp and coord and coord.UpdateLabel then
-        local p = hrp.Position
-        coord:UpdateLabel(
-            ("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper()
-        )
-    end
-end)
-
-----------------------------------------------------------------
--- ============================================================
--- ▼ Tambahan fitur (APPEND SAJA • tidak mengubah kode di atas)
--- ============================================================
+local Players           = game:GetService("Players")
+local LocalPlayer       = Players.LocalPlayer
+local RS                = game:GetService("RunService")
+local VirtualUser       = game:GetService("VirtualUser")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- ---------- Helper umum ----------
-local function tpTo(pos: Vector3)
-    if not pos then return end
-    local plr = Players.LocalPlayer
-    local ch  = plr and (plr.Character or plr.CharacterAdded:Wait())
-    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
-    end
-end
-
--- ---------- TELEPORT: Island/NPC/Player ----------
-local islands = {
-    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
-    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
-    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
-    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
-    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
-    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
-    ["Crater Island"]     = Vector3.new(968,1,4854),
-    ["Kohana"]            = Vector3.new(-658,3,719),
-    ["Winter Fest"]       = Vector3.new(1611,4,3280),
-    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
-    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
-    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
-    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
-    ["Crystal Cavern"]    = Vector3.new(-2026,-440,7428),
-    ["Halloween"]         = Vector3.new(2127,78,3334),
-    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
-    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
-    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
-}
-local islandList = {}
-for name in pairs(islands) do table.insert(islandList, name) end
-table.sort(islandList)
-
--- Dropdown baru: island lengkap (tidak mengubah dropdown demo kamu)
-local ddIslandFull = PageTP:CreateDropdown("Teleport Island (Full)", islandList, function(choice)
-    tpTo(islands[choice])
-end)
-
--- Scan NPC model/humanoid/prompt
-local function scanNPC_Models()
-    local found = {}
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and #m.Name >= 3 then
-            local hasHum = m:FindFirstChildOfClass("Humanoid")
-            local hasPrompt = false
-            for _,d in ipairs(m:GetDescendants()) do
-                if d:IsA("ProximityPrompt") then hasPrompt = true break end
-            end
-            if hasHum or hasPrompt then found[m.Name] = true end
-        end
-    end
-    local list = {}
-    for k in pairs(found) do table.insert(list, k) end
-    table.sort(list)
-    return list
-end
-
--- Dropdown NPC (scan)
-local ddNPC = PageTP:CreateDropdown("Teleport NPC (Scan)", scanNPC_Models(), function(nm)
-    if not nm or nm == "" then return end
-    local plr = Players.LocalPlayer
-    local ch  = plr and (plr.Character or plr.CharacterAdded:Wait())
-    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local best,dist
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm), 1, true) then
-            local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-            if p then
-                local d = (p.Position - hrp.Position).Magnitude
-                if not dist or d < dist then best = p; dist = d end
-            end
-        end
-    end
-    if best then tpTo(best.Position) end
-end)
-
--- Dropdown Player (list dinamis)
-local function playersList()
-    local t = {}
-    for _,pl in ipairs(Players:GetPlayers()) do
-        if pl ~= Players.LocalPlayer then table.insert(t, pl.Name) end
-    end
-    table.sort(t)
-    return t
-end
-
-local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
-    local p = Players:FindFirstChild(nm)
-    if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-        tpTo(p.Character.HumanoidRootPart.Position)
-    end
-end)
-
--- Refresh berkala untuk NPC & Player dropdown
-task.spawn(function()
-    while true do
-        task.wait(8)
-        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
-        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
-    end
-end)
-Players.PlayerAdded:Connect(function() if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end end)
-Players.PlayerRemoving:Connect(function() if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end end)
-
--- ---------- EVENT: Live teleport + Auto watcher ----------
-local staticEvents = { "Admin Event","Shark Hunt","Ghost Shark Hunt","Worm Hunt","Black Hole","Shocked","Ghost Worm","Meteor Rain" }
-
-local function discoverEvents()
-    local set = {}
-    local props = Workspace:FindFirstChild("Props")
-    if props then
-        for _,child in ipairs(props:GetChildren()) do
-            if (child:IsA("Folder") or child:IsA("Model")) and #child.Name >= 3 then
-                set[child.Name] = true
-            end
-        end
-    end
-    if next(set) == nil then
-        for _,n in ipairs(staticEvents) do set[n] = true end
-    end
-    local list = {}
-    for k in pairs(set) do table.insert(list, k) end
-    table.sort(list)
-    return list
-end
-
-local function tpToEventByName(evName: string)
-    local props = Workspace:FindFirstChild("Props")
-    if not props then return false,"Props missing" end
-    local node  = props:FindFirstChild(evName)
-    if not node then return false,"Event missing" end
-    local boat  = node:FindFirstChild("Fishing Boat")
-    if not boat then return false,"Boat missing" end
-    local cf    = boat:GetPivot()
-    local plr   = Players.LocalPlayer
-    local ch    = plr and (plr.Character or plr.CharacterAdded:Wait())
-    local hrp   = ch and ch:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false,"HRP missing" end
-    hrp.CFrame  = cf + Vector3.new(0,15,0)
-    return true
-end
-
--- Dropdown event live (tidak mengganti dropdown demo kamu)
-local ddEventLive = PageEvent:CreateDropdown("Event Teleport (Live)", discoverEvents(), function(option)
-    local ok, why = tpToEventByName(option)
-    if not ok then warn("Event Teleport gagal:", why) end
-end)
-
--- Pilih target event untuk auto-teleport
-local autoTarget = nil
-local ddAutoTarget = PageEvent:CreateDropdown("Auto Event Target", discoverEvents(), function(opt)
-    autoTarget = opt
-end)
-
--- Status + Toggle auto
-local lblEventStatus = PageEvent:CreateLabel("EVENT WATCH • IDLE")
-local tglAuto = PageEvent:CreateToggle("Auto Teleport (Target)", "Teleport otomatis saat event target aktif", function(on)
-    _G.__AUTO_EVT_ON = on
-end)
-
--- Worker auto (scan tiap 2 detik)
-task.spawn(function()
-    while true do
-        if _G.__AUTO_EVT_ON and autoTarget then
-            local props = Workspace:FindFirstChild("Props")
-            local jumped = false
-            if props then
-                local node = props:FindFirstChild(autoTarget)
-                if node and node:FindFirstChild("Fishing Boat") then
-                    local ok = tpToEventByName(autoTarget)
-                    if ok then
-                        jumped = true
-                        if lblEventStatus and lblEventStatus.UpdateLabel then
-                            lblEventStatus:UpdateLabel(("EVENT WATCH • TELEPORTED: %s"):format(string.upper(autoTarget)))
-                        end
-                    end
-                end
-            end
-            if not jumped and lblEventStatus and lblEventStatus.UpdateLabel then
-                lblEventStatus:UpdateLabel(("EVENT WATCH • WAITING: %s"):format(string.upper(tostring(autoTarget))))
-            end
-        end
-        task.wait(2)
-    end
-end)
-
--- Refresh daftar event berkala untuk kedua dropdown event
-task.spawn(function()
-    while true do
-        task.wait(8)
-        local fresh = discoverEvents()
-        if ddEventLive   and ddEventLive.SetOptions   then ddEventLive:SetOptions(fresh) end
-        if ddAutoTarget  and ddAutoTarget.SetOptions  then ddAutoTarget:SetOptions(fresh) end
-    end
-end)
-
--- ---------- FARM: Auto Fishing / Perfect / Bypass / Sell / Favorite ----------
--- Anti AFK ringan
-local VirtualUser = game:GetService("VirtualUser")
-Players.LocalPlayer.Idled:Connect(function()
+-- Anti-AFK
+LocalPlayer.Idled:Connect(function()
     VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
     task.wait(0.7)
     VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
 end)
 
--- net (sleitnick)
+-- Net (sleitnick)
 local net; pcall(function()
     net = ReplicatedStorage:WaitForChild("Packages")
         :WaitForChild("_Index")
@@ -565,15 +311,15 @@ end)
 -- Remotes
 local RF_Charge, RF_Start, RE_Completed, RE_Equip, RE_Text
 pcall(function()
-    RF_Charge     = net:WaitForChild("RF/ChargeFishingRod",5)
-    RF_Start      = net:WaitForChild("RF/RequestFishingMinigameStarted",5)
-    RE_Completed  = net:WaitForChild("RE/FishingCompleted",5)
-    RE_Equip      = net:WaitForChild("RE/EquipToolFromHotbar",5)
-    RE_Text       = net:WaitForChild("RE/ReplicateTextEffect",5)
+    RF_Charge     = net:WaitForChild("RF/ChargeFishingRod",10)
+    RF_Start      = net:WaitForChild("RF/RequestFishingMinigameStarted",10)
+    RE_Completed  = net:WaitForChild("RE/FishingCompleted",10)
+    RE_Equip      = net:WaitForChild("RE/EquipToolFromHotbar",10)
+    RE_Text       = net:WaitForChild("RE/ReplicateTextEffect",10)
 end)
 
 -- Animations
-local character = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local humanoid  = character:WaitForChild("Humanoid")
 local animator  = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
 local AIdle, AReel, ACast
@@ -586,7 +332,7 @@ pcall(function()
     ACast = animator:LoadAnimation(RodCast)
 end)
 
--- State & delay map (auto-detect + bypass)
+-- State & delay
 local Flags = { AutoFish=false, PerfectCast=true, AutoSell=false, AutoFav=false }
 local RodDelays = {
     ["Ares Rod"]={custom=1.12,bypass=1.45},
@@ -609,7 +355,7 @@ local fishingActive=false
 
 local function getEquippedRodName()
     local ok, display = pcall(function()
-        return Players.LocalPlayer.PlayerGui:WaitForChild("Backpack",5):WaitForChild("Display",5)
+        return LocalPlayer.PlayerGui:WaitForChild("Backpack",5):WaitForChild("Display",5)
     end)
     if not ok or not display then return nil end
     for _, tile in ipairs(display:GetChildren()) do
@@ -633,7 +379,7 @@ local function refreshDelays()
     end
 end
 
--- Fast-finish: dengar efek "Exclaim"
+-- Fast-finish via text effect
 pcall(function()
     if RE_Text then
         RE_Text.OnClientEvent:Connect(function(d)
@@ -660,6 +406,7 @@ local function castOnce()
     if RF_Charge then RF_Charge:InvokeServer(tNow) end
     task.wait(0.15)
     pcall(function() if RF_Charge then RF_Charge:InvokeServer(Workspace:GetServerTimeNow()) end end)
+
     local bx,by = -0.7499996423721313, 1
     local x,y
     if Flags.PerfectCast then
@@ -671,6 +418,7 @@ local function castOnce()
     end
     if AIdle then AIdle:Play() end
     if RF_Start then RF_Start:InvokeServer(x,y) end
+
     task.wait(CastDelay)
     fishingActive=false
 end
@@ -696,7 +444,7 @@ local function StopAutoFish()
     pcall(function() if ACast then ACast:Stop() end end)
 end
 
--- Optional: Replion & ItemUtility untuk sell/favorite
+-- Replion & ItemUtility (lazy load)
 local Replion, ItemUtility
 task.spawn(function()
     local okRp,modRp=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
@@ -705,22 +453,23 @@ task.spawn(function()
     if okU then ItemUtility=modU end
 end)
 
--- Auto Sell / Auto Favorite
+-- Auto Sell / Favorite
 local lastSell = 0
 local SELL_THRESHOLD = 60
 local SELL_COOLDOWN = 60
+
 local function startAutoSell()
     task.spawn(function()
         while Flags.AutoSell do
             pcall(function()
-                if not Replion then return end
+                if not (net and Replion) then return end
                 local Data = Replion.Client:WaitReplion("Data")
                 local items = Data and Data:Get({"Inventory","Items"})
                 if type(items)~="table" then return end
                 local unfav=0
                 for _,it in ipairs(items) do if not it.Favorited then unfav += (it.Count or 1) end end
                 if unfav >= SELL_THRESHOLD and os.time()-lastSell >= SELL_COOLDOWN then
-                    local SellAll = net and net:FindFirstChild("RF/SellAllItems")
+                    local SellAll = net:FindFirstChild("RF/SellAllItems")
                     if SellAll then pcall(function() SellAll:InvokeServer() end); lastSell=os.time() end
                 end
             end)
@@ -748,3 +497,141 @@ local function startAutoFavorite()
         end
     end)
 end
+
+----------------------------------------------------------------
+-- ========================== TELEPORT =========================
+----------------------------------------------------------------
+local function tpTo(pos: Vector3)
+    if not pos then return end
+    local plr = LocalPlayer
+    local ch  = plr and (plr.Character or plr.CharacterAdded:Wait())
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0)) end
+end
+
+local islands = {
+    ["Weather Machine"]   = Vector3.new(-1471,-3,1929),
+    ["Esoteric Depths"]   = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]    = Vector3.new(-2038,3,3650),
+    ["Stingray Shores"]   = Vector3.new(-32,4,2773),
+    ["Kohana Volcano"]    = Vector3.new(-519,24,189),
+    ["Coral Reefs"]       = Vector3.new(-3095,1,2177),
+    ["Crater Island"]     = Vector3.new(968,1,4854),
+    ["Kohana"]            = Vector3.new(-658,3,719),
+    ["Winter Fest"]       = Vector3.new(1611,4,3280),
+    ["Esoteric Island"]   = Vector3.new(1987,4,1400),
+    ["Treasure Room"]     = Vector3.new(-3600,-267,-1558),
+    ["Lost Shore"]        = Vector3.new(-3663,38,-989),
+    ["Sisyphus"]          = Vector3.new(-3792,-135,-986),
+    ["Crystal Cavern"]    = Vector3.new(-2026,-440,7428),
+    ["Halloween"]         = Vector3.new(2127,78,3334),
+    ["Ancient Underground Cave"]  = Vector3.new(2102,-91,-709),
+    ["Ancient Inside Temple"]     = Vector3.new(1506,-22,-641),
+    ["Ancient Jungle"]            = Vector3.new(1268,78,-183),
+    ["Fisherman Island"]          = Vector3.new(-3,17,2840),
+}
+local islandList = {} for n,_ in pairs(islands) do table.insert(islandList, n) end table.sort(islandList)
+
+local function scanNPC_Models()
+    local found = {}
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and #m.Name >= 3 then
+            local hasHum = m:FindFirstChildOfClass("Humanoid")
+            local hasPrompt = false
+            for _,d in ipairs(m:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then hasPrompt = true break end
+            end
+            if hasHum or hasPrompt then found[m.Name] = true end
+        end
+    end
+    local list = {}; for name in pairs(found) do table.insert(list,name) end
+    table.sort(list); return list
+end
+
+local function playersList()
+    local t={} for _,pl in ipairs(Players:GetPlayers()) do if pl~=LocalPlayer then table.insert(t,pl.Name) end end
+    table.sort(t); return t
+end
+
+----------------------------------------------------------------
+-- ============================ BUILD UI =======================
+----------------------------------------------------------------
+local UI = library:CreateWindow("AegisHub • Fish It","Premium",10044538000)
+local PageFarm = UI:CreateTab("Farm")
+local PageTP   = UI:CreateTab("Teleport")
+
+-- ===== FARM =====
+PageFarm:CreateLabel("FARMING")
+
+PageFarm:CreateToggle("Auto Fishing","Loop otomatis memancing (rod auto-detect delay)", function(on)
+    if on then StartAutoFish() else StopAutoFish() end
+end)
+
+PageFarm:CreateToggle("Perfect Cast","Akurasi lemparan sangat presisi", function(on)
+    Flags.PerfectCast = on
+end)
+
+PageFarm:CreateBox("Bypass Delay Override (ex: 1.45)", nil, function(txt)
+    local n = tonumber(txt); if n then BypassDelay = math.max(0.05, n) end
+end)
+
+PageFarm:CreateToggle("Auto Sell Fish","Jual otomatis non-favorite saat jumlah banyak", function(on)
+    Flags.AutoSell = on; if on then startAutoSell() end
+end)
+
+PageFarm:CreateBox("Sell Threshold (default 60)", nil, function(txt)
+    local n = tonumber(txt); if n then SELL_THRESHOLD = math.max(1, math.floor(n)) end
+end)
+
+PageFarm:CreateToggle("Auto Favorite (Secret/Mythic/Legendary)","Favorit agar tidak terjual", function(on)
+    Flags.AutoFav = on; if on then startAutoFavorite() end
+end)
+
+-- ===== TELEPORT =====
+local coord = PageTP:CreateLabel("COORDINATES • X: 0.0  Y: 0.0  Z: 0.0")
+
+PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
+    tpTo(islands[choice])
+end)
+
+local ddNPC = PageTP:CreateDropdown("Teleport NPC (Scan)", scanNPC_Models(), function(nm)
+    if not nm or nm=="" then return end
+    local ch  = (LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local best,dist
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and string.find(string.lower(m.Name), string.lower(nm), 1, true) then
+            local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+            if p then
+                local d = (p.Position - hrp.Position).Magnitude
+                if not dist or d < dist then best = p; dist = d end
+            end
+        end
+    end
+    if best then tpTo(best.Position) end
+end)
+
+local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
+    local p=Players:FindFirstChild(nm); if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then tpTo(p.Character.HumanoidRootPart.Position) end
+end)
+
+-- Live updates
+RS.RenderStepped:Connect(function()
+    local ch = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if hrp and coord and coord.UpdateLabel then
+        local p = hrp.Position
+        coord:UpdateLabel(("COORDINATES • X: %.1f  Y: %.1f  Z: %.1f"):format(p.X,p.Y,p.Z):upper())
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(8)
+        if ddNPC and ddNPC.SetOptions then ddNPC:SetOptions(scanNPC_Models()) end
+        if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+    end
+end)
+Players.PlayerAdded:Connect(function() if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end end)
+Players.PlayerRemoving:Connect(function() if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end end)
