@@ -463,15 +463,233 @@ end
 local win = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
 
 --========================================================
--- Tabs + Pages
+-- FARM: Auto Fish + Perfect Casting
 --========================================================
 local TabFarm   = win:CreateTab("Farm")
 local PageFarm  = TabFarm:CreateFrame("Farm")
 PageFarm:CreateLabel("FARM MENU")
 
-local TabInv    = win:CreateTab("Inventory")
-local PageInv   = TabInv:CreateFrame("Inventory")
-PageInv:CreateLabel("INVENTORY MENU")
+-- ---------- STATE ----------
+local Farm = {
+    AutoFish        = false,
+    PerfectCasting  = true,
+    RecastDelayMin  = 0.25,   -- jeda setelah hasil dapat
+    RecastDelayMax  = 0.50,
+}
+
+-- ---------- UTIL ----------
+local UIS            = game:GetService("UserInputService")
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local TweenService   = game:GetService("TweenService")
+local VirtualUser    = game:GetService("VirtualUser")
+local Workspace      = game:GetService("Workspace")
+local LocalPlayer    = Players.LocalPlayer
+
+local function rng(a,b) return a + math.random() * (b-a) end
+
+local function equipRod()
+    local ch = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local bp = LocalPlayer:WaitForChild("Backpack")
+    -- cari tool yang mengandung 'Rod'
+    local rod = ch:FindFirstChildWhichIsA("Tool") or bp:FindFirstChildWhichIsA("Tool")
+    if rod and (rod.Name:lower():find("rod") or rod:FindFirstChild("Rod")) then
+        if rod.Parent == bp then rod.Parent = ch end
+        return rod
+    end
+    -- kalau ada tool lain dulu, tetap equip biar event gui muncul
+    if rod and rod.Parent == bp then rod.Parent = ch; return rod end
+    return nil
+end
+
+local function clickMouse()
+    local cam = Workspace.CurrentCamera
+    VirtualUser:Button1Down(Vector2.new(0,0), cam and cam.CFrame or CFrame.new())
+    task.wait(0.05)
+    VirtualUser:Button1Up(Vector2.new(0,0), cam and cam.CFrame or CFrame.new())
+end
+
+local function pressE()
+    -- fallback: beberapa game pakai E saat reel
+    UIS.InputBegan:Fire({KeyCode = Enum.KeyCode.E}) -- tidak semua executor support; tetap coba
+end
+
+-- cari ProximityPrompt "Reel"/"Catch" di sekitar player; gunakan fireproximityprompt bila ada
+local function tryReelNearby()
+    local ch = LocalPlayer.Character
+    if not ch then return false end
+    local hrp = ch:FindFirstChild("HumanoidRootPart")
+    if not hrp then return false end
+
+    local nearest, nd = nil, 18 -- radius 18 stud
+    for _,pp in ipairs(Workspace:GetDescendants()) do
+        if pp:IsA("ProximityPrompt") then
+            local at = (pp.ActionText or ""):lower()
+            if at:find("reel") or at:find("catch") or at:find("pull") then
+                local p = pp.Parent
+                local pos = (p and p:IsA("BasePart") and p.Position)
+                    or (p and p:IsA("Model") and (p.PrimaryPart and p.PrimaryPart.Position))
+                if pos then
+                    local d = (pos - hrp.Position).Magnitude
+                    if d < nd then nearest, nd = pp, d end
+                end
+            end
+        end
+    end
+
+    if nearest then
+        if typeof(fireproximityprompt) == "function" then
+            fireproximityprompt(nearest)
+        else
+            pressE()
+        end
+        return true
+    end
+    return false
+end
+
+-- ---------- PERFECT CASTING DETECTOR ----------
+-- Mencari power/cast bar di PlayerGui; mengembalikan accessor:
+-- { getAlpha(): 0..1, isVisible():bool }
+local function findCastingBarAccessor()
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    -- heuristik: cari Frame yang namanya mengandung cast/power/charge dengan anak Bar/Fill
+    local candidateFill = nil
+    for _,gui in ipairs(pg:GetDescendants()) do
+        if gui:IsA("Frame") or gui:IsA("ImageLabel") then
+            local n = gui.Name:lower()
+            if n:find("fill") or n:find("bar") then
+                local p = gui.Parent
+                if p and p:IsA("Frame") then
+                    local pn = (p.Name or ""):lower()
+                    if pn:find("cast") or pn:find("power") or pn:find("charge") then
+                        candidateFill = gui; break
+                    end
+                end
+            end
+        end
+    end
+    if not candidateFill then
+        -- fallback: ambil frame terbesar yang berubah lebar
+        for _,gui in ipairs(pg:GetDescendants()) do
+            if gui:IsA("Frame") and gui.Parent and gui.Parent:IsA("Frame") then
+                if gui.Parent.AbsoluteSize.Y <= 60 and gui.Parent.AbsoluteSize.Y >= 6 then
+                    candidateFill = gui; break
+                end
+            end
+        end
+    end
+    if not candidateFill then
+        return {
+            getAlpha = function() return nil end,
+            isVisible = function() return false end,
+        }
+    end
+
+    local function getAlpha()
+        -- coba Size.X.Scale kalau pakai UDim2 scale, kalau tidak pakai relative width
+        local sz = candidateFill.Size
+        if typeof(sz) == "UDim2" and sz.X.Scale > 0 then
+            return math.clamp(sz.X.Scale, 0, 1)
+        end
+        local parent = candidateFill.Parent
+        if parent and parent.AbsoluteSize.X > 0 then
+            return math.clamp(candidateFill.AbsoluteSize.X / parent.AbsoluteSize.X, 0, 1)
+        end
+        return nil
+    end
+    local function isVisible()
+        local a = candidateFill
+        while a and a ~= LocalPlayer.PlayerGui do
+            if a:IsA("GuiObject") and (a.Visible == false) then return false end
+            a = a.Parent
+        end
+        return true
+    end
+
+    return { getAlpha = getAlpha, isVisible = isVisible }
+end
+
+-- ---------- CORE LOOP ----------
+local farmThread = nil
+
+local function startFarm()
+    if farmThread ~= nil then return end
+    farmThread = task.spawn(function()
+        local bar = findCastingBarAccessor()
+
+        while Farm.AutoFish do
+            -- 1) pastikan rod ter-equip
+            equipRod()
+
+            -- 2) CAST (klik untuk mulai)
+            clickMouse()
+            task.wait(0.05)
+
+            -- 3) PERFECT CASTING (tahan sampai alpha ~ 0.5)
+            if Farm.PerfectCasting then
+                local t0 = os.clock()
+                while Farm.AutoFish do
+                    local a = bar.getAlpha()
+                    if a and bar.isVisible() then
+                        if a >= 0.50 and a <= 0.54 then
+                            clickMouse() -- release
+                            break
+                        end
+                    end
+                    -- timeout keamanan (bar tidak terdeteksi)
+                    if os.clock() - t0 > 2.5 then
+                        clickMouse()
+                        break
+                    end
+                    RunService.Heartbeat:Wait()
+                end
+            else
+                task.wait(0.25 + math.random() * 0.25)
+                clickMouse()
+            end
+
+            -- 4) TUNGGU “BITE” lalu REEL
+            local biteTimeout = os.clock() + 10
+            local reeled = false
+            while Farm.AutoFish and os.clock() < biteTimeout do
+                -- coba ProximityPrompt “Reel/Catch”
+                if tryReelNearby() then
+                    reeled = true
+                    break
+                end
+                -- sebagian game pas hook muncul GUI “REEL!”; bisa tambahkan deteksi teks di sini kalau tahu nama Gui-nya
+                RunService.RenderStepped:Wait()
+            end
+
+            -- 5) jeda kecil, ulangi
+            task.wait(rng(Farm.RecastDelayMin, Farm.RecastDelayMax))
+        end
+    end)
+end
+
+local function stopFarm()
+    if farmThread then
+        task.cancel(farmThread)
+        farmThread = nil
+    end
+end
+
+-- ---------- UI CONTROLS ----------
+local tgAuto = PageFarm:CreateToggle("Auto Fish", "Auto cast & auto reel", function(on)
+    Farm.AutoFish = on
+    if on then startFarm() else stopFarm() end
+end)
+
+local tgPerfect = PageFarm:CreateToggle("Perfect Casting", "Lepaskan saat power bar di tengah (~50%)", function(on)
+    Farm.PerfectCasting = on
+end)
+
+-- aktifkan default sesuai preferensi
+if tgPerfect and tgPerfect.Set then tgPerfect.Set(true) end
+
+
+
 
 local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
