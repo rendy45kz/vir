@@ -1,223 +1,55 @@
---========================================================
--- AegisHub • Fish It — UI + Misc Features
--- Bagian lain (Farm/Inventory/Trade/Teleport) tetap kosong (label).
--- Misc berisi: Anti AFK (auto ON), FPS Boost (auto ON), Lighting Simplify (auto ON),
---              Textures Off (auto ON), SmoothPlastic (auto ON), FPS Cap slider, Reset Visuals.
--- Tanpa pcall.
---========================================================
+-- one-liner bootstrap (client)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/guilibs.lua"))()  -- ini harus mengembalikan table UIPremium (module 'return UIPremium')
 
--- Pastikan game siap
-if not game:IsLoaded() then
-    game.Loaded:Wait()
+-- setelah module terpanggil, ia biasanya meng-return lib. 
+-- beberapa executor menjalankan loadstring tanpa return, jadi kita guard:
+local ok, UIPremium = pcall(function()
+    return require(game:GetService("ReplicatedStorage"):WaitForChild("UIPremium"))
+end)
+if not ok or type(UIPremium) ~= "table" then
+    -- kalau module nggak ada di ReplicatedStorage, coba minta loader mengembalikan global
+    UIPremium = rawget(getgenv and getgenv() or _G, "UIPremium") or _G.UIPremium
 end
+assert(type(UIPremium)=="table", "[UIPremium] Library belum ter-load. Pastikan URL raw mengembalikan module 'return UIPremium'.")
 
--- Services
-local Players            = game:GetService("Players")
-local RunService         = game:GetService("RunService")
-local Lighting           = game:GetService("Lighting")
-local Workspace          = game:GetService("Workspace")
-local UserInputService   = game:GetService("UserInputService")
-local LocalPlayer        = Players.LocalPlayer
-local VirtualUser        = game:GetService("VirtualUser")
+-- coba mount ke CoreGui (akan sukses di Studio/Plugin), kalau gagal fallback ke PlayerGui
+local screen = (UIPremium.CreateCoreScreen and UIPremium.CreateCoreScreen("MyUILib")) 
+            or UIPremium.CreateScreen("MyUILib")
 
--- Muat Vanis UI Library
-local UI_URL  = "https://raw.githubusercontent.com/rendy45kz/vir/main/guilibs.lua"
-local library = loadstring(game:HttpGet(UI_URL))()
+-- bikin window bergaya “Vanis-style” (window + tabs + sections)
+local win = UIPremium.CreateWindow({
+    Title = "My UI Library",
+    SubTitle = "client demo",
+    Size = Vector2.new(780, 480),
+})
 
--- Buat window
-local win = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
+-- Tab 1: General
+local TabGeneral = win:CreateTab("General")
+local SecControls = TabGeneral:AddSection("Controls")
+SecControls:AddToggle("Enabled", true, function(v) print("Enabled:", v) end)
+SecControls:AddSlider("Opacity", 0.5, function(v) print("Opacity:", math.floor(v*100).."%") end)
+SecControls:AddDropdown("Quality", {"Low","Medium","High"}, {Value=2,Open=false}, function(i) print("Quality:", i) end)
+SecControls:AddTextbox("Nickname", "Type here", function(txt) print("Nick:", txt) end)
+SecControls:AddKeybind("Toggle UI", Enum.KeyCode.RightShift, function(key) print("Key:", key.Name) end)
+SecControls:AddButton("Show Toast", function() UIPremium.Toast("Hello from client!") end)
 
---========================================================
--- Tabs + Pages (section saja untuk menu lain)
---========================================================
--- FARM
-local TabFarm   = win:CreateTab("Farm")
-local PageFarm  = TabFarm:CreateFrame("Farm")
-PageFarm:CreateLabel("FARM MENU")
+-- Tab 2: Visuals
+local TabVisuals = win:CreateTab("Visuals")
+local SecESP = TabVisuals:AddSection("ESP")
+SecESP:AddToggle("Boxes", true)
+SecESP:AddToggle("Tracers", false)
+SecESP:AddSlider("Thickness", 0.3)
 
--- INVENTORY
-local TabInv    = win:CreateTab("Inventory")
-local PageInv   = TabInv:CreateFrame("Inventory")
-PageInv:CreateLabel("INVENTORY MENU")
-
--- TRADE
-local TabTrade  = win:CreateTab("Trade")
-local PageTrade = TabTrade:CreateFrame("Trade")
-PageTrade:CreateLabel("TRADE MENU")
-
--- TELEPORT
-local TabTP     = win:CreateTab("Teleport")
-local PageTP    = TabTP:CreateFrame("Teleport")
-PageTP:CreateLabel("TELEPORT MENU")
-
---========================================================
--- MISC (fitur aktif)
---========================================================
-local TabMisc   = win:CreateTab("Misc")
-local PageMisc  = TabMisc:CreateFrame("Misc")
-PageMisc:CreateLabel("MISC MENU")
-
--- ---------- STATE ----------
-local State = {
-    AntiAFK         = true,
-    FPSBoost        = true,
-    LightingSimple  = true,
-    TexturesOff     = true,
-    SmoothPlastic   = true,
-    FPSCapValue     = 120,
-}
-
--- Simpan efek yang kita matikan supaya bisa reset (sebatas mungkin)
-local Saved = {
-    PostEffects = {},
-    GlobalShadows = nil,
-    FogEnd = nil,
-}
-
--- ---------- ANTI AFK ----------
-local AntiAFK_Conn = nil
-local function EnableAntiAFK()
-    if AntiAFK_Conn ~= nil then AntiAFK_Conn:Disconnect() end
-    AntiAFK_Conn = LocalPlayer.Idled:Connect(function()
-        local cam = Workspace.CurrentCamera
-        VirtualUser:Button2Down(Vector2.new(0,0), (cam and cam.CFrame) or CFrame.new())
-        task.wait(0.7)
-        VirtualUser:Button2Up(Vector2.new(0,0), (cam and cam.CFrame) or CFrame.new())
-    end)
-end
-local function DisableAntiAFK()
-    if AntiAFK_Conn ~= nil then
-        AntiAFK_Conn:Disconnect()
-        AntiAFK_Conn = nil
-    end
-end
-
--- ---------- FPS / VISUAL HELPERS ----------
-local function ApplySmoothPlastic()
-    for _, v in ipairs(game:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.SmoothPlastic
-            v.Reflectance = 0
-        end
-    end
-end
-
-local function DisableTextures()
-    for _, v in ipairs(game:GetDescendants()) do
-        if v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = 1
-        end
-    end
-end
-
-local function LightingSimplify()
-    -- simpan state awal sekali saja
-    if Saved.GlobalShadows == nil then
-        Saved.GlobalShadows = Lighting.GlobalShadows
-    end
-    if Saved.FogEnd == nil then
-        Saved.FogEnd = Lighting.FogEnd
-    end
-    if #Saved.PostEffects == 0 then
-        for _, eff in ipairs(Lighting:GetChildren()) do
-            if eff:IsA("PostEffect") then
-                table.insert(Saved.PostEffects, {ref = eff, enabled = eff.Enabled})
-            end
-        end
-    end
-
-    -- terapkan simplifikasi
-    for _, eff in ipairs(Lighting:GetChildren()) do
-        if eff:IsA("PostEffect") then
-            eff.Enabled = false
-        end
-    end
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd = 1e10
-end
-
-local function ResetLighting()
-    -- kembalikan post effects
-    for _, item in ipairs(Saved.PostEffects) do
-        if item.ref and item.ref.Parent then
-            item.ref.Enabled = item.enabled
-        end
-    end
-    -- reset shadows & fog jika tersimpan
-    if Saved.GlobalShadows ~= nil then
-        Lighting.GlobalShadows = Saved.GlobalShadows
-    end
-    if Saved.FogEnd ~= nil then
-        Lighting.FogEnd = Saved.FogEnd
-    end
-end
-
-local function FPSBoostApply()
-    if State.SmoothPlastic then ApplySmoothPlastic() end
-    if State.TexturesOff   then DisableTextures()   end
-    if State.LightingSimple then LightingSimplify() end
-    -- quality level rendah
-    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-end
-
--- ---------- FPS CAP ----------
-local function ApplyFPSCap()
-    -- hanya bekerja kalau executor mendukung setfpscap
-    if typeof(setfpscap) == "function" then
-        setfpscap(tonumber(State.FPSCapValue) or 120)
-    end
-end
-
--- ---------- UI: TOGGLES / SLIDER / BUTTON ----------
-local tgAntiAFK = PageMisc:CreateToggle("Anti AFK", "Cegah kick saat idle (Auto ON)", function(on)
-    State.AntiAFK = on
-    if on then EnableAntiAFK() else DisableAntiAFK() end
+-- Tab 3: Config
+local TabConfig = win:CreateTab("Config")
+local SecProfile = TabConfig:AddSection("Profile")
+SecProfile:AddButton("Save Config", function()
+    UIPremium.Toast("Config saved", "success")
+    -- opsional (butuh environment writefile):
+    UIPremium.TrySaveConfig("myui/config.json", '{"ok":true}')
 end)
 
-local tgFPSBoost = PageMisc:CreateToggle("FPS Boost", "Optimasi performa (Auto ON)", function(on)
-    State.FPSBoost = on
-    if on then FPSBoostApply() else ResetLighting() end
-end)
+-- contoh tooltip (opsional) — tampilkan di atas tombol “Show Toast”
+-- (kamu bisa simpan handle dari AddButton kalau mau pasangi tooltip ke instance-nya)
 
-local tgLighting = PageMisc:CreateToggle("Lighting Simplify", "Matikan post-effect, shadows, perpanjang Fog (Auto ON)", function(on)
-    State.LightingSimple = on
-    if on then LightingSimplify() else ResetLighting() end
-end)
-
-local tgTextures = PageMisc:CreateToggle("Textures/Decals Off", "Sembunyikan tekstur & decal (Auto ON)", function(on)
-    State.TexturesOff = on
-    if on then DisableTextures() end
-end)
-
-local tgSmooth = PageMisc:CreateToggle("Parts: SmoothPlastic", "Ubah material part ke SmoothPlastic (Auto ON)", function(on)
-    State.SmoothPlastic = on
-    if on then ApplySmoothPlastic() end
-end)
-
-local sliderFPS = PageMisc:CreateSlider("FPS Cap (jika didukung executor)", 30, 360, function(val)
-    State.FPSCapValue = math.floor(val)
-    ApplyFPSCap()
-end)
-
-local btnReset = PageMisc:CreateButton("Reset Visuals", "Kembalikan pengaturan Lighting yang disederhanakan", function()
-    ResetLighting()
-end)
-
--- ---------- AUTO-APPLY SAAT STARTUP ----------
--- Toggle.set(true) supaya indikator UI ikut terset
-if tgAntiAFK and tgAntiAFK.Set then tgAntiAFK.Set(true) end
-if tgFPSBoost and tgFPSBoost.Set then tgFPSBoost.Set(true) end
-if tgLighting and tgLighting.Set then tgLighting.Set(true) end
-if tgTextures and tgTextures.Set then tgTextures.Set(true) end
-if tgSmooth  and tgSmooth.Set  then tgSmooth.Set(true)  end
-
--- Terapkan juga langsung tanpa menunggu callback toggle (double sure):
-EnableAntiAFK()
-FPSBoostApply()
-LightingSimplify()
-DisableTextures()
-ApplySmoothPlastic()
-ApplyFPSCap()
-
--- Info kecil (opsional, tanpa notifikasi UI eksternal)
-PageMisc:CreateLabel("Semua optimasi & Anti-AFK sudah aktif.")
+print("[UIPremium] Client demo loaded.")
