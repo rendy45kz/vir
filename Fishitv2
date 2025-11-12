@@ -477,9 +477,140 @@ local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
 PageTrade:CreateLabel("TRADE MENU")
 
+--========================================================
+-- TELEPORT (Island / NPC / Player)
+--========================================================
 local TabTP     = win:CreateTab("Teleport")
 local PageTP    = TabTP:CreateFrame("Teleport")
 PageTP:CreateLabel("TELEPORT MENU")
+
+-- Util
+local function getHRP(char)
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function tpTo(cf)
+    local char = Players.LocalPlayer.Character or Players.LocalPlayer.CharacterAdded:Wait()
+    local hrp  = getHRP(char)
+    if hrp then
+        -- kecilkan kecepatan untuk menghindari desync
+        if char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").Sit = false
+        end
+        hrp.CFrame = cf + Vector3.new(0, 3, 0) -- offset sedikit agar aman
+    end
+end
+
+local function getModelCFrame(m: Instance): CFrame?
+    if m:IsA("BasePart") then return m.CFrame end
+    if m:IsA("Model") then
+        if m.PrimaryPart then return m.PrimaryPart.CFrame end
+        local hrp = m:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp:IsA("BasePart") then return hrp.CFrame end
+        local any = m:FindFirstChildWhichIsA("BasePart", true)
+        if any then return any.CFrame end
+    end
+    return nil
+end
+
+-- scanners
+local function scanIslands()
+    local map, list = {}, {}
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        local name = inst.Name:lower()
+        if inst:IsA("BasePart") or inst:IsA("Model") then
+            if name:find("island") or name:find("spawn") or name:find("teleport") or name=="island" or name=="spawn" or name=="teleport" then
+                local cf = getModelCFrame(inst)
+                if cf then
+                    local label = inst:GetFullName()
+                    map[label] = cf
+                    table.insert(list, label)
+                end
+            end
+        end
+    end
+    table.sort(list)
+    return map, list
+end
+
+local function scanNPCs()
+    local map, list = {}, {}
+    for _, m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") then
+            -- bedakan dari player
+            if Players:GetPlayerFromCharacter(m) == nil then
+                local cf = getModelCFrame(m)
+                if cf then
+                    local label = m.Name
+                    map[label] = cf
+                    table.insert(list, label)
+                end
+            end
+        end
+    end
+    table.sort(list)
+    return map, list
+end
+
+local function scanPlayers()
+    local map, list = {}, {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Players.LocalPlayer and p.Character then
+            local cf = getModelCFrame(p.Character)
+            if cf then
+                map[p.Name] = cf
+                table.insert(list, p.Name)
+            end
+        end
+    end
+    table.sort(list)
+    return map, list
+end
+
+-- build UI
+local islandMap, islandList = scanIslands()
+local npcMap,    npcList    = scanNPCs()
+local plrMap,    plrList    = scanPlayers()
+
+local selectedIsland, selectedNPC, selectedPlayer = islandList[1], npcList[1], plrList[1]
+
+local ddIsland = PageTP:CreateDropdown("Island", islandList, function(text) selectedIsland = text end)
+local btnIsland = PageTP:CreateButton("Teleport Island", "Teleport ke lokasi Island/Spawn/Teleport", function()
+    local cf = islandMap[selectedIsland or ""]
+    if cf then tpTo(cf) end
+end)
+
+local ddNPC = PageTP:CreateDropdown("NPC", npcList, function(text) selectedNPC = text end)
+local btnNPC = PageTP:CreateButton("Teleport NPC", "Teleport ke posisi NPC", function()
+    local cf = npcMap[selectedNPC or ""]
+    if cf then tpTo(cf) end
+end)
+
+local ddPlayer = PageTP:CreateDropdown("Player", plrList, function(text) selectedPlayer = text end)
+local btnPlayer = PageTP:CreateButton("Teleport Player", "Teleport ke posisi pemain lain", function()
+    -- refresh posisi terakhir player target (biar akurat)
+    local p = Players:FindFirstChild(selectedPlayer or "")
+    if p and p.Character then
+        local cf = getModelCFrame(p.Character)
+        if cf then tpTo(cf) end
+    end
+end)
+
+-- tombol refresh untuk rebuild daftar
+PageTP:CreateButton("Refresh List", "Scan ulang Island, NPC, dan Player", function()
+    islandMap, islandList = scanIslands()
+    npcMap,    npcList    = scanNPCs()
+    plrMap,    plrList    = scanPlayers()
+
+    if ddIsland and ddIsland.SetOptions then ddIsland.SetOptions(islandList) end
+    if ddNPC    and ddNPC.SetOptions    then ddNPC.SetOptions(npcList) end
+    if ddPlayer and ddPlayer.SetOptions then ddPlayer.SetOptions(plrList) end
+
+    selectedIsland = islandList[1]
+    selectedNPC    = npcList[1]
+    selectedPlayer = plrList[1]
+end)
+
 
 --========================================================
 -- MISC (fitur aktif)
