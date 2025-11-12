@@ -459,6 +459,150 @@ end
 
 -- Tabs are above.
 
+-- CoreGui helper (use only in Studio/plugins; live experiences usually block parenting to CoreGui)
+function UIPremium.CreateCoreScreen(name: string?)
+	local ok, res = pcall(function()
+		local CoreGui = game:GetService("CoreGui")
+		return UIPremium.CreateScreen(name or "UIPremiumCore", CoreGui)
+	end)
+	if not ok then
+		warn("[UIPremium] Gagal membuat ScreenGui di CoreGui (dibatasi oleh Roblox). Gunakan PlayerGui sebagai gantinya.")
+		return nil
+	end
+	return res
+end
+
+-- Window/Tab system (inspired by common Roblox UI libs, original API)
+export type Window = { ScreenGui: ScreenGui, Root: Frame, Topbar: Frame, TabsBar: Frame, Pages: Frame, Tabs: {[string]: Frame} }
+
+function UIPremium.CreateWindow(opts: { Title: string, SubTitle: string?, Size: Vector2? }): Window
+	local sg = UIPremium.CreateScreen(opts.Title or "UIPremium")
+	local win = create("Frame", {BackgroundTransparency = 1, Size = UDim2.fromOffset((opts.Size and opts.Size.X) or 760, (opts.Size and opts.Size.Y) or 460), Position = UDim2.fromScale(0.5,0.5), AnchorPoint = Vector2.new(0.5,0.5)})
+	win.Parent = sg
+	local card = UIPremium.Card({Parent = win, Size = UDim2.fromScale(1,1)})
+	local top = create("Frame", {BackgroundColor3 = Color3.fromRGB(245,246,250), BorderSizePixel = 0, Size = UDim2.new(1,0,0,44)})
+	corner(top, DEFAULT_THEME.Radius)
+	top.Parent = card
+	local title = UIPremium.Title(opts.Title or "Window", 3, {Parent = top, Position = UDim2.fromOffset(14, 10), Size = UDim2.fromOffset(300,24)})
+	if opts.SubTitle then UIPremium.Text(opts.SubTitle, true, {Parent = top, Position = UDim2.fromOffset(160, 12)}) end
+	local close = UIPremium.Button("✕", function() sg:Destroy() end, "ghost", {Parent = top, Size = UDim2.fromOffset(36,28), Position = UDim2.new(1,-44,0,8)})
+	local minimize = UIPremium.Button("–", function() card.Visible = not card.Visible end, "ghost", {Parent = top, Size = UDim2.fromOffset(36,28), Position = UDim2.new(1,-88,0,8)})
+
+	-- drag
+	local dragging=false; local dragStart; local startPos
+	top.InputBegan:Connect(function(io)
+		if io.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; dragStart = io.Position; startPos = win.Position end
+	end)
+	top.InputEnded:Connect(function(io)
+		if io.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
+	end)
+	game:GetService('UserInputService').InputChanged:Connect(function(io)
+		if dragging and io.UserInputType==Enum.UserInputType.MouseMovement then
+			local delta = io.Position - dragStart
+			win.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
+		end
+	end)
+
+	-- tabs bar + pages
+	local tabsBar = create("Frame", {BackgroundTransparency = 1, Size = UDim2.new(0, 160, 1, -44), Position = UDim2.fromOffset(0,44)})
+	local tabsList = list(tabsBar, Enum.FillDirection.Vertical, 6)
+	tabsBar.Parent = card
+	local pages = create("Frame", {BackgroundTransparency = 1, Position = UDim2.fromOffset(176, 52), Size = UDim2.new(1, -192, 1, -64)})
+	pages.Parent = card
+
+	local api: Window = { ScreenGui = sg, Root = card, Topbar = top, TabsBar = tabsBar, Pages = pages, Tabs = {} }
+
+	function (api :: any).CreateTab(name: string)
+		local tabBtn = UIPremium.Button(name, nil, "ghost", {Parent = tabsBar, Size = UDim2.fromOffset(150, 32)})
+		local page = create("ScrollingFrame", {Active = true, CanvasSize = UDim2.new(0,0,0,0), ScrollBarImageTransparency = 0.6, BackgroundTransparency = 1, Size = UDim2.fromScale(1,1)})
+		page.Parent = pages; page.Visible = false
+		list(page, Enum.FillDirection.Vertical, 8)
+		api.Tabs[name] = page
+		tabBtn.Instance.Activated:Connect(function()
+			for _, fr in pairs(api.Tabs) do fr.Visible = false end
+			page.Visible = true
+		end)
+		if (#pages:GetChildren()==1) then page.Visible = true end
+		local sectionApi = {}
+		function sectionApi:AddSection(title: string)
+			local section = UIPremium.Card({Parent = page, Size = UDim2.new(1, -0, 0, 120)})
+			UIPremium.CardHeader(section, title, nil)
+			local inner = create("Frame", {BackgroundTransparency = 1, Size = UDim2.new(1,-32,1,-64), Position = UDim2.fromOffset(16,56)})
+			inner.Parent = section
+			list(inner, Enum.FillDirection.Vertical, 10)
+			local controls = {}
+			function controls:AddLabel(text)
+				return UIPremium.Text(text, false, {Parent = inner})
+			end
+			function controls:AddButton(text, cb)
+				return UIPremium.Button(text, cb, "primary", {Parent = inner})
+			end
+			function controls:AddToggle(text, value, cb)
+				local row = Instance.new('Frame'); row.BackgroundTransparency=1; row.Size = UDim2.fromOffset(340, 26); row.Parent = inner
+				UIPremium.Text(text, false, {Parent = row, Position = UDim2.fromOffset(0,4)})
+				local sw = UIPremium.Switch(value, function(v) if cb then cb(v) end end, {Parent = row, Position = UDim2.fromOffset(280, 0)})
+				return sw
+			end
+			function controls:AddSlider(text, value, cb)
+				local row = Instance.new('Frame'); row.BackgroundTransparency=1; row.Size = UDim2.fromOffset(360, 40); row.Parent = inner
+				UIPremium.Text(text, false, {Parent = row})
+				return UIPremium.Slider(value or 0, function(v) if cb then cb(v) end end, {Parent = row, Position = UDim2.fromOffset(0,22), Width = 320})
+			end
+			function controls:AddDropdown(text, items, state, cb)
+				local row = Instance.new('Frame'); row.BackgroundTransparency=1; row.Size = UDim2.fromOffset(360, 60); row.Parent = inner
+				UIPremium.Text(text, false, {Parent = row})
+				return UIPremium.Dropdown(items, state or {Value=nil,Open=false}, function(i) if cb then cb(i) end end, {Parent = row, Position = UDim2.fromOffset(0,22)})
+			end
+			function controls:AddTextbox(text, placeholder, cb)
+				local row = Instance.new('Frame'); row.BackgroundTransparency=1; row.Size = UDim2.fromOffset(360, 60); row.Parent = inner
+				UIPremium.Text(text, false, {Parent = row})
+				local input = UIPremium.TextInput(placeholder or "", {Parent = row, Position = UDim2.fromOffset(0,22)})
+				input.Instance.FocusLost:Connect(function(enter) if enter and cb then cb(input.Instance.Text) end end)
+				return input
+			end
+			function controls:AddKeybind(text, defaultKey, cb)
+				local row = Instance.new('Frame'); row.BackgroundTransparency=1; row.Size = UDim2.fromOffset(360, 40); row.Parent = inner
+				UIPremium.Text(text, false, {Parent = row})
+				local current = defaultKey or Enum.KeyCode.RightShift
+				local btn = UIPremium.Button(current.Name, function()
+					btn.Instance.Text = "Press a key..."
+					local con; con = game:GetService('UserInputService').InputBegan:Connect(function(io)
+						if io.UserInputType==Enum.UserInputType.Keyboard then
+							current = io.KeyCode; btn.Instance.Text = current.Name; if cb then cb(current) end; con:Disconnect()
+						end
+					end)
+				end, 'outline', {Parent = row, Position = UDim2.fromOffset(260, 4)})
+				return btn
+			end
+			return controls
+		end
+		return sectionApi
+	end
+
+	return api
+end
+
+-- Optional: SaveManager (executor environments only)
+function UIPremium.TrySaveConfig(path: string, data: string)
+	local ok, err = pcall(function()
+		if writefile then writefile(path, data) end
+	end)
+	if not ok then warn('[UIPremium] writefile not available: '.. tostring(err)) end
+end
+
+-- CoreGui helper (use only in Studio/plugins; live experiences usually block parenting to CoreGui)
+function UIPremium.CreateCoreScreen(name: string?)
+	local ok, res = pcall(function()
+		local CoreGui = game:GetService("CoreGui")
+		return UIPremium.CreateScreen(name or "UIPremiumCore", CoreGui)
+	end)
+	if not ok then
+		warn("[UIPremium] Gagal membuat ScreenGui di CoreGui (dibatasi oleh Roblox). Gunakan PlayerGui sebagai gantinya.")
+		return nil
+	end
+	return res
+end
+
 -- ======== END OF MODULE ========
 return UIPremium
 
@@ -468,7 +612,8 @@ Place this LocalScript under StarterPlayerScripts (or StarterGui) to preview the
 Make sure the ModuleScript `UIPremium` is in ReplicatedStorage.
 --]]
 
-
+--[[
+-- LocalScript (Demo)
 local ReplicatedStorage = game:GetService('ReplicatedStorage')
 local Players = game:GetService('Players')
 local UIPremium = require(ReplicatedStorage:WaitForChild('UIPremium'))
@@ -545,3 +690,5 @@ UIPremium.Checkbox('Terima email notifikasi', true, function(v) end, {Parent = c
 
 -- Tooltip example
 UIPremium.Tooltip(saveBtn.Instance, 'Simpan data formulir')
+-- END DEMO
+--]]
