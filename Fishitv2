@@ -463,7 +463,7 @@ end
 local win = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
 
 --========================================================
--- FARM: Auto Fish + Perfect Casting (Fish It, net@0.2.0)
+-- AUTO FISH (Perfect Casting + Auto Rod Detection)
 --========================================================
 local TabFarm   = win:CreateTab("Farm")
 local PageFarm  = TabFarm:CreateFrame("Farm")
@@ -477,9 +477,10 @@ local LocalPlayer       = Players.LocalPlayer
 
 -- sleitnick/net remotes
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
-                  :WaitForChild("_Index")
-                  :WaitForChild("sleitnick_net@0.2.0")
-local net      = netIndex:WaitForChild("net")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
 
 local RF_Charge            = net:WaitForChild("RF/ChargeFishingRod")
 local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted")
@@ -487,13 +488,13 @@ local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
 
--- State
+-- STATE
 local Farm = {
-    AutoFish       = false,
+    AutoFish = false,
     PerfectCasting = true,
 }
 
--- delay per rod (diambil dari referensi kamu, bisa tambah sendiri)
+-- Delay referensi per rod
 local RodDelays = {
     ["Ares Rod"]        = {custom = 1.12, bypass = 1.45},
     ["Angler Rod"]      = {custom = 1.12, bypass = 1.45},
@@ -513,76 +514,92 @@ local RodDelays = {
 
 local CurrentDelay = {custom = 2.0, bypass = 1.2}
 
--- ambil nama rod dari PlayerGui.Backpack.Display (sesuai referensi)
-local function detectRodName()
-    local pg = LocalPlayer:WaitForChild("PlayerGui")
-    local display = pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
-    if not display then return nil end
-    for _, tile in ipairs(display:GetChildren()) do
-        local ok = (tile:FindFirstChild("Inner") and tile.Inner:FindFirstChild("Tags") and tile.Inner.Tags:FindFirstChild("ItemName"))
-        if ok and tile.Inner.Tags.ItemName:IsA("TextLabel") then
-            local txt = tile.Inner.Tags.ItemName.Text
-            if RodDelays[txt] then return txt end
-        end
+--=== DETEKSI ROD OTOMATIS ===--
+local function getCurrentRodName()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and RodDelays[tool.Name] then
+        return tool.Name
     end
     return nil
 end
 
 local function applyRodDelay()
-    local name = detectRodName()
-    if name and RodDelays[name] then
-        CurrentDelay = RodDelays[name]
+    local rodName = getCurrentRodName()
+    if rodName and RodDelays[rodName] then
+        CurrentDelay = RodDelays[rodName]
     else
-        CurrentDelay = {custom = 10, bypass = 1} -- default aman kalau tak terdeteksi
+        CurrentDelay = {custom = 2.0, bypass = 1.2}
     end
 end
 
--- hook: kalau teks "!" (Exclaim) muncul di kepala player → spam FishingCompleted untuk cepat claim
-RE_TextEffect.OnClientEvent:Connect(function(data)
-    if not Farm.AutoFish then return end
-    if not data or not data.TextData or data.TextData.EffectType ~= "Exclaim" then return end
-    local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-    if head and data.Container == head then
-        -- beberapa kali untuk memastikan
-        for _ = 1, 3 do
-            task.wait(CurrentDelay.bypass)
-            RE_FishingCompleted:FireServer()
-        end
-    end
-end)
+--=== PERFECT CASTING (auto detect charge perfect) ===--
+local BASE_X, BASE_Y = -0.7499996423721313, 1
 
--- loop utama
-local farmThread
-
-local BASE_X, BASE_Y = -0.7499996423721313, 1 -- referensi perfect cast vector
-local function castOnce()
-    -- equip rod slot 1 (ikut referensi)
+local function castPerfect()
     RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
 
-    -- charge & start minigame
-    local ts = Workspace:GetServerTimeNow()
-    RF_Charge:InvokeServer(ts)
-    task.wait(0.40)
+    local startTime = Workspace:GetServerTimeNow()
+    RF_Charge:InvokeServer(startTime)
 
-    -- minor random agar tidak 100% identik
-    local rx = Farm.PerfectCasting and (BASE_X + (math.random(-500, 500) / 1e7)) or (math.random(-1000,1000)/1000)
-    local ry = Farm.PerfectCasting and (BASE_Y + (math.random(-500, 500) / 1e7)) or (math.random(0,1000)/1000)
+    -- tunggu hingga teks “Perfect” muncul di layar (deteksi via TextEffect)
+    local perfectDetected = false
+    local connection
+    connection = RE_TextEffect.OnClientEvent:Connect(function(data)
+        if data and data.TextData and data.TextData.Text == "Perfect" then
+            perfectDetected = true
+        end
+    end)
+
+    -- timeout 3 detik kalau “Perfect” tidak muncul
+    local timer = 0
+    while not perfectDetected and timer < 3 do
+        task.wait(0.05)
+        timer += 0.05
+    end
+
+    if connection then
+        connection:Disconnect()
+    end
+
+    -- Gunakan koordinat perfect
+    local rx = BASE_X + (math.random(-250, 250) / 1e7)
+    local ry = BASE_Y + (math.random(-250, 250) / 1e7)
 
     RF_RequestMinigame:InvokeServer(rx, ry)
+end
 
-    -- tunggu durasi khusus rod lalu (fallback) kirim FishingCompleted jika belum terselesaikan oleh hook Exclaim
+--=== AUTO COMPLETE ===--
+RE_TextEffect.OnClientEvent:Connect(function(data)
+    if not Farm.AutoFish then return end
+    if not data or not data.TextData then return end
+    if data.TextData.EffectType ~= "Exclaim" then return end
+
+    local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+    if head and data.Container == head then
+        task.wait(CurrentDelay.bypass)
+        RE_FishingCompleted:FireServer()
+    end
+end)
+
+--=== LOOP AUTO FISH ===--
+local farmThread
+
+local function castOnce()
+    applyRodDelay()
+    castPerfect()
     task.wait(CurrentDelay.custom)
     RE_FishingCompleted:FireServer()
 end
 
 local function startAutoFish()
     if farmThread then return end
-    applyRodDelay()
     farmThread = task.spawn(function()
         while Farm.AutoFish do
             castOnce()
-            task.wait(0.2) -- jeda kecil antar cast
+            task.wait(0.15)
         end
     end)
 end
@@ -594,13 +611,13 @@ local function stopAutoFish()
     end
 end
 
--- UI controls
-local tgAuto = PageFarm:CreateToggle("Auto Fish", "Invoke remotes untuk cast & reel otomatis", function(on)
+--=== UI ===--
+local tgAuto = PageFarm:CreateToggle("Auto Fish", "Auto lempar dan tarik pancing (Perfect)", function(on)
     Farm.AutoFish = on
     if on then startAutoFish() else stopAutoFish() end
 end)
 
-local tgPerfect = PageFarm:CreateToggle("Perfect Casting", "Gunakan vektor perfect (rx,ry) agar selalu perfect", function(on)
+local tgPerfect = PageFarm:CreateToggle("Perfect Casting", "Selalu lempar perfect otomatis", function(on)
     Farm.PerfectCasting = on
 end)
 if tgPerfect and tgPerfect.Set then tgPerfect.Set(true) end
