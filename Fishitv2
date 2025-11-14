@@ -699,7 +699,7 @@ Other:CreateToggle("Auto Best Luck Rod", "Equip rod luck tertinggi otomatis", fu
     Farm.AutoBestRod = v
 end)
 
--- END
+if tgPerfect and tgPerfect.Set then tgPerfect.Set(true) end
 
 
 local TabTrade  = win:CreateTab("Trade")
