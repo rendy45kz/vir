@@ -460,7 +460,7 @@ function library:CreateWindow(name, version, icon)
 end
 
 -- Buat window
-local win = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
+local win = library:CreateWindow("AegisHub â€¢ Fish It", "Premium", 10044538000)
 
 --========================================================
 -- FISHIT PRO AUTO v1.2 (Grouped UI + Blatant + BlatantV2 + Other Features)
@@ -688,7 +688,6 @@ end, tostring(Farm.V2_CompleteDelay))
 --========================================================
 -- OTHER FEATURES GROUP
 --========================================================
-
 local Other = PageFarm:CreateDropdown("Other Features")
 
 Other:CreateToggle("Auto Bait", "Gunakan bait otomatis", function(v)
