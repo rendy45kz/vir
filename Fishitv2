@@ -463,19 +463,20 @@ end
 local win = library:CreateWindow("AegisHub • Fish It", "Premium", 10044538000)
 
 --========================================================
--- AUTO FISH (Perfect Casting + Auto Rod Detection via timestamps)
+-- AUTO FISH (Manual Input Delay + Perfect Casting)
 --========================================================
+
 local TabFarm   = win:CreateTab("Farm")
 local PageFarm  = TabFarm:CreateFrame("Farm")
 PageFarm:CreateLabel("FARM MENU")
 
--- Services (kept)
+-- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players           = game:GetService("Players")
 local Workspace         = game:GetService("Workspace")
 local LocalPlayer       = Players.LocalPlayer
 
--- sleitnick/net remotes (kept)
+-- sleitnick/net remotes
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
@@ -492,104 +493,54 @@ local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
 local Farm = {
     AutoFish = false,
     PerfectCasting = true,
+    ReelDelay = 2.8,            -- default
+    CompleteDelay = 1.145,      -- default
 }
 
--- =======================
--- Auto-detect delays (server timestamp based)
--- =======================
--- raw timings (in seconds)
-local lastChargeTime = 0            -- timestamp when we sent RF_Charge
-local lastMinigameTime = 0          -- timestamp when we sent RF_RequestMinigame
-local rawCastDelay = 1.0            -- minigameTime - chargeTime (real rod cast)
-local rawReelDelay = 1.0            -- exclaimTime - minigameTime (real reel/exclaim)
-
--- delays used by the auto-loop (scaled / bypassed)
-local CurrentDelay = {
-    custom = 0.9,   -- used for waiting between cast -> auto-complete (scaled)
-    bypass = 0.5,   -- used for waiting after Exclaim -> FireServer complete (scaled)
-}
-
--- Safety clamps for computed delays
-local function clampDelay(v, minv, maxv)
-    return math.max(minv or 0.03, math.min(maxv or 10, v or 0.03))
-end
-
--- Function to update CurrentDelay from raw values using multipliers
-local function updateCurrentDelayFromRaw()
-    -- Tunable multipliers: kamu bisa ubah kalau mau lebih agresif
-    -- cast multiplier: berapa bagian dari real cast delay kita tunggu sebelum calling fishing complete
-    local CAST_MULTIPLIER = 0.22   -- ~22% of real cast delay
-    local REEL_MULTIPLIER = 0.14   -- ~14% of real reel delay
-
-    CurrentDelay.custom = clampDelay(rawCastDelay * CAST_MULTIPLIER, 0.03, 5)
-    CurrentDelay.bypass = clampDelay(rawReelDelay * REEL_MULTIPLIER, 0.02, 5)
-end
-
 --========================================================
--- PERFECT CASTING (modified to capture server timestamps)
+-- PERFECT CASTING
 --========================================================
+
 local BASE_X, BASE_Y = -0.7499996423721313, 1
 
 local function castPerfect()
-    -- equip first
     RE_EquipHotbar:FireServer(1)
-    task.wait(0.03)
+    task.wait(0.10)
 
-    -- record charge time we will send (use Workspace server time)
-    local chargeTs = Workspace:GetServerTimeNow()
-    lastChargeTime = chargeTs
+    local startTime = Workspace:GetServerTimeNow()
+    RF_Charge:InvokeServer(startTime)
 
-    -- send charge with timestamp similar to spy logs
-    -- (original script did RF_Charge:InvokeServer(startTime) — we keep that)
-    -- wrap pcall to avoid hard errors
-    pcall(function()
-        RF_Charge:InvokeServer(chargeTs)
-    end)
-
-    -- We still attempt to detect "Perfect" text if enabled; but do not block forever
+    -- detect "Perfect"
     local perfectDetected = false
-    local conn
-    conn = RE_TextEffect.OnClientEvent:Connect(function(data)
+    local connection
+    connection = RE_TextEffect.OnClientEvent:Connect(function(data)
         if data and data.TextData and data.TextData.Text == "Perfect" then
             perfectDetected = true
         end
     end)
 
-    -- Wait a short moment for perfect (non-blocking long wait)
     local timer = 0
-    local PERFECT_WAIT_MAX = 0.45  -- keep small so script is fast
-    while not perfectDetected and timer < PERFECT_WAIT_MAX do
-        task.wait(0.03)
-        timer = timer + 0.03
+    while not perfectDetected and timer < 3 do
+        task.wait(0.05)
+        timer += 0.05
     end
 
-    if conn then conn:Disconnect() end
+    if connection then
+        connection:Disconnect()
+    end
 
-    -- prepare coords (tiny randomness)
-    local rx = BASE_X + (math.random(-150, 150) / 1e7)
-    local ry = BASE_Y + (math.random(-150, 150) / 1e7)
+    -- randomize tiny offset
+    local rx = BASE_X + (math.random(-250, 250) / 1e7)
+    local ry = BASE_Y + (math.random(-250, 250) / 1e7)
 
-    -- record minigameTime and send it as third arg (matches spy)
-    local minigameTs = Workspace:GetServerTimeNow()
-    lastMinigameTime = minigameTs
-
-    -- compute rawCastDelay here: minigame - charge
-    rawCastDelay = clampDelay(minigameTs - lastChargeTime, 0.02, 60)
-    -- ensure rawReelDelay has a default (won't be available until Exclaim)
-    rawReelDelay = clampDelay(rawReelDelay or 0.8, 0.02, 60)
-    updateCurrentDelayFromRaw()
-
-    -- call RequestFishingMinigame with timestamp similar to spy logs
-    pcall(function()
-        -- try to send third arg timestamp if server expects it
-        -- some implementations may accept (rx, ry, ts) as shown in spy images
-        RF_RequestMinigame:InvokeServer(rx, ry, minigameTs)
-    end)
+    -- tanpa timestamp (lebih stabil)
+    RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
 --========================================================
--- AUTO COMPLETE (detect Exclaim → compute rawReelDelay → fast complete)
+-- AUTO COMPLETE (detect Exclaim)
 --========================================================
+
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not Farm.AutoFish then return end
     if not data or not data.TextData then return end
@@ -597,35 +548,21 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
 
     local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
     if head and data.Container == head then
-        -- compute reel delay based on server time difference from lastMinigameTime
-        local exclaimTs = Workspace:GetServerTimeNow()
-        if lastMinigameTime and lastMinigameTime > 0 then
-            rawReelDelay = clampDelay(exclaimTs - lastMinigameTime, 0.02, 60)
-        else
-            rawReelDelay = clampDelay(rawReelDelay or 0.8, 0.02, 60)
-        end
-        updateCurrentDelayFromRaw()
-
-        -- Wait only bypass portion then send completed
-        task.wait(CurrentDelay.bypass)
-        pcall(function() RE_FishingCompleted:FireServer() end)
+        task.wait(Farm.CompleteDelay)
+        RE_FishingCompleted:FireServer()
     end
 end)
 
 --========================================================
--- LOOP AUTO FISH (uses CurrentDelay computed from timestamps)
+-- MAIN AUTO LOOP
 --========================================================
+
 local farmThread
 
 local function castOnce()
-    -- cast and update timestamps inside castPerfect
     castPerfect()
-
-    -- wait scaled cast delay (fast)
-    task.wait(CurrentDelay.custom)
-
-    -- finish fishing (safe-call)
-    pcall(function() RE_FishingCompleted:FireServer() end)
+    task.wait(Farm.ReelDelay)
+    RE_FishingCompleted:FireServer()
 end
 
 local function startAutoFish()
@@ -633,8 +570,7 @@ local function startAutoFish()
     farmThread = task.spawn(function()
         while Farm.AutoFish do
             castOnce()
-            -- tiny outer loop pause to yield
-            task.wait(0.04)
+            task.wait(0.15)
         end
     end)
 end
@@ -646,18 +582,32 @@ local function stopAutoFish()
     end
 end
 
---========================================================
--- UI (unchanged placement)
---========================================================
-local tgAuto = PageFarm:CreateToggle("Auto Fish", "Auto lempar dan tarik pancing (Perfect)", function(on)
+PageFarm:CreateToggle("Auto Fish", "Auto lempar & tarik pancing", function(on)
     Farm.AutoFish = on
     if on then startAutoFish() else stopAutoFish() end
 end)
 
-local tgPerfect = PageFarm:CreateToggle("Perfect Casting", "Selalu lempar perfect otomatis", function(on)
+PageFarm:CreateToggle("Perfect Casting", "Selalu lempar perfect", function(on)
     Farm.PerfectCasting = on
 end)
-if tgPerfect and tgPerfect.Set then tgPerfect.Set(true) end
+
+--========================================================
+-- UI INPUT
+--========================================================
+
+PageFarm:CreateBox("Reel Delay", "Delay sebelum loop restart", function(txt)
+    local num = tonumber(txt)
+    if num then
+        Farm.ReelDelay = num
+    end
+end, tostring(Farm.ReelDelay))
+
+PageFarm:CreateBox("Custom Complete Delay", "Delay sebelum FishingCompleted", function(txt)
+    local num = tonumber(txt)
+    if num then
+        Farm.CompleteDelay = num
+    end
+end, tostring(Farm.CompleteDelay))
 
 local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
