@@ -1,5 +1,5 @@
 --========================================================
--- AegisHub • Fish It — UI + Misc Features (REVISED)
+-- AegisHub â€¢ Fish It â€” UI + Misc Features (REVISED)
 --========================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -16,7 +16,7 @@ local LocalPlayer        = Players.LocalPlayer
 local VirtualUser        = game:GetService("VirtualUser")
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2 • FIX) ===========
+-- ================== UI LIBRARY (Polished v2 â€¢ FIX) ===========
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -131,7 +131,7 @@ function library:CreateWindow(name, version, icon)
     TitleText.TextSize=math.floor(12*SCALE)
     TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1)
-    TitleText.Text=("%s • %s"):format(name,version)
+    TitleText.Text=("%s â€¢ %s"):format(name,version)
 
     local Under=Instance.new("Frame",Title)
     Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
@@ -172,7 +172,7 @@ function library:CreateWindow(name, version, icon)
     trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE))
     trlbl.Position=UDim2.new(0,8,0,0)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"
-    trlbl.TextSize=math.floor(12*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
+    trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
     trlbl.TextColor3=Color3.new(1,1,1)
 
     local trlist=Instance.new("UIListLayout",TabsRail)
@@ -210,7 +210,7 @@ function library:CreateWindow(name, version, icon)
         TabBtn.BackgroundTransparency=1
         TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
         TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(12*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
+        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
         TabBtn.TextTransparency=.5
 
         local indicator=Instance.new("Frame",TabBtn)
@@ -322,7 +322,7 @@ function library:CreateWindow(name, version, icon)
             local ttl=Instance.new("TextLabel",fr); ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,0,18)
             ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
             local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            caret.Font=Enum.Font.GothamBlack; caret.Text="â–¼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
 
             local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
             holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
@@ -463,123 +463,82 @@ end
 local win = library:CreateWindow("AegisHub â€¢ Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISHIT PRO AUTO v1.2 (Grouped UI + Blatant + BlatantV2 + Other Features)
+-- AUTO FISH (Manual Input Delay + Perfect Casting)
 --========================================================
 
-local TabFarm = win:CreateTab("Farm")
-local PageFarm = TabFarm:CreateFrame("Farm")
+local TabFarm   = win:CreateTab("Farm")
+local PageFarm  = TabFarm:CreateFrame("Farm")
 PageFarm:CreateLabel("FARM MENU")
 
+-- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
+local Players           = game:GetService("Players")
+local Workspace         = game:GetService("Workspace")
+local LocalPlayer       = Players.LocalPlayer
 
-local netIndex = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"]
-local net = netIndex.net
+-- sleitnick/net remotes
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
 
-local RF_Charge = net["RF/ChargeFishingRod"]
-local RF_RequestMinigame = net["RF/RequestFishingMinigameStarted"]
-local RE_FishingCompleted = net["RE/FishingCompleted"]
-local RE_EquipHotbar = net["RE/EquipToolFromHotbar"]
-local RE_TextEffect = net["RE/ReplicateTextEffect"]
+local net = netIndex:WaitForChild("net")
 
---========================================================
+local RF_Charge            = net:WaitForChild("RF/ChargeFishingRod")
+local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted")
+local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
+local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
+local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
+
 -- STATE
---========================================================
-
 local Farm = {
     AutoFish = false,
     PerfectCasting = true,
-
-    Mode = "Legit",  -- Legit / Blatant / BlatantV2
-
-    -- Blatant delay
-    Blatant_ReelDelay = 0.12,
-    Blatant_CompleteDelay = 0.08,
-
-    -- BlatantV2 delay
-    V2_ReelDelay = 0.01,
-    V2_CompleteDelay = 0.01,
-
-    AutoBait = true,
-    AutoBestRod = true,
+    ReelDelay = 2.8,            -- default
+    CompleteDelay = 1.145,      -- default
 }
-
---========================================================
--- UTILITY FUNCTIONS
---========================================================
-
-local function getBestLuckRod()
-    local best, bestLuck = nil, -9e9
-    
-    local function scan(holder)
-        for _, tool in ipairs(holder:GetChildren()) do
-            local stats = tool:FindFirstChild("Stats")
-            if stats and stats:FindFirstChild("Luck") then
-                local luck = stats.Luck.Value
-                if luck > bestLuck then
-                    bestLuck = luck
-                    best = tool
-                end
-            end
-        end
-    end
-
-    scan(LocalPlayer.Backpack)
-    if LocalPlayer.Character then scan(LocalPlayer.Character) end
-
-    return best
-end
-
-local function autoEquipBestRod()
-    if not Farm.AutoBestRod then return end
-    local rod = getBestLuckRod()
-    if rod then
-        pcall(function()
-            RE_EquipHotbar:FireServer(1)
-        end)
-    end
-end
-
-local function autoBait()
-    if not Farm.AutoBait then return end
-    pcall(function()
-        RE_EquipHotbar:FireServer(2)
-    end)
-end
 
 --========================================================
 -- PERFECT CASTING
 --========================================================
 
-local BASE_X, BASE_Y = -0.75, 1
+local BASE_X, BASE_Y = -0.7499996423721313, 1
 
 local function castPerfect()
-    autoEquipBestRod()
-    autoBait()
-
     RE_EquipHotbar:FireServer(1)
-    task.wait(0.05)
+    task.wait(0.10)
 
-    RF_Charge:InvokeServer(Workspace:GetServerTimeNow())
+    local startTime = Workspace:GetServerTimeNow()
+    RF_Charge:InvokeServer(startTime)
 
-    if Farm.Mode == "BlatantV2" then
-        local rx = BASE_X + math.random(-200,200)/1e7
-        local ry = BASE_Y + math.random(-200,200)/1e7
-        RF_RequestMinigame:InvokeServer(rx, ry)
-        task.wait(Farm.V2_CompleteDelay)
-        RE_FishingCompleted:FireServer()
-        return
+    -- detect "Perfect"
+    local perfectDetected = false
+    local connection
+    connection = RE_TextEffect.OnClientEvent:Connect(function(data)
+        if data and data.TextData and data.TextData.Text == "Perfect" then
+            perfectDetected = true
+        end
+    end)
+
+    local timer = 0
+    while not perfectDetected and timer < 3 do
+        task.wait(0.05)
+        timer += 0.05
     end
 
-    local rx = BASE_X + math.random(-300,300)/1e7
-    local ry = BASE_Y + math.random(-300,300)/1e7
+    if connection then
+        connection:Disconnect()
+    end
+
+    -- randomize tiny offset
+    local rx = BASE_X + (math.random(-250, 250) / 1e7)
+    local ry = BASE_Y + (math.random(-250, 250) / 1e7)
+
+    -- tanpa timestamp (lebih stabil)
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
 --========================================================
--- EXCLAIM AUTO COMPLETE
+-- AUTO COMPLETE (detect Exclaim)
 --========================================================
 
 RE_TextEffect.OnClientEvent:Connect(function(data)
@@ -588,36 +547,21 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     if data.TextData.EffectType ~= "Exclaim" then return end
 
     local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-    if data.Container ~= head then return end
-
-    if Farm.Mode == "Blatant" then
-        task.wait(Farm.Blatant_CompleteDelay)
+    if head and data.Container == head then
+        task.wait(Farm.CompleteDelay)
         RE_FishingCompleted:FireServer()
-        return
-    end
-
-    if Farm.Mode == "BlatantV2" then
-        task.wait(Farm.V2_CompleteDelay)
-        RE_FishingCompleted:FireServer()
-        return
     end
 end)
 
 --========================================================
--- AUTO LOOP
+-- MAIN AUTO LOOP
 --========================================================
 
 local farmThread
 
-local function castCycle()
+local function castOnce()
     castPerfect()
-
-    if Farm.Mode == "Blatant" then
-        task.wait(Farm.Blatant_ReelDelay)
-    elseif Farm.Mode == "BlatantV2" then
-        task.wait(Farm.V2_ReelDelay)
-    end
-
+    task.wait(Farm.ReelDelay)
     RE_FishingCompleted:FireServer()
 end
 
@@ -625,81 +569,45 @@ local function startAutoFish()
     if farmThread then return end
     farmThread = task.spawn(function()
         while Farm.AutoFish do
-            castCycle()
-            task.wait(0.05)
+            castOnce()
+            task.wait(0.15)
         end
     end)
 end
 
 local function stopAutoFish()
-    if farmThread then task.cancel(farmThread) end
-    farmThread = nil
+    if farmThread then
+        task.cancel(farmThread)
+        farmThread = nil
+    end
 end
 
---========================================================
--- UI SECTION
---========================================================
-
-PageFarm:CreateToggle("Auto Fish", "Auto lempar & tarik pancing", function(v)
-    Farm.AutoFish = v
-    if v then startAutoFish() else stopAutoFish() end
+PageFarm:CreateToggle("Auto Fish", "Auto lempar & tarik pancing", function(on)
+    Farm.AutoFish = on
+    if on then startAutoFish() else stopAutoFish() end
 end)
 
-PageFarm:CreateToggle("Perfect Casting", "Lempar selalu perfect", function(v)
-    Farm.PerfectCasting = v
+PageFarm:CreateToggle("Perfect Casting", "Selalu lempar perfect", function(on)
+    Farm.PerfectCasting = on
 end)
 
 --========================================================
--- BLATANT MODE GROUP
+-- UI INPUT
 --========================================================
 
-local GroupBlatant = PageFarm:CreateDropdown("Blatant Mode Settings")
+PageFarm:CreateBox("Reel Delay", "Delay sebelum loop restart", function(txt)
+    local num = tonumber(txt)
+    if num then
+        Farm.ReelDelay = num
+    end
+end, tostring(Farm.ReelDelay))
 
-GroupBlatant:CreateToggle("Enable Blatant Mode", "Cepat tapi agak berisiko", function(v)
-    if v then Farm.Mode = "Blatant" else Farm.Mode = "Legit" end
-end)
-
-GroupBlatant:CreateBox("Reel Delay", "Delay reel Blatant", function(v)
-    Farm.Blatant_ReelDelay = tonumber(v) or 0.12
-end, tostring(Farm.Blatant_ReelDelay))
-
-GroupBlatant:CreateBox("Complete Delay", "Delay Complete Blatant", function(v)
-    Farm.Blatant_CompleteDelay = tonumber(v) or 0.08
-end, tostring(Farm.Blatant_CompleteDelay))
-
---========================================================
--- BLATANT V2 GROUP
---========================================================
-
-local GroupV2 = PageFarm:CreateDropdown("Blatant V2 Settings")
-
-GroupV2:CreateToggle("Enable Blatant V2", "Super instant (HIGH RISK)", function(v)
-    if v then Farm.Mode = "BlatantV2" else Farm.Mode = "Legit" end
-end)
-
-GroupV2:CreateBox("Reel Delay", "Delay Reel V2", function(v)
-    Farm.V2_ReelDelay = tonumber(v) or 0.01
-end, tostring(Farm.V2_ReelDelay))
-
-GroupV2:CreateBox("Complete Delay", "Delay Complete V2", function(v)
-    Farm.V2_CompleteDelay = tonumber(v) or 0.01
-end, tostring(Farm.V2_CompleteDelay))
-
---========================================================
--- OTHER FEATURES GROUP
---========================================================
-local Other = PageFarm:CreateDropdown("Other Features")
-
-Other:CreateToggle("Auto Bait", "Gunakan bait otomatis", function(v)
-    Farm.AutoBait = v
-end)
-
-Other:CreateToggle("Auto Best Luck Rod", "Equip rod luck tertinggi otomatis", function(v)
-    Farm.AutoBestRod = v
-end)
-
-if tgPerfect and tgPerfect.Set then tgPerfect.Set(true) end
-
+PageFarm:CreateBox("Custom Complete Delay", "Delay sebelum FishingCompleted", function(txt)
+    local num = tonumber(txt)
+    if num then
+        Farm.CompleteDelay = num
+    end
+end, tostring(Farm.CompleteDelay))
 
 local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
