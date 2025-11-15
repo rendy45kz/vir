@@ -491,7 +491,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISH IT FARM - Auto Fish + Blatant x5
+-- FISH IT FARM - Auto Fish + Blatant x5 (FIX)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -515,6 +515,7 @@ local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted"
 local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
+local RE_FishCaught        = net:FindFirstChild("RE/FishCaught") -- referensi
 
 -- STATE FARM
 local Farm = {
@@ -532,7 +533,7 @@ local Farm = {
     AutoBestRod            = true,
 }
 
-local BLATANT_SPEED_X      = 5      -- Blatant 5x lebih cepat dari Auto Fish
+local BLATANT_SPEED_X      = 5      -- Blatant ~5x lebih cepat dari Auto Fish
 local LEGIT_COMPLETE_DELAY = 1.145  -- Delay aman mode legit (Exclaim)
 
 -- Best Luck Rod
@@ -601,10 +602,45 @@ local function DoCastOnce()
     local rx = BASE_X + math.random(-300, 300) / 1e7
     local ry = BASE_Y + math.random(-300, 300) / 1e7
 
+    -- kalau game butuh argumen ke-3 time, bisa diganti:
+    -- RF_RequestMinigame:InvokeServer(BASE_X, BASE_Y, Workspace2:GetServerTimeNow())
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
--- Handler Exclaim (!) - dipakai hanya untuk AutoFish (legit)
+--========================================================
+-- BLATANT STATE (SPAM COMPLETE BERBASIS EXCLAIM)
+--========================================================
+local BlatantState = {
+    IsSpamming = false,
+    SpamThread = nil,
+}
+
+local function StartBlatantSpam()
+    if BlatantState.IsSpamming then return end
+    if not Farm.Blatant_Enabled then return end
+
+    BlatantState.IsSpamming = true
+    BlatantState.SpamThread = task.spawn(function()
+        while Farm.Blatant_Enabled and BlatantState.IsSpamming do
+            RE_FishingCompleted:FireServer()
+            local d = tonumber(Farm.Blatant_CompleteDelay) or 0.2
+            if d < 0.01 then d = 0.01 end
+            task.wait(d)
+        end
+    end)
+end
+
+local function StopBlatantSpam()
+    BlatantState.IsSpamming = false
+    if BlatantState.SpamThread then
+        task.cancel(BlatantState.SpamThread)
+        BlatantState.SpamThread = nil
+    end
+end
+
+--========================================================
+-- HANDLER EXCLAIM
+--========================================================
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -613,18 +649,44 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
-    -- kalau Blatant aktif, handler Exclaim di-skip
+    -- BLATANT: begitu "!" muncul → langsung mulai spam complete
     if Farm.Blatant_Enabled then
+        StartBlatantSpam()
         return
     end
 
+    -- AUTO FISH: tunggu delay aman, lalu sekali complete
     if Farm.AutoFish_Enabled then
         task.wait(LEGIT_COMPLETE_DELAY)
         RE_FishingCompleted:FireServer()
     end
 end)
 
--- LOOP FARM
+--========================================================
+-- HANDLER FISH CAUGHT (BLATANT RECAST)
+--========================================================
+if RE_FishCaught then
+    RE_FishCaught.OnClientEvent:Connect(function(fishName, info)
+        if Farm.Blatant_Enabled then
+            -- stop spam, lalu recast setelah ReelDelay
+            StopBlatantSpam()
+
+            local reel = tonumber(Farm.Blatant_ReelDelay) or 0.15
+            if reel < 0 then reel = 0 end
+
+            task.delay(reel, function()
+                if Farm.Blatant_Enabled then
+                    DoCastOnce()
+                end
+            end)
+        end
+    end)
+end
+
+--========================================================
+-- LOOP FARM HANYA UNTUK AUTO FISH (LEGIT)
+--========================================================
+
 local autoFishThread = nil
 
 local function StopAutoFishLoop()
@@ -640,60 +702,41 @@ local function AutoFish_Normal_Step()
     task.wait(Farm.AutoFish_ReelDelay)
 end
 
--- Blatant (fast):
---  - Cast
---  - SPAM FishingCompleted tiap Blatant_CompleteDelay
---  - Tunggu Blatant_ReelDelay → cast lagi
-local function AutoFish_Blatant_Step()
-    DoCastOnce()
-
-    local spamDelay   = math.max(0.01, tonumber(Farm.Blatant_CompleteDelay) or 0.2)
-    local reelDelay   = math.max(0,     tonumber(Farm.Blatant_ReelDelay)     or 0.15)
-    local spamTimeMax = 1.0 -- durasi total spam per cast (bisa diubah kalau mau)
-
-    local t0 = tick()
-    while Farm.Blatant_Enabled and (tick() - t0) < spamTimeMax do
-        RE_FishingCompleted:FireServer()
-        task.wait(spamDelay)
-    end
-
-    task.wait(reelDelay)
-end
-
 local function StartAutoFishLoop()
     StopAutoFishLoop()
-    if not Farm.AutoFish_Enabled and not Farm.Blatant_Enabled then
+    if not Farm.AutoFish_Enabled then
         return
     end
 
     autoFishThread = task.spawn(function()
-        while Farm.AutoFish_Enabled or Farm.Blatant_Enabled do
-            if Farm.Blatant_Enabled then
-                AutoFish_Blatant_Step()
-            elseif Farm.AutoFish_Enabled then
-                AutoFish_Normal_Step()
-            else
-                break
-            end
+        while Farm.AutoFish_Enabled do
+            AutoFish_Normal_Step()
             task.wait(0.01)
         end
         autoFishThread = nil
     end)
 end
 
+--========================================================
 -- UI: FARM
+--========================================================
 
 -- Group Auto Fish
 PageFarm:CreateLabel("AUTO FISH MODE")
 
-local tgAutoFish = PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", function(on)
+PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", function(on)
     Farm.AutoFish_Enabled = on
 
     if on and Farm.Blatant_Enabled then
         Farm.Blatant_Enabled = false
+        StopBlatantSpam()
     end
 
-    StartAutoFishLoop()
+    if on then
+        StartAutoFishLoop()
+    else
+        StopAutoFishLoop()
+    end
 end)
 
 PageFarm:CreateBox("Reel Delay (Auto Fish)", "Delay antar cast mode legit", function(txt)
@@ -706,12 +749,15 @@ end)
 -- Group Blatant
 PageFarm:CreateLabel("BLATANT MODE (FAST FISHING x5)")
 
-local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-game, spam complete)", function(on)
+PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-game drag, spam complete)", function(on)
     Farm.Blatant_Enabled = on
 
     if on and Farm.AutoFish_Enabled then
         Farm.AutoFish_Enabled = false
+        StopAutoFishLoop()
     end
+
+    StopBlatantSpam()
 
     if on then
         -- Hitung total cycle Auto: cast -> ! -> tarik
@@ -724,9 +770,10 @@ local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-
 
         Farm.Blatant_CompleteDelay = math.max(0.03, comp)
         Farm.Blatant_ReelDelay     = math.max(0.03, reel)
-    end
 
-    StartAutoFishLoop()
+        -- mulai dengan satu cast
+        DoCastOnce()
+    end
 end)
 
 PageFarm:CreateBox("Reel Delay (Blatant)", "Delay antar cast (lempar ke lempar)", function(txt)
@@ -753,6 +800,7 @@ end)
 PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", function(on)
     Farm.AutoBestRod = on
 end)
+
 
 --========================================================
 -- TRADE TAB (kosong, bisa diisi nanti)
