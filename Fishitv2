@@ -1,5 +1,5 @@
 --========================================================
--- AegisHub - Fish It — UI + Misc + Farm (Blatant x5)
+-- AegisHub - Fish It — UI + Misc + Farm (Blatant x5, NO STUCK, DELAY DARI INPUT)
 --========================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -153,7 +153,7 @@ function library:CreateWindow(name, version, icon)
 
     CloseBtn.MouseButton1Click:Connect(function()
         if Gui and Gui.Parent then
-            Gui:Destroy() -- hanya menu utama & tombol overlay
+            Gui:Destroy()
         end
     end)
 
@@ -491,7 +491,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISH IT FARM - Auto Fish + Blatant x5 (FIX)
+-- FISH IT FARM - Auto Fish + Blatant x5 (NO STUCK, DELAY INPUT)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -515,7 +515,7 @@ local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted"
 local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
-local RE_FishCaught        = net:FindFirstChild("RE/FishCaught") -- referensi
+local RE_FishCaught        = net:FindFirstChild("RE/FishCaught")
 
 -- STATE FARM
 local Farm = {
@@ -523,7 +523,7 @@ local Farm = {
     AutoFish_Enabled       = false,
     AutoFish_ReelDelay     = 2.8,
 
-    -- BLATANT MODE (Fast)
+    -- BLATANT MODE (Fast) - NILAI AWAL SAJA, HABIS ITU DARI INPUT
     Blatant_Enabled        = false,
     Blatant_ReelDelay      = 0.15, -- delay antar cast
     Blatant_CompleteDelay  = 0.20, -- delay antar spam FishingCompleted
@@ -533,8 +533,7 @@ local Farm = {
     AutoBestRod            = true,
 }
 
-local BLATANT_SPEED_X      = 5      -- Blatant ~5x lebih cepat dari Auto Fish
-local LEGIT_COMPLETE_DELAY = 1.145  -- Delay aman mode legit (Exclaim)
+local LEGIT_COMPLETE_DELAY = 1.145  -- dipakai hanya Auto Fish normal
 
 -- Best Luck Rod
 local function getBestLuckRod()
@@ -602,8 +601,6 @@ local function DoCastOnce()
     local rx = BASE_X + math.random(-300, 300) / 1e7
     local ry = BASE_Y + math.random(-300, 300) / 1e7
 
-    -- kalau game butuh argumen ke-3 time, bisa diganti:
-    -- RF_RequestMinigame:InvokeServer(BASE_X, BASE_Y, Workspace2:GetServerTimeNow())
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
@@ -668,7 +665,7 @@ end)
 if RE_FishCaught then
     RE_FishCaught.OnClientEvent:Connect(function(fishName, info)
         if Farm.Blatant_Enabled then
-            -- stop spam, lalu recast setelah ReelDelay
+            -- stop spam, lalu recast setelah ReelDelay (dari input)
             StopBlatantSpam()
 
             local reel = tonumber(Farm.Blatant_ReelDelay) or 0.15
@@ -747,7 +744,7 @@ PageFarm:CreateBox("Reel Delay (Auto Fish)", "Delay antar cast mode legit", func
 end)
 
 -- Group Blatant
-PageFarm:CreateLabel("BLATANT MODE (FAST FISHING x5)")
+PageFarm:CreateLabel("BLATANT MODE (FAST FISHING)")
 
 PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-game drag, spam complete)", function(on)
     Farm.Blatant_Enabled = on
@@ -757,21 +754,13 @@ PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-game drag, spam co
         StopAutoFishLoop()
     end
 
+    -- setiap ganti state, stop spam dulu
     StopBlatantSpam()
 
     if on then
-        -- Hitung total cycle Auto: cast -> ! -> tarik
-        local autoCycle   = math.max(0.1, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
-        local targetCycle = autoCycle / BLATANT_SPEED_X
-
-        -- bagi 40% untuk spam complete, 60% untuk jeda antar cast
-        local comp = targetCycle * 0.4
-        local reel = targetCycle * 0.6
-
-        Farm.Blatant_CompleteDelay = math.max(0.03, comp)
-        Farm.Blatant_ReelDelay     = math.max(0.03, reel)
-
-        -- mulai dengan satu cast
+        -- Tidak ada auto perhitungan x5
+        -- Semua delay pakai nilai di Farm.Blatant_ReelDelay & Farm.Blatant_CompleteDelay
+        -- Mulai dengan satu cast
         DoCastOnce()
     end
 end)
@@ -800,7 +789,6 @@ end)
 PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", function(on)
     Farm.AutoBestRod = on
 end)
-
 
 --========================================================
 -- TRADE TAB (kosong, bisa diisi nanti)
