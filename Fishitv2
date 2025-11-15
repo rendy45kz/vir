@@ -1,5 +1,5 @@
 --========================================================
--- AegisHub • Fish It — UI + Misc Features (REVISED)
+-- AegisHub - Fish It — UI + Misc + Farm (Blatant x5)
 --========================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -16,7 +16,7 @@ local LocalPlayer        = Players.LocalPlayer
 local VirtualUser        = game:GetService("VirtualUser")
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2 • FIX) ===========
+-- ============== UI LIBRARY (Polished v2) =====================
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -50,9 +50,9 @@ function library:CreateWindow(name, version, icon)
     Gui.ResetOnSpawn = false
     Gui.DisplayOrder = 9999
     protect(Gui)
-    Gui.Parent = CoreGui  -- NOTE: jika tidak muncul di sebagian game, ganti ke PlayerGui
+    Gui.Parent = CoreGui
 
-    -- scale kecil utk layar kecil
+    -- Scale kecil utk layar kecil
     local function calcScale()
         local cam = Workspace.CurrentCamera
         local vp = cam and cam.ViewportSize or Vector2.new(1280,720)
@@ -61,7 +61,7 @@ function library:CreateWindow(name, version, icon)
     end
     local SCALE = calcScale()
 
-    -- Overlay (toggle + draggable)
+    -- Overlay toggle (bulat di samping, buat show/hide window)
     local Overlay = Instance.new("ImageButton")
     Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
     Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
@@ -130,13 +130,13 @@ function library:CreateWindow(name, version, icon)
     TitleText.TextSize=math.floor(12*SCALE)
     TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1)
-    TitleText.Text=("%s • %s"):format(name,version)
+    TitleText.Text=(name .. " - " .. version)
 
     local Under=Instance.new("Frame",Title)
     Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
     Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
 
-    -- ========= TOMBOL X (TUTUP MENU UTAMA) =========
+    -- Tombol X (tutup menu utama)
     local CloseBtn = Instance.new("TextButton")
     CloseBtn.Name = "CloseButton"
     CloseBtn.Parent = Title
@@ -153,7 +153,7 @@ function library:CreateWindow(name, version, icon)
 
     CloseBtn.MouseButton1Click:Connect(function()
         if Gui and Gui.Parent then
-            Gui:Destroy() -- hanya menu utama & tombol overlay bulat
+            Gui:Destroy() -- hanya menu utama & tombol overlay
         end
     end)
 
@@ -173,7 +173,7 @@ function library:CreateWindow(name, version, icon)
         end)
     end
 
-    -- Overlay toggle (show/hide window)
+    -- Overlay toggle show/hide window
     local hidden=false
     Overlay.MouseButton1Click:Connect(function()
         hidden=not hidden; Window.Visible=not hidden
@@ -200,9 +200,9 @@ function library:CreateWindow(name, version, icon)
     trlist.SortOrder=Enum.SortOrder.LayoutOrder
     trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
-    ----------------------------------------------------------------
+    ------------------------------------------------------------
     -- Tab/Page API
-    ----------------------------------------------------------------
+    ------------------------------------------------------------
     local firstShown=false
 
     local function makePage(title)
@@ -353,7 +353,7 @@ function library:CreateWindow(name, version, icon)
             ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
             local caret=Instance.new("TextLabel",fr)
             caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            caret.Font=Enum.Font.GothamBlack; caret.Text="v"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
 
             local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
             holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
@@ -491,7 +491,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISHIT PRO AUTO v3 (No PerfectCast, Mode Terpisah + Blatant Bener-bener Fast)
+-- FISH IT FARM - Auto Fish + Blatant x5
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -516,32 +516,26 @@ local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
 
---========================================================
--- STATE FARM (MODE TERPISAH)
---========================================================
-
+-- STATE FARM
 local Farm = {
-    -- AUTO FISH MODE (Legit)
+    -- AUTO FISH (Legit)
     AutoFish_Enabled       = false,
-    AutoFish_ReelDelay     = 2.8,   -- delay antar cast (mode normal)
+    AutoFish_ReelDelay     = 2.8,
 
     -- BLATANT MODE (Fast)
     Blatant_Enabled        = false,
-    Blatant_ReelDelay      = 0.15,  -- delay antar cast SESUDAH FishingCompleted
-    Blatant_CompleteDelay  = 0.20,  -- delay setelah cast sebelum FishingCompleted (fast)
+    Blatant_ReelDelay      = 0.15,
+    Blatant_CompleteDelay  = 0.20,
 
     -- UTIL
     AutoBait               = true,
     AutoBestRod            = true,
 }
 
--- delay aman untuk mode legit (Exclaim)
-local LEGIT_COMPLETE_DELAY = 1.145
+local BLATANT_SPEED_X      = 5      -- Blatant 5x lebih cepat dari Auto Fish
+local LEGIT_COMPLETE_DELAY = 1.145  -- Delay aman mode legit (Exclaim)
 
---========================================================
--- BEST LUCK ROD + BAIT
---========================================================
-
+-- Best Luck Rod
 local function getBestLuckRod()
     local backpack = LocalPlayer2.Backpack
     local char = LocalPlayer2.Character
@@ -575,8 +569,7 @@ local function AutoEquipBestRod()
     if not Farm.AutoBestRod then return end
     local rod = getBestLuckRod()
     if rod then
-        -- asumsikan rod ada di slot 1
-        RE_EquipHotbar:FireServer(1)
+        RE_EquipHotbar:FireServer(1) -- slot 1
     end
 end
 
@@ -587,43 +580,31 @@ local function ApplyBaitIfNeeded()
 
     for _, bait in ipairs(baitFolder:GetChildren()) do
         if bait.Value and bait.Value > 0 then
-            -- asumsikan bait di slot 2
-            RE_EquipHotbar:FireServer(2)
+            RE_EquipHotbar:FireServer(2) -- bait slot 2
             return
         end
     end
 end
 
---========================================================
--- CAST UTAMA (TANPA PERFECT CASTING)
---========================================================
-
-local BASE_X, BASE_Y = -0.75, 1  -- titik cast “bagus” standar
+-- CAST UTAMA (tanpa perfect casting UI)
+local BASE_X, BASE_Y = -0.75, 1
 
 local function DoCastOnce()
     AutoEquipBestRod()
     ApplyBaitIfNeeded()
 
-    -- equip rod slot 1
     RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
 
-    -- charge & mulai minigame
     RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
 
-    -- random kecil buat keliatan natural
     local rx = BASE_X + math.random(-300, 300) / 1e7
     local ry = BASE_Y + math.random(-300, 300) / 1e7
 
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
---========================================================
--- HANDLER EXCLAIM (!) → FishingCompleted
---   • Dipakai hanya oleh AutoFish_Enabled (mode legit)
---   • Diabaikan saat Blatant_Enabled = true
---========================================================
-
+-- Handler Exclaim (!) - dipakai hanya untuk AutoFish (legit)
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -632,22 +613,18 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
-    -- Kalau BLATANT ON → Handler Exclaim DIABAIKAN
+    -- kalau Blatant aktif, handler Exclaim di-skip
     if Farm.Blatant_Enabled then
         return
     end
 
-    -- AUTO FISH MODE (legit) → pakai Exclaim + delay aman
     if Farm.AutoFish_Enabled then
         task.wait(LEGIT_COMPLETE_DELAY)
         RE_FishingCompleted:FireServer()
     end
 end)
 
---========================================================
--- LOOP AUTO FISH (MODE TERGANTUNG STATE)
---========================================================
-
+-- LOOP FARM
 local autoFishThread = nil
 
 local function StopAutoFishLoop()
@@ -657,19 +634,14 @@ local function StopAutoFishLoop()
     end
 end
 
--- Mode LEGIT:
---  • DoCastOnce()
---  • Tunggu AutoFish_ReelDelay
---  • FishingCompleted diurus Exclaim handler (LEGIT_COMPLETE_DELAY)
+-- Auto Fish (legit)
 local function AutoFish_Normal_Step()
     DoCastOnce()
     task.wait(Farm.AutoFish_ReelDelay)
+    -- FishingCompleted dikerjakan oleh Exclaim handler
 end
 
--- Mode BLATANT (FAST):
---  • DoCastOnce()
---  • Tunggu Blatant_CompleteDelay → paksa FishingCompleted
---  • Tunggu Blatant_ReelDelay → langsung cast lagi
+-- Blatant (fast)
 local function AutoFish_Blatant_Step()
     DoCastOnce()
     task.wait(Farm.Blatant_CompleteDelay)
@@ -698,17 +670,14 @@ local function StartAutoFishLoop()
     end)
 end
 
---========================================================
--- UI: FARM TAB
---========================================================
+-- UI: FARM
 
--- ---------- AUTO FISH MODE ----------
+-- Group Auto Fish
 PageFarm:CreateLabel("AUTO FISH MODE")
 
-local tgAutoFish = PageFarm:CreateToggle("Auto Fish", "Mode normal (lebih aman, pakai Exclaim)", function(on)
+local tgAutoFish = PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", function(on)
     Farm.AutoFish_Enabled = on
 
-    -- kalau mengaktifkan AutoFish, matikan Blatant supaya nggak tabrakan
     if on and Farm.Blatant_Enabled then
         Farm.Blatant_Enabled = false
     end
@@ -723,15 +692,29 @@ PageFarm:CreateBox("Reel Delay (Auto Fish)", "", function(txt)
     end
 end)
 
--- ---------- BLATANT MODE ----------
-PageFarm:CreateLabel("BLATANT MODE (FAST FISHING)")
+-- Group Blatant
+PageFarm:CreateLabel("BLATANT MODE (FAST FISHING x5)")
 
 local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (tidak pakai Exclaim, resiko flag)", function(on)
     Farm.Blatant_Enabled = on
 
-    -- kalau mengaktifkan Blatant, matikan AutoFish
     if on and Farm.AutoFish_Enabled then
         Farm.AutoFish_Enabled = false
+    end
+
+    if on then
+        -- Hitung total cycle Auto: cast -> ! -> tarik
+        local autoCycle = math.max(0.1, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
+
+        -- Blatant: 5x lebih cepat
+        local targetCycle = autoCycle / BLATANT_SPEED_X
+
+        -- bagi 40% untuk CompleteDelay, 60% untuk ReelDelay
+        local comp = targetCycle * 0.4
+        local reel = targetCycle * 0.6
+
+        Farm.Blatant_CompleteDelay = math.max(0.05, comp)
+        Farm.Blatant_ReelDelay     = math.max(0.05, reel)
     end
 
     StartAutoFishLoop()
@@ -751,7 +734,7 @@ PageFarm:CreateBox("Complete Delay (Blatant)", "", function(txt)
     end
 end)
 
--- ---------- UTIL (tetap) ----------
+-- Utility
 PageFarm:CreateLabel("UTILITY")
 
 PageFarm:CreateToggle("Auto Bait", "Pakai bait otomatis", function(on)
@@ -762,9 +745,8 @@ PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", funct
     Farm.AutoBestRod = on
 end)
 
-    
 --========================================================
--- TRADE TAB (kosong, siap diisi)
+-- TRADE TAB (kosong, bisa diisi nanti)
 --========================================================
 local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
@@ -787,7 +769,7 @@ local TabTP  = win:CreateTab("Teleport")
 local PageTP = TabTP:CreateFrame("Teleport")
 PageTP:CreateLabel("TELEPORT MENU")
 
--- ---------- ISLAND (static list) ----------
+-- Island list
 local islands = {
     ["Weather Machine"]            = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]            = Vector3.new(3157,-1303,1439),
@@ -823,7 +805,7 @@ if currentIsland and ddIslandFull and ddIslandFull.SetValue then
     ddIslandFull:SetValue(currentIsland)
 end
 
--- ---------- NPC (scan workspace, exclude player chars) ----------
+-- Scan NPC
 local function scanNPC_Models()
     local found = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
@@ -876,7 +858,7 @@ if currentNPC and ddNPC and ddNPC.SetValue then
     ddNPC:SetValue(currentNPC)
 end
 
--- ---------- PLAYER (dynamic list) ----------
+-- Players dropdown
 local function playersList()
     local t = {}
     for _,pl in ipairs(Players:GetPlayers()) do
@@ -899,10 +881,10 @@ if currentPlayer and ddPlayer and ddPlayer.SetValue then
     ddPlayer:SetValue(currentPlayer)
 end
 
--- ---------- Refresh berkala untuk NPC & Player ----------
 task.spawn(function()
     while true do
         task.wait(8)
+        -- NPC refresh
         local newNPC = scanNPC_Models()
         if ddNPC and ddNPC.SetOptions then
             ddNPC:SetOptions(newNPC)
@@ -912,7 +894,7 @@ task.spawn(function()
                 end
             end
         end
-
+        -- Player refresh
         local newPL = playersList()
         if ddPlayer and ddPlayer.SetOptions then
             ddPlayer:SetOptions(newPL)
@@ -933,7 +915,7 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 --========================================================
--- MISC (fitur aktif) - VERSI ULTRA FPS / NO EFFECT
+-- MISC ULTRA FPS / NO EFFECT
 --========================================================
 local TabMisc   = win:CreateTab("Misc")
 local PageMisc  = TabMisc:CreateFrame("Misc")
@@ -1173,7 +1155,7 @@ ApplyFPSCap()
 PageMisc:CreateLabel("Semua optimasi & Anti-AFK sudah aktif.")
 
 --========================================================
--- OVERLAY FPS + PING (TEXT ONLY, DRAGGABLE)
+-- OVERLAY FPS + PING (TEXT ONLY, TENGAH ATAS, DRAGGABLE)
 --========================================================
 local Stats = game:GetService("Stats")
 local guiParent = (gethui and gethui()) or CoreGui
@@ -1199,8 +1181,19 @@ holder.Parent = screenGui
 holder.BackgroundTransparency = 1
 holder.BorderSizePixel = 0
 holder.AnchorPoint = Vector2.new(0, 0)
-holder.Position = UDim2.new(0, 10, 0, 10)
+holder.Position = UDim2.new(0, 0, 0, 6)
 holder.Size = UDim2.new(0, 320, 0, 20)
+
+task.spawn(function()
+    task.wait(0.15)
+    local cam3 = Workspace.CurrentCamera
+    if cam3 then
+        local vp = cam3.ViewportSize
+        holder.Position = UDim2.new(0, (vp.X - holder.AbsoluteSize.X) / 2, 0, 6)
+    else
+        holder.Position = UDim2.new(0, 10, 0, 6)
+    end
+end)
 
 local hList = Instance.new("UIListLayout", holder)
 hList.FillDirection = Enum.FillDirection.Horizontal
@@ -1222,6 +1215,7 @@ infoLabel.TextStrokeTransparency = 0.5
 infoLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
 infoLabel.Text = "FPS: ... | Ping: ..."
 
+-- drag overlay
 do
     local dragging = false
     local dragStart, startPos
@@ -1258,6 +1252,7 @@ do
     end)
 end
 
+-- FPS smoothing
 local fps = 0
 local avgFPS = 0
 local alphaFPS = 0.15
