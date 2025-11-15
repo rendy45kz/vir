@@ -643,11 +643,21 @@ end
 
 -- Blatant (fast)
 local function AutoFish_Blatant_Step()
+    -- 1) Lempar pancing
     DoCastOnce()
+
+    -- 2) Tunggu sampai waktunya tarik (CompleteDelay)
     task.wait(Farm.Blatant_CompleteDelay)
     RE_FishingCompleted:FireServer()
-    task.wait(Farm.Blatant_ReelDelay)
+
+    -- 3) Sisa waktu sampai loop casting berikutnya
+    --    Total 1 cycle ≈ ReelDelay
+    local sisa = math.max(0, Farm.Blatant_ReelDelay - Farm.Blatant_CompleteDelay)
+    if sisa > 0 then
+        task.wait(sisa)
+    end
 end
+
 
 local function StartAutoFishLoop()
     StopAutoFishLoop()
@@ -698,27 +708,30 @@ PageFarm:CreateLabel("BLATANT MODE (FAST FISHING x5)")
 local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (tidak pakai Exclaim, resiko flag)", function(on)
     Farm.Blatant_Enabled = on
 
+    -- Nyalain Blatant = matiin AutoFish biar nggak tabrakan
     if on and Farm.AutoFish_Enabled then
         Farm.AutoFish_Enabled = false
     end
 
     if on then
-        -- Hitung total cycle Auto: cast -> ! -> tarik
+        -- Total cycle Auto (lempar -> ! -> tarik)
         local autoCycle = math.max(0.1, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
 
-        -- Blatant: 5x lebih cepat
+        -- Target total cycle Blatant = 5x lebih cepat
         local targetCycle = autoCycle / BLATANT_SPEED_X
 
-        -- bagi 40% untuk CompleteDelay, 60% untuk ReelDelay
-        local comp = targetCycle * 0.4
-        local reel = targetCycle * 0.6
+        -- ReelDelay = TOTAL waktu per ikan di Blatant
+        Farm.Blatant_ReelDelay = math.max(0.05, targetCycle)
 
-        Farm.Blatant_CompleteDelay = math.max(0.05, comp)
-        Farm.Blatant_ReelDelay     = math.max(0.05, reel)
+        -- CompleteDelay = bagian kecil di awal (biar Exclaim cepet)
+        -- misal 20% dari total, tapi jangan lebih gede dari ReelDelay - 0.01
+        local comp = Farm.Blatant_ReelDelay * 0.2
+        Farm.Blatant_CompleteDelay = math.clamp(comp, 0.01, Farm.Blatant_ReelDelay - 0.01)
     end
 
     StartAutoFishLoop()
 end)
+
 
 PageFarm:CreateBox("Reel Delay (Blatant)", "", function(txt)
     local num = tonumber(txt)
