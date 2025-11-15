@@ -491,7 +491,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISH IT FARM - Auto Fish + Blatant x5
+-- FISH IT FARM - Auto Fish + Blatant x5 (ReelDelay = cast-to-cast)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -510,32 +510,55 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
-local RF_Charge            = net:WaitForChild("RF/ChargeFishingRod")
-local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted")
-local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
-local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
-local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
+local RF_Charge              = net:WaitForChild("RF/ChargeFishingRod")
+local RF_RequestMinigame     = net:WaitForChild("RF/RequestFishingMinigameStarted")
+local RE_FishingCompleted    = net:WaitForChild("RE/FishingCompleted")
+local RE_EquipHotbar         = net:WaitForChild("RE/EquipToolFromHotbar")
+local RE_TextEffect          = net:WaitForChild("RE/ReplicateTextEffect")
 
+-- (optional, dipakai kalau mau anti-stuck gaya referensi kamu)
+local RF_CancelFishingInputs = net:FindFirstChild("RF/CancelFishingInputs")
+local RE_FishingStopped      = net:FindFirstChild("RE/FishingStopped")
+
+local function StopFishing()
+    if RF_CancelFishingInputs then
+        pcall(function()
+            RF_CancelFishingInputs:InvokeServer()
+        end)
+    end
+    if RE_FishingStopped and typeof(firesignal) == "function" then
+        pcall(function()
+            firesignal(RE_FishingStopped.OnClientEvent)
+        end)
+    end
+end
+
+--========================================================
 -- STATE FARM
+--========================================================
+
 local Farm = {
     -- AUTO FISH (Legit)
     AutoFish_Enabled       = false,
-    AutoFish_ReelDelay     = 2.8,
+    AutoFish_ReelDelay     = 2.8,    -- Delay antar cast (legit, pelan)
 
-    -- BLATANT MODE (Fast)
+    -- BLATANT (FAST)
     Blatant_Enabled        = false,
-    Blatant_ReelDelay      = 0.15,
-    Blatant_CompleteDelay  = 0.20,
+    Blatant_ReelDelay      = 0.30,   -- TOTAL waktu cast -> cast (x5 dari auto)
+    Blatant_CompleteDelay  = 0.05,   -- Waktu setelah lempar sebelum “tarik”
 
     -- UTIL
     AutoBait               = true,
     AutoBestRod            = true,
 }
 
-local BLATANT_SPEED_X      = 5      -- Blatant 5x lebih cepat dari Auto Fish
-local LEGIT_COMPLETE_DELAY = 1.145  -- Delay aman mode legit (Exclaim)
+local BLATANT_SPEED_X      = 5       -- Blatant = 5x lebih cepat dari Auto Fish
+local LEGIT_COMPLETE_DELAY = 1.145   -- Delay aman untuk mode AutoFish (Exclaim)
 
--- Best Luck Rod
+--========================================================
+-- BEST LUCK ROD + BAIT
+--========================================================
+
 local function getBestLuckRod()
     local backpack = LocalPlayer2.Backpack
     local char = LocalPlayer2.Character
@@ -586,25 +609,38 @@ local function ApplyBaitIfNeeded()
     end
 end
 
--- CAST UTAMA (tanpa perfect casting UI)
+--========================================================
+-- CAST UTAMA
+--========================================================
+
+-- Titik cast “aman” (boleh kamu tweak, referensi script lain pakai -1.25, 1.0)
 local BASE_X, BASE_Y = -0.75, 1
 
+-- Versi general (dipakai di kedua mode)
 local function DoCastOnce()
     AutoEquipBestRod()
     ApplyBaitIfNeeded()
 
+    -- Equip rod
     RE_EquipHotbar:FireServer(1)
-    task.wait(0.10)
+    task.wait(0.05)
 
-    RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
+    local now = Workspace2:GetServerTimeNow()
 
-    local rx = BASE_X + math.random(-300, 300) / 1e7
-    local ry = BASE_Y + math.random(-300, 300) / 1e7
+    -- Charge
+    RF_Charge:InvokeServer(now)
 
-    RF_RequestMinigame:InvokeServer(rx, ry)
+    -- Mulai minigame (disini kita “cheat” sedikit ke titik yang cenderung cepat)
+    -- Kalau mau persis kayak referensi, bisa pakai:
+    -- RF_RequestMinigame:InvokeServer(-1.25, 1.0, Workspace2:GetServerTimeNow())
+    -- tapi signaturenya tergantung game, jadi versi aman:
+    RF_RequestMinigame:InvokeServer(BASE_X, BASE_Y)
 end
 
--- Handler Exclaim (!) - dipakai hanya untuk AutoFish (legit)
+--========================================================
+-- EXCLAIM HANDLER (CUMA UNTUK AUTO FISH LEGIT)
+--========================================================
+
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -613,18 +649,22 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
-    -- kalau Blatant aktif, handler Exclaim di-skip
+    -- Blatant: kita paksa sendiri FishingCompleted, jadi abaikan Exclaim
     if Farm.Blatant_Enabled then
         return
     end
 
+    -- AutoFish legit: pakai Exclaim sebagai trigger
     if Farm.AutoFish_Enabled then
         task.wait(LEGIT_COMPLETE_DELAY)
         RE_FishingCompleted:FireServer()
     end
 end)
 
--- LOOP FARM
+--========================================================
+-- LOOP AUTO FISH
+--========================================================
+
 local autoFishThread = nil
 
 local function StopAutoFishLoop()
@@ -634,30 +674,33 @@ local function StopAutoFishLoop()
     end
 end
 
--- Auto Fish (legit)
+-- Auto Fish (Legit):
+--  • DoCastOnce()
+--  • Tunggu AutoFish_ReelDelay
+--  • FishingCompleted diurus Exclaim handler (LEGIT_COMPLETE_DELAY)
 local function AutoFish_Normal_Step()
     DoCastOnce()
     task.wait(Farm.AutoFish_ReelDelay)
-    -- FishingCompleted dikerjakan oleh Exclaim handler
 end
 
--- Blatant (fast)
+-- Blatant (Fast, skip-ish minigame):
+--  • DoCastOnce()
+--  • Tunggu CompleteDelay → paksa FishingCompleted (biar Exclaim cepat)
+--  • Tunggu sisa (ReelDelay - CompleteDelay) → cast lagi
+--  • TOTAL satu cycle ≈ Blatant_ReelDelay (sesuai definisi kamu)
 local function AutoFish_Blatant_Step()
-    -- 1) Lempar pancing
     DoCastOnce()
 
-    -- 2) Tunggu sampai waktunya tarik (CompleteDelay)
-    task.wait(Farm.Blatant_CompleteDelay)
+    -- Tarik sangat cepat
+    task.wait(math.max(0.01, Farm.Blatant_CompleteDelay))
     RE_FishingCompleted:FireServer()
 
-    -- 3) Sisa waktu sampai loop casting berikutnya
-    --    Total 1 cycle ≈ ReelDelay
+    -- Sisa waktu sebelum loop cast lagi
     local sisa = math.max(0, Farm.Blatant_ReelDelay - Farm.Blatant_CompleteDelay)
     if sisa > 0 then
         task.wait(sisa)
     end
 end
-
 
 local function StartAutoFishLoop()
     StopAutoFishLoop()
@@ -674,15 +717,17 @@ local function StartAutoFishLoop()
             else
                 break
             end
-            task.wait(0.01)
+            task.wait(0.005)
         end
         autoFishThread = nil
     end)
 end
 
+--========================================================
 -- UI: FARM
+--========================================================
 
--- Group Auto Fish
+-- ---------- AUTO FISH MODE ----------
 PageFarm:CreateLabel("AUTO FISH MODE")
 
 local tgAutoFish = PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", function(on)
@@ -702,29 +747,28 @@ PageFarm:CreateBox("Reel Delay (Auto Fish)", "", function(txt)
     end
 end)
 
--- Group Blatant
+-- ---------- BLATANT MODE ----------
 PageFarm:CreateLabel("BLATANT MODE (FAST FISHING x5)")
 
-local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (tidak pakai Exclaim, resiko flag)", function(on)
+local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip-ish minigame, resiko flag)", function(on)
     Farm.Blatant_Enabled = on
 
-    -- Nyalain Blatant = matiin AutoFish biar nggak tabrakan
+    -- Nyalain Blatant = matiin AutoFish
     if on and Farm.AutoFish_Enabled then
         Farm.AutoFish_Enabled = false
     end
 
     if on then
-        -- Total cycle Auto (lempar -> ! -> tarik)
-        local autoCycle = math.max(0.1, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
+        -- Total cycle Auto (lempar -> Exclaim -> tarik)
+        local autoCycle = math.max(0.2, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
 
         -- Target total cycle Blatant = 5x lebih cepat
         local targetCycle = autoCycle / BLATANT_SPEED_X
 
-        -- ReelDelay = TOTAL waktu per ikan di Blatant
-        Farm.Blatant_ReelDelay = math.max(0.05, targetCycle)
+        -- ReelDelay = total loop cast->cast (sesuai definisi kamu)
+        Farm.Blatant_ReelDelay = math.max(0.10, targetCycle)
 
-        -- CompleteDelay = bagian kecil di awal (biar Exclaim cepet)
-        -- misal 20% dari total, tapi jangan lebih gede dari ReelDelay - 0.01
+        -- CompleteDelay = bagian awal loop untuk “narik” cepat
         local comp = Farm.Blatant_ReelDelay * 0.2
         Farm.Blatant_CompleteDelay = math.clamp(comp, 0.01, Farm.Blatant_ReelDelay - 0.01)
     end
@@ -732,22 +776,21 @@ local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Super cepat (tidak paka
     StartAutoFishLoop()
 end)
 
-
-PageFarm:CreateBox("Reel Delay (Blatant)", "", function(txt)
+PageFarm:CreateBox("Reel Delay (Blatant)", "Total waktu cast -> cast (semakin kecil = makin brutal)", function(txt)
     local num = tonumber(txt)
     if num and num > 0 then
         Farm.Blatant_ReelDelay = num
     end
 end)
 
-PageFarm:CreateBox("Complete Delay (Blatant)", "", function(txt)
+PageFarm:CreateBox("Complete Delay (Blatant)", "Seberapa cepat setelah lempar langsung tarik", function(txt)
     local num = tonumber(txt)
     if num and num >= 0 then
         Farm.Blatant_CompleteDelay = num
     end
 end)
 
--- Utility
+-- ---------- UTILITY ----------
 PageFarm:CreateLabel("UTILITY")
 
 PageFarm:CreateToggle("Auto Bait", "Pakai bait otomatis", function(on)
@@ -757,7 +800,7 @@ end)
 PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", function(on)
     Farm.AutoBestRod = on
 end)
-
+    
 --========================================================
 -- TRADE TAB (kosong, bisa diisi nanti)
 --========================================================
