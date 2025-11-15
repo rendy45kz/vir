@@ -858,27 +858,28 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 --========================================================
--- MISC (fitur aktif)
+-- MISC (fitur aktif) - VERSI ULTRA FPS / NO EFFECT
 --========================================================
 local TabMisc   = win:CreateTab("Misc")
 local PageMisc  = TabMisc:CreateFrame("Misc")
-PageMisc:CreateLabel("MISC MENU")
+PageMisc:CreateLabel("MISC ULTRA FPS")
 
 -- ---------- STATE ----------
 local State = {
-    AntiAFK         = true,
-    FPSBoost        = true,
-    LightingSimple  = true,
-    TexturesOff     = true,
-    SmoothPlastic   = true,
-    FPSCapValue     = 120,
+    AntiAFK           = true,
+    FPSBoost          = true,
+    LightingSimple    = true,
+    TexturesOff       = true,
+    SmoothPlastic     = true,
+    UltraNoEffects    = true,   -- MATIIN ANIMASI + PARTICLE + LIGHT
+    FPSCapValue       = 120,
 }
 
--- Simpan efek yang dimatikan supaya bisa reset
+-- Simpan efek yang dimatikan supaya bisa reset lighting doang
 local Saved = {
-    PostEffects = {},
+    PostEffects   = {},
     GlobalShadows = nil,
-    FogEnd = nil,
+    FogEnd        = nil,
 }
 
 -- ---------- ANTI AFK ----------
@@ -896,7 +897,7 @@ local function DisableAntiAFK()
     if AntiAFK_Conn ~= nil then AntiAFK_Conn:Disconnect(); AntiAFK_Conn = nil end
 end
 
--- ---------- FPS / VISUAL HELPERS ----------
+-- ---------- VISUAL HELPERS DASAR ----------
 local function ApplySmoothPlastic()
     for _, v in ipairs(game:GetDescendants()) do
         if v:IsA("BasePart") then
@@ -928,13 +929,18 @@ local function LightingSimplify()
             end
         end
     end
+
     for _, eff in ipairs(Lighting:GetChildren()) do
         if eff:IsA("PostEffect") then
             eff.Enabled = false
         end
     end
+
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 1e10
+    Lighting.Brightness = 1
+    Lighting.EnvironmentDiffuseScale  = 0
+    Lighting.EnvironmentSpecularScale = 0
 end
 
 local function ResetLighting()
@@ -951,11 +957,93 @@ local function ResetLighting()
     end
 end
 
+-- ---------- ULTRA MODE: MATIKAN ANIMASI + PARTICLE + LIGHT BERAT ----------
+local function KillCharacterAnimation(char)
+    if not char then return end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        -- stop semua track yang lagi jalan
+        for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+            pcall(function() track:Stop() end)
+        end
+        -- hancurin animator biar nggak main lagi
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if animator then
+            pcall(function() animator:Destroy() end)
+        end
+    end
+
+    -- script Animate default Roblox (jalan, lompat, dsb)
+    local animate = char:FindFirstChild("Animate")
+    if animate then
+        pcall(function() animate:Destroy() end)
+    end
+end
+
+local function KillAllHumanoidAnimations()
+    for _, hum in ipairs(game:GetDescendants()) do
+        if hum:IsA("Humanoid") then
+            KillCharacterAnimation(hum.Parent)
+        end
+    end
+end
+
+local function KillParticlesAndLights()
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("ParticleEmitter")
+        or v:IsA("Trail")
+        or v:IsA("Fire")
+        or v:IsA("Smoke")
+        or v:IsA("Sparkles")
+        or v:IsA("Explosion")
+        or v:IsA("Beam") then
+            v.Enabled = false
+        elseif v:IsA("PointLight")
+        or v:IsA("SpotLight")
+        or v:IsA("SurfaceLight") then
+            v.Enabled = false
+        end
+    end
+
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize        = 0
+        terrain.WaterWaveSpeed       = 0
+        terrain.WaterReflectance     = 0
+        terrain.WaterTransparency    = 0
+    end
+end
+
+local function UltraNoEffectsApply()
+    KillAllHumanoidAnimations()
+    KillParticlesAndLights()
+
+    -- apply lagi ke karakter player setiap spawn
+    local function onChar(char)
+        task.delay(1, function()
+            if State.UltraNoEffects then
+                KillCharacterAnimation(char)
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        onChar(LocalPlayer.Character)
+    end
+    LocalPlayer.CharacterAdded:Connect(onChar)
+end
+
+-- ---------- FPS BOOST MAIN ----------
 local function FPSBoostApply()
-    if State.SmoothPlastic then ApplySmoothPlastic() end
-    if State.TexturesOff   then DisableTextures()   end
-    if State.LightingSimple then LightingSimplify() end
+    if State.SmoothPlastic   then ApplySmoothPlastic()   end
+    if State.TexturesOff     then DisableTextures()      end
+    if State.LightingSimple  then LightingSimplify()     end
+    if State.UltraNoEffects  then UltraNoEffectsApply()  end
+
+    -- minimal quality
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    -- kalau Delta support, biasanya juga nurunin render distance dsb sendiri
 end
 
 -- ---------- FPS CAP ----------
@@ -965,18 +1053,20 @@ local function ApplyFPSCap()
     end
 end
 
--- ---------- UI: TOGGLES / SLIDER / BUTTON ----------
+-- ========================================================
+-- UI: TOGGLES / SLIDER / BUTTON
+-- ========================================================
 local tgAntiAFK = PageMisc:CreateToggle("Anti AFK", "Cegah kick saat idle (Auto ON)", function(on)
     State.AntiAFK = on
     if on then EnableAntiAFK() else DisableAntiAFK() end
 end)
 
-local tgFPSBoost = PageMisc:CreateToggle("FPS Boost", "Optimasi performa (Auto ON)", function(on)
+local tgFPSBoost = PageMisc:CreateToggle("FPS Boost", "Optimasi performa agresif (Auto ON)", function(on)
     State.FPSBoost = on
     if on then FPSBoostApply() else ResetLighting() end
 end)
 
-local tgLighting = PageMisc:CreateToggle("Lighting Simplify", "Matikan post-effect, shadows, perpanjang Fog (Auto ON)", function(on)
+local tgLighting = PageMisc:CreateToggle("Lighting Simplify", "Matikan post-effect, shadows, fog jauh (Auto ON)", function(on)
     State.LightingSimple = on
     if on then LightingSimplify() else ResetLighting() end
 end)
@@ -991,29 +1081,38 @@ local tgSmooth = PageMisc:CreateToggle("Parts: SmoothPlastic", "Ubah material pa
     if on then ApplySmoothPlastic() end
 end)
 
-local sliderFPS = PageMisc:CreateSlider("FPS Cap (jika didukung executor)", 30, 360, function(val)
+local tgUltra = PageMisc:CreateToggle("ULTRA: No Anim/Particles", "Matikan animasi & efek berat (ONE WAY, bisa bikin game keliatan aneh)", function(on)
+    State.UltraNoEffects = on
+    if on then UltraNoEffectsApply() end
+end)
+
+local sliderFPS = PageMisc:CreateSlider("FPS Cap (Delta / executor support)", 30, 360, function(val)
     State.FPSCapValue = math.floor(val)
     ApplyFPSCap()
 end)
 sliderFPS:Set(State.FPSCapValue)
 
-local btnReset = PageMisc:CreateButton("Reset Visuals", "Kembalikan pengaturan Lighting yang disederhanakan", function()
+local btnReset = PageMisc:CreateButton("Reset Lighting", "Kembalikan pengaturan Lighting yang disederhanakan saja", function()
     ResetLighting()
 end)
 
--- ---------- AUTO-APPLY SAAT STARTUP ----------
-if tgAntiAFK and tgAntiAFK.Set then tgAntiAFK.Set(true) end
-if tgFPSBoost and tgFPSBoost.Set then tgFPSBoost.Set(true) end
-if tgLighting and tgLighting.Set then tgLighting.Set(true) end
-if tgTextures and tgTextures.Set then tgTextures.Set(true) end
-if tgSmooth  and tgSmooth.Set  then tgSmooth.Set(true)  end
+-- ========================================================
+-- AUTO-APPLY SAAT STARTUP
+-- ========================================================
+if tgAntiAFK and tgAntiAFK.Set   then tgAntiAFK.Set(true)   end
+if tgFPSBoost and tgFPSBoost.Set then tgFPSBoost.Set(true)  end
+if tgLighting and tgLighting.Set then tgLighting.Set(true)  end
+if tgTextures and tgTextures.Set then tgTextures.Set(true)  end
+if tgSmooth  and tgSmooth.Set    then tgSmooth.Set(true)    end
+if tgUltra   and tgUltra.Set     then tgUltra.Set(true)     end
 
--- Juga jalankan sekali
+-- Juga jalankan sekali di awal
 EnableAntiAFK()
 FPSBoostApply()
 LightingSimplify()
 DisableTextures()
 ApplySmoothPlastic()
+UltraNoEffectsApply()
 ApplyFPSCap()
 
 PageMisc:CreateLabel("Semua optimasi & Anti-AFK sudah aktif.")
