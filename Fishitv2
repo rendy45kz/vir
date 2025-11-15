@@ -491,7 +491,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISHIT PRO AUTO v1.0 (Best Luck Rod + Manual Delay)
+-- FISHIT PRO AUTO v2 (No PerfectCast, Mode Terpisah)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -517,21 +517,29 @@ local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
 
 --========================================================
--- STATE
+-- STATE FARM (MODE TERPISAH)
 --========================================================
 
 local Farm = {
-    AutoFish = false,
-    PerfectCasting = true,
-    Mode = "Legit",              -- "Legit" / "Blatant"
-    ReelDelay = 2.8,
-    CompleteDelay = 1.145,
-    AutoBait = true,
-    AutoBestRod = true,
+    -- AUTO FISH MODE (Legit)
+    AutoFish_Enabled       = false,
+    AutoFish_ReelDelay     = 2.8,   -- delay antar cast (mode normal)
+
+    -- BLATANT MODE (Fast)
+    Blatant_Enabled        = false,
+    Blatant_ReelDelay      = 0.2,   -- seberapa cepat re-cast
+    Blatant_CompleteDelay  = 0.25,  -- delay sebelum FishingCompleted setelah "!"
+
+    -- UTIL
+    AutoBait               = true,
+    AutoBestRod            = true,
 }
 
+-- default complete delay legit (fix)
+local LEGIT_COMPLETE_DELAY = 1.145
+
 --========================================================
--- GET BEST LUCK ROD FUNCTION
+-- BEST LUCK ROD + BAIT
 --========================================================
 
 local function getBestLuckRod()
@@ -563,60 +571,47 @@ local function getBestLuckRod()
     return bestRod
 end
 
-local function autoEquipBestRod()
+local function AutoEquipBestRod()
     if not Farm.AutoBestRod then return end
     local rod = getBestLuckRod()
     if rod then
-        RE_EquipHotbar:FireServer(1)  -- equip slot 1
+        -- asumsikan rod ada di slot 1
+        RE_EquipHotbar:FireServer(1)
     end
 end
 
---========================================================
--- AUTO BAIT
---========================================================
-
-local function applyBaitIfNeeded()
+local function ApplyBaitIfNeeded()
     if not Farm.AutoBait then return end
+    local baitFolder = LocalPlayer2:FindFirstChild("Baits")
+    if not baitFolder then return end
 
-    local baitFolder = LocalPlayer2:WaitForChild("Baits")
     for _, bait in ipairs(baitFolder:GetChildren()) do
-        if bait.Value > 0 then
-            RE_EquipHotbar:FireServer(2)  -- biasanya bait slot 2
+        if bait.Value and bait.Value > 0 then
+            -- asumsikan bait di slot 2
+            RE_EquipHotbar:FireServer(2)
             return
         end
     end
 end
 
 --========================================================
--- PERFECT CASTING
+-- CAST UTAMA (TANPA PERFECT CASTING UI)
 --========================================================
 
-local BASE_X, BASE_Y = -0.75, 1
+local BASE_X, BASE_Y = -0.75, 1  -- titik cast “bagus” bawaan
 
-local function castPerfect()
-    autoEquipBestRod()
-    applyBaitIfNeeded()
+local function DoCastOnce()
+    AutoEquipBestRod()
+    ApplyBaitIfNeeded()
 
+    -- equip rod slot 1
     RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
 
+    -- charge & mulai minigame
     RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
 
-    local perfect = false
-    local conn
-    conn = RE_TextEffect.OnClientEvent:Connect(function(data)
-        if data and data.TextData and data.TextData.Text == "Perfect" then
-            perfect = true
-        end
-    end)
-
-    local t = 0
-    while not perfect and t < 3 do
-        t += 0.05
-        task.wait(0.05)
-    end
-    if conn then conn:Disconnect() end
-
+    -- random kecil supaya keliatan natural
     local rx = BASE_X + math.random(-300, 300) / 1e7
     local ry = BASE_Y + math.random(-300, 300) / 1e7
 
@@ -624,82 +619,130 @@ local function castPerfect()
 end
 
 --========================================================
--- AUTO COMPLETE (Exclaim)
+-- HANDLER EXCLAIM (!) → FishingCompleted
 --========================================================
 
 RE_TextEffect.OnClientEvent:Connect(function(data)
-    if not Farm.AutoFish then return end
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
 
-    local head = LocalPlayer2.Character and LocalPlayer2.Character:FindFirstChild("Head")
-    if head and data.Container == head then
-        task.wait(Farm.CompleteDelay)
+    local char = LocalPlayer2.Character
+    local head = char and char:FindFirstChild("Head")
+    if not head or data.Container ~= head then return end
+
+    -- BLATANT MODE: pakai custom complete delay
+    if Farm.Blatant_Enabled then
+        task.wait(Farm.Blatant_CompleteDelay)
+        RE_FishingCompleted:FireServer()
+        return
+    end
+
+    -- AUTO FISH MODE (legit): delay fix aman
+    if Farm.AutoFish_Enabled then
+        task.wait(LEGIT_COMPLETE_DELAY)
         RE_FishingCompleted:FireServer()
     end
 end)
 
 --========================================================
--- AUTO FISH LOOP
+-- LOOP AUTO FISH (MODE TERGANTUNG STATE)
 --========================================================
 
-local farmThread
+local autoFishThread = nil
 
-local function castOnce()
-    castPerfect()
-
-    if Farm.Mode == "Blatant" then
-        task.wait(0.12)
-    else
-        task.wait(Farm.ReelDelay)
+local function StopAutoFishLoop()
+    if autoFishThread then
+        task.cancel(autoFishThread)
+        autoFishThread = nil
     end
-
-    RE_FishingCompleted:FireServer()
 end
 
-local function startAutoFish()
-    if farmThread then return end
-    farmThread = task.spawn(function()
-        while Farm.AutoFish do
-            castOnce()
-            task.wait(0.10)
+local function AutoFish_Normal_Step()
+    DoCastOnce()
+    task.wait(Farm.AutoFish_ReelDelay)
+end
+
+local function AutoFish_Blatant_Step()
+    DoCastOnce()
+    task.wait(Farm.Blatant_ReelDelay)
+end
+
+local function StartAutoFishLoop()
+    StopAutoFishLoop()
+    if not Farm.AutoFish_Enabled and not Farm.Blatant_Enabled then
+        return
+    end
+
+    autoFishThread = task.spawn(function()
+        while Farm.AutoFish_Enabled or Farm.Blatant_Enabled do
+            if Farm.Blatant_Enabled then
+                AutoFish_Blatant_Step()
+            elseif Farm.AutoFish_Enabled then
+                AutoFish_Normal_Step()
+            else
+                break
+            end
+            task.wait(0.02)
         end
+        autoFishThread = nil
     end)
 end
 
-local function stopAutoFish()
-    if farmThread then
-        task.cancel(farmThread)
-        farmThread = nil
+--========================================================
+-- UI: FARM TAB
+--========================================================
+
+-- ---------- AUTO FISH MODE ----------
+PageFarm:CreateLabel("AUTO FISH MODE")
+
+local tgAutoFish = PageFarm:CreateToggle("Auto Fish", "Mode normal (lebih aman)", function(on)
+    Farm.AutoFish_Enabled = on
+
+    -- kalau mengaktifkan AutoFish, matikan Blatant supaya nggak tabrakan
+    if on and Farm.Blatant_Enabled then
+        Farm.Blatant_Enabled = false
     end
-end
 
---========================================================
--- UI INPUT
---========================================================
-
-PageFarm:CreateToggle("Auto Fish", "Auto lempar & tarik", function(on)
-    Farm.AutoFish = on
-    if on then startAutoFish() else stopAutoFish() end
+    StartAutoFishLoop()
 end)
 
-PageFarm:CreateToggle("Perfect Casting", "Lakukan perfect casting", function(on)
-    Farm.PerfectCasting = on
-end)
-
-PageFarm:CreateBox("Reel Delay", "Delay sebelum restart loop", function(txt)
+PageFarm:CreateBox("Reel Delay (Auto Fish)", "", function(txt)
     local num = tonumber(txt)
-    if num then Farm.ReelDelay = num end
+    if num and num > 0 then
+        Farm.AutoFish_ReelDelay = num
+    end
 end)
 
-PageFarm:CreateBox("Complete Delay", "Delay sebelum FishingCompleted", function(txt)
+-- ---------- BLATANT MODE ----------
+PageFarm:CreateLabel("BLATANT MODE (FAST FISHING)")
+
+local tgBlatant = PageFarm:CreateToggle("Blatant Mode", "Fast fishing (resiko flag)", function(on)
+    Farm.Blatant_Enabled = on
+
+    -- kalau mengaktifkan Blatant, matikan AutoFish
+    if on and Farm.AutoFish_Enabled then
+        Farm.AutoFish_Enabled = false
+    end
+
+    StartAutoFishLoop()
+end)
+
+PageFarm:CreateBox("Reel Delay (Blatant)", "", function(txt)
     local num = tonumber(txt)
-    if num then Farm.CompleteDelay = num end
+    if num and num > 0 then
+        Farm.Blatant_ReelDelay = num
+    end
 end)
 
-PageFarm:CreateToggle("Blatant Mode", "Super cepat (resiko flag)", function(on)
-    Farm.Mode = on and "Blatant" or "Legit"
+PageFarm:CreateBox("Complete Delay (Blatant)", "", function(txt)
+    local num = tonumber(txt)
+    if num and num >= 0 then
+        Farm.Blatant_CompleteDelay = num
+    end
 end)
+
+-- ---------- UTIL (tetap) ----------
+PageFarm:CreateLabel("UTILITY")
 
 PageFarm:CreateToggle("Auto Bait", "Pakai bait otomatis", function(on)
     Farm.AutoBait = on
@@ -708,6 +751,7 @@ end)
 PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", function(on)
     Farm.AutoBestRod = on
 end)
+
 
 --========================================================
 -- TRADE TAB (kosong, siap diisi)
