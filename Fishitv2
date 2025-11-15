@@ -1,5 +1,5 @@
 --========================================================
--- AegisHub Ã¢â‚¬Â¢ Fish It Ã¢â‚¬â€ UI + Misc Features (REVISED)
+-- AegisHub • Fish It — UI + Misc Features (REVISED)
 --========================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -16,7 +16,7 @@ local LocalPlayer        = Players.LocalPlayer
 local VirtualUser        = game:GetService("VirtualUser")
 
 ----------------------------------------------------------------
--- ================== UI LIBRARY (Polished v2 Ã¢â‚¬Â¢ FIX) ===========
+-- ================== UI LIBRARY (Polished v2 • FIX) ===========
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
@@ -24,19 +24,18 @@ local BG_DARK     = Color3.fromRGB(42,44,56)
 local BG_CARD     = Color3.fromRGB(30,31,41)
 
 local function protect(inst)
-    -- Tanpa pcall: aman selama 'syn' ada
     if syn and syn.protect_gui then
         syn.protect_gui(inst)
     end
 end
+
+local UIS = UserInputService
 
 local function tw(o,t,props)
     local a = TweenService:Create(o, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
     a:Play()
     return a
 end
-
-local UIS = UserInputService
 
 local library = {}
 
@@ -131,11 +130,32 @@ function library:CreateWindow(name, version, icon)
     TitleText.TextSize=math.floor(12*SCALE)
     TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1)
-    TitleText.Text=("%s Ã¢â‚¬Â¢ %s"):format(name,version)
+    TitleText.Text=("%s • %s"):format(name,version)
 
     local Under=Instance.new("Frame",Title)
     Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
     Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
+
+    -- ========= TOMBOL X (TUTUP MENU UTAMA) =========
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Name = "CloseButton"
+    CloseBtn.Parent = Title
+    CloseBtn.BackgroundTransparency = 1
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.AnchorPoint = Vector2.new(1, 0)
+    CloseBtn.Position = UDim2.new(1, -6, 0, 4)
+    CloseBtn.Size = UDim2.new(0, math.floor(18 * SCALE), 0, math.floor(18 * SCALE))
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.Text = "X"
+    CloseBtn.TextSize = math.floor(14 * SCALE)
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+    CloseBtn.AutoButtonColor = false
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        if Gui and Gui.Parent then
+            Gui:Destroy() -- hanya menu utama & tombol overlay bulat
+        end
+    end)
 
     -- Drag window
     do local dragging,start,origin
@@ -153,7 +173,7 @@ function library:CreateWindow(name, version, icon)
         end)
     end
 
-    -- Overlay toggle
+    -- Overlay toggle (show/hide window)
     local hidden=false
     Overlay.MouseButton1Click:Connect(function()
         hidden=not hidden; Window.Visible=not hidden
@@ -181,7 +201,7 @@ function library:CreateWindow(name, version, icon)
     trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
 
     ----------------------------------------------------------------
-    -- Tab/Page API (FIXED)
+    -- Tab/Page API
     ----------------------------------------------------------------
     local firstShown=false
 
@@ -221,7 +241,6 @@ function library:CreateWindow(name, version, icon)
         indicator.Visible=false
 
         local function selectThis()
-            -- sembunyikan semua page & indikator
             for _,v in ipairs(Window:GetChildren()) do
                 if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end
             end
@@ -232,7 +251,6 @@ function library:CreateWindow(name, version, icon)
                     if ind then ind.Visible=false end
                 end
             end
-            -- tampilkan yang ini
             TabBtn.TextTransparency=0
             Page.Visible=true
             indicator.Visible=true
@@ -240,7 +258,6 @@ function library:CreateWindow(name, version, icon)
         TabBtn.MouseButton1Click:Connect(selectThis)
         if not firstShown then firstShown=true; selectThis() end
 
-        -- helper: card konten
         local function Card(baseH)
             local fr=Instance.new("Frame",Page)
             fr.BackgroundColor3=BG_CARD
@@ -251,7 +268,6 @@ function library:CreateWindow(name, version, icon)
             return fr
         end
 
-        -- ===== PageAPI (komponen) =====
         local PageAPI = {}
 
         function PageAPI:CreateLabel(text)
@@ -271,11 +287,14 @@ function library:CreateWindow(name, version, icon)
         function PageAPI:CreateButton(name,desc,cb)
             cb=cb or function() end
             local fr=Card(40)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-100,0,math.floor(18*SCALE))
+            local t=Instance.new("TextLabel",fr)
+            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-100,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(name or "BUTTON"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-100,0,math.floor(16*SCALE))
+            local d=Instance.new("TextLabel",fr)
+            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-100,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local run=Instance.new("TextButton",fr); run.BackgroundColor3=Color3.fromRGB(24,25,32); run.Size=UDim2.new(0,84,0,24); run.Position=UDim2.new(1,-100,0,6)
+            local run=Instance.new("TextButton",fr)
+            run.BackgroundColor3=Color3.fromRGB(24,25,32); run.Size=UDim2.new(0,84,0,24); run.Position=UDim2.new(1,-100,0,6)
             run.Text="RUN"; run.Font=Enum.Font.GothamSemibold; run.TextSize=math.floor(11*SCALE); run.TextColor3=Color3.new(1,1,1)
             Instance.new("UICorner",run).CornerRadius=UDim.new(0,8)
             run.MouseButton1Click:Connect(cb)
@@ -285,19 +304,27 @@ function library:CreateWindow(name, version, icon)
         function PageAPI:CreateToggle(title,desc,cb)
             cb=cb or function() end
             local fr=Card(40)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-70,0,math.floor(18*SCALE))
+            local t=Instance.new("TextLabel",fr)
+            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-70,0,math.floor(18*SCALE))
             t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(title or "TOGGLE"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr); d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-70,0,math.floor(16*SCALE))
+            local d=Instance.new("TextLabel",fr)
+            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-70,0,math.floor(16*SCALE))
             d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local track=Instance.new("Frame",fr); track.BackgroundColor3=Color3.fromRGB(24,25,32); track.Size=UDim2.fromOffset(math.floor(50*SCALE),math.floor(22*SCALE)); track.Position=UDim2.new(1,-math.floor(62*SCALE),0,math.floor(8*SCALE))
+            local track=Instance.new("Frame",fr)
+            track.BackgroundColor3=Color3.fromRGB(24,25,32); track.Size=UDim2.fromOffset(math.floor(50*SCALE),math.floor(22*SCALE)); track.Position=UDim2.new(1,-math.floor(62*SCALE),0,math.floor(8*SCALE))
             Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
-            local dot=Instance.new("Frame",track); dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=.6
+            local dot=Instance.new("Frame",track)
+            dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=.6
             Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
 
             local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
             local on=false
             local function apply()
-                tw(dot,.12,{Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE)) or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)), BackgroundTransparency=on and 0 or .6})
+                tw(dot,.12,{
+                    Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE))
+                               or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)),
+                    BackgroundTransparency=on and 0 or .6
+                })
                 cb(on)
             end
             btn.MouseButton1Click:Connect(function() on=not on; apply() end)
@@ -307,9 +334,11 @@ function library:CreateWindow(name, version, icon)
         function PageAPI:CreateBox(placeholder,_,cb)
             cb=cb or function() end
             local fr=Card(32)
-            local t=Instance.new("TextLabel",fr); t.BackgroundTransparency=1; t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.fromRGB(200,205,230)
+            local t=Instance.new("TextLabel",fr)
+            t.BackgroundTransparency=1; t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.fromRGB(200,205,230)
             t.Text=string.upper(placeholder or "INPUT"); t.TextXAlignment=Enum.TextXAlignment.Left; t.Position=UDim2.new(0,8,0,0); t.Size=UDim2.new(1,-8,0,18)
-            local tb=Instance.new("TextBox",fr); tb.BackgroundColor3=Color3.fromRGB(24,25,32); tb.Position=UDim2.new(0,8,0,20); tb.Size=UDim2.new(1,-16,0,26)
+            local tb=Instance.new("TextBox",fr)
+            tb.BackgroundColor3=Color3.fromRGB(24,25,32); tb.Position=UDim2.new(0,8,0,20); tb.Size=UDim2.new(1,-16,0,26)
             tb.ClearTextOnFocus=false; tb.Text=""; tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
             Instance.new("UICorner",tb).CornerRadius=UDim.new(0,8)
             tb.FocusLost:Connect(function() cb(tb.Text) end)
@@ -319,10 +348,12 @@ function library:CreateWindow(name, version, icon)
         function PageAPI:CreateDropdown(title, options, onChanged)
             options=options or {}; onChanged=onChanged or function() end
             local fr=Card(28); fr.Name="Dropdown"
-            local ttl=Instance.new("TextLabel",fr); ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,0,18)
+            local ttl=Instance.new("TextLabel",fr)
+            ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,0,18)
             ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
-            local caret=Instance.new("TextLabel",fr); caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="Ã¢â€“Â¼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            local caret=Instance.new("TextLabel",fr)
+            caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
+            caret.Font=Enum.Font.GothamBlack; caret.Text="▼"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
 
             local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
             holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
@@ -349,7 +380,8 @@ function library:CreateWindow(name, version, icon)
             rebuild(options)
 
             local open=false
-            local header=Instance.new("TextButton",fr); header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,20); header.Position=UDim2.new(0,0,0,0); header.Text=""
+            local header=Instance.new("TextButton",fr)
+            header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,20); header.Position=UDim2.new(0,0,0,0); header.Text=""
             header.MouseButton1Click:Connect(function()
                 open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0})
             end)
@@ -361,7 +393,6 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
-        -- >>> NEW: Slider (min, max, cb) <<<
         function PageAPI:CreateSlider(title, min, max, cb)
             min = tonumber(min) or 0
             max = tonumber(max) or 100
@@ -443,7 +474,6 @@ function library:CreateWindow(name, version, icon)
         return PageAPI
     end
 
-    -- Objek tab yang sesuai pemakaian: Tab = win:CreateTab("X"); Page = Tab:CreateFrame("Y")
     local winAPI = {}
 
     function winAPI:CreateTab(title)
@@ -451,8 +481,6 @@ function library:CreateWindow(name, version, icon)
         function tabObj:CreateFrame(pageTitle)
             return makePage(pageTitle or title or "Page")
         end
-        -- auto buat 1 page default saat dipanggil kalau mau langsung dipakai:
-        -- return setmetatable(tabObj, {__index = tabObj}):CreateFrame(title)
         return setmetatable(tabObj, {__index = tabObj})
     end
 
@@ -471,9 +499,9 @@ local PageFarm  = TabFarm:CreateFrame("Farm")
 PageFarm:CreateLabel("FARM MENU")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players           = game:GetService("Players")
-local Workspace         = game:GetService("Workspace")
-local LocalPlayer       = Players.LocalPlayer
+local Players2          = game:GetService("Players")
+local Workspace2        = game:GetService("Workspace")
+local LocalPlayer2      = Players2.LocalPlayer
 
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
@@ -507,8 +535,8 @@ local Farm = {
 --========================================================
 
 local function getBestLuckRod()
-    local backpack = LocalPlayer.Backpack
-    local char = LocalPlayer.Character
+    local backpack = LocalPlayer2.Backpack
+    local char = LocalPlayer2.Character
 
     local bestRod = nil
     local highestLuck = -999
@@ -550,7 +578,7 @@ end
 local function applyBaitIfNeeded()
     if not Farm.AutoBait then return end
 
-    local baitFolder = LocalPlayer:WaitForChild("Baits")
+    local baitFolder = LocalPlayer2:WaitForChild("Baits")
     for _, bait in ipairs(baitFolder:GetChildren()) do
         if bait.Value > 0 then
             RE_EquipHotbar:FireServer(2)  -- biasanya bait slot 2
@@ -572,7 +600,7 @@ local function castPerfect()
     RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
 
-    RF_Charge:InvokeServer(Workspace:GetServerTimeNow())
+    RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
 
     local perfect = false
     local conn
@@ -604,7 +632,7 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
 
-    local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+    local head = LocalPlayer2.Character and LocalPlayer2.Character:FindFirstChild("Head")
     if head and data.Container == head then
         task.wait(Farm.CompleteDelay)
         RE_FishingCompleted:FireServer()
@@ -620,11 +648,10 @@ local farmThread
 local function castOnce()
     castPerfect()
 
-    -- 2 mode delay
     if Farm.Mode == "Blatant" then
-        task.wait(0.12)            -- agresif
+        task.wait(0.12)
     else
-        task.wait(Farm.ReelDelay)  -- manual
+        task.wait(Farm.ReelDelay)
     end
 
     RE_FishingCompleted:FireServer()
@@ -660,16 +687,15 @@ PageFarm:CreateToggle("Perfect Casting", "Lakukan perfect casting", function(on)
     Farm.PerfectCasting = on
 end)
 
-
 PageFarm:CreateBox("Reel Delay", "Delay sebelum restart loop", function(txt)
     local num = tonumber(txt)
     if num then Farm.ReelDelay = num end
-end, tostring(Farm.ReelDelay))
+end)
 
 PageFarm:CreateBox("Complete Delay", "Delay sebelum FishingCompleted", function(txt)
     local num = tonumber(txt)
     if num then Farm.CompleteDelay = num end
-end, tostring(Farm.CompleteDelay))
+end)
 
 PageFarm:CreateToggle("Blatant Mode", "Super cepat (resiko flag)", function(on)
     Farm.Mode = on and "Blatant" or "Legit"
@@ -683,6 +709,9 @@ PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", funct
     Farm.AutoBestRod = on
 end)
 
+--========================================================
+-- TRADE TAB (kosong, siap diisi)
+--========================================================
 local TabTrade  = win:CreateTab("Trade")
 local PageTrade = TabTrade:CreateFrame("Trade")
 PageTrade:CreateLabel("TRADE MENU")
@@ -690,7 +719,6 @@ PageTrade:CreateLabel("TRADE MENU")
 --========================================================
 -- TELEPORT (Island / NPC / Player)
 --========================================================
--- ---------- Helper umum ----------
 local function tpTo(pos: Vector3)
     if not pos then return end
     local plr = Players.LocalPlayer
@@ -701,9 +729,6 @@ local function tpTo(pos: Vector3)
     end
 end
 
---========================================================
--- TELEPORT (Island / NPC / Player)
---========================================================
 local TabTP  = win:CreateTab("Teleport")
 local PageTP = TabTP:CreateFrame("Teleport")
 PageTP:CreateLabel("TELEPORT MENU")
@@ -749,7 +774,6 @@ local function scanNPC_Models()
     local found = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and #m.Name >= 3 then
-            -- abaikan karakter player
             if Players:GetPlayerFromCharacter(m) == nil then
                 local hasHum = m:FindFirstChildOfClass("Humanoid") ~= nil
                 local hasPrompt = false
@@ -780,7 +804,6 @@ local ddNPC = PageTP:CreateDropdown("Teleport NPC", npcList, function(nm)
     local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    -- pilih instance NPC terdekat dengan nama mengandung 'nm'
     local best,dist
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
@@ -826,18 +849,16 @@ end
 task.spawn(function()
     while true do
         task.wait(8)
-        -- NPC
         local newNPC = scanNPC_Models()
         if ddNPC and ddNPC.SetOptions then
             ddNPC:SetOptions(newNPC)
             if currentNPC then
-                -- jaga pilihan jika masih ada
                 for _,name in ipairs(newNPC) do
                     if name == currentNPC and ddNPC.SetValue then ddNPC:SetValue(currentNPC) break end
                 end
             end
         end
-        -- Player
+
         local newPL = playersList()
         if ddPlayer and ddPlayer.SetOptions then
             ddPlayer:SetOptions(newPL)
@@ -864,40 +885,36 @@ local TabMisc   = win:CreateTab("Misc")
 local PageMisc  = TabMisc:CreateFrame("Misc")
 PageMisc:CreateLabel("MISC ULTRA FPS")
 
--- ---------- STATE ----------
 local State = {
     AntiAFK           = true,
     FPSBoost          = true,
     LightingSimple    = true,
     TexturesOff       = true,
     SmoothPlastic     = true,
-    UltraNoEffects    = true,   -- MATIIN ANIMASI + PARTICLE + LIGHT
+    UltraNoEffects    = true,
     FPSCapValue       = 120,
 }
 
--- Simpan efek yang dimatikan supaya bisa reset lighting doang
 local Saved = {
     PostEffects   = {},
     GlobalShadows = nil,
     FogEnd        = nil,
 }
 
--- ---------- ANTI AFK ----------
 local AntiAFK_Conn = nil
 local function EnableAntiAFK()
     if AntiAFK_Conn ~= nil then AntiAFK_Conn:Disconnect() end
     AntiAFK_Conn = LocalPlayer.Idled:Connect(function()
-        local cam = Workspace.CurrentCamera
-        VirtualUser:Button2Down(Vector2.new(0,0), (cam and cam.CFrame) or CFrame.new())
+        local cam2 = Workspace.CurrentCamera
+        VirtualUser:Button2Down(Vector2.new(0,0), (cam2 and cam2.CFrame) or CFrame.new())
         task.wait(0.7)
-        VirtualUser:Button2Up(Vector2.new(0,0), (cam and cam.CFrame) or CFrame.new())
+        VirtualUser:Button2Up(Vector2.new(0,0), (cam2 and cam2.CFrame) or CFrame.new())
     end)
 end
 local function DisableAntiAFK()
     if AntiAFK_Conn ~= nil then AntiAFK_Conn:Disconnect(); AntiAFK_Conn = nil end
 end
 
--- ---------- VISUAL HELPERS DASAR ----------
 local function ApplySmoothPlastic()
     for _, v in ipairs(game:GetDescendants()) do
         if v:IsA("BasePart") then
@@ -957,24 +974,20 @@ local function ResetLighting()
     end
 end
 
--- ---------- ULTRA MODE: MATIKAN ANIMASI + PARTICLE + LIGHT BERAT ----------
 local function KillCharacterAnimation(char)
     if not char then return end
 
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        -- stop semua track yang lagi jalan
         for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
             pcall(function() track:Stop() end)
         end
-        -- hancurin animator biar nggak main lagi
         local animator = humanoid:FindFirstChildOfClass("Animator")
         if animator then
             pcall(function() animator:Destroy() end)
         end
     end
 
-    -- script Animate default Roblox (jalan, lompat, dsb)
     local animate = char:FindFirstChild("Animate")
     if animate then
         pcall(function() animate:Destroy() end)
@@ -1019,7 +1032,6 @@ local function UltraNoEffectsApply()
     KillAllHumanoidAnimations()
     KillParticlesAndLights()
 
-    -- apply lagi ke karakter player setiap spawn
     local function onChar(char)
         task.delay(1, function()
             if State.UltraNoEffects then
@@ -1034,28 +1046,21 @@ local function UltraNoEffectsApply()
     LocalPlayer.CharacterAdded:Connect(onChar)
 end
 
--- ---------- FPS BOOST MAIN ----------
 local function FPSBoostApply()
     if State.SmoothPlastic   then ApplySmoothPlastic()   end
     if State.TexturesOff     then DisableTextures()      end
     if State.LightingSimple  then LightingSimplify()     end
     if State.UltraNoEffects  then UltraNoEffectsApply()  end
 
-    -- minimal quality
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-    -- kalau Delta support, biasanya juga nurunin render distance dsb sendiri
 end
 
--- ---------- FPS CAP ----------
 local function ApplyFPSCap()
     if typeof(setfpscap) == "function" then
         setfpscap(tonumber(State.FPSCapValue) or 120)
     end
 end
 
--- ========================================================
--- UI: TOGGLES / SLIDER / BUTTON
--- ========================================================
 local tgAntiAFK = PageMisc:CreateToggle("Anti AFK", "Cegah kick saat idle (Auto ON)", function(on)
     State.AntiAFK = on
     if on then EnableAntiAFK() else DisableAntiAFK() end
@@ -1096,9 +1101,6 @@ local btnReset = PageMisc:CreateButton("Reset Lighting", "Kembalikan pengaturan 
     ResetLighting()
 end)
 
--- ========================================================
--- AUTO-APPLY SAAT STARTUP
--- ========================================================
 if tgAntiAFK and tgAntiAFK.Set   then tgAntiAFK.Set(true)   end
 if tgFPSBoost and tgFPSBoost.Set then tgFPSBoost.Set(true)  end
 if tgLighting and tgLighting.Set then tgLighting.Set(true)  end
@@ -1106,7 +1108,6 @@ if tgTextures and tgTextures.Set then tgTextures.Set(true)  end
 if tgSmooth  and tgSmooth.Set    then tgSmooth.Set(true)    end
 if tgUltra   and tgUltra.Set     then tgUltra.Set(true)     end
 
--- Juga jalankan sekali di awal
 EnableAntiAFK()
 FPSBoostApply()
 LightingSimplify()
@@ -1116,3 +1117,133 @@ UltraNoEffectsApply()
 ApplyFPSCap()
 
 PageMisc:CreateLabel("Semua optimasi & Anti-AFK sudah aktif.")
+
+--========================================================
+-- OVERLAY FPS + PING (TEXT ONLY, DRAGGABLE)
+--========================================================
+local Stats = game:GetService("Stats")
+local guiParent = (gethui and gethui()) or CoreGui
+local UIS2 = game:GetService("UserInputService")
+
+local oldOverlay = guiParent:FindFirstChild("FPS_PING_TEXT_ONLY")
+if oldOverlay then
+    oldOverlay:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FPS_PING_TEXT_ONLY"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+if syn and syn.protect_gui then
+    syn.protect_gui(screenGui)
+end
+screenGui.Parent = guiParent
+
+local holder = Instance.new("Frame")
+holder.Name = "Holder"
+holder.Parent = screenGui
+holder.BackgroundTransparency = 1
+holder.BorderSizePixel = 0
+holder.AnchorPoint = Vector2.new(0, 0)
+holder.Position = UDim2.new(0, 10, 0, 10)
+holder.Size = UDim2.new(0, 320, 0, 20)
+
+local hList = Instance.new("UIListLayout", holder)
+hList.FillDirection = Enum.FillDirection.Horizontal
+hList.SortOrder = Enum.SortOrder.LayoutOrder
+hList.VerticalAlignment = Enum.VerticalAlignment.Center
+hList.Padding = UDim.new(0, 6)
+
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Name = "InfoLabel"
+infoLabel.Parent = holder
+infoLabel.BackgroundTransparency = 1
+infoLabel.BorderSizePixel = 0
+infoLabel.Size = UDim2.new(0, 320, 0, 20)
+infoLabel.Font = Enum.Font.Code
+infoLabel.TextSize = 14
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoLabel.TextStrokeTransparency = 0.5
+infoLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+infoLabel.Text = "FPS: ... | Ping: ..."
+
+do
+    local dragging = false
+    local dragStart, startPos
+
+    holder.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = holder.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UIS2.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+
+            local cam3 = Workspace.CurrentCamera
+            if cam3 then
+                local vp = cam3.ViewportSize
+                newX = math.clamp(newX, 0, vp.X - holder.AbsoluteSize.X)
+                newY = math.clamp(newY, 0, vp.Y - holder.AbsoluteSize.Y)
+            end
+
+            holder.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end)
+end
+
+local fps = 0
+local avgFPS = 0
+local alphaFPS = 0.15
+
+RunService.RenderStepped:Connect(function(dt)
+    local instFPS = 1 / math.max(dt, 1/1000)
+    if avgFPS == 0 then
+        avgFPS = instFPS
+    else
+        avgFPS = avgFPS + (instFPS - avgFPS) * alphaFPS
+    end
+    fps = avgFPS
+end)
+
+local function getPingMs()
+    local pingStat
+    local ok = pcall(function()
+        pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+    end)
+
+    if ok and pingStat then
+        local str = pingStat:GetValueString() or ""
+        local num = tonumber(string.match(str, "(%d+)"))
+        return num or 0
+    end
+
+    return 0
+end
+
+task.spawn(function()
+    while screenGui.Parent do
+        local fpsRounded = math.floor(fps + 0.5)
+        local pingMs = getPingMs()
+
+        if pingMs > 0 then
+            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: " .. tostring(pingMs) .. " ms"
+        else
+            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: N/A"
+        end
+
+        task.wait(0.25)
+    end
+end)
