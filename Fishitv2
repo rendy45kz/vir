@@ -535,8 +535,8 @@ local Farm = {
 
     -- BLATANT (5x style)
     Blatant_Enabled        = false,
-    Blatant_FinishDelay    = 0.05,  -- spam delay ke FishingCompleted (mirip FINISH_DELAY)
-    Blatant_RecastDelay    = 0.2,   -- jeda kecil sebelum recast setelah FishCaught
+    Blatant_FinishDelay    = 0.05,  -- spam delay ke FishingCompleted (Complete Delay)
+    Blatant_RecastDelay    = 0.2,   -- REEL DELAY antar cast
     AntiStuck_Enabled      = false,
     AntiStuck_Timeout      = 10,    -- detik tanpa ikan → restart Blatant
 
@@ -607,19 +607,15 @@ local function ApplyBaitIfNeeded()
 end
 
 --========================================================
--- STOP FISHING (mirip _G.StopFishing)
+-- STOP FISHING (tanpa pcall)
 --========================================================
 
 local function StopFishing()
     if RF_CancelFishingInputs then
-        pcall(function()
-            RF_CancelFishingInputs:InvokeServer()
-        end)
+        RF_CancelFishingInputs:InvokeServer()
     end
     if RE_FishingStopped and typeof(firesignal) == "function" then
-        pcall(function()
-            firesignal(RE_FishingStopped.OnClientEvent)
-        end)
+        firesignal(RE_FishingStopped.OnClientEvent)
     end
 end
 
@@ -645,7 +641,7 @@ local function DoCastOnce()
 end
 
 --========================================================
--- AUTO SELL & ANTI-STUCK (mirip referensi)
+-- AUTO SELL & ANTI-STUCK (tanpa pcall di Sell)
 --========================================================
 
 local obtainedFishCount = 0
@@ -663,9 +659,9 @@ if RE_ObtainedNewFishNotif and RF_SellAllItems then
         while true do
             task.wait(0.5)
             if Farm.AutoSell_Enabled and obtainedFishCount >= (tonumber(Farm.AutoSell_Limit) or 30) then
-                pcall(function()
+                if RF_SellAllItems then
                     RF_SellAllItems:InvokeServer()
-                end)
+                end
                 obtainedFishCount = 0
             end
         end
@@ -688,7 +684,7 @@ task.spawn(function()
 end)
 
 --========================================================
--- BLATANT ENGINE (mirip autofish5x)
+-- BLATANT ENGINE (tanpa pcall di cast loop)
 --========================================================
 
 local BlatantState = {
@@ -704,7 +700,7 @@ local function StartSpamFinish()
 
     BlatantState.SpamThread = task.spawn(function()
         while BlatantState.IsSpammingFinish and Farm.Blatant_Enabled do
-            task.wait(tonumber(Farm.Blatant_FinishDelay) or 0.05)
+            task.wait(tonumber(Farm.Blatant_FinishDelay) or 0.05) -- COMPLETE DELAY
             RE_FishingCompleted:FireServer()
         end
     end)
@@ -724,12 +720,8 @@ local function StartRecastLoop()
 
     BlatantState.RecastThread = task.spawn(function()
         while BlatantState.IsRecasting and Farm.Blatant_Enabled do
-            local ok, err = pcall(DoCastOnce)
-            if not ok then
-                warn("[Blatant] Cast error:", err)
-                break
-            end
-            -- tunggu efek catch / stop dari event
+            DoCastOnce()
+            -- REEL DELAY antar cast
             task.wait(tonumber(Farm.Blatant_RecastDelay) or 0.2)
         end
         BlatantState.IsRecasting = false
@@ -744,7 +736,7 @@ local function StopRecastLoop()
     end
 end
 
--- Saat "!" Exclaim muncul → mulai spam finish (mirip _G.startSpam)
+-- Saat "!" Exclaim muncul → mulai spam finish (Complete Delay)
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -768,14 +760,14 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     end
 end)
 
--- Saat ikan tertangkap → stop spam & stop fishing lalu recast (mirip REFishCaught handler)
+-- Saat ikan tertangkap → stop spam & stop fishing lalu recast
 if RE_FishCaught then
     RE_FishCaught.OnClientEvent:Connect(function(fishName, info)
         lastFishTime = tick()
         if Farm.Blatant_Enabled then
             StopSpamFinish()
             StopFishing()
-            -- recast cepat
+            -- recast cepat (Reel Delay)
             task.delay(tonumber(Farm.Blatant_RecastDelay) or 0.2, function()
                 if Farm.Blatant_Enabled then
                     DoCastOnce()
@@ -785,12 +777,10 @@ if RE_FishCaught then
     end)
 end
 
--- Kalau PlayFishingEffect dipakai untuk indikator active, bisa stop recast spam di situ (mirip referensi)
 if RE_PlayFishingEffect then
     RE_PlayFishingEffect.OnClientEvent:Connect(function(player, head, data)
         if player == LocalPlayer2 and Farm.Blatant_Enabled then
-            -- pas effect jalan, kita bisa reset spam jika mau
-            -- di referensi: StopRecastSpam()
+            -- bisa dipakai untuk reset recast kalau mau
         end
     end)
 end
@@ -876,12 +866,12 @@ PageFarm:CreateToggle("Blatant Mode", "Super cepat (spam finish, resiko flag)", 
         -- auto set speed kurang lebih 5x dari AutoFish
         local autoCycle = math.max(0.5, Farm.AutoFish_ReelDelay + LEGIT_COMPLETE_DELAY)
         local targetCycle = autoCycle / BLATANT_SPEED_X
-        Farm.Blatant_FinishDelay = math.max(0.02, targetCycle * 0.2)
-        Farm.Blatant_RecastDelay = math.max(0.05, targetCycle * 0.2)
+        Farm.Blatant_FinishDelay = math.max(0.02, targetCycle * 0.2) -- Complete Delay
+        Farm.Blatant_RecastDelay = math.max(0.05, targetCycle * 0.2) -- Reel Delay
 
         lastFishTime = tick()
         DoCastOnce()
-        -- recast loop dikerjain saat FishCaught & anti-stuck
+        -- recast berikutnya di-handle event + anti-stuck
     end
 end)
 
@@ -892,7 +882,7 @@ PageFarm:CreateBox("Finish Delay (Blatant)", "Delay spam FishingCompleted (lebih
     end
 end)
 
-PageFarm:CreateBox("Recast Delay (Blatant)", "Delay kecil sebelum lempar ulang setelah fish caught", function(txt)
+PageFarm:CreateBox("Reel Delay (Blatant)", "Delay antar cast (lempar ke lempar berikutnya)", function(txt)
     local num = tonumber(txt)
     if num and num >= 0 then
         Farm.Blatant_RecastDelay = num
