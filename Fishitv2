@@ -490,7 +490,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISH IT FARM - Auto Fish (FAST, NO BLATANT)
+-- FISH IT FARM - Auto Fish cepat (NO BLATANT)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -514,90 +514,41 @@ local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted"
 local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
-local RE_FishCaught        = net:FindFirstChild("RE/FishCaught") -- tidak dipakai di AutoFish saja
+local RE_FishCaught        = net:FindFirstChild("RE/FishCaught") -- tidak dipakai
 
--- STATE FARM (tanpa Blatant)
+-- STATE FARM (Auto Fish saja)
 local Farm = {
     AutoFish_Enabled       = false,
-    AutoFish_ReelDelay     = 0.05,  -- delay setelah Exclaim sebelum recast (super cepat default)
 
-    AutoBait               = true,  -- masih disimpan kalau mau dipakai nanti
+    -- Delay bisa kamu atur dari UI:
+    AutoFish_CompleteDelay = 0.10, -- jeda setelah "!" sebelum tarik ikan
+    AutoFish_ReelDelay     = 0.05, -- jeda setelah tarik ikan sebelum lempar lagi
+
+    AutoBait               = true,
     AutoBestRod            = true,
 }
 
--- (opsional) fungsi rod/bait masih ada kalau kamu mau pakai nanti, tapi tidak dipanggil
-local function getBestLuckRod()
-    local backpack = LocalPlayer2.Backpack
-    local char = LocalPlayer2.Character
-
-    local bestRod = nil
-    local highestLuck = -999
-
-    local function check(tool)
-        if tool:FindFirstChild("Stats") and tool.Stats:FindFirstChild("Luck") then
-            local luck = tool.Stats.Luck.Value
-            if luck > highestLuck then
-                highestLuck = luck
-                bestRod = tool
-            end
-        end
-    end
-
-    for _, tool in ipairs(backpack:GetChildren()) do
-        check(tool)
-    end
-    if char then
-        for _, tool in ipairs(char:GetChildren()) do
-            check(tool)
-        end
-    end
-
-    return bestRod
-end
-
-local function AutoEquipBestRod()
-    if not Farm.AutoBestRod then return end
-    local rod = getBestLuckRod()
-    if rod then
-        RE_EquipHotbar:FireServer(1) -- slot 1
-    end
-end
-
-local function ApplyBaitIfNeeded()
-    if not Farm.AutoBait then return end
-    local baitFolder = LocalPlayer2:FindFirstChild("Baits")
-    if not baitFolder then return end
-
-    for _, bait in ipairs(baitFolder:GetChildren()) do
-        if bait.Value and bait.Value > 0 then
-            RE_EquipHotbar:FireServer(2) -- bait slot 2
-            return
-        end
-    end
-end
-
--------------------------------------
+------------------------------------------------
 -- EQUIP ROD SEKALI SAJA
--------------------------------------
+------------------------------------------------
 local RodEquippedOnce = false
 
 local function EquipRodOnce()
     if RodEquippedOnce then return end
     RodEquippedOnce = true
 
-    -- kalau mau, di sini bisa panggil AutoEquipBestRod / ApplyBaitIfNeeded 1x
-    -- AutoEquipBestRod()
-    RE_EquipHotbar:FireServer(1) -- << HANYA SEKALI DI SINI
+    -- Kalau mau simple: selalu equip slot 1
+    RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
 end
 
--------------------------------------
--- CAST UTAMA (FAST)
--------------------------------------
+------------------------------------------------
+-- CAST UTAMA
+------------------------------------------------
 local BASE_X, BASE_Y = -0.75, 1
 
 local function DoCastOnce()
-    EquipRodOnce() -- pastikan rod sudah ter-equip sekali saja
+    EquipRodOnce()
 
     RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
 
@@ -607,9 +558,9 @@ local function DoCastOnce()
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
---------------------------------------------------------
--- HANDLER EXCLAIM → langsung tarik + recast cepat
---------------------------------------------------------
+------------------------------------------------
+-- HANDLER EXCLAIM → tarik + recast
+------------------------------------------------
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -620,19 +571,41 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
 
     if not Farm.AutoFish_Enabled then return end
 
-    -- TARIK IKAN LANGSUNG
-    RE_FishingCompleted:FireServer()
+    local completeDelay = tonumber(Farm.AutoFish_CompleteDelay) or 0.10
+    local reelDelay     = tonumber(Farm.AutoFish_ReelDelay)     or 0.05
 
-    -- RECAST CEPAT setelah AutoFish_ReelDelay
-    local d = tonumber(Farm.AutoFish_ReelDelay) or 0.05
-    if d < 0 then d = 0 end
+    if completeDelay < 0 then completeDelay = 0 end
+    if reelDelay     < 0 then reelDelay     = 0 end
 
-    task.delay(d, function()
-        if Farm.AutoFish_Enabled then
-            DoCastOnce()
-        end
+    -- 1) Tunggu dikit, lalu tarik ikan
+    task.delay(completeDelay, function()
+        if not Farm.AutoFish_Enabled then return end
+
+        RE_FishingCompleted:FireServer()
+
+        -- 2) Setelah itu tunggu ReelDelay, lalu cast lagi
+        task.delay(reelDelay, function()
+            if Farm.AutoFish_Enabled then
+                DoCastOnce()
+            end
+        end)
     end)
 end)
+
+-- (Opsional) Kalau mau aman, boleh juga auto recast ketika event FishCaught keluar
+--[[
+if RE_FishCaught then
+    RE_FishCaught.OnClientEvent:Connect(function()
+        if Farm.AutoFish_Enabled then
+            task.delay(Farm.AutoFish_ReelDelay, function()
+                if Farm.AutoFish_Enabled then
+                    DoCastOnce()
+                end
+            end)
+        end
+    end)
+end
+]]
 
 --========================================================
 -- UI: FARM
@@ -640,16 +613,23 @@ end)
 
 PageFarm:CreateLabel("AUTO FISH MODE")
 
-PageFarm:CreateToggle("Auto Fish", "Mode cepat (Exclaim → tarik → recast otomatis)", function(on)
+PageFarm:CreateToggle("Auto Fish", "Exclaim → tarik → recast otomatis", function(on)
     Farm.AutoFish_Enabled = on
 
     if on then
-        -- mulai dengan satu cast, selanjutnya di-loop oleh Exclaim handler
+        -- mulai satu kali, selanjutnya di-handle Exclaim
         DoCastOnce()
     end
 end)
 
-PageFarm:CreateBox("Reel Delay (Auto Fish)", "Delay setelah ! sebelum recast (misal 0.05 - 0.2)", function(txt)
+PageFarm:CreateBox("Complete Delay", "Delay dari ! ke tarik (contoh: 0.08 - 0.20)", function(txt)
+    local num = tonumber(txt)
+    if num and num >= 0 then
+        Farm.AutoFish_CompleteDelay = num
+    end
+end)
+
+PageFarm:CreateBox("Reel Delay", "Delay dari tarik ke lempar lagi (contoh: 0.03 - 0.15)", function(txt)
     local num = tonumber(txt)
     if num and num >= 0 then
         Farm.AutoFish_ReelDelay = num
