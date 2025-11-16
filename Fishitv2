@@ -1,496 +1,5 @@
 --========================================================
--- AegisHub - Fish It — UI + Misc + Farm (Blatant cepat, NO STUCK, DELAY INPUT)
---========================================================
-
-if not game:IsLoaded() then game.Loaded:Wait() end
-
--- Services
-local Players            = game:GetService("Players")
-local RunService         = game:GetService("RunService")
-local Lighting           = game:GetService("Lighting")
-local Workspace          = game:GetService("Workspace")
-local UserInputService   = game:GetService("UserInputService")
-local TweenService       = game:GetService("TweenService")
-local CoreGui            = game:GetService("CoreGui")
-local LocalPlayer        = Players.LocalPlayer
-local VirtualUser        = game:GetService("VirtualUser")
-
-----------------------------------------------------------------
--- ============== UI LIBRARY (Polished v2) =====================
-----------------------------------------------------------------
-local ACCENT      = Color3.fromRGB(110,175,255)
-local ACCENT_TEXT = Color3.fromRGB(227,229,255)
-local BG_DARK     = Color3.fromRGB(42,44,56)
-local BG_CARD     = Color3.fromRGB(30,31,41)
-
-local function protect(inst)
-    if syn and syn.protect_gui then
-        syn.protect_gui(inst)
-    end
-end
-
-local UIS = UserInputService
-
-local function tw(o,t,props)
-    local a = TweenService:Create(o, TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
-    a:Play()
-    return a
-end
-
-local library = {}
-
-function library:CreateWindow(name, version, icon)
-    name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
-
-    -- ScreenGui
-    local Gui = Instance.new("ScreenGui")
-    Gui.Name = "AegisHub_UIv2"
-    Gui.IgnoreGuiInset = false
-    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    Gui.ResetOnSpawn = false
-    Gui.DisplayOrder = 9999
-    protect(Gui)
-    Gui.Parent = CoreGui
-
-    -- Scale kecil utk layar kecil
-    local function calcScale()
-        local cam = Workspace.CurrentCamera
-        local vp = cam and cam.ViewportSize or Vector2.new(1280,720)
-        local shortest = math.min(vp.X, vp.Y)
-        if shortest <= 720 then return 0.85 elseif shortest <= 900 then return 0.92 else return 1 end
-    end
-    local SCALE = calcScale()
-
-    -- Overlay toggle
-    local Overlay = Instance.new("ImageButton")
-    Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
-    Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
-    Overlay.BackgroundColor3=Color3.fromRGB(32,34,46)
-    Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
-    Instance.new("UICorner", Overlay).CornerRadius = UDim.new(1,0)
-    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
-
-    local cam = Workspace.CurrentCamera
-    local ox = Gui:GetAttribute("ovx") or 12
-    local oy = Gui:GetAttribute("ovy") or math.floor((cam.ViewportSize.Y/2)-20)
-    Overlay.Position = UDim2.fromOffset(ox, oy)
-
-    do
-        local dragging, start, origin
-        Overlay.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                dragging=true; start=i.Position; origin=Overlay.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState==Enum.UserInputState.End then
-                        dragging=false
-                        Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
-                        Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
-                    end
-                end)
-            end
-        end)
-        UIS.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-                local d=i.Position-start
-                local vp=Workspace.CurrentCamera.ViewportSize
-                local nx = math.clamp(origin.X.Offset + d.X, 4, vp.X-44)
-                local ny = math.clamp(origin.Y.Offset + d.Y, 4, vp.Y-44)
-                Overlay.Position = UDim2.fromOffset(nx, ny)
-            end
-        end)
-    end
-
-    -- Window
-    local Window = Instance.new("Frame")
-    protect(Window)
-    Window.Parent=Gui
-    Window.BackgroundColor3=BG_DARK
-    Window.ClipsDescendants=false
-    Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(340*SCALE))
-    Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
-    Instance.new("UICorner",Window).CornerRadius=UDim.new(0,6)
-
-    -- Title bar
-    local Title=Instance.new("Frame",Window)
-    Title.BackgroundTransparency=1
-    Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
-
-    local Icon=Instance.new("ImageLabel",Title)
-    Icon.BackgroundTransparency=1
-    Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-    Icon.Position=UDim2.new(0,8,0,6)
-    Icon.Image="rbxassetid://"..tostring(icon)
-    Icon.ImageColor3=ACCENT
-
-    local TitleText=Instance.new("TextLabel",Title)
-    TitleText.BackgroundTransparency=1
-    TitleText.Position=UDim2.new(0,30,0,0)
-    TitleText.Size=UDim2.new(1,-30,1,0)
-    TitleText.Font=Enum.Font.GothamMedium
-    TitleText.TextSize=math.floor(12*SCALE)
-    TitleText.TextXAlignment=Enum.TextXAlignment.Left
-    TitleText.TextColor3=Color3.new(1,1,1)
-    TitleText.Text=(name .. " - " .. version)
-
-    local Under=Instance.new("Frame",Title)
-    Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
-    Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
-
-    -- Tombol X
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Name = "CloseButton"
-    CloseBtn.Parent = Title
-    CloseBtn.BackgroundTransparency = 1
-    CloseBtn.BorderSizePixel = 0
-    CloseBtn.AnchorPoint = Vector2.new(1, 0)
-    CloseBtn.Position = UDim2.new(1, -6, 0, 4)
-    CloseBtn.Size = UDim2.new(0, math.floor(18 * SCALE), 0, math.floor(18 * SCALE))
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.Text = "X"
-    CloseBtn.TextSize = math.floor(14 * SCALE)
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-    CloseBtn.AutoButtonColor = false
-    CloseBtn.MouseButton1Click:Connect(function()
-        if Gui and Gui.Parent then
-            Gui:Destroy()
-        end
-    end)
-
-    -- Drag window
-    do local dragging,start,origin
-        Title.InputBegan:Connect(function(i)
-            if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
-                dragging=true; start=i.Position; origin=Window.Position
-                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
-            end
-        end)
-        UIS.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-                local d=i.Position-start
-                Window.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
-            end
-        end)
-    end
-
-    -- Overlay show/hide
-    local hidden=false
-    Overlay.MouseButton1Click:Connect(function()
-        hidden=not hidden; Window.Visible=not hidden
-        tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
-    end)
-
-    -- Tabs rail
-    local TabsRail=Instance.new("Frame",Window)
-    TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
-    TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE))
-    TabsRail.Size=UDim2.new(0,math.floor(136*SCALE),1,-math.floor(42*SCALE))
-    Instance.new("UICorner",TabsRail).CornerRadius=UDim.new(0,6)
-
-    local trlbl=Instance.new("TextLabel",TabsRail)
-    trlbl.BackgroundTransparency=1
-    trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE))
-    trlbl.Position=UDim2.new(0,8,0,0)
-    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"
-    trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
-    trlbl.TextColor3=Color3.new(1,1,1)
-
-    local trlist=Instance.new("UIListLayout",TabsRail)
-    trlist.Padding=UDim.new(0,math.floor(4*SCALE))
-    trlist.SortOrder=Enum.SortOrder.LayoutOrder
-    trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
-
-    ------------------------------------------------------------
-    -- Tab/Page API
-    ------------------------------------------------------------
-    local firstShown=false
-
-    local function makePage(title)
-        title = title or "Page"
-
-        local Page=Instance.new("ScrollingFrame",Window)
-        Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
-        Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.new(0,0,0,0)
-        Page.BackgroundColor3=BG_DARK
-        Page.Position=UDim2.new(0,math.floor(150*SCALE),0,math.floor(36*SCALE))
-        Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
-        Page.Visible=false
-        Instance.new("UICorner",Page).CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page)
-        pad.PaddingTop=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingRight=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
-        local vlist=Instance.new("UIListLayout",Page)
-        vlist.Padding=UDim.new(0,math.floor(6*SCALE))
-        vlist.SortOrder=Enum.SortOrder.LayoutOrder
-        vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
-
-        local TabBtn=Instance.new("TextButton",TabsRail)
-        TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
-        TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
-        TabBtn.TextTransparency=.5
-
-        local indicator=Instance.new("Frame",TabBtn)
-        indicator.BackgroundColor3=ACCENT
-        indicator.Size=UDim2.new(0,2,1,-4)
-        indicator.Position=UDim2.new(0,-8,0,2)
-        indicator.BorderSizePixel=0
-        indicator.Visible=false
-
-        local function selectThis()
-            for _,v in ipairs(Window:GetChildren()) do
-                if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end
-            end
-            for _,btn in ipairs(TabsRail:GetChildren()) do
-                if btn:IsA("TextButton") then
-                    btn.TextTransparency = .5
-                    local ind = btn:FindFirstChildWhichIsA("Frame")
-                    if ind then ind.Visible=false end
-                end
-            end
-            TabBtn.TextTransparency=0
-            Page.Visible=true
-            indicator.Visible=true
-        end
-        TabBtn.MouseButton1Click:Connect(selectThis)
-        if not firstShown then firstShown=true; selectThis() end
-
-        local function Card(baseH)
-            local fr=Instance.new("Frame",Page)
-            fr.BackgroundColor3=BG_CARD
-            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 40)*SCALE))
-            fr.AutomaticSize = Enum.AutomaticSize.Y
-            fr.ClipsDescendants=false
-            Instance.new("UICorner",fr).CornerRadius=UDim.new(0,6)
-            return fr
-        end
-
-        local PageAPI = {}
-
-        function PageAPI:CreateLabel(text)
-            local lb = Instance.new("TextLabel")
-            lb.Parent = Page
-            lb.BackgroundTransparency = 1
-            lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
-            lb.Position = UDim2.new(0, 8, 0, 0)
-            lb.Font = Enum.Font.GothamBlack
-            lb.TextSize = math.floor(12 * SCALE)
-            lb.TextXAlignment = Enum.TextXAlignment.Left
-            lb.TextColor3 = Color3.new(1, 1, 1)
-            lb.Text = string.upper(text or "LABEL")
-            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end }
-        end
-
-        function PageAPI:CreateButton(name,desc,cb)
-            cb=cb or function() end
-            local fr=Card(40)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-100,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(name or "BUTTON"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr)
-            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-100,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local run=Instance.new("TextButton",fr)
-            run.BackgroundColor3=Color3.fromRGB(24,25,32); run.Size=UDim2.new(0,84,0,24); run.Position=UDim2.new(1,-100,0,6)
-            run.Text="RUN"; run.Font=Enum.Font.GothamSemibold; run.TextSize=math.floor(11*SCALE); run.TextColor3=Color3.new(1,1,1)
-            Instance.new("UICorner",run).CornerRadius=UDim.new(0,8)
-            run.MouseButton1Click:Connect(cb)
-            return {}
-        end
-
-        function PageAPI:CreateToggle(title,desc,cb)
-            cb=cb or function() end
-            local fr=Card(40)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-70,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(title or "TOGGLE"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr)
-            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-70,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local track=Instance.new("Frame",fr)
-            track.BackgroundColor3=Color3.fromRGB(24,25,32); track.Size=UDim2.fromOffset(math.floor(50*SCALE),math.floor(22*SCALE)); track.Position=UDim2.new(1,-math.floor(62*SCALE),0,math.floor(8*SCALE))
-            Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
-            local dot=Instance.new("Frame",track)
-            dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=.6
-            Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
-
-            local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
-            local on=false
-            local function apply()
-                tw(dot,.12,{
-                    Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE))
-                               or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)),
-                    BackgroundTransparency=on and 0 or .6
-                })
-                cb(on)
-            end
-            btn.MouseButton1Click:Connect(function() on=not on; apply() end)
-            return { Set=function(_,v) if v~=on then on=v; apply() end end }
-        end
-
-        function PageAPI:CreateBox(placeholder,_,cb)
-            cb=cb or function() end
-            local fr=Card(32)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.fromRGB(200,205,230)
-            t.Text=string.upper(placeholder or "INPUT"); t.TextXAlignment=Enum.TextXAlignment.Left; t.Position=UDim2.new(0,8,0,0); t.Size=UDim2.new(1,-8,0,18)
-            local tb=Instance.new("TextBox",fr)
-            tb.BackgroundColor3=Color3.fromRGB(24,25,32); tb.Position=UDim2.new(0,8,0,20); tb.Size=UDim2.new(1,-16,0,26)
-            tb.ClearTextOnFocus=false; tb.Text=""; tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
-            Instance.new("UICorner",tb).CornerRadius=UDim.new(0,8)
-            tb.FocusLost:Connect(function() cb(tb.Text) end)
-            return { SetText=function(_,t2) tb.Text=t2 or "" end }
-        end
-
-        function PageAPI:CreateDropdown(title, options, onChanged)
-            options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(28); fr.Name="Dropdown"
-            local ttl=Instance.new("TextLabel",fr)
-            ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,0,18)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
-            local caret=Instance.new("TextLabel",fr)
-            caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="v"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
-
-            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
-            holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
-            holder.AutomaticSize=Enum.AutomaticSize.Y; holder.Visible=false
-            Instance.new("UICorner",holder).CornerRadius=UDim.new(0,8)
-            Instance.new("UIListLayout",holder).Padding=UDim.new(0,4)
-            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
-
-            local current=nil
-            local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
-                for _,opt in ipairs(list) do
-                    local b=Instance.new("TextButton",holder)
-                    b.Size=UDim2.new(1,0,0,24); b.BackgroundColor3=BG_CARD
-                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
-                    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
-                    b.MouseButton1Click:Connect(function()
-                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt))
-                        holder.Visible=false; tw(caret,.12,{Rotation=0})
-                        onChanged(opt)
-                    end)
-                end
-            end
-            rebuild(options)
-
-            local open=false
-            local header=Instance.new("TextButton",fr)
-            header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,20); header.Position=UDim2.new(0,0,0,0); header.Text=""
-            header.MouseButton1Click:Connect(function()
-                open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0})
-            end)
-
-            return {
-                SetValue=function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end,
-                GetValue=function() return current end,
-                SetOptions=function(_,opts) rebuild(opts or {}) end
-            }
-        end
-
-        function PageAPI:CreateSlider(title, min, max, cb)
-            min = tonumber(min) or 0
-            max = tonumber(max) or 100
-            cb  = cb or function() end
-
-            local fr = Card(44)
-            local t  = Instance.new("TextLabel", fr)
-            t.BackgroundTransparency = 1
-            t.Position = UDim2.new(0,8,0,2)
-            t.Size = UDim2.new(1,-8,0,18)
-            t.Font = Enum.Font.GothamBlack
-            t.TextSize = math.floor(12*SCALE)
-            t.TextColor3 = Color3.new(1,1,1)
-            t.Text = string.upper(title or "SLIDER")
-            t.TextXAlignment = Enum.TextXAlignment.Left
-
-            local bar = Instance.new("Frame", fr)
-            bar.BackgroundColor3 = Color3.fromRGB(24,25,32)
-            bar.Position = UDim2.new(0,8,0,22)
-            bar.Size = UDim2.new(1,-16,0,8)
-            bar.BorderSizePixel = 0
-            Instance.new("UICorner", bar).CornerRadius = UDim.new(0,8)
-
-            local fill = Instance.new("Frame", bar)
-            fill.BackgroundColor3 = ACCENT
-            fill.Size = UDim2.new(0,0,1,0)
-            fill.BorderSizePixel = 0
-            Instance.new("UICorner", fill).CornerRadius = UDim.new(0,8)
-
-            local valLbl = Instance.new("TextLabel", fr)
-            valLbl.BackgroundTransparency = 1
-            valLbl.Size = UDim2.new(0,60,0,16)
-            valLbl.Position = UDim2.new(1,-68,0,2)
-            valLbl.Font = Enum.Font.Gotham
-            valLbl.TextSize = math.floor(11*SCALE)
-            valLbl.TextColor3 = ACCENT_TEXT
-            valLbl.TextXAlignment = Enum.TextXAlignment.Right
-
-            local value = min
-            local function render()
-                local alpha = (value - min) / math.max(1, (max-min))
-                fill.Size = UDim2.new(math.clamp(alpha,0,1), 0, 1, 0)
-                valLbl.Text = tostring(math.floor(value))
-            end
-            render()
-
-            local dragging = false
-            bar.InputBegan:Connect(function(io)
-                if io.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = true
-                end
-            end)
-            bar.InputEnded:Connect(function(io)
-                if io.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = false
-                end
-            end)
-            RunService.RenderStepped:Connect(function()
-                if dragging then
-                    local abs = bar.AbsolutePosition
-                    local size = bar.AbsoluteSize
-                    local mx = UIS:GetMouseLocation().X
-                    local pct = math.clamp((mx - abs.X) / size.X, 0, 1)
-                    value = math.floor(min + pct * (max-min))
-                    render()
-                    cb(value)
-                end
-            end)
-
-            return {
-                Set = function(_,v)
-                    value = math.clamp(tonumber(v) or value, min, max)
-                    render()
-                    cb(value)
-                end
-            }
-        end
-
-        return PageAPI
-    end
-
-    local winAPI = {}
-
-    function winAPI:CreateTab(title)
-        local tabObj = {}
-        function tabObj:CreateFrame(pageTitle)
-            return makePage(pageTitle or title or "Page")
-        end
-        return setmetatable(tabObj, {__index = tabObj})
-    end
-
-    return setmetatable({}, { __index = winAPI })
-end
-
--- Buat window
-local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
-
---========================================================
--- FISH IT FARM - Auto Fish + Blatant cepat (NO STUCK, DELAY INPUT)
+-- FISH IT FARM - Auto Fish + Blatant cepat (NO STUCK, DELAY INPUT + SPEED X)
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -522,10 +31,11 @@ local Farm = {
     AutoFish_Enabled       = false,
     AutoFish_ReelDelay     = 2.8,
 
-    -- BLATANT MODE (Metode sama, tapi delay sendiri)
+    -- BLATANT MODE (Metode sama, tapi delay sendiri + speed)
     Blatant_Enabled        = false,
-    Blatant_ReelDelay      = 1.9, -- contoh default sama di SS-mu
-    Blatant_CompleteDelay  = 1.1, -- contoh default sama di SS-mu
+    Blatant_ReelDelay      = 1.9,  -- nilai dasar (sebelum dibagi speed)
+    Blatant_CompleteDelay  = 1.1,  -- nilai dasar (sebelum dibagi speed)
+    Blatant_SpeedMultiplier= 5,    -- 5x lebih cepat (default)
 
     -- UTIL
     AutoBait               = true,
@@ -604,7 +114,7 @@ local function DoCastOnce()
 end
 
 --========================================================
--- HANDLER EXCLAIM (Auto Fish & Blatant, beda delay)
+-- HANDLER EXCLAIM (Auto Fish & Blatant, beda delay + speed)
 --========================================================
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
@@ -614,19 +124,26 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
-    -- BLATANT: metode sama, tapi delay sendiri
+    -- BLATANT: metode sama, tapi delay dibagi speed
     if Farm.Blatant_Enabled then
-        local completeDelay = tonumber(Farm.Blatant_CompleteDelay) or 1.1
+        local baseComplete = tonumber(Farm.Blatant_CompleteDelay) or 1.1
+        local baseReel     = tonumber(Farm.Blatant_ReelDelay)     or 1.9
+        local spd          = tonumber(Farm.Blatant_SpeedMultiplier) or 1
+
+        if spd < 1 then spd = 1 end
+
+        local completeDelay = baseComplete / spd
+        local reelDelay     = baseReel     / spd
+
         if completeDelay < 0 then completeDelay = 0 end
+        if reelDelay     < 0 then reelDelay     = 0 end
 
         task.delay(completeDelay, function()
             if not Farm.Blatant_Enabled then return end
             RE_FishingCompleted:FireServer()
 
             -- setelah tarik ikan, tunggu ReelDelay lalu cast lagi
-            local reel = tonumber(Farm.Blatant_ReelDelay) or 1.9
-            if reel < 0 then reel = 0 end
-            task.delay(reel, function()
+            task.delay(reelDelay, function()
                 if Farm.Blatant_Enabled then
                     DoCastOnce()
                 end
@@ -707,7 +224,7 @@ end)
 -- Group Blatant
 PageFarm:CreateLabel("BLATANT MODE (FAST FISHING)")
 
-PageFarm:CreateToggle("Blatant Mode", "Very fast fishing mode (metode sama, delay sendiri)", function(on)
+PageFarm:CreateToggle("Blatant Mode", "Very fast fishing mode (metode sama, delay + speed)", function(on)
     Farm.Blatant_Enabled = on
 
     if on and Farm.AutoFish_Enabled then
@@ -720,22 +237,27 @@ PageFarm:CreateToggle("Blatant Mode", "Very fast fishing mode (metode sama, dela
     end
 end)
 
-PageFarm:CreateBox("Reel Delay (Blatant)", "Delay (seconds) before restarting loop", function(txt)
+PageFarm:CreateBox("Reel Delay (Blatant)", "Delay dasar sebelum restart loop (sebelum dibagi speed)", function(txt)
     local num = tonumber(txt)
     if num and num > 0 then
         Farm.Blatant_ReelDelay = num
     end
 end)
 
-PageFarm:CreateBox("Custom Complete Delay", "Enter delay in seconds", function(txt)
+PageFarm:CreateBox("Custom Complete Delay", "Delay dasar setelah ! (sebelum dibagi speed)", function(txt)
     local num = tonumber(txt)
     if num and num >= 0 then
         Farm.Blatant_CompleteDelay = num
     end
 end)
 
+-- Slider speed multiplier: 1x - 10x
+local sliderSpeed = PageFarm:CreateSlider("Blatant Speed (x)", 1, 10, function(val)
+    Farm.Blatant_SpeedMultiplier = math.floor(val)
+end)
+sliderSpeed:Set(Farm.Blatant_SpeedMultiplier)
+
 PageFarm:CreateButton("Cancel Fishing", "Use this if you're stuck", function()
-    -- simple recast, kalau state game nyangkut bisa bantu “refresh”
     DoCastOnce()
 end)
 
@@ -749,9 +271,3 @@ end)
 PageFarm:CreateToggle("Auto Best Luck Rod", "Rod luck tertinggi otomatis", function(on)
     Farm.AutoBestRod = on
 end)
-
---========================================================
--- (Bagian TELEPORT, MISC, FPS overlay tetap sama persis seperti sebelumnya)
---========================================================
--- (Untuk menghemat ruang jawaban, bagian bawah tidak diubah dari script terakhir;
--- kamu tinggal tempel lanjutan scriptmu setelah bagian Farm ini.)
