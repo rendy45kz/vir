@@ -535,6 +535,9 @@ local Farm = {
 
 local LEGIT_COMPLETE_DELAY = 1.145  -- dipakai hanya Auto Fish normal
 
+-- deklarasi awal untuk state Blatant (supaya bisa dipakai di DoCastOnce)
+local BlatantState
+
 -- Best Luck Rod
 local function getBestLuckRod()
     local backpack = LocalPlayer2.Backpack
@@ -602,14 +605,21 @@ local function DoCastOnce()
     local ry = BASE_Y + math.random(-300, 300) / 1e7
 
     RF_RequestMinigame:InvokeServer(rx, ry)
+
+    -- catat waktu cast untuk anti-stuck Blatant
+    if Farm.Blatant_Enabled and BlatantState then
+        BlatantState.LastCastTime = os.clock()
+    end
 end
 
 --========================================================
 -- BLATANT STATE (SPAM COMPLETE BERBASIS EXCLAIM)
 --========================================================
-local BlatantState = {
-    IsSpamming = false,
-    SpamThread = nil,
+BlatantState = {
+    IsSpamming     = false,
+    SpamThread     = nil,
+    LastCastTime   = 0,   -- waktu cast terakhir
+    WatchdogThread = nil, -- thread anti-stuck
 }
 
 local function StartBlatantSpam()
@@ -632,6 +642,41 @@ local function StopBlatantSpam()
     if BlatantState.SpamThread then
         task.cancel(BlatantState.SpamThread)
         BlatantState.SpamThread = nil
+    end
+end
+
+-- Watchdog anti-stuck Blatant (kalau kelamaan nggak ada ikan, recast)
+local function StartBlatantWatchdog()
+    if BlatantState.WatchdogThread then return end
+
+    BlatantState.WatchdogThread = task.spawn(function()
+        while Farm.Blatant_Enabled do
+            local now      = os.clock()
+            local lastCast = BlatantState.LastCastTime or 0
+            local reel     = tonumber(Farm.Blatant_ReelDelay) or 0.15
+
+            -- batas maksimal nunggu ikan setelah cast:
+            -- minimal 4 detik, atau 3x ReelDelay (ambil yang lebih besar)
+            local maxWait = math.max(4, reel * 3)
+
+            if lastCast > 0 and (now - lastCast) > maxWait then
+                -- Terlalu lama nggak ada FishCaught / respon -> recast paksa
+                StopBlatantSpam()
+                DoCastOnce()
+                BlatantState.LastCastTime = os.clock()
+            end
+
+            task.wait(0.5)
+        end
+
+        BlatantState.WatchdogThread = nil
+    end)
+end
+
+local function StopBlatantWatchdog()
+    if BlatantState.WatchdogThread then
+        task.cancel(BlatantState.WatchdogThread)
+        BlatantState.WatchdogThread = nil
     end
 end
 
@@ -727,6 +772,7 @@ PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", fu
     if on and Farm.Blatant_Enabled then
         Farm.Blatant_Enabled = false
         StopBlatantSpam()
+        StopBlatantWatchdog()
     end
 
     if on then
@@ -754,10 +800,13 @@ PageFarm:CreateToggle("Blatant Mode", "Super cepat (skip mini-game drag, spam co
         StopAutoFishLoop()
     end
 
-    -- setiap ganti state, stop spam dulu
+    -- setiap ganti state, stop spam & watchdog dulu
     StopBlatantSpam()
+    StopBlatantWatchdog()
 
     if on then
+        BlatantState.LastCastTime = 0
+        StartBlatantWatchdog()
         -- Tidak ada auto perhitungan x5
         -- Semua delay pakai nilai di Farm.Blatant_ReelDelay & Farm.Blatant_CompleteDelay
         -- Mulai dengan satu cast
@@ -953,10 +1002,10 @@ task.spawn(function()
 end)
 
 Players.PlayerAdded:Connect(function()
-    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+    if ddPlayer and ddPlayer.SetOptions then ddPlayer.SetOptions(playersList()) end
 end)
 Players.PlayerRemoving:Connect(function()
-    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+    if ddPlayer and ddPlayer.SetOptions then ddPlayer.SetOptions(playersList()) end
 end)
 
 --========================================================
