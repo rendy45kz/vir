@@ -586,16 +586,29 @@ local function ApplyBaitIfNeeded()
     end
 end
 
--- CAST UTAMA
-local BASE_X, BASE_Y = -0.75, 1
+-------------------------------------
+-- EQUIP ROD SEKALI SAJA
+-------------------------------------
+local RodEquippedOnce = false
 
-local function DoCastOnce()
-    AutoEquipBestRod()
-    ApplyBaitIfNeeded()
+local function EquipRodOnce()
+    if RodEquippedOnce then return end
+    RodEquippedOnce = true
 
     RE_EquipHotbar:FireServer(1)
     task.wait(0.10)
+end
 
+
+-------------------------------------
+-- CAST UTAMA (FAST)
+-------------------------------------
+local BASE_X, BASE_Y = -0.75, 1
+
+local function DoCastOnce()
+    EquipRodOnce() -- hanya dipanggil sekali saja
+
+    -- Charge dan lempar
     RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
 
     local rx = BASE_X + math.random(-300, 300) / 1e7
@@ -604,9 +617,10 @@ local function DoCastOnce()
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
---========================================================
--- HANDLER EXCLAIM (Auto Fish & Blatant, beda delay + speed)
---========================================================
+
+--------------------------------------------------------
+-- HANDLER EXCLAIM → langsung tarik + recast
+--------------------------------------------------------
 RE_TextEffect.OnClientEvent:Connect(function(data)
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
@@ -615,38 +629,23 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
-    -- BLATANT: metode sama, tapi delay dibagi speed
-    if Farm.Blatant_Enabled then
-        local baseComplete = tonumber(Farm.Blatant_CompleteDelay) or 1.1
-        local baseReel     = tonumber(Farm.Blatant_ReelDelay)     or 1.9
-        local spd          = tonumber(Farm.Blatant_SpeedMultiplier) or 1
+    if not Farm.AutoFish_Enabled then return end
 
-        if spd < 1 then spd = 1 end
+    -- TARIK IKAN LANGSUNG
+    RE_FishingCompleted:FireServer()
 
-        local completeDelay = baseComplete / spd
-        local reelDelay     = baseReel     / spd
+    -- RECAST CEPAT (tanpa delay atau minimal delay)
+    task.delay(Farm.AutoFish_ReelDelay, function()
+        if Farm.AutoFish_Enabled then
+            DoCastOnce()
+        end
+    end)
+end)
 
-        if completeDelay < 0 then completeDelay = 0 end
-        if reelDelay     < 0 then reelDelay     = 0 end
-
-        task.delay(completeDelay, function()
-            if not Farm.Blatant_Enabled then return end
-            RE_FishingCompleted:FireServer()
-
-            -- setelah tarik ikan, tunggu ReelDelay lalu cast lagi
-            task.delay(reelDelay, function()
-                if Farm.Blatant_Enabled then
-                    DoCastOnce()
-                end
-            end)
-        end)
-
-        return
-    end
 
     -- AUTO FISH: delay legit, sekali complete
     if Farm.AutoFish_Enabled then
-        task.delay(LEGIT_COMPLETE_DELAY, function()
+        task.delay(Farm.AutoFish_ReelDelay, function()
             if Farm.AutoFish_Enabled then
                 RE_FishingCompleted:FireServer()
             end
@@ -694,10 +693,7 @@ PageFarm:CreateLabel("AUTO FISH MODE")
 PageFarm:CreateToggle("Auto Fish", "Mode normal (pakai Exclaim, lebih aman)", function(on)
     Farm.AutoFish_Enabled = on
 
-    if on and Farm.Blatant_Enabled then
-        Farm.Blatant_Enabled = false
-    end
-
+    
     if on then
         StartAutoFishLoop()
     else
@@ -712,45 +708,7 @@ PageFarm:CreateBox("Reel Delay (Auto Fish)", "Delay antar cast mode legit", func
     end
 end)
 
--- Group Blatant
-PageFarm:CreateLabel("BLATANT MODE (FAST FISHING)")
 
-PageFarm:CreateToggle("Blatant Mode", "Very fast fishing mode (metode sama, delay + speed)", function(on)
-    Farm.Blatant_Enabled = on
-
-    if on and Farm.AutoFish_Enabled then
-        Farm.AutoFish_Enabled = false
-        StopAutoFishLoop()
-    end
-
-    if on then
-        DoCastOnce()
-    end
-end)
-
-PageFarm:CreateBox("Reel Delay (Blatant)", "Delay dasar sebelum restart loop (sebelum dibagi speed)", function(txt)
-    local num = tonumber(txt)
-    if num and num > 0 then
-        Farm.Blatant_ReelDelay = num
-    end
-end)
-
-PageFarm:CreateBox("Custom Complete Delay", "Delay dasar setelah ! (sebelum dibagi speed)", function(txt)
-    local num = tonumber(txt)
-    if num and num >= 0 then
-        Farm.Blatant_CompleteDelay = num
-    end
-end)
-
--- Slider speed multiplier: 1x - 10x
-local sliderSpeed = PageFarm:CreateSlider("Blatant Speed (x)", 1, 10, function(val)
-    Farm.Blatant_SpeedMultiplier = math.floor(val)
-end)
-sliderSpeed:Set(Farm.Blatant_SpeedMultiplier)
-
-PageFarm:CreateButton("Cancel Fishing", "Use this if you're stuck", function()
-    DoCastOnce()
-end)
 
 -- Utility
 PageFarm:CreateLabel("UTILITY")
