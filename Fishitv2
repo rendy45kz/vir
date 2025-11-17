@@ -392,6 +392,173 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
+                ----------------------------------------------------------------
+        -- MULTI SELECT DROPDOWN
+        ----------------------------------------------------------------
+        function PageAPI:CreateMultiDropdown(title, options, onToggle)
+            options   = options   or {}
+            onToggle  = onToggle  or function() end
+
+            -- Frame utama (card)
+            local fr = Instance.new("Frame", Page)
+            fr.BackgroundColor3 = BG_CARD
+            fr.Size = UDim2.new(1, 0, 0, math.floor(64 * SCALE))
+            fr.AutomaticSize = Enum.AutomaticSize.Y
+            fr.ClipsDescendants = false
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+
+            -- Judul
+            local ttl = Instance.new("TextLabel", fr)
+            ttl.BackgroundTransparency = 1
+            ttl.Position = UDim2.new(0, 10, 0, 4)
+            ttl.Size = UDim2.new(1, -40, 0, math.floor(22 * SCALE))
+            ttl.Font = Enum.Font.GothamBlack
+            ttl.TextSize = math.floor(14 * SCALE)
+            ttl.TextColor3 = Color3.new(1, 1, 1)
+            ttl.TextXAlignment = Enum.TextXAlignment.Left
+            ttl.Text = string.upper(title or "MULTI SELECT")
+
+            -- Summary value (teks pilihan yg aktif)
+            local valueLabel = Instance.new("TextLabel", fr)
+            valueLabel.BackgroundTransparency = 1
+            valueLabel.Position = UDim2.new(0, 12, 0, 30)
+            valueLabel.Size = UDim2.new(1, -40, 0, math.floor(22 * SCALE))
+            valueLabel.Font = Enum.Font.Gotham
+            valueLabel.TextSize = math.floor(13 * SCALE)
+            valueLabel.TextColor3 = ACCENT_TEXT
+            valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+            valueLabel.Text = "None"
+
+            -- caret
+            local caret = Instance.new("TextLabel", fr)
+            caret.BackgroundTransparency = 1
+            caret.Size = UDim2.fromOffset(math.floor(18 * SCALE), math.floor(18 * SCALE))
+            caret.Position = UDim2.new(1, -math.floor(28 * SCALE), 0, 30)
+            caret.Font = Enum.Font.GothamBlack
+            caret.Text = "v"
+            caret.TextSize = math.floor(13 * SCALE)
+            caret.TextColor3 = ACCENT
+
+            -- klik area head
+            local headBtn = Instance.new("TextButton", fr)
+            headBtn.BackgroundTransparency = 1
+            headBtn.Position = UDim2.new(0, 8, 0, 26)
+            headBtn.Size = UDim2.new(1, -16, 0, math.floor(28 * SCALE))
+            headBtn.Text = ""
+
+            -- holder list opsi
+            local holder = Instance.new("Frame", fr)
+            holder.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+            holder.Position = UDim2.new(0, 10, 0, math.floor(60 * SCALE))
+            holder.Size = UDim2.new(1, -20, 0, 0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible = false
+            Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
+
+            local hl = Instance.new("UIListLayout", holder)
+            hl.Padding = UDim.new(0, math.floor(4 * SCALE))
+
+            local pad = Instance.new("UIPadding", holder)
+            pad.PaddingTop    = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingBottom = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingLeft   = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingRight  = UDim.new(0, math.floor(6 * SCALE))
+
+            -- state
+            local selected = {}      -- [opt] = true/false
+            local buttons  = {}      -- [opt] = button (buat update tanda centang)
+
+            local function updateSummary()
+                local list = {}
+                for _,opt in ipairs(options) do
+                    if selected[opt] then
+                        table.insert(list, opt)
+                    end
+                end
+                if #list == 0 then
+                    valueLabel.Text = "None"
+                else
+                    valueLabel.Text = table.concat(list, ", ")
+                end
+            end
+
+            local function rebuild(list)
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy() end
+                end
+                buttons = {}
+
+                for _,opt in ipairs(list) do
+                    local b = Instance.new("TextButton", holder)
+                    b.Size = UDim2.new(1, 0, 0, math.floor(24 * SCALE))
+                    b.BackgroundColor3 = BG_CARD
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = math.floor(13 * SCALE)
+                    b.TextColor3 = Color3.new(1, 1, 1)
+                    b.TextXAlignment = Enum.TextXAlignment.Left
+                    b.Text = tostring(opt)
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+                    local tickLabel = Instance.new("TextLabel", b)
+                    tickLabel.BackgroundTransparency = 1
+                    tickLabel.AnchorPoint = Vector2.new(1,0.5)
+                    tickLabel.Position = UDim2.new(1, -8, 0.5, 0)
+                    tickLabel.Size = UDim2.fromOffset(16,16)
+                    tickLabel.Font = Enum.Font.GothamBold
+                    tickLabel.TextSize = math.floor(14 * SCALE)
+                    tickLabel.TextColor3 = ACCENT
+                    tickLabel.Text = selected[opt] and "✓" or ""
+
+                    buttons[opt] = {button=b, tick=tickLabel}
+
+                    b.MouseButton1Click:Connect(function()
+                        selected[opt] = not selected[opt]
+                        tickLabel.Text = selected[opt] and "✓" or ""
+                        updateSummary()
+                        onToggle(opt, selected[opt])
+                    end)
+                end
+                updateSummary()
+            end
+
+            rebuild(options)
+
+            local open = false
+            headBtn.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret, 0.12, {Rotation = open and 180 or 0})
+            end)
+
+            return {
+                SetSelected = function(_, opt, state)
+                    if selected[opt] ~= nil then
+                        selected[opt] = state and true or false
+                        local info = buttons[opt]
+                        if info and info.tick then
+                            info.tick.Text = selected[opt] and "✓" or ""
+                        end
+                        updateSummary()
+                    end
+                end,
+                GetSelectedList = function()
+                    local list = {}
+                    for _,opt in ipairs(options) do
+                        if selected[opt] then table.insert(list, opt) end
+                    end
+                    return list
+                end,
+                SetSummaryText = function(_, txt)
+                    valueLabel.Text = txt
+                end,
+                SetOptions = function(_, opts)
+                    options = opts or {}
+                    rebuild(options)
+                end
+            }
+        end
+
+
         function PageAPI:CreateSlider(title, min, max, cb)
             min = tonumber(min) or 0
             max = tonumber(max) or 100
@@ -530,10 +697,9 @@ PageFarm:CreateLabel("MAIN MENU")
 -- STATE FARM
 --========================================================
 local Farm = {
-    -- AUTO FISH
     AutoFish_Enabled        = false,
-    AutoFish_CompleteDelay  = 0.10, -- jeda dari ! ke tarik
-    AutoFish_ReelDelay      = 0.05, -- jeda dari tarik ke lempar
+    AutoFish_CompleteDelay  = 0.10,
+    AutoFish_ReelDelay      = 0.05,
 
     -- FAVORITE
     AutoFavorite_Enabled    = false,
@@ -547,23 +713,24 @@ local Farm = {
         SECRET    = false,
     },
 
-    -- AUTO SELL
+    -- WEATHER
+    AutoWeather_Enabled     = false,
+    AutoWeather             = {
+        Storm      = false,
+        Cloudy     = false,
+        Snow       = false,
+        Wind       = false,
+        Radiant    = false,
+        ["Shark Hunt"] = false,
+    },
+
     AutoSell_Enabled        = false,
     AutoSell_Threshold      = 30,
     AutoSell_Delay          = 1.0,
 
-    -- AUTO WEATHER (hanya satu aktif sekaligus via dropdown)
-    AutoWeather             = {
-        Storm   = false,
-        Cloudy  = false,
-        Snow    = false,
-        Wind    = false,
-        Radiant = false,
-    },
-
-    -- AUTO ENCHANT (manual sekali via dropdown)
     AutoEnchant_LastRun     = 0,
 }
+
 
 --========================================================
 -- EQUIP ROD SEKALI
@@ -661,6 +828,46 @@ do
     end
 end
 
+-- ========== AUTO FAVORITE HELPER ==========
+local function refreshAutoFavoriteEnabled()
+    if not Farm.AutoFavorite_Enabled then return end -- toggle global akan matikan dari luar
+    -- kalau toggle global ON, tapi semua rarity false, tetap dianggap ON tapi tidak melakukan apa-apa
+end
+
+-- ========== AUTO WEATHER HELPER ==========
+local WeatherThreads = {} -- name -> thread
+
+local function randomDelay(min, max)
+    return math.random(min * 100, max * 100) / 100
+end
+
+local function startWeatherLoop(weatherName)
+    if WeatherThreads[weatherName] then return end
+
+    WeatherThreads[weatherName] = task.spawn(function()
+        while Farm.AutoWeather_Enabled and Farm.AutoWeather[weatherName] do
+            pcall(function()
+                RF_PurchaseWeather:InvokeServer(weatherName)
+                print("[AutoWeather] Beli weather:", weatherName)
+            end)
+
+            local baseDuration = 900 -- 15 menit
+            local extraDelay   = randomDelay(1, 5)
+            local totalWait    = baseDuration + extraDelay
+
+            local t0 = tick()
+            while tick() - t0 < totalWait do
+                if not (Farm.AutoWeather_Enabled and Farm.AutoWeather[weatherName]) then
+                    break
+                end
+                task.wait(1)
+            end
+        end
+        WeatherThreads[weatherName] = nil
+    end)
+end
+
+
 --========================================================
 -- AUTO FAVORITE + AUTO SELL (pakai ObtainedNewFish)
 --========================================================
@@ -674,15 +881,17 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
     if not uuid then return end
 
     -- AUTO FAVORITE BY RARITY
-    if Farm.AutoFavorite_Enabled and itemId then
-        local rarity = FishIdToRarity[itemId] or "UNKNOWN"
-        rarity = string.upper(rarity)
-        if Farm.AutoFavorite_Rarity[rarity] then
-            pcall(function()
-                RE_FavoriteItem:FireServer(uuid)
-            end)
-        end
+    -- AUTO FAVORITE
+if Farm.AutoFavorite_Enabled and itemId then
+    local rarity = FishIdToRarity[itemId] or "UNKNOWN"
+    rarity = string.upper(rarity)
+    if Farm.AutoFavorite_Rarity[rarity] then
+        pcall(function()
+            RE_FavoriteItem:FireServer(uuid)
+        end)
     end
+end
+
 
     -- AUTO SELL DENGAN DELAY
     if Farm.AutoSell_Enabled then
@@ -784,11 +993,17 @@ end
 
 
 ------------------------------------------------------------
--- 2. AUTO FAVORITE BY RARITY (MULTI SELECT)
+-- 2. AUTO FAVORITE BY RARITY (TOGGLE + MULTI SELECT)
 ------------------------------------------------------------
 PageFarm:CreateLabel("Auto Favorite")
 
-local rarityOptions = {
+-- Toggle global Auto Favorite
+local tgAutoFav = PageFarm:CreateToggle("Auto Favorite", function(on)
+    Farm.AutoFavorite_Enabled = on
+end)
+tgAutoFav:Set(false)
+
+local rarityList = {
     "COMMON",
     "UNCOMMON",
     "RARE",
@@ -796,77 +1011,63 @@ local rarityOptions = {
     "LEGENDARY",
     "MYTHIC",
     "SECRET",
-    "[Clear All]"
 }
 
-local ddAutoFavorite = PageFarm:CreateDropdown("Select Rarity to Favorite (multi)", rarityOptions, function(opt)
-    if opt == "[Clear All]" then
-        for k in pairs(Farm.AutoFavorite_Rarity) do
-            Farm.AutoFavorite_Rarity[k] = false
-        end
-    else
+local ddAutoFavorite = PageFarm:CreateMultiDropdown(
+    "Select Rarity to Favorite",
+    rarityList,
+    function(opt, state)
         local key = string.upper(opt)
         if Farm.AutoFavorite_Rarity[key] ~= nil then
-            Farm.AutoFavorite_Rarity[key] = not Farm.AutoFavorite_Rarity[key]
+            Farm.AutoFavorite_Rarity[key] = state
+        end
+        refreshAutoFavoriteEnabled()
+    end
+)
+ddAutoFavorite:SetSummaryText("None selected")
+
+------------------------------------------------------------
+-- 5. AUTO BUY WEATHER (TOGGLE + MULTI SELECT)
+------------------------------------------------------------
+PageFarm:CreateLabel("Auto Buy Weather")
+
+-- Toggle global Auto Weather
+local tgAutoWeather = PageFarm:CreateToggle("Auto Weather", function(on)
+    Farm.AutoWeather_Enabled = on
+
+    -- kalau di-on-kan, start loop untuk semua yg sudah dicentang
+    if on then
+        for name, flag in pairs(Farm.AutoWeather) do
+            if flag then
+                startWeatherLoop(name)
+            end
         end
     end
-
-    refreshAutoFavoriteEnabled()
-
-    -- update teks dropdown: list rarity yang aktif
-    local selected = {}
-    for r, flag in pairs(Farm.AutoFavorite_Rarity) do
-        if flag then table.insert(selected, r) end
-    end
-    table.sort(selected)
-    local summary = (#selected > 0) and table.concat(selected, ", ") or "None"
-    ddAutoFavorite:SetValue(summary)
 end)
-ddAutoFavorite:SetValue("None")
+tgAutoWeather:Set(false)
 
-PageFarm:CreateLabel("Auto Favorite Fish")
-PageFarm:CreateBox("Info: Akan auto favorite ikan baru sesuai rarity terpilih di atas", function() end)
-
-------------------------------------------------------------
--- 5. AUTO BUY WEATHER (MULTI SELECT)
-------------------------------------------------------------
-PageFarm:CreateLabel("Weather Option")
-
-local weatherOptions = {
+local weatherList = {
     "Storm",
     "Cloudy",
     "Snow",
     "Wind",
     "Radiant",
-    "[Clear All]"
+    "Shark Hunt",
 }
 
-local ddWeather = PageFarm:CreateDropdown("Auto Weather (multi)", weatherOptions, function(opt)
-    if opt == "[Clear All]" then
-        for k in pairs(Farm.AutoWeather) do
-            Farm.AutoWeather[k] = false
-        end
-    else
-        local key = opt
-        if Farm.AutoWeather[key] ~= nil then
-            Farm.AutoWeather[key] = not Farm.AutoWeather[key]
-            if Farm.AutoWeather[key] then
-                startWeatherLoop(key)
+local ddWeather = PageFarm:CreateMultiDropdown(
+    "Select Weather(s)",
+    weatherList,
+    function(opt, state)
+        if Farm.AutoWeather[opt] ~= nil then
+            Farm.AutoWeather[opt] = state
+            if state and Farm.AutoWeather_Enabled then
+                startWeatherLoop(opt)
             end
         end
     end
-
-    -- update teks dropdown: list weather yang aktif
-    local selected = {}
-    for name, flag in pairs(Farm.AutoWeather) do
-        if flag then table.insert(selected, name) end
-    end
-    table.sort(selected)
-    local summary = (#selected > 0) and table.concat(selected, ", ") or "Off"
-    ddWeather:SetValue(summary)
-end)
-ddWeather:SetValue("Off")
-
+)
+ddWeather:SetSummaryText("Off")
 
 ----------------------------------------------------------------
 -- AUTO SELL (dropdown interval + delay)
