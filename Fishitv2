@@ -522,9 +522,9 @@ local RE_ActivateEnchant     = net:WaitForChild("RE/ActivateEnchantingAltar")
 --========================================================
 -- TAB FARM
 --========================================================
-local TabFarm   = win:CreateTab("Farm")
-local PageFarm  = TabFarm:CreateFrame("Farm")
-PageFarm:CreateLabel("FARM MENU")
+local TabFarm   = win:CreateTab("Main")
+local PageFarm  = TabFarm:CreateFrame("Main")
+PageFarm:CreateLabel("MAIN MENU")
 
 --========================================================
 -- STATE FARM
@@ -739,14 +739,18 @@ local function AutoEnchantRod()
 end
 
 --========================================================
--- AUTO BUY WEATHER
+-- AUTO BUY WEATHER (BISA MULTI)
 --========================================================
 local function randomDelay(min, max)
     return math.random(min * 100, max * 100) / 100
 end
 
+local WeatherThreads = {} -- name -> thread
+
 local function startWeatherLoop(weatherName)
-    task.spawn(function()
+    if WeatherThreads[weatherName] then return end
+
+    WeatherThreads[weatherName] = task.spawn(function()
         while Farm.AutoWeather[weatherName] do
             pcall(function()
                 RF_PurchaseWeather:InvokeServer(weatherName)
@@ -759,123 +763,110 @@ local function startWeatherLoop(weatherName)
 
             local t0 = tick()
             while tick() - t0 < totalWait do
-                if not Farm.AutoWeather[weatherName] then
-                    return
-                end
+                if not Farm.AutoWeather[weatherName] then break end
                 task.wait(1)
             end
         end
+        WeatherThreads[weatherName] = nil
     end)
 end
 
-local function setWeatherMode(mode)
-    -- matikan semua dulu
-    for k in pairs(Farm.AutoWeather) do
-        Farm.AutoWeather[k] = false
-    end
-
-    if mode == "Off" then
-        return
-    end
-
-    if Farm.AutoWeather[mode] ~= nil then
-        Farm.AutoWeather[mode] = true
-        startWeatherLoop(mode)
+-- Helper: aktifkan AutoFavorite_Enabled bila ada minimal satu rarity ON
+local function refreshAutoFavoriteEnabled()
+    Farm.AutoFavorite_Enabled = false
+    for _, v in pairs(Farm.AutoFavorite_Rarity) do
+        if v then
+            Farm.AutoFavorite_Enabled = true
+            break
+        end
     end
 end
 
---========================================================
--- UI / DROPDOWN FARM
---========================================================
 
-----------------------------------------------------------------
--- AUTO FISH DROPDOWN (mode + preset delay)
-----------------------------------------------------------------
-PageFarm:CreateLabel("AUTO FISH (EXCLAIM)")
+------------------------------------------------------------
+-- 2. AUTO FAVORITE BY RARITY (MULTI SELECT)
+------------------------------------------------------------
+PageFarm:CreateLabel("Auto Favorite")
 
-local ddAutoFishMode = PageFarm:CreateDropdown("Auto Fish Mode", {"Off","On"}, function(opt)
-    if opt == "On" then
-        Farm.AutoFish_Enabled = true
-        DoCastOnce()
+local rarityOptions = {
+    "COMMON",
+    "UNCOMMON",
+    "RARE",
+    "EPIC",
+    "LEGENDARY",
+    "MYTHIC",
+    "SECRET",
+    "[Clear All]"
+}
+
+local ddAutoFavorite = PageFarm:CreateDropdown("Select Rarity to Favorite (multi)", rarityOptions, function(opt)
+    if opt == "[Clear All]" then
+        for k in pairs(Farm.AutoFavorite_Rarity) do
+            Farm.AutoFavorite_Rarity[k] = false
+        end
     else
-        Farm.AutoFish_Enabled = false
-    end
-end)
-
--- Preset speed: Safe / Fast / Ultra
-local ddAutoFishPreset = PageFarm:CreateDropdown("Auto Fish Speed Preset", {"Safe","Fast","Ultra"}, function(opt)
-    if opt == "Safe" then
-        Farm.AutoFish_CompleteDelay = 0.18
-        Farm.AutoFish_ReelDelay     = 0.10
-    elseif opt == "Fast" then
-        Farm.AutoFish_CompleteDelay = 0.12
-        Farm.AutoFish_ReelDelay     = 0.06
-    elseif opt == "Ultra" then
-        Farm.AutoFish_CompleteDelay = 0.08
-        Farm.AutoFish_ReelDelay     = 0.04
-    end
-end)
-ddAutoFishPreset:SetValue("Fast")
-
--- Box manual (kalau mau tuning halus)
-PageFarm:CreateBox("Manual Complete Delay (detik)", function(txt)
-    local n = tonumber(txt)
-    if n and n >= 0 then
-        Farm.AutoFish_CompleteDelay = n
-    end
-end)
-
-PageFarm:CreateBox("Manual Reel Delay (detik)", function(txt)
-    local n = tonumber(txt)
-    if n and n >= 0 then
-        Farm.AutoFish_ReelDelay = n
-    end
-end)
-
-----------------------------------------------------------------
--- AUTO FAVORITE BY RARITY (dropdown preset)
-----------------------------------------------------------------
-PageFarm:CreateLabel("AUTO FAVORITE BY RARITY")
-
-local ddAutoFavorite = PageFarm:CreateDropdown("Favorite Preset", {
-    "Off",
-    "Rare+ (RARE,EPIC,LEGENDARY,MYTHIC,SECRET)",
-    "Epic+ (EPIC,LEGENDARY,MYTHIC,SECRET)",
-    "Legendary+ (LEGENDARY,MYTHIC,SECRET)",
-    "Mythic+ (MYTHIC,SECRET)",
-    "Secret only"
-}, function(opt)
-    -- reset semua
-    for k in pairs(Farm.AutoFavorite_Rarity) do
-        Farm.AutoFavorite_Rarity[k] = false
-    end
-
-    if opt == "Off" then
-        Farm.AutoFavorite_Enabled = false
-        return
-    end
-
-    Farm.AutoFavorite_Enabled = true
-
-    local function setRange(list)
-        for _,r in ipairs(list) do
-            Farm.AutoFavorite_Rarity[r] = true
+        local key = string.upper(opt)
+        if Farm.AutoFavorite_Rarity[key] ~= nil then
+            Farm.AutoFavorite_Rarity[key] = not Farm.AutoFavorite_Rarity[key]
         end
     end
 
-    if opt:sub(1,4) == "Rare" then
-        setRange({"RARE","EPIC","LEGENDARY","MYTHIC","SECRET"})
-    elseif opt:sub(1,4) == "Epic" then
-        setRange({"EPIC","LEGENDARY","MYTHIC","SECRET"})
-    elseif opt:sub(1,9) == "Legendary" then
-        setRange({"LEGENDARY","MYTHIC","SECRET"})
-    elseif opt:sub(1,6) == "Mythic" then
-        setRange({"MYTHIC","SECRET"})
-    elseif opt:sub(1,6) == "Secret" then
-        setRange({"SECRET"})
+    refreshAutoFavoriteEnabled()
+
+    -- update teks dropdown: list rarity yang aktif
+    local selected = {}
+    for r, flag in pairs(Farm.AutoFavorite_Rarity) do
+        if flag then table.insert(selected, r) end
     end
+    table.sort(selected)
+    local summary = (#selected > 0) and table.concat(selected, ", ") or "None"
+    ddAutoFavorite:SetValue(summary)
 end)
-ddAutoFavorite:SetValue("Epic+ (EPIC,LEGENDARY,MYTHIC,SECRET)")
+ddAutoFavorite:SetValue("None")
+
+PageFarm:CreateLabel("Auto Favorite Fish")
+PageFarm:CreateBox("Info: Akan auto favorite ikan baru sesuai rarity terpilih di atas", function() end)
+
+------------------------------------------------------------
+-- 5. AUTO BUY WEATHER (MULTI SELECT)
+------------------------------------------------------------
+PageFarm:CreateLabel("Weather Option")
+
+local weatherOptions = {
+    "Storm",
+    "Cloudy",
+    "Snow",
+    "Wind",
+    "Radiant",
+    "[Clear All]"
+}
+
+local ddWeather = PageFarm:CreateDropdown("Auto Weather (multi)", weatherOptions, function(opt)
+    if opt == "[Clear All]" then
+        for k in pairs(Farm.AutoWeather) do
+            Farm.AutoWeather[k] = false
+        end
+    else
+        local key = opt
+        if Farm.AutoWeather[key] ~= nil then
+            Farm.AutoWeather[key] = not Farm.AutoWeather[key]
+            if Farm.AutoWeather[key] then
+                startWeatherLoop(key)
+            end
+        end
+    end
+
+    -- update teks dropdown: list weather yang aktif
+    local selected = {}
+    for name, flag in pairs(Farm.AutoWeather) do
+        if flag then table.insert(selected, name) end
+    end
+    table.sort(selected)
+    local summary = (#selected > 0) and table.concat(selected, ", ") or "Off"
+    ddWeather:SetValue(summary)
+end)
+ddWeather:SetValue("Off")
+
 
 ----------------------------------------------------------------
 -- AUTO SELL (dropdown interval + delay)
@@ -884,10 +875,10 @@ PageFarm:CreateLabel("AUTO SELL (SELL ALL)")
 
 local ddAutoSell = PageFarm:CreateDropdown("Auto Sell Mode", {
     "Off",
-    "Every 10 fish",
-    "Every 20 fish",
-    "Every 30 fish",
-    "Every 50 fish"
+    "10 Fish",
+    "20 Fish",
+    "30 Fish",
+    "50 Fish"
 }, function(opt)
     if opt == "Off" then
         Farm.AutoSell_Enabled   = false
@@ -896,19 +887,19 @@ local ddAutoSell = PageFarm:CreateDropdown("Auto Sell Mode", {
     end
 
     Farm.AutoSell_Enabled = true
-    if opt == "Every 10 fish" then
+    if opt == "10 Fish" then
         Farm.AutoSell_Threshold = 10
-    elseif opt == "Every 20 fish" then
+    elseif opt == "20 Fish" then
         Farm.AutoSell_Threshold = 20
-    elseif opt == "Every 30 fish" then
+    elseif opt == "30 Fish" then
         Farm.AutoSell_Threshold = 30
-    elseif opt == "Every 50 fish" then
+    elseif opt == "50 Fish" then
         Farm.AutoSell_Threshold = 50
     end
 end)
 ddAutoSell:SetValue("Off")
 
-PageFarm:CreateBox("Sell Delay setelah SellAll (detik, contoh 1.0)", function(txt)
+PageFarm:CreateBox("Input delay", function(txt)
     local n = tonumber(txt)
     if n and n >= 0 then
         Farm.AutoSell_Delay = n
@@ -937,22 +928,6 @@ local ddAutoEnchant = PageFarm:CreateDropdown("Auto Enchant Action", {
 end)
 ddAutoEnchant:SetValue("Idle")
 
-----------------------------------------------------------------
--- AUTO BUY WEATHER (Dropdown)
-----------------------------------------------------------------
-PageFarm:CreateLabel("AUTO BUY WEATHER")
-
-local ddWeather = PageFarm:CreateDropdown("Weather Mode", {
-    "Off",
-    "Storm",
-    "Cloudy",
-    "Snow",
-    "Wind",
-    "Radiant"
-}, function(opt)
-    setWeatherMode(opt)
-end)
-ddWeather:SetValue("Off")
 
 
 --========================================================
