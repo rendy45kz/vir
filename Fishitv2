@@ -127,7 +127,7 @@ function library:CreateWindow(name, version, icon)
     TitleText.Position=UDim2.new(0,30,0,0)
     TitleText.Size=UDim2.new(1,-30,1,0)
     TitleText.Font=Enum.Font.GothamMedium
-    TitleText.TextSize=math.floor(12*SCALE)
+    TitleText.TextSize=math.floor(14*SCALE)
     TitleText.TextXAlignment=Enum.TextXAlignment.Left
     TitleText.TextColor3=Color3.new(1,1,1)
     TitleText.Text=(name .. " - " .. version)
@@ -191,7 +191,7 @@ function library:CreateWindow(name, version, icon)
     trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE))
     trlbl.Position=UDim2.new(0,8,0,0)
     trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"
-    trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
+    trlbl.TextSize=math.floor(14*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
     trlbl.TextColor3=Color3.new(1,1,1)
 
     local trlist=Instance.new("UIListLayout",TabsRail)
@@ -229,7 +229,7 @@ function library:CreateWindow(name, version, icon)
         TabBtn.BackgroundTransparency=1
         TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
         TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
+        TabBtn.TextSize=math.floor(15*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
         TabBtn.TextTransparency=.5
 
         local indicator=Instance.new("Frame",TabBtn)
@@ -276,7 +276,7 @@ function library:CreateWindow(name, version, icon)
             lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
             lb.Position = UDim2.new(0, 8, 0, 0)
             lb.Font = Enum.Font.GothamBlack
-            lb.TextSize = math.floor(12 * SCALE)
+            lb.TextSize = math.floor(14 * SCALE)
             lb.TextXAlignment = Enum.TextXAlignment.Left
             lb.TextColor3 = Color3.new(1, 1, 1)
             lb.Text = string.upper(text or "LABEL")
