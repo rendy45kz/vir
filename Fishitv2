@@ -558,32 +558,46 @@ local function DoCastOnce()
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
-------------------------------------------------
--- HANDLER EXCLAIM → tarik + recast
-------------------------------------------------
+--------------------------------------------------------
+-- HANDLER EXCLAIM → tarik + recast cepat
+--------------------------------------------------------
+local lastExclaimTick = 0
+
 RE_TextEffect.OnClientEvent:Connect(function(data)
+    -- Validasi basic
     if not data or not data.TextData then return end
     if data.TextData.EffectType ~= "Exclaim" then return end
 
+    -- Pastikan Exclaim di atas kepala karakter kita sendiri
     local char = LocalPlayer2.Character
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
+    -- Auto Fish harus ON
     if not Farm.AutoFish_Enabled then return end
 
+    -- Anti spam (kalau server kirim Exclaim double)
+    local now = tick()
+    if now - lastExclaimTick < 0.05 then
+        return
+    end
+    lastExclaimTick = now
+
+    -- Ambil delay dari config
     local completeDelay = tonumber(Farm.AutoFish_CompleteDelay) or 0.10
     local reelDelay     = tonumber(Farm.AutoFish_ReelDelay)     or 0.05
 
     if completeDelay < 0 then completeDelay = 0 end
     if reelDelay     < 0 then reelDelay     = 0 end
 
-    -- 1) Tunggu dikit, lalu tarik ikan
+    -- 1) Tunggu sedikit dari munculnya "!"
     task.delay(completeDelay, function()
         if not Farm.AutoFish_Enabled then return end
 
+        -- Tarik ikan
         RE_FishingCompleted:FireServer()
 
-        -- 2) Setelah itu tunggu ReelDelay, lalu cast lagi
+        -- 2) Setelah tarik, tunggu sedikit dan lempar lagi
         task.delay(reelDelay, function()
             if Farm.AutoFish_Enabled then
                 DoCastOnce()
@@ -592,8 +606,9 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     end)
 end)
 
+
 -- (Opsional) Kalau mau aman, boleh juga auto recast ketika event FishCaught keluar
---[[
+
 if RE_FishCaught then
     RE_FishCaught.OnClientEvent:Connect(function()
         if Farm.AutoFish_Enabled then
@@ -605,7 +620,6 @@ if RE_FishCaught then
         end
     end)
 end
-]]
 
 --========================================================
 -- UI: FARM
