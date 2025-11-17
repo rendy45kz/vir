@@ -657,7 +657,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- PART 2 - FARM (Auto Fish + Auto Favorite + Auto Sell + Auto Enchant + Weather)
+-- PART 2 - FARM (Auto Favorite + Auto Sell + Auto Enchant + Weather)
 --========================================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -672,35 +672,27 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
-local RF_Charge              = net:WaitForChild("RF/ChargeFishingRod")
-local RF_RequestMinigame     = net:WaitForChild("RF/RequestFishingMinigameStarted")
-local RE_FishingCompleted    = net:WaitForChild("RE/FishingCompleted")
-local RE_EquipHotbar         = net:WaitForChild("RE/EquipToolFromHotbar")
-local RE_TextEffect          = net:WaitForChild("RE/ReplicateTextEffect")
-local RE_FishCaught          = net:FindFirstChild("RE/FishCaught")
+-- REMOTE yang dipakai (TANPA Auto Fish)
+local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
 
--- Tambahan dari decompile (favorit, jual, weather, enchant)
-local RE_ObtainedNewFish     = net:WaitForChild("RE/ObtainedNewFishNotification")
-local RE_FavoriteItem        = net:WaitForChild("RE/FavoriteItem")
-local RF_SellAllItems        = net:WaitForChild("RF/SellAllItems")
-local RF_PurchaseWeather     = net:WaitForChild("RF/PurchaseWeatherEvent")
-local RE_ActivateEnchant     = net:WaitForChild("RE/ActivateEnchantingAltar")
+local RE_ObtainedNewFish  = net:WaitForChild("RE/ObtainedNewFishNotification")
+local RE_FavoriteItem     = net:WaitForChild("RE/FavoriteItem")
+local RF_SellAllItems     = net:WaitForChild("RF/SellAllItems")
+
+local RF_PurchaseWeather  = net:WaitForChild("RF/PurchaseWeatherEvent")
+local RE_ActivateEnchant  = net:WaitForChild("RE/ActivateEnchantingAltar")
 
 --========================================================
--- TAB FARM
+-- TAB FARM (MAIN)
 --========================================================
 local TabFarm   = win:CreateTab("Main")
 local PageFarm  = TabFarm:CreateFrame("Main")
 PageFarm:CreateLabel("MAIN MENU")
 
 --========================================================
--- STATE FARM
+-- STATE FARM (TANPA AUTO FISH)
 --========================================================
 local Farm = {
-    AutoFish_Enabled        = false,
-    AutoFish_CompleteDelay  = 0.10,
-    AutoFish_ReelDelay      = 0.05,
-
     -- FAVORITE
     AutoFavorite_Enabled    = false,
     AutoFavorite_Rarity     = {
@@ -716,81 +708,22 @@ local Farm = {
     -- WEATHER
     AutoWeather_Enabled     = false,
     AutoWeather             = {
-        Storm      = false,
-        Cloudy     = false,
-        Snow       = false,
-        Wind       = false,
-        Radiant    = false,
+        Storm       = false,
+        Cloudy      = false,
+        Snow        = false,
+        Wind        = false,
+        Radiant     = false,
         ["Shark Hunt"] = false,
     },
 
+    -- AUTO SELL
     AutoSell_Enabled        = false,
     AutoSell_Threshold      = 30,
     AutoSell_Delay          = 1.0,
 
+    -- AUTO ENCHANT
     AutoEnchant_LastRun     = 0,
 }
-
-
---========================================================
--- EQUIP ROD SEKALI
---========================================================
-local RodEquippedOnce = false
-
-local function EquipRodOnce()
-    if RodEquippedOnce then return end
-    RodEquippedOnce = true
-    RE_EquipHotbar:FireServer(1) -- slot 1
-    task.wait(0.30)
-end
-
---========================================================
--- AUTO FISH - CAST + EXCLAIM HANDLER GLOBAL
---========================================================
-local BASE_X, BASE_Y = -0.75, 1
-
-local function DoCastOnce()
-    if not Farm.AutoFish_Enabled then return end
-
-    EquipRodOnce()
-
-    local serverTime = Workspace2:GetServerTimeNow()
-    RF_Charge:InvokeServer(serverTime)
-
-    local rx = BASE_X + math.random(-300, 300) / 1e7
-    local ry = BASE_Y + math.random(-300, 300) / 1e7
-
-    RF_RequestMinigame:InvokeServer(rx, ry)
-end
-
--- Exclaim global → tarik + recast (bypass delay = delay kecil, bisa diatur)
-RE_TextEffect.OnClientEvent:Connect(function(data)
-    if not Farm.AutoFish_Enabled then return end
-    if not data or not data.TextData then return end
-    if data.TextData.EffectType ~= "Exclaim" then return end
-
-    local char = LocalPlayer2.Character
-    local head = char and char:FindFirstChild("Head")
-    if not head or data.Container ~= head then return end
-
-    local completeDelay = tonumber(Farm.AutoFish_CompleteDelay) or 0.10
-    local reelDelay     = tonumber(Farm.AutoFish_ReelDelay)     or 0.05
-
-    if completeDelay < 0 then completeDelay = 0 end
-    if reelDelay     < 0 then reelDelay     = 0 end
-
-    task.delay(completeDelay, function()
-        if not Farm.AutoFish_Enabled then return end
-
-        RE_FishingCompleted:FireServer()
-
-        task.delay(reelDelay, function()
-            if Farm.AutoFish_Enabled then
-                DoCastOnce()
-            end
-        end)
-    end)
-end)
 
 --========================================================
 -- RARITY MAP (FishId → Rarity) untuk Auto Favorite
@@ -828,18 +761,21 @@ do
     end
 end
 
--- ========== AUTO FAVORITE HELPER ==========
+--========================================================
+-- HELPER AUTOFAVORITE & WEATHER
+--========================================================
+
+-- Helper: kalau toggle global ON, tapi semua false ya sudah, script tidak favorite apa-apa.
 local function refreshAutoFavoriteEnabled()
-    if not Farm.AutoFavorite_Enabled then return end -- toggle global akan matikan dari luar
-    -- kalau toggle global ON, tapi semua rarity false, tetap dianggap ON tapi tidak melakukan apa-apa
+    -- AutoFavorite_Enabled dikontrol dari toggle UI, jadi di sini cukup dibiarkan.
 end
 
--- ========== AUTO WEATHER HELPER ==========
-local WeatherThreads = {} -- name -> thread
-
+-- Weather loop per jenis weather
 local function randomDelay(min, max)
     return math.random(min * 100, max * 100) / 100
 end
+
+local WeatherThreads = {} -- name -> thread
 
 local function startWeatherLoop(weatherName)
     if WeatherThreads[weatherName] then return end
@@ -851,7 +787,7 @@ local function startWeatherLoop(weatherName)
                 print("[AutoWeather] Beli weather:", weatherName)
             end)
 
-            local baseDuration = 900 -- 15 menit
+            local baseDuration = 900 -- 15 menit durasi weather
             local extraDelay   = randomDelay(1, 5)
             local totalWait    = baseDuration + extraDelay
 
@@ -867,9 +803,8 @@ local function startWeatherLoop(weatherName)
     end)
 end
 
-
 --========================================================
--- AUTO FAVORITE + AUTO SELL (pakai ObtainedNewFish)
+-- AUTO FAVORITE + AUTO SELL (via ObtainedNewFish)
 --========================================================
 local AutoSell_Count    = 0
 local AutoSell_Cooldown = false
@@ -880,20 +815,22 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
     local uuid    = invItem.UUID
     if not uuid then return end
 
+    ----------------------------------------------------------------
     -- AUTO FAVORITE BY RARITY
-    -- AUTO FAVORITE
-if Farm.AutoFavorite_Enabled and itemId then
-    local rarity = FishIdToRarity[itemId] or "UNKNOWN"
-    rarity = string.upper(rarity)
-    if Farm.AutoFavorite_Rarity[rarity] then
-        pcall(function()
-            RE_FavoriteItem:FireServer(uuid)
-        end)
+    ----------------------------------------------------------------
+    if Farm.AutoFavorite_Enabled and itemId then
+        local rarity = FishIdToRarity[itemId] or "UNKNOWN"
+        rarity = string.upper(rarity)
+        if Farm.AutoFavorite_Rarity[rarity] then
+            pcall(function()
+                RE_FavoriteItem:FireServer(uuid)
+            end)
+        end
     end
-end
 
-
-    -- AUTO SELL DENGAN DELAY
+    ----------------------------------------------------------------
+    -- AUTO SELL DENGAN DELAY (SELL ALL)
+    ----------------------------------------------------------------
     if Farm.AutoSell_Enabled then
         AutoSell_Count += 1
         local limit = tonumber(Farm.AutoSell_Threshold) or 30
@@ -916,7 +853,7 @@ end)
 --========================================================
 -- AUTO ENCHANT ROD (teleport ke altar, slot 5)
 --========================================================
-local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402) -- contoh dari decompile
+local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402) -- posisi altar (dari decompile, sesuaikan kalau beda)
 
 local function AutoEnchantRod()
     local chars = Workspace2:FindFirstChild("Characters")
@@ -936,7 +873,7 @@ local function AutoEnchantRod()
     task.wait(1.0)
 
     pcall(function()
-        RE_EquipHotbar:FireServer(5)
+        RE_EquipHotbar:FireServer(5) -- stone di slot 5
         task.wait(0.5)
         RE_ActivateEnchant:FireServer()
     end)
@@ -948,52 +885,11 @@ local function AutoEnchantRod()
 end
 
 --========================================================
--- AUTO BUY WEATHER (BISA MULTI)
+-- UI: FARM
 --========================================================
-local function randomDelay(min, max)
-    return math.random(min * 100, max * 100) / 100
-end
-
-local WeatherThreads = {} -- name -> thread
-
-local function startWeatherLoop(weatherName)
-    if WeatherThreads[weatherName] then return end
-
-    WeatherThreads[weatherName] = task.spawn(function()
-        while Farm.AutoWeather[weatherName] do
-            pcall(function()
-                RF_PurchaseWeather:InvokeServer(weatherName)
-                print("[AutoWeather] Beli weather:", weatherName)
-            end)
-
-            local baseDuration = 900 -- 15 menit
-            local extraDelay   = randomDelay(1, 5)
-            local totalWait    = baseDuration + extraDelay
-
-            local t0 = tick()
-            while tick() - t0 < totalWait do
-                if not Farm.AutoWeather[weatherName] then break end
-                task.wait(1)
-            end
-        end
-        WeatherThreads[weatherName] = nil
-    end)
-end
-
--- Helper: aktifkan AutoFavorite_Enabled bila ada minimal satu rarity ON
-local function refreshAutoFavoriteEnabled()
-    Farm.AutoFavorite_Enabled = false
-    for _, v in pairs(Farm.AutoFavorite_Rarity) do
-        if v then
-            Farm.AutoFavorite_Enabled = true
-            break
-        end
-    end
-end
-
 
 ------------------------------------------------------------
--- 2. AUTO FAVORITE BY RARITY (TOGGLE + MULTI SELECT)
+-- 1. AUTO FAVORITE BY RARITY (TOGGLE + MULTI SELECT)
 ------------------------------------------------------------
 PageFarm:CreateLabel("Auto Favorite")
 
@@ -1027,7 +923,7 @@ local ddAutoFavorite = PageFarm:CreateMultiDropdown(
 ddAutoFavorite:SetSummaryText("None selected")
 
 ------------------------------------------------------------
--- 5. AUTO BUY WEATHER (TOGGLE + MULTI SELECT)
+-- 2. AUTO BUY WEATHER (TOGGLE + MULTI SELECT)
 ------------------------------------------------------------
 PageFarm:CreateLabel("Auto Buy Weather")
 
@@ -1069,10 +965,10 @@ local ddWeather = PageFarm:CreateMultiDropdown(
 )
 ddWeather:SetSummaryText("Off")
 
-----------------------------------------------------------------
--- AUTO SELL (dropdown interval + delay)
-----------------------------------------------------------------
-PageFarm:CreateLabel("AUTO SELL (SELL ALL)")
+------------------------------------------------------------
+-- 3. AUTO SELL (SELL ALL)
+------------------------------------------------------------
+PageFarm:CreateLabel("Auto Sell (Sell All)")
 
 local ddAutoSell = PageFarm:CreateDropdown("Auto Sell Mode", {
     "Off",
@@ -1100,17 +996,17 @@ local ddAutoSell = PageFarm:CreateDropdown("Auto Sell Mode", {
 end)
 ddAutoSell:SetValue("Off")
 
-PageFarm:CreateBox("Input delay", function(txt)
+PageFarm:CreateBox("Sell Delay setelah SellAll (detik)", function(txt)
     local n = tonumber(txt)
     if n and n >= 0 then
         Farm.AutoSell_Delay = n
     end
 end)
 
-----------------------------------------------------------------
--- AUTO ENCHANT (Dropdown trigger sekali)
-----------------------------------------------------------------
-PageFarm:CreateLabel("AUTO ENCHANT")
+------------------------------------------------------------
+-- 4. AUTO ENCHANT (TRIGGER SEKALI)
+------------------------------------------------------------
+PageFarm:CreateLabel("Auto Enchant")
 
 local ddAutoEnchant = PageFarm:CreateDropdown("Auto Enchant Action", {
     "Idle",
@@ -1123,13 +1019,10 @@ local ddAutoEnchant = PageFarm:CreateDropdown("Auto Enchant Action", {
         end
         Farm.AutoEnchant_LastRun = tick()
         AutoEnchantRod()
-        -- balik ke Idle biar jelas
         ddAutoEnchant:SetValue("Idle")
     end
 end)
 ddAutoEnchant:SetValue("Idle")
-
-
 
 --========================================================
 -- PART 3 - TELEPORT + MISC + FPS/PING OVERLAY
