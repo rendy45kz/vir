@@ -1113,7 +1113,7 @@ local MiscState = {
     TexturesOff    = false,
     SmoothPlastic  = false,
     UltraNoEffects = false,
-    FPSCapValue    = 120,
+    FPSCapValue    = 190,
 }
 
 local Saved = {
