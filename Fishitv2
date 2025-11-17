@@ -1367,3 +1367,576 @@ task.spawn(function()
     end
 end)
 
+--========================================================
+-- PART 3 - TELEPORT + MISC + FPS/PING OVERLAY
+--========================================================
+
+local VirtualUser = game:GetService("VirtualUser")
+local Stats       = game:GetService("Stats")
+
+--------------------------------------------------------
+-- TELEPORT TAB
+--------------------------------------------------------
+local function tpTo(pos: Vector3)
+    if not pos then return end
+    local plr = LocalPlayer
+    local ch  = plr and (plr.Character or plr.CharacterAdded:Wait())
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+    end
+end
+
+local TabTP  = win:CreateTab("Teleport")
+local PageTP = TabTP:CreateFrame("Teleport")
+PageTP:CreateLabel("TELEPORT MENU")
+
+-- Island list
+local islands = {
+    ["Weather Machine"]            = Vector3.new(-1471,-3,1929),
+    ["Esoteric Depths"]            = Vector3.new(3157,-1303,1439),
+    ["Tropical Grove"]             = Vector3.new(-2038,3,3650),
+    ["Stingray Shores"]            = Vector3.new(-32,4,2773),
+    ["Kohana Volcano"]             = Vector3.new(-519,24,189),
+    ["Coral Reefs"]                = Vector3.new(-3095,1,2177),
+    ["Crater Island"]              = Vector3.new(968,1,4854),
+    ["Kohana"]                     = Vector3.new(-658,3,719),
+    ["Winter Fest"]                = Vector3.new(1611,4,3280),
+    ["Esoteric Island"]            = Vector3.new(1987,4,1400),
+    ["Treasure Room"]              = Vector3.new(-3600,-267,-1558),
+    ["Lost Shore"]                 = Vector3.new(-3663,38,-989),
+    ["Sisyphus"]                   = Vector3.new(-3792,-135,-986),
+    ["Crystal Cavern"]             = Vector3.new(-2026,-440,7428),
+    ["Halloween"]                  = Vector3.new(2127,78,3334),
+    ["Ancient Underground Cave"]   = Vector3.new(2102,-91,-709),
+    ["Ancient Inside Temple"]      = Vector3.new(1506,-22,-641),
+    ["Ancient Jungle"]             = Vector3.new(1268,78,-183),
+    ["Fisherman Island"]           = Vector3.new(-3,17,2840),
+}
+local islandList = {}
+for name in pairs(islands) do table.insert(islandList, name) end
+table.sort(islandList)
+
+PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
+    local v = islands[choice]
+    if v then tpTo(v) end
+end)
+
+-- Scan NPC models
+local function scanNPC_Models()
+    local found = {}
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and #m.Name >= 3 then
+            if Players:GetPlayerFromCharacter(m) == nil then
+                local hasHum = m:FindFirstChildOfClass("Humanoid") ~= nil
+                local hasPrompt = false
+                if not hasHum then
+                    for _,d in ipairs(m:GetDescendants()) do
+                        if d:IsA("ProximityPrompt") then hasPrompt = true break end
+                    end
+                end
+                if hasHum or hasPrompt then
+                    found[m.Name] = true
+                end
+            end
+        end
+    end
+    local list = {}
+    for k in pairs(found) do table.insert(list, k) end
+    table.sort(list)
+    return list
+end
+
+local npcList = scanNPC_Models()
+local ddNPC = PageTP:CreateDropdown("Teleport NPC", npcList, function(nm)
+    if not nm or nm == "" then return end
+    local me   = LocalPlayer
+    local ch   = me and (me.Character or me.CharacterAdded:Wait())
+    local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local best,dist
+    for _,m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
+            if string.find(string.lower(m.Name), string.lower(nm), 1, true) then
+                local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+                if p then
+                    local d = (p.Position - hrp.Position).Magnitude
+                    if not dist or d < dist then best = p; dist = d end
+                end
+            end
+        end
+    end
+    if best then tpTo(best.Position) end
+end)
+
+-- Players dropdown
+local function playersList()
+    local t = {}
+    for _,pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then table.insert(t, pl.Name) end
+    end
+    table.sort(t)
+    return t
+end
+
+local plrList = playersList()
+local ddPlayer = PageTP:CreateDropdown("Teleport Player", plrList, function(nm)
+    local p = Players:FindFirstChild(nm)
+    if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+        tpTo(p.Character.HumanoidRootPart.Position)
+    end
+end)
+
+-- Refresh NPC & Player lists berkala
+task.spawn(function()
+    while true do
+        task.wait(8)
+        -- NPC refresh
+        local newNPC = scanNPC_Models()
+        if ddNPC and ddNPC.SetOptions then
+            ddNPC:SetOptions(newNPC)
+        end
+        -- Player refresh
+        local newPL = playersList()
+        if ddPlayer and ddPlayer.SetOptions then
+            ddPlayer:SetOptions(newPL)
+        end
+    end
+end)
+
+Players.PlayerAdded:Connect(function()
+    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+end)
+Players.PlayerRemoving:Connect(function()
+    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
+end)
+
+--------------------------------------------------------
+-- MISC TAB (ANTI AFK, FPS BOOST, LIGHTING, DLL)
+--------------------------------------------------------
+local TabMisc   = win:CreateTab("Misc")
+local PageMisc  = TabMisc:CreateFrame("Misc")
+PageMisc:CreateLabel("MISC / PERFORMANCE")
+
+local MiscState = {
+    AntiAFK        = false,
+    FPSBoost       = false,
+    LightingSimple = false,
+    TexturesOff    = false,
+    SmoothPlastic  = false,
+    UltraNoEffects = false,
+    FPSCapValue    = 120,
+}
+
+local Saved = {
+    PostEffects   = {},
+    GlobalShadows = nil,
+    FogEnd        = nil,
+}
+
+-- ANTI AFK
+local AntiAFK_Conn
+
+local function EnableAntiAFK()
+    if AntiAFK_Conn then AntiAFK_Conn:Disconnect() end
+    AntiAFK_Conn = LocalPlayer.Idled:Connect(function()
+        local cam = Workspace.CurrentCamera
+        VirtualUser:Button2Down(Vector2.new(0,0), cam and cam.CFrame or CFrame.new())
+        task.wait(0.7)
+        VirtualUser:Button2Up(Vector2.new(0,0), cam and cam.CFrame or CFrame.new())
+    end)
+end
+
+local function DisableAntiAFK()
+    if AntiAFK_Conn then AntiAFK_Conn:Disconnect(); AntiAFK_Conn = nil end
+end
+
+-- FPS BOOST HELPERS
+local function ApplySmoothPlastic()
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
+            v.Reflectance = 0
+        end
+    end
+end
+
+local function DisableTextures()
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("Decal") or v:IsA("Texture") then
+            v.Transparency = 1
+        end
+    end
+end
+
+local function LightingSimplify()
+    if Saved.GlobalShadows == nil then
+        Saved.GlobalShadows = Lighting.GlobalShadows
+    end
+    if Saved.FogEnd == nil then
+        Saved.FogEnd = Lighting.FogEnd
+    end
+    if #Saved.PostEffects == 0 then
+        for _, eff in ipairs(Lighting:GetChildren()) do
+            if eff:IsA("PostEffect") then
+                table.insert(Saved.PostEffects, {ref = eff, enabled = eff.Enabled})
+            end
+        end
+    end
+
+    for _, eff in ipairs(Lighting:GetChildren()) do
+        if eff:IsA("PostEffect") then
+            eff.Enabled = false
+        end
+    end
+
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 1e10
+    Lighting.Brightness = 1
+    Lighting.EnvironmentDiffuseScale  = 0
+    Lighting.EnvironmentSpecularScale = 0
+end
+
+local function ResetLighting()
+    for _, item in ipairs(Saved.PostEffects) do
+        if item.ref and item.ref.Parent then
+            item.ref.Enabled = item.enabled
+        end
+    end
+    if Saved.GlobalShadows ~= nil then
+        Lighting.GlobalShadows = Saved.GlobalShadows
+    end
+    if Saved.FogEnd ~= nil then
+        Lighting.FogEnd = Saved.FogEnd
+    end
+end
+
+local function KillCharacterAnimation(char)
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+            pcall(function() track:Stop() end)
+        end
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if animator then
+            pcall(function() animator:Destroy() end)
+        end
+    end
+    local animate = char:FindFirstChild("Animate")
+    if animate then
+        pcall(function() animate:Destroy() end)
+    end
+end
+
+local function KillAllHumanoidAnimations()
+    for _, hum in ipairs(game:GetDescendants()) do
+        if hum:IsA("Humanoid") then
+            KillCharacterAnimation(hum.Parent)
+        end
+    end
+end
+
+local function KillParticlesAndLights()
+    for _, v in ipairs(game:GetDescendants()) do
+        if v:IsA("ParticleEmitter")
+        or v:IsA("Trail")
+        or v:IsA("Fire")
+        or v:IsA("Smoke")
+        or v:IsA("Sparkles")
+        or v:IsA("Explosion")
+        or v:IsA("Beam") then
+            v.Enabled = false
+        elseif v:IsA("PointLight")
+        or v:IsA("SpotLight")
+        or v:IsA("SurfaceLight") then
+            v.Enabled = false
+        end
+    end
+
+    local terrain = Workspace:FindFirstChildOfClass("Terrain")
+    if terrain then
+        terrain.WaterWaveSize        = 0
+        terrain.WaterWaveSpeed       = 0
+        terrain.WaterReflectance     = 0
+        terrain.WaterTransparency    = 0
+    end
+end
+
+local function UltraNoEffectsApply()
+    KillAllHumanoidAnimations()
+    KillParticlesAndLights()
+
+    local function onChar(char)
+        task.delay(1, function()
+            if MiscState.UltraNoEffects then
+                KillCharacterAnimation(char)
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        onChar(LocalPlayer.Character)
+    end
+    LocalPlayer.CharacterAdded:Connect(onChar)
+end
+
+local function FPSBoostApply()
+    if MiscState.SmoothPlastic   then ApplySmoothPlastic()   end
+    if MiscState.TexturesOff     then DisableTextures()      end
+    if MiscState.LightingSimple  then LightingSimplify()     end
+    if MiscState.UltraNoEffects  then UltraNoEffectsApply()  end
+
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end
+
+local function ApplyFPSCap()
+    if typeof(setfpscap) == "function" then
+        setfpscap(tonumber(MiscState.FPSCapValue) or 120)
+    end
+end
+
+-- UI DROPDOWNS MISC
+
+-- Anti AFK
+local ddAntiAFK = PageMisc:CreateDropdown("Anti AFK", {"Off","On"}, function(opt)
+    MiscState.AntiAFK = (opt == "On")
+    if MiscState.AntiAFK then
+        EnableAntiAFK()
+    else
+        DisableAntiAFK()
+    end
+end)
+ddAntiAFK:SetValue("On")
+MiscState.AntiAFK = true
+EnableAntiAFK()
+
+-- FPS Boost
+local ddFPSBoost = PageMisc:CreateDropdown("FPS Boost (Aggressive)", {"Off","On"}, function(opt)
+    MiscState.FPSBoost = (opt == "On")
+    if MiscState.FPSBoost then
+        FPSBoostApply()
+    else
+        ResetLighting()
+    end
+end)
+ddFPSBoost:SetValue("On")
+MiscState.FPSBoost = true
+FPSBoostApply()
+
+-- Lighting Simplify
+local ddLighting = PageMisc:CreateDropdown("Lighting Simplify", {"Off","On"}, function(opt)
+    MiscState.LightingSimple = (opt == "On")
+    if MiscState.LightingSimple then
+        LightingSimplify()
+    else
+        ResetLighting()
+    end
+end)
+ddLighting:SetValue("On")
+MiscState.LightingSimple = true
+LightingSimplify()
+
+-- Textures/Decals
+local ddTextures = PageMisc:CreateDropdown("Textures / Decals", {"Keep","Hide All"}, function(opt)
+    MiscState.TexturesOff = (opt == "Hide All")
+    if MiscState.TexturesOff then
+        DisableTextures()
+    end
+end)
+ddTextures:SetValue("Hide All")
+MiscState.TexturesOff = true
+DisableTextures()
+
+-- SmoothPlastic
+local ddSmooth = PageMisc:CreateDropdown("Part Material", {"Default","SmoothPlastic"}, function(opt)
+    MiscState.SmoothPlastic = (opt == "SmoothPlastic")
+    if MiscState.SmoothPlastic then
+        ApplySmoothPlastic()
+    end
+end)
+ddSmooth:SetValue("SmoothPlastic")
+MiscState.SmoothPlastic = true
+ApplySmoothPlastic()
+
+-- Ultra No Effects
+local ddUltra = PageMisc:CreateDropdown("ULTRA: No Anim/Particles", {"Off","On (One-way)"}, function(opt)
+    MiscState.UltraNoEffects = (opt == "On (One-way)")
+    if MiscState.UltraNoEffects then
+        UltraNoEffectsApply()
+    end
+end)
+ddUltra:SetValue("On (One-way)")
+MiscState.UltraNoEffects = true
+UltraNoEffectsApply()
+
+-- FPS Cap Dropdown
+local ddFPSCap = PageMisc:CreateDropdown("FPS Cap", {"60","90","120","144","240","Unlimited"}, function(opt)
+    if opt == "Unlimited" then
+        MiscState.FPSCapValue = 1000
+    else
+        MiscState.FPSCapValue = tonumber(opt) or 120
+    end
+    ApplyFPSCap()
+end)
+ddFPSCap:SetValue("120")
+MiscState.FPSCapValue = 120
+ApplyFPSCap()
+
+-- Reset Lighting action
+local ddResetLight = PageMisc:CreateDropdown("Lighting Action", {"Idle","Reset Lighting Now"}, function(opt)
+    if opt == "Reset Lighting Now" then
+        ResetLighting()
+        ddResetLight:SetValue("Idle")
+    end
+end)
+ddResetLight:SetValue("Idle")
+
+--------------------------------------------------------
+-- FPS + PING OVERLAY (TEXT, DRAGGABLE)
+--------------------------------------------------------
+local guiParent = (gethui and gethui()) or CoreGui
+
+local oldOverlay = guiParent:FindFirstChild("FPS_PING_TEXT_ONLY")
+if oldOverlay then
+    oldOverlay:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FPS_PING_TEXT_ONLY"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+if syn and syn.protect_gui then
+    syn.protect_gui(screenGui)
+end
+screenGui.Parent = guiParent
+
+local holder = Instance.new("Frame")
+holder.Name = "Holder"
+holder.Parent = screenGui
+holder.BackgroundTransparency = 1
+holder.BorderSizePixel = 0
+holder.AnchorPoint = Vector2.new(0, 0)
+holder.Position = UDim2.new(0, 0, 0, 6)
+holder.Size = UDim2.new(0, 320, 0, 20)
+
+task.spawn(function()
+    task.wait(0.15)
+    local cam3 = Workspace.CurrentCamera
+    if cam3 then
+        local vp = cam3.ViewportSize
+        holder.Position = UDim2.new(0, (vp.X - holder.AbsoluteSize.X) / 2, 0, 6)
+    else
+        holder.Position = UDim2.new(0, 10, 0, 6)
+    end
+end)
+
+local hList = Instance.new("UIListLayout", holder)
+hList.FillDirection = Enum.FillDirection.Horizontal
+hList.SortOrder = Enum.SortOrder.LayoutOrder
+hList.VerticalAlignment = Enum.VerticalAlignment.Center
+hList.Padding = UDim.new(0, 6)
+
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Name = "InfoLabel"
+infoLabel.Parent = holder
+infoLabel.BackgroundTransparency = 1
+infoLabel.BorderSizePixel = 0
+infoLabel.Size = UDim2.new(0, 320, 0, 20)
+infoLabel.Font = Enum.Font.Code
+infoLabel.TextSize = 14
+infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoLabel.TextStrokeTransparency = 0.5
+infoLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+infoLabel.Text = "FPS: ... | Ping: ..."
+
+-- drag overlay
+do
+    local dragging = false
+    local dragStart, startPos
+
+    holder.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = holder.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Offset + delta.X
+            local newY = startPos.Y.Offset + delta.Y
+
+            local cam3 = Workspace.CurrentCamera
+            if cam3 then
+                local vp = cam3.ViewportSize
+                newX = math.clamp(newX, 0, vp.X - holder.AbsoluteSize.X)
+                newY = math.clamp(newY, 0, vp.Y - holder.AbsoluteSize.Y)
+            end
+
+            holder.Position = UDim2.new(0, newX, 0, newY)
+        end
+    end)
+end
+
+-- FPS smoothing
+local fps = 0
+local avgFPS = 0
+local alphaFPS = 0.15
+
+RunService.RenderStepped:Connect(function(dt)
+    local instFPS = 1 / math.max(dt, 1/1000)
+    if avgFPS == 0 then
+        avgFPS = instFPS
+    else
+        avgFPS = avgFPS + (instFPS - avgFPS) * alphaFPS
+    end
+    fps = avgFPS
+end)
+
+local function getPingMs()
+    local pingStat
+    local ok = pcall(function()
+        pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+    end)
+
+    if ok and pingStat then
+        local str = pingStat:GetValueString() or ""
+        local num = tonumber(string.match(str, "(%d+)"))
+        return num or 0
+    end
+
+    return 0
+end
+
+task.spawn(function()
+    while screenGui.Parent do
+        local fpsRounded = math.floor(fps + 0.5)
+        local pingMs = getPingMs()
+
+        if pingMs > 0 then
+            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: " .. tostring(pingMs) .. " ms"
+        else
+            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: N/A"
+        end
+
+        task.wait(0.25)
+    end
+end)
+
+-- Dropdown untuk show/hide overlay
+PageMisc:CreateDropdown("Stats Overlay", {"On","Off"}, function(opt)
+    if screenGui then
+        screenGui.Enabled = (opt == "On")
+    end
+end)
