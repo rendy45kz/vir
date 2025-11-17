@@ -550,7 +550,7 @@ local BASE_X, BASE_Y = -0.75, 1
 local function DoCastOnce()
     EquipRodOnce()
 
-    RF_Charge:InvokeServer(Workspace2:GetServerTimeNow())
+    RF_Charge:InvokeServer(Workspace:GetServerTimeNow())
 
     local rx = BASE_X + math.random(-300, 300) / 1e7
     local ry = BASE_Y + math.random(-300, 300) / 1e7
@@ -569,7 +569,7 @@ RE_TextEffect.OnClientEvent:Connect(function(data)
     if data.TextData.EffectType ~= "Exclaim" then return end
 
     -- Pastikan Exclaim di atas kepala karakter kita sendiri
-    local char = LocalPlayer2.Character
+    local char = LocalPlayer.Character
     local head = char and char:FindFirstChild("Head")
     if not head or data.Container ~= head then return end
 
