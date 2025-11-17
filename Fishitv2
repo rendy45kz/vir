@@ -490,7 +490,7 @@ end
 local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
 
 --========================================================
--- FISH IT FARM - Auto Fish cepat (NO BLATANT)
+-- FISH IT FARM - Auto Fish + Blatant 5x
 --========================================================
 
 local TabFarm   = win:CreateTab("Farm")
@@ -514,15 +514,21 @@ local RF_RequestMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted"
 local RE_FishingCompleted  = net:WaitForChild("RE/FishingCompleted")
 local RE_EquipHotbar       = net:WaitForChild("RE/EquipToolFromHotbar")
 local RE_TextEffect        = net:WaitForChild("RE/ReplicateTextEffect")
-local RE_FishCaught        = net:FindFirstChild("RE/FishCaught") -- tidak dipakai
+local RE_FishCaught        = net:FindFirstChild("RE/FishCaught")
 
--- STATE FARM (Auto Fish saja)
+-- STATE FARM
 local Farm = {
+    -- AUTO FISH (cepat, tapi masih 1x finish)
     AutoFish_Enabled       = false,
-
-    -- Delay bisa kamu atur dari UI:
     AutoFish_CompleteDelay = 0.10, -- jeda setelah "!" sebelum tarik ikan
     AutoFish_ReelDelay     = 0.05, -- jeda setelah tarik ikan sebelum lempar lagi
+
+    -- BLATANT 5X (spam finish)
+    Blatant5x_Enabled      = false,
+    Blatant5x_FinishDelay  = 0.03, -- delay antar spam FishingCompleted
+    Blatant5x_RecastDelay  = 0.05, -- delay setelah fish caught sebelum cast lagi
+    Blatant5x_AntiStuck    = true,
+    Blatant5x_StuckTimeout = 15,   -- detik tanpa ikan → recovery
 
     AutoBait               = true,
     AutoBestRod            = true,
@@ -537,42 +543,42 @@ local function EquipRodOnce()
     if RodEquippedOnce then return end
     RodEquippedOnce = true
 
-    -- Kalau mau simple: selalu equip slot 1
+    -- simple: selalu equip slot 1 sekali di awal
     RE_EquipHotbar:FireServer(1)
     task.wait(0.5)
 end
 
+------------------------------------------------
+-- AUTO FISH (Exclaim per cast)
+------------------------------------------------
 local BASE_X, BASE_Y = -0.75, 1
 
--- connection Exclaim disimpan supaya bisa di-disconnect tiap cast
+-- connection Exclaim disimpan supaya bisa di-disconnect tiap cast (AutoFish)
 local currentExclaimConn
 
 local function DoCastOnce()
-    -- Kalau Auto Fish dimatikan, stop loop
     if not Farm.AutoFish_Enabled then return end
 
-    -- Pastikan rod sudah ter-equip (hanya sekali di awal)
     EquipRodOnce()
 
-    -- Bersihkan listener lama kalau ada, biar gak numpuk
+    -- Bersihkan listener lama kalau ada
     if currentExclaimConn then
         currentExclaimConn:Disconnect()
         currentExclaimConn = nil
     end
 
-    -- Siapkan referensi karakter & head saat ini
-    local char = LocalPlayer.Character
+    -- Referensi karakter & head saat ini
+    local char = LocalPlayer2.Character
     local head = char and char:FindFirstChild("Head")
 
-    -- Pasang listener untuk Exclaim UNTUK CAST INI
+    -- Listener Exclaim khusus cast ini (AUTO FISH MODE)
     currentExclaimConn = RE_TextEffect.OnClientEvent:Connect(function(data)
-        -- Validasi basic
+        if not Farm.AutoFish_Enabled then return end
         if not data or not data.TextData then return end
         if data.TextData.EffectType ~= "Exclaim" then return end
 
         -- Pastikan Exclaim di atas kepala kita sendiri
         if not head or data.Container ~= head then return end
-        if not Farm.AutoFish_Enabled then return end
 
         -- Sekali Exclaim ke-trigger, listener ini bisa dilepas
         if currentExclaimConn then
@@ -580,7 +586,7 @@ local function DoCastOnce()
             currentExclaimConn = nil
         end
 
-        -- Ambil delay dari config
+        -- Delay dari config
         local completeDelay = tonumber(Farm.AutoFish_CompleteDelay) or 0.10
         local reelDelay     = tonumber(Farm.AutoFish_ReelDelay)     or 0.05
 
@@ -603,7 +609,7 @@ local function DoCastOnce()
     end)
 
     -- === CAST SEKARANG ===
-    local serverTime = Workspace:GetServerTimeNow()
+    local serverTime = Workspace2:GetServerTimeNow()
     RF_Charge:InvokeServer(serverTime)
 
     local rx = BASE_X + math.random(-300, 300) / 1e7
@@ -612,20 +618,118 @@ local function DoCastOnce()
     RF_RequestMinigame:InvokeServer(rx, ry)
 end
 
--- (Opsional) Kalau mau aman, boleh juga auto recast ketika event FishCaught keluar
---[[
-if RE_FishCaught then
-    RE_FishCaught.OnClientEvent:Connect(function()
-        if Farm.AutoFish_Enabled then
-            task.delay(Farm.AutoFish_ReelDelay, function()
-                if Farm.AutoFish_Enabled then
-                    DoCastOnce()
-                end
-            end)
+------------------------------------------------
+-- BLATANT 5X (spam finish)
+------------------------------------------------
+local Blatant5xState = {
+    IsSpammingFinish = false,
+    FinishThread     = nil,
+    LastFishTime     = tick(),
+}
+
+-- Koordinat cast khas 5x (boleh kamu ubah)
+local B5X_BASE_X, B5X_BASE_Y = -1.25, 1.0
+
+local function FastCast5X()
+    if not Farm.Blatant5x_Enabled then return end
+
+    EquipRodOnce()
+
+    local serverTime = Workspace2:GetServerTimeNow()
+    RF_Charge:InvokeServer(serverTime)
+
+    local rx = B5X_BASE_X + math.random(-300, 300) / 1e7
+    local ry = B5X_BASE_Y + math.random(-300, 300) / 1e7
+
+    RF_RequestMinigame:InvokeServer(rx, ry)
+end
+
+local function StopFinishSpam()
+    Blatant5xState.IsSpammingFinish = false
+end
+
+local function StartFinishSpam()
+    if Blatant5xState.IsSpammingFinish then return end
+    Blatant5xState.IsSpammingFinish = true
+
+    if Blatant5xState.FinishThread then
+        task.cancel(Blatant5xState.FinishThread)
+        Blatant5xState.FinishThread = nil
+    end
+
+    Blatant5xState.FinishThread = task.spawn(function()
+        while Blatant5xState.IsSpammingFinish and Farm.Blatant5x_Enabled do
+            local d = tonumber(Farm.Blatant5x_FinishDelay) or 0.03
+            if d < 0.005 then d = 0.005 end
+            task.wait(d)
+            RE_FishingCompleted:FireServer()
         end
     end)
 end
-]]
+
+--------------------------------------------------------
+-- EXCLAIM HANDLER KHUSUS BLATANT 5X (GLOBAL)
+--------------------------------------------------------
+RE_TextEffect.OnClientEvent:Connect(function(data)
+    if not Farm.Blatant5x_Enabled then return end
+    if not data or not data.TextData then return end
+    if data.TextData.EffectType ~= "Exclaim" then return end
+
+    local char = LocalPlayer2.Character
+    local head = char and char:FindFirstChild("Head")
+    if not head or data.Container ~= head then return end
+
+    -- Saat "!" di atas kepala kita → mulai spam FishingCompleted
+    StartFinishSpam()
+end)
+
+--------------------------------------------------------
+-- FISH CAUGHT HANDLER BLATANT 5X
+--------------------------------------------------------
+if RE_FishCaught then
+    RE_FishCaught.OnClientEvent:Connect(function(fishName, info)
+        if not Farm.Blatant5x_Enabled then return end
+
+        Blatant5xState.LastFishTime = tick()
+
+        -- stop spam finish
+        StopFinishSpam()
+
+        -- recast cepat
+        local d = tonumber(Farm.Blatant5x_RecastDelay) or 0.05
+        if d < 0 then d = 0 end
+
+        task.delay(d, function()
+            if Farm.Blatant5x_Enabled then
+                FastCast5X()
+            end
+        end)
+    end)
+end
+
+--------------------------------------------------------
+-- ANTI STUCK BLATANT 5X
+--------------------------------------------------------
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if Farm.Blatant5x_Enabled and Farm.Blatant5x_AntiStuck then
+            local timeout = tonumber(Farm.Blatant5x_StuckTimeout) or 15
+            if timeout < 3 then timeout = 3 end
+
+            if tick() - Blatant5xState.LastFishTime > timeout then
+                -- Recovery: stop spam & cast ulang
+                StopFinishSpam()
+                task.wait(0.3)
+                if Farm.Blatant5x_Enabled then
+                    FastCast5X()
+                    Blatant5xState.LastFishTime = tick()
+                end
+            end
+        end
+    end
+end)
+
 --========================================================
 -- UI: FARM
 --========================================================
@@ -636,8 +740,18 @@ PageFarm:CreateToggle("Auto Fish", "Exclaim → tarik → recast otomatis", func
     Farm.AutoFish_Enabled = on
 
     if on then
-        -- mulai satu kali, selanjutnya di-handle Exclaim
+        -- Matikan Blatant kalau nyala
+        if Farm.Blatant5x_Enabled then
+            Farm.Blatant5x_Enabled = false
+            StopFinishSpam()
+        end
         DoCastOnce()
+    else
+        -- matikan listener per-cast kalau ada
+        if currentExclaimConn then
+            currentExclaimConn:Disconnect()
+            currentExclaimConn = nil
+        end
     end
 end)
 
@@ -654,6 +768,51 @@ PageFarm:CreateBox("Reel Delay", "Delay dari tarik ke lempar lagi (contoh: 0.03 
         Farm.AutoFish_ReelDelay = num
     end
 end)
+
+PageFarm:CreateLabel("BLATANT 5X MODE")
+
+PageFarm:CreateToggle("Blatant 5x", "Spam FishingCompleted + recast cepat (lebih risk)", function(on)
+    Farm.Blatant5x_Enabled = on
+
+    if on then
+        -- Matikan AutoFish biasa
+        if Farm.AutoFish_Enabled then
+            Farm.AutoFish_Enabled = false
+            if currentExclaimConn then
+                currentExclaimConn:Disconnect()
+                currentExclaimConn = nil
+            end
+        end
+
+        StopFinishSpam()
+        Blatant5xState.LastFishTime = tick()
+        FastCast5X()
+    else
+        StopFinishSpam()
+    end
+end)
+
+PageFarm:CreateBox("Finish Delay (5x)", "Delay antar FishingCompleted spam (0.02 - 0.08)", function(txt)
+    local num = tonumber(txt)
+    if num and num >= 0 then
+        Farm.Blatant5x_FinishDelay = num
+    end
+end)
+
+PageFarm:CreateBox("Recast Delay (5x)", "Delay setelah fish caught sebelum cast lagi", function(txt)
+    local num = tonumber(txt)
+    if num and num >= 0 then
+        Farm.Blatant5x_RecastDelay = num
+    end
+end)
+
+PageFarm:CreateBox("Stuck Timeout (5x)", "Detik tanpa ikan → recovery (default 15)", function(txt)
+    local num = tonumber(txt)
+    if num and num >= 3 then
+        Farm.Blatant5x_StuckTimeout = num
+    end
+end)
+
 
 --========================================================
 -- TELEPORT (Island / NPC / Player)
