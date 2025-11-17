@@ -317,155 +317,177 @@ function library:CreateWindow(name, version, icon)
             return box
         end
 
-        function PageAPI:CreateToggle(text, callback)
+                function PageAPI:CreateToggle(title, callback)
             callback = callback or function() end
 
-            local container = Instance.new("Frame",Page)
-            container.Size = UDim2.new(1,0,0,30)
-            container.BackgroundColor3 = BG_CARD
-            Instance.new("UICorner",container).CornerRadius = UDim.new(0,6)
+            local fr = Instance.new("Frame", Page)
+            fr.BackgroundColor3 = BG_CARD
+            fr.Size = UDim2.new(1, 0, 0, math.floor(40 * SCALE))
+            fr.AutomaticSize = Enum.AutomaticSize.Y
+            fr.ClipsDescendants = false
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 6)
 
-            local lbl = Instance.new("TextLabel",container)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 11*SCALE
-            lbl.TextColor3 = Color3.new(1,1,1)
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Position = UDim2.fromOffset(8,6)
-            lbl.Size = UDim2.new(1,-50,1,-12)
-            lbl.Text = text
+            local t = Instance.new("TextLabel", fr)
+            t.BackgroundTransparency = 1
+            t.Position = UDim2.new(0, 8, 0, 2)
+            t.Size = UDim2.new(1, -70, 0, math.floor(18 * SCALE))
+            t.Font = Enum.Font.GothamBlack
+            t.TextSize = math.floor(12 * SCALE)
+            t.TextColor3 = Color3.new(1, 1, 1)
+            t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Text = string.upper(title or "TOGGLE")
 
-            local btn = Instance.new("TextButton",container)
-            btn.Size = UDim2.fromOffset(36,18)
-            btn.Position = UDim2.new(1,-44,0.5,-9)
-            btn.BackgroundColor3 = Color3.fromRGB(24,25,32)
-            btn.Text = ""
-            Instance.new("UICorner",btn).CornerRadius = UDim.new(1,0)
+            local track = Instance.new("Frame", fr)
+            track.BackgroundColor3 = Color3.fromRGB(24, 25, 32)
+            track.Size = UDim2.fromOffset(math.floor(50 * SCALE), math.floor(22 * SCALE))
+            track.Position = UDim2.new(1, -math.floor(62 * SCALE), 0, math.floor(8 * SCALE))
+            Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-            local dot = Instance.new("Frame",btn)
-            dot.Size = UDim2.fromOffset(16,16)
-            dot.Position = UDim2.fromOffset(2,1)
+            local dot = Instance.new("Frame", track)
+            dot.Size = UDim2.fromOffset(math.floor(18 * SCALE), math.floor(18 * SCALE))
+            dot.Position = UDim2.new(0, math.floor(2 * SCALE), 0, math.floor(2 * SCALE))
             dot.BackgroundColor3 = ACCENT
-            dot.BackgroundTransparency = .5
-            Instance.new("UICorner",dot).CornerRadius = UDim.new(1,0)
+            dot.BackgroundTransparency = 0.6
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
 
-            local state = false
+            local btn = Instance.new("TextButton", fr)
+            btn.BackgroundTransparency = 1
+            btn.Size = UDim2.new(1, 0, 1, 0)
+            btn.Text = ""
 
-            local function update()
-                if state then
-                    tw(dot,.12,{
-                        Position = UDim2.fromOffset(18,1),
-                        BackgroundTransparency = 0
-                    })
-                else
-                    tw(dot,.12,{
-                        Position = UDim2.fromOffset(2,1),
-                        BackgroundTransparency = .5
-                    })
-                end
-                callback(state)
+            local on = false
+            local function apply()
+                tw(dot, 0.12, {
+                    Position = on
+                        and UDim2.new(1, -math.floor(20 * SCALE), 0, math.floor(2 * SCALE))
+                        or  UDim2.new(0,  math.floor(2 * SCALE), 0, math.floor(2 * SCALE)),
+                    BackgroundTransparency = on and 0 or 0.6
+                })
+                callback(on)
             end
 
             btn.MouseButton1Click:Connect(function()
-                state = not state
-                update()
+                on = not on
+                apply()
             end)
 
             return {
-                Set = function(_,v)
-                    state = v
-                    update()
+                Set = function(_, v)
+                    if v ~= on then
+                        on = v
+                        apply()
+                    end
                 end
             }
         end
 
-        function PageAPI:CreateDropdown(title, options, callback)
-            callback = callback or function() end
-            options = options or {}
 
-            local container = Instance.new("Frame",Page)
-            container.Size = UDim2.new(1,0,0,60)
-            container.BackgroundColor3 = BG_CARD
-            Instance.new("UICorner",container).CornerRadius = UDim.new(0,6)
+                function PageAPI:CreateDropdown(title, options, onChanged)
+            options   = options   or {}
+            onChanged = onChanged or function() end
 
-            local lbl = Instance.new("TextLabel",container)
-            lbl.Text = title
-            lbl.Font = Enum.Font.GothamBlack
-            lbl.TextSize = 12*SCALE
-            lbl.TextColor3 = Color3.new(1,1,1)
-            lbl.BackgroundTransparency = 1
-            lbl.Position = UDim2.fromOffset(8,4)
-            lbl.Size = UDim2.new(1,-16,0,16)
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            local fr = Instance.new("Frame", Page)
+            fr.Name = "Dropdown"
+            fr.BackgroundColor3 = BG_CARD
+            fr.Size = UDim2.new(1, 0, 0, math.floor(28 * SCALE))
+            fr.AutomaticSize = Enum.AutomaticSize.Y
+            fr.ClipsDescendants = false
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 6)
 
-            local mainBtn = Instance.new("TextButton",container)
-            mainBtn.Position = UDim2.fromOffset(8,24)
-            mainBtn.Size = UDim2.new(1,-16,0,24)
-            mainBtn.BackgroundColor3 = Color3.fromRGB(24,25,32)
-            mainBtn.TextColor3 = Color3.new(1,1,1)
-            mainBtn.Font = Enum.Font.Gotham
-            mainBtn.Text = "Select"
-            mainBtn.TextSize = 11*SCALE
-            Instance.new("UICorner",mainBtn).CornerRadius = UDim.new(0,6)
+            local ttl = Instance.new("TextLabel", fr)
+            ttl.BackgroundTransparency = 1
+            ttl.Position = UDim2.new(0, 8, 0, 0)
+            ttl.Size = UDim2.new(1, -40, 0, math.floor(18 * SCALE))
+            ttl.Font = Enum.Font.GothamBlack
+            ttl.TextSize = math.floor(12 * SCALE)
+            ttl.TextColor3 = Color3.new(1, 1, 1)
+            ttl.TextXAlignment = Enum.TextXAlignment.Left
+            ttl.Text = string.upper(title or "DROPDOWN")
 
-            local listHolder = Instance.new("Frame",container)
-            listHolder.Visible = false
-            listHolder.BackgroundColor3 = BG_CARD
-            listHolder.Position = UDim2.fromOffset(8,52)
-            listHolder.Size = UDim2.new(1,-16,0,0)
-            listHolder.AutomaticSize = Enum.AutomaticSize.Y
-            Instance.new("UICorner",listHolder).CornerRadius = UDim.new(0,6)
+            local caret = Instance.new("TextLabel", fr)
+            caret.BackgroundTransparency = 1
+            caret.Size = UDim2.fromOffset(math.floor(16 * SCALE), math.floor(16 * SCALE))
+            caret.Position = UDim2.new(1, -math.floor(24 * SCALE), 0, 0)
+            caret.Font = Enum.Font.GothamBlack
+            caret.Text = "v"
+            caret.TextSize = math.floor(11 * SCALE)
+            caret.TextColor3 = ACCENT
 
-            local layout = Instance.new("UIListLayout",listHolder)
-            layout.Padding = UDim.new(0,4)
+            local holder = Instance.new("Frame", fr)
+            holder.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
+            holder.Position = UDim2.new(0, 6, 0, math.floor(20 * SCALE))
+            holder.Size = UDim2.new(1, -12, 0, 0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible = false
+            Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
 
-            local currentValue = nil
+            local hl = Instance.new("UIListLayout", holder)
+            hl.Padding = UDim.new(0, math.floor(4 * SCALE))
 
-            local function rebuild()
-                for _,v in ipairs(listHolder:GetChildren()) do
-                    if v:IsA("TextButton") then v:Destroy() end
+            local pad = Instance.new("UIPadding", holder)
+            pad.PaddingTop    = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingBottom = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingLeft   = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingRight  = UDim.new(0, math.floor(6 * SCALE))
+
+            local current = nil
+
+            local function rebuild(list)
+                for _, c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then
+                        c:Destroy()
+                    end
                 end
 
-                for _,opt in ipairs(options) do
-                    local op = Instance.new("TextButton",listHolder)
-                    op.Size = UDim2.new(1,0,0,22)
-                    op.BackgroundColor3 = Color3.fromRGB(24,25,32)
-                    op.Font = Enum.Font.Gotham
-                    op.TextSize = 11*SCALE
-                    op.TextColor3 = Color3.new(1,1,1)
-                    op.Text = opt
-                    Instance.new("UICorner",op).CornerRadius = UDim.new(0,6)
+                for _, opt in ipairs(list) do
+                    local b = Instance.new("TextButton", holder)
+                    b.Size = UDim2.new(1, 0, 0, math.floor(24 * SCALE))
+                    b.BackgroundColor3 = BG_CARD
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = math.floor(11 * SCALE)
+                    b.TextColor3 = Color3.new(1, 1, 1)
+                    b.Text = tostring(opt)
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
 
-                    op.MouseButton1Click:Connect(function()
-                        currentValue = opt
-                        mainBtn.Text = opt
-                        listHolder.Visible = false
-                        callback(opt)
+                    b.MouseButton1Click:Connect(function()
+                        current = opt
+                        ttl.Text = string.upper(("%s : %s"):format(title or "DROPDOWN", tostring(opt)))
+                        holder.Visible = false
+                        tw(caret, 0.12, {Rotation = 0})
+                        onChanged(opt)
                     end)
                 end
             end
 
-            rebuild()
+            rebuild(options)
 
-            mainBtn.MouseButton1Click:Connect(function()
-                listHolder.Visible = not listHolder.Visible
+            local open = false
+            local header = Instance.new("TextButton", fr)
+            header.BackgroundTransparency = 1
+            header.Size = UDim2.new(1, 0, 0, math.floor(20 * SCALE))
+            header.Position = UDim2.new(0, 0, 0, 0)
+            header.Text = ""
+            header.MouseButton1Click:Connect(function()
+                open = not open
+                holder.Visible = open
+                tw(caret, 0.12, {Rotation = open and 180 or 0})
             end)
 
             return {
-                SetValue = function(_,v)
-                    currentValue = v
-                    mainBtn.Text = tostring(v)
+                SetValue = function(_, v)
+                    current = v
+                    ttl.Text = string.upper(("%s : %s"):format(title or "DROPDOWN", tostring(v)))
                 end,
-                SetOptions = function(_,opts)
-                    options = opts
-                    rebuild()
+                GetValue = function()
+                    return current
                 end,
-                GetValue = function() return currentValue end
+                SetOptions = function(_, opts)
+                    options = opts or {}
+                    rebuild(options)
+                end
             }
         end
 
-        return PageAPI
-    end
 
     --------------------------------------------------------
     -- RETURN WINDOW API
