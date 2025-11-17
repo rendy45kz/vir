@@ -1,5 +1,5 @@
 --========================================================
--- AEGISHUB UI LIBRARY - CLEAN BASE
+-- AEGISHUB UI LIBRARY - BIGGER UI
 --========================================================
 
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -55,24 +55,25 @@ function library:CreateWindow(name, version, icon)
         local cam = Workspace.CurrentCamera
         local vp  = cam and cam.ViewportSize or Vector2.new(1280,720)
         local s   = math.min(vp.X, vp.Y)
-        if s <= 720 then return .85 elseif s <= 900 then return .92 else return 1 end
+        if s <= 720 then return .9 elseif s <= 900 then return 1 else return 1.05 end
     end
-    local SCALE = calcScale()
+    local BASE_SCALE = 1.05
+    local SCALE = calcScale() * BASE_SCALE
 
     -- Overlay toggle (floating ball)
     local Overlay = Instance.new("ImageButton")
     Overlay.Parent = Gui
-    Overlay.Size = UDim2.fromOffset(40,40)
+    Overlay.Size = UDim2.fromOffset(46,46)
     Overlay.BackgroundColor3 = Color3.fromRGB(32,34,46)
     Overlay.Image = "rbxassetid://10045753138"
     Overlay.ImageColor3 = ACCENT
     local u = Instance.new("UICorner",Overlay) u.CornerRadius = UDim.new(1,0)
-    local s = Instance.new("UIStroke",Overlay) s.Transparency = .85
+    local s = Instance.new("UIStroke",Overlay) s.Transparency = .6
 
     -- Position overlay
     task.wait()
     local cam = Workspace.CurrentCamera
-    Overlay.Position = UDim2.fromOffset(12, (cam.ViewportSize.Y/2)-20)
+    Overlay.Position = UDim2.fromOffset(14, (cam.ViewportSize.Y/2)-30)
 
     -- Drag overlay
     do
@@ -99,31 +100,36 @@ function library:CreateWindow(name, version, icon)
     end
 
     -- Window
+    local WindowWidth  = 580 * SCALE
+    local WindowHeight = 400 * SCALE
+
     local Window = Instance.new("Frame")
     Window.Parent = Gui
-    Window.Size = UDim2.fromOffset(520*SCALE, 340*SCALE)
-    Window.Position = UDim2.new(.5, -260*SCALE, .5, -170*SCALE)
+    Window.Size = UDim2.fromOffset(WindowWidth, WindowHeight)
+    Window.Position = UDim2.new(.5, -WindowWidth/2, .5, -WindowHeight/2)
     Window.BackgroundColor3 = BG_DARK
-    Instance.new("UICorner",Window).CornerRadius = UDim.new(0,6)
+    Instance.new("UICorner",Window).CornerRadius = UDim.new(0,8)
 
     -- Title bar
+    local TitleHeight = 36 * SCALE
+
     local Title = Instance.new("Frame",Window)
-    Title.Size = UDim2.new(1,0,0,30*SCALE)
+    Title.Size = UDim2.new(1,0,0,TitleHeight)
     Title.BackgroundTransparency = 1
 
-    local Icon = Instance.new("ImageLabel",Title)
-    Icon.BackgroundTransparency = 1
-    Icon.Size = UDim2.fromOffset(18*SCALE,18*SCALE)
-    Icon.Position = UDim2.fromOffset(8,6)
-    Icon.Image = "rbxassetid://"..icon
-    Icon.ImageColor3 = ACCENT
+    local IconImg = Instance.new("ImageLabel",Title)
+    IconImg.BackgroundTransparency = 1
+    IconImg.Size = UDim2.fromOffset(22*SCALE,22*SCALE)
+    IconImg.Position = UDim2.fromOffset(10,7)
+    IconImg.Image = "rbxassetid://"..icon
+    IconImg.ImageColor3 = ACCENT
 
     local TitleText = Instance.new("TextLabel",Title)
     TitleText.BackgroundTransparency = 1
-    TitleText.Position = UDim2.fromOffset(30,0)
-    TitleText.Size = UDim2.new(1,-30,1,0)
+    TitleText.Position = UDim2.fromOffset(40,0)
+    TitleText.Size = UDim2.new(1,-80,1,0)
     TitleText.Font = Enum.Font.GothamMedium
-    TitleText.TextSize = 12*SCALE
+    TitleText.TextSize = 15 * SCALE
     TitleText.TextXAlignment = Enum.TextXAlignment.Left
     TitleText.Text = name.." - "..version
     TitleText.TextColor3 = Color3.new(1,1,1)
@@ -133,10 +139,16 @@ function library:CreateWindow(name, version, icon)
     CloseBtn.Text = "X"
     CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
     CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.TextSize = 14*SCALE
-    CloseBtn.Size = UDim2.fromOffset(20,20)
-    CloseBtn.Position = UDim2.new(1,-26,0,4)
+    CloseBtn.TextSize = 16 * SCALE
+    CloseBtn.Size = UDim2.fromOffset(24,24)
+    CloseBtn.Position = UDim2.new(1,-30,0,6)
     CloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
+
+    local Under = Instance.new("Frame",Title)
+    Under.BorderSizePixel = 0
+    Under.BackgroundColor3 = ACCENT
+    Under.Size = UDim2.new(1,0,0,2)
+    Under.Position = UDim2.new(0,0,1,-2)
 
     -- Window Drag
     do
@@ -147,9 +159,7 @@ function library:CreateWindow(name, version, icon)
                 startPos = i.Position
                 windowPos = Window.Position
                 i.Changed:Connect(function()
-                    if i.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
+                    if i.UserInputState == Enum.UserInputState.End then dragging = false end
                 end)
             end
         end)
@@ -170,23 +180,27 @@ function library:CreateWindow(name, version, icon)
     end)
 
     -- Tabs rail
+    local TabsRailWidth = 156 * SCALE
+
     local TabsRail = Instance.new("Frame",Window)
-    TabsRail.Position = UDim2.fromOffset(6,36*SCALE)
-    TabsRail.Size = UDim2.fromOffset(136*SCALE, 340*SCALE - 42*SCALE)
+    TabsRail.Position = UDim2.fromOffset(8,TitleHeight+6)
+    TabsRail.Size = UDim2.fromOffset(TabsRailWidth, WindowHeight - TitleHeight - 16)
     TabsRail.BackgroundColor3 = Color3.fromRGB(39,40,51)
-    Instance.new("UICorner",TabsRail).CornerRadius = UDim.new(0,6)
+    Instance.new("UICorner",TabsRail).CornerRadius = UDim.new(0,8)
 
     local TabsLayout = Instance.new("UIListLayout",TabsRail)
-    TabsLayout.Padding = UDim.new(0,6)
+    TabsLayout.Padding = UDim.new(0,8)
+    TabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
 
     local label = Instance.new("TextLabel",TabsRail)
     label.BackgroundTransparency = 1
-    label.Text = "Sections"
+    label.Text = "SECTIONS"
     label.TextColor3 = Color3.new(1,1,1)
     label.Font = Enum.Font.GothamBlack
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Position = UDim2.fromOffset(8,0)
-    label.Size = UDim2.fromOffset(100,20)
+    label.Position = UDim2.fromOffset(10,4)
+    label.Size = UDim2.fromOffset(TabsRailWidth-16,22)
+    label.TextSize = 13 * SCALE
 
     local firstTabLoaded = false
 
@@ -196,23 +210,23 @@ function library:CreateWindow(name, version, icon)
     local function makePage(title)
         local Page = Instance.new("ScrollingFrame",Window)
         Page.Visible = false
-        Page.Position = UDim2.fromOffset(150*SCALE, 36*SCALE)
-        Page.Size = UDim2.new(1,-156*SCALE,1,-42*SCALE)
+        Page.Position = UDim2.fromOffset(TabsRailWidth+16, TitleHeight+6)
+        Page.Size = UDim2.new(1,-(TabsRailWidth+24),1,-(TitleHeight+14))
         Page.CanvasSize = UDim2.new(0,0,0,0)
         Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
         Page.ScrollBarThickness = 4
         Page.ScrollBarImageColor3 = ACCENT
         Page.BackgroundColor3 = BG_DARK
-        Instance.new("UICorner",Page).CornerRadius = UDim.new(0,6)
+        Instance.new("UICorner",Page).CornerRadius = UDim.new(0,8)
 
         local pad = Instance.new("UIPadding",Page)
-        pad.PaddingTop = UDim.new(0,6)
-        pad.PaddingLeft = UDim.new(0,6)
-        pad.PaddingRight = UDim.new(0,6)
-        pad.PaddingBottom = UDim.new(0,6)
+        pad.PaddingTop = UDim.new(0,10)
+        pad.PaddingLeft = UDim.new(0,10)
+        pad.PaddingRight = UDim.new(0,10)
+        pad.PaddingBottom = UDim.new(0,10)
 
         local vlist = Instance.new("UIListLayout",Page)
-        vlist.Padding = UDim.new(0,6)
+        vlist.Padding = UDim.new(0,8)
 
         local TabBtn = Instance.new("TextButton",TabsRail)
         TabBtn.Text = title
@@ -220,13 +234,14 @@ function library:CreateWindow(name, version, icon)
         TabBtn.TextColor3 = Color3.new(1,1,1)
         TabBtn.TextTransparency = .5
         TabBtn.Font = Enum.Font.Gotham
-        TabBtn.TextSize = 11*SCALE
-        TabBtn.Size = UDim2.fromOffset(130*SCALE,20)
+        TabBtn.TextSize = 13 * SCALE
+        TabBtn.Size = UDim2.fromOffset(TabsRailWidth-16,24)
 
         local indicator = Instance.new("Frame",TabBtn)
-        indicator.Size = UDim2.fromOffset(2, 16)
-        indicator.Position = UDim2.fromOffset(-6,2)
+        indicator.Size = UDim2.fromOffset(3, 18)
+        indicator.Position = UDim2.fromOffset(-4,3)
         indicator.BackgroundColor3 = ACCENT
+        indicator.BorderSizePixel = 0
         indicator.Visible = false
 
         local function select()
@@ -252,7 +267,7 @@ function library:CreateWindow(name, version, icon)
         if not firstTabLoaded then firstTabLoaded = true; select() end
 
         ----------------------------------------------------
-        -- PAGE API (label, toggle, box, dropdown)
+        -- PAGE API (label, button, box, toggle, dropdown)
         ----------------------------------------------------
         local PageAPI = {}
 
@@ -260,24 +275,24 @@ function library:CreateWindow(name, version, icon)
             local L = Instance.new("TextLabel",Page)
             L.BackgroundTransparency = 1
             L.Font = Enum.Font.GothamBlack
-            L.TextSize = 12*SCALE
+            L.TextSize = 14 * SCALE
             L.TextColor3 = Color3.new(1,1,1)
             L.TextXAlignment = Enum.TextXAlignment.Left
-            L.Size = UDim2.new(1,0,0,16)
-            L.Text = string.upper(text)
+            L.Size = UDim2.new(1,0,0,20)
+            L.Text = string.upper(text or "")
             return L
         end
 
         function PageAPI:CreateButton(text, callback)
             callback = callback or function() end
             local B = Instance.new("TextButton",Page)
-            B.Size = UDim2.new(1,0,0,30)
+            B.Size = UDim2.new(1,0,0,40)
             B.BackgroundColor3 = BG_CARD
             B.Font = Enum.Font.GothamSemibold
-            B.TextSize = 11*SCALE
+            B.TextSize = 13 * SCALE
             B.TextColor3 = Color3.new(1,1,1)
-            B.Text = text
-            Instance.new("UICorner",B).CornerRadius = UDim.new(0,6)
+            B.Text = text or "BUTTON"
+            Instance.new("UICorner",B).CornerRadius = UDim.new(0,8)
             B.MouseButton1Click:Connect(callback)
             return B
         end
@@ -287,27 +302,29 @@ function library:CreateWindow(name, version, icon)
 
             local container = Instance.new("Frame",Page)
             container.BackgroundColor3 = BG_CARD
-            container.Size = UDim2.new(1,0,0,50)
-            Instance.new("UICorner",container).CornerRadius = UDim.new(0,6)
+            container.Size = UDim2.new(1,0,0,64)
+            container.AutomaticSize = Enum.AutomaticSize.Y
+            Instance.new("UICorner",container).CornerRadius = UDim.new(0,8)
 
             local txt = Instance.new("TextLabel",container)
             txt.BackgroundTransparency = 1
-            txt.Position = UDim2.fromOffset(8,4)
-            txt.Size = UDim2.new(1,-16,0,16)
+            txt.Position = UDim2.fromOffset(10,6)
+            txt.Size = UDim2.new(1,-20,0,20)
             txt.Font = Enum.Font.GothamBlack
-            txt.TextSize = 12*SCALE
+            txt.TextSize = 14 * SCALE
             txt.TextColor3 = Color3.new(1,1,1)
             txt.TextXAlignment = Enum.TextXAlignment.Left
-            txt.Text = placeholder
+            txt.Text = placeholder or "INPUT"
 
             local box = Instance.new("TextBox",container)
-            box.Position = UDim2.fromOffset(8,22)
-            box.Size = UDim2.new(1,-16,0,22)
+            box.Position = UDim2.fromOffset(10,30)
+            box.Size = UDim2.new(1,-20,0,26)
             box.BackgroundColor3 = Color3.fromRGB(24,25,32)
             box.Font = Enum.Font.Gotham
             box.TextColor3 = Color3.new(1,1,1)
-            box.PlaceholderText = placeholder
-            box.TextSize = 11*SCALE
+            box.PlaceholderText = placeholder or "..."
+            box.PlaceholderColor3 = ACCENT_TEXT
+            box.TextSize = 13 * SCALE
             Instance.new("UICorner",box).CornerRadius = UDim.new(0,6)
 
             box.FocusLost:Connect(function()
@@ -317,34 +334,35 @@ function library:CreateWindow(name, version, icon)
             return box
         end
 
-                function PageAPI:CreateToggle(title, callback)
+        -- BIGGER TOGGLE
+        function PageAPI:CreateToggle(title, callback)
             callback = callback or function() end
 
             local fr = Instance.new("Frame", Page)
             fr.BackgroundColor3 = BG_CARD
-            fr.Size = UDim2.new(1, 0, 0, math.floor(40 * SCALE))
+            fr.Size = UDim2.new(1, 0, 0, math.floor(44 * SCALE))
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.ClipsDescendants = false
-            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
 
             local t = Instance.new("TextLabel", fr)
             t.BackgroundTransparency = 1
-            t.Position = UDim2.new(0, 8, 0, 2)
-            t.Size = UDim2.new(1, -70, 0, math.floor(18 * SCALE))
+            t.Position = UDim2.new(0, 10, 0, 4)
+            t.Size = UDim2.new(1, -80, 0, math.floor(20 * SCALE))
             t.Font = Enum.Font.GothamBlack
-            t.TextSize = math.floor(12 * SCALE)
+            t.TextSize = math.floor(14 * SCALE)
             t.TextColor3 = Color3.new(1, 1, 1)
             t.TextXAlignment = Enum.TextXAlignment.Left
             t.Text = string.upper(title or "TOGGLE")
 
             local track = Instance.new("Frame", fr)
             track.BackgroundColor3 = Color3.fromRGB(24, 25, 32)
-            track.Size = UDim2.fromOffset(math.floor(50 * SCALE), math.floor(22 * SCALE))
-            track.Position = UDim2.new(1, -math.floor(62 * SCALE), 0, math.floor(8 * SCALE))
+            track.Size = UDim2.fromOffset(math.floor(58 * SCALE), math.floor(24 * SCALE))
+            track.Position = UDim2.new(1, -math.floor(72 * SCALE), 0.5, -math.floor(12 * SCALE))
             Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
             local dot = Instance.new("Frame", track)
-            dot.Size = UDim2.fromOffset(math.floor(18 * SCALE), math.floor(18 * SCALE))
+            dot.Size = UDim2.fromOffset(math.floor(20 * SCALE), math.floor(20 * SCALE))
             dot.Position = UDim2.new(0, math.floor(2 * SCALE), 0, math.floor(2 * SCALE))
             dot.BackgroundColor3 = ACCENT
             dot.BackgroundTransparency = 0.6
@@ -359,7 +377,7 @@ function library:CreateWindow(name, version, icon)
             local function apply()
                 tw(dot, 0.12, {
                     Position = on
-                        and UDim2.new(1, -math.floor(20 * SCALE), 0, math.floor(2 * SCALE))
+                        and UDim2.new(1, -math.floor(22 * SCALE), 0, math.floor(2 * SCALE))
                         or  UDim2.new(0,  math.floor(2 * SCALE), 0, math.floor(2 * SCALE)),
                     BackgroundTransparency = on and 0 or 0.6
                 })
@@ -381,42 +399,53 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
-
-                function PageAPI:CreateDropdown(title, options, onChanged)
+        -- BIGGER DROPDOWN
+        function PageAPI:CreateDropdown(title, options, onChanged)
             options   = options   or {}
             onChanged = onChanged or function() end
 
             local fr = Instance.new("Frame", Page)
             fr.Name = "Dropdown"
             fr.BackgroundColor3 = BG_CARD
-            fr.Size = UDim2.new(1, 0, 0, math.floor(28 * SCALE))
+            fr.Size = UDim2.new(1, 0, 0, math.floor(64 * SCALE))
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.ClipsDescendants = false
-            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
 
             local ttl = Instance.new("TextLabel", fr)
             ttl.BackgroundTransparency = 1
-            ttl.Position = UDim2.new(0, 8, 0, 0)
-            ttl.Size = UDim2.new(1, -40, 0, math.floor(18 * SCALE))
+            ttl.Position = UDim2.new(0, 10, 0, 4)
+            ttl.Size = UDim2.new(1, -40, 0, math.floor(22 * SCALE))
             ttl.Font = Enum.Font.GothamBlack
-            ttl.TextSize = math.floor(12 * SCALE)
+            ttl.TextSize = math.floor(14 * SCALE)
             ttl.TextColor3 = Color3.new(1, 1, 1)
             ttl.TextXAlignment = Enum.TextXAlignment.Left
             ttl.Text = string.upper(title or "DROPDOWN")
 
             local caret = Instance.new("TextLabel", fr)
             caret.BackgroundTransparency = 1
-            caret.Size = UDim2.fromOffset(math.floor(16 * SCALE), math.floor(16 * SCALE))
-            caret.Position = UDim2.new(1, -math.floor(24 * SCALE), 0, 0)
+            caret.Size = UDim2.fromOffset(math.floor(18 * SCALE), math.floor(18 * SCALE))
+            caret.Position = UDim2.new(1, -math.floor(28 * SCALE), 0, 6)
             caret.Font = Enum.Font.GothamBlack
             caret.Text = "v"
-            caret.TextSize = math.floor(11 * SCALE)
+            caret.TextSize = math.floor(13 * SCALE)
             caret.TextColor3 = ACCENT
+
+            local mainBtn = Instance.new("TextButton", fr)
+            mainBtn.Position = UDim2.fromOffset(10, 30)
+            mainBtn.Size = UDim2.new(1, -20, 0, math.floor(26 * SCALE))
+            mainBtn.BackgroundColor3 = Color3.fromRGB(24, 25, 32)
+            mainBtn.Font = Enum.Font.Gotham
+            mainBtn.TextSize = math.floor(13 * SCALE)
+            mainBtn.TextColor3 = Color3.new(1,1,1)
+            mainBtn.TextXAlignment = Enum.TextXAlignment.Left
+            mainBtn.Text = "Select"
+            Instance.new("UICorner", mainBtn).CornerRadius = UDim.new(0, 6)
 
             local holder = Instance.new("Frame", fr)
             holder.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-            holder.Position = UDim2.new(0, 6, 0, math.floor(20 * SCALE))
-            holder.Size = UDim2.new(1, -12, 0, 0)
+            holder.Position = UDim2.new(0, 10, 0, math.floor(60 * SCALE))
+            holder.Size = UDim2.new(1, -20, 0, 0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
             holder.Visible = false
             Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
@@ -427,8 +456,8 @@ function library:CreateWindow(name, version, icon)
             local pad = Instance.new("UIPadding", holder)
             pad.PaddingTop    = UDim.new(0, math.floor(6 * SCALE))
             pad.PaddingBottom = UDim.new(0, math.floor(6 * SCALE))
-            pad.PaddingLeft   = UDim.new(0, math.floor(6 * SCALE))
-            pad.PaddingRight  = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingLeft   = UDimNew(0, math.floor(6 * SCALE))
+            pad.PaddingRight  = UDimNew(0, math.floor(6 * SCALE))
 
             local current = nil
 
@@ -444,14 +473,15 @@ function library:CreateWindow(name, version, icon)
                     b.Size = UDim2.new(1, 0, 0, math.floor(24 * SCALE))
                     b.BackgroundColor3 = BG_CARD
                     b.Font = Enum.Font.Gotham
-                    b.TextSize = math.floor(11 * SCALE)
+                    b.TextSize = math.floor(13 * SCALE)
                     b.TextColor3 = Color3.new(1, 1, 1)
                     b.Text = tostring(opt)
-                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+                    b.TextXAlignment = Enum.TextXAlignment.Left
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
                     b.MouseButton1Click:Connect(function()
                         current = opt
-                        ttl.Text = string.upper(("%s : %s"):format(title or "DROPDOWN", tostring(opt)))
+                        mainBtn.Text = tostring(opt)
                         holder.Visible = false
                         tw(caret, 0.12, {Rotation = 0})
                         onChanged(opt)
@@ -462,12 +492,7 @@ function library:CreateWindow(name, version, icon)
             rebuild(options)
 
             local open = false
-            local header = Instance.new("TextButton", fr)
-            header.BackgroundTransparency = 1
-            header.Size = UDim2.new(1, 0, 0, math.floor(20 * SCALE))
-            header.Position = UDim2.new(0, 0, 0, 0)
-            header.Text = ""
-            header.MouseButton1Click:Connect(function()
+            mainBtn.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
                 tw(caret, 0.12, {Rotation = open and 180 or 0})
@@ -476,7 +501,7 @@ function library:CreateWindow(name, version, icon)
             return {
                 SetValue = function(_, v)
                     current = v
-                    ttl.Text = string.upper(("%s : %s"):format(title or "DROPDOWN", tostring(v)))
+                    mainBtn.Text = tostring(v)
                 end,
                 GetValue = function()
                     return current
@@ -488,6 +513,8 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
+        return PageAPI
+    end
 
     --------------------------------------------------------
     -- RETURN WINDOW API
