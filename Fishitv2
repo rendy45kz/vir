@@ -872,12 +872,12 @@ PageFarm:CreateLabel("MAIN MENU")
 local Farm = {
     AutoFavorite_Enabled = false,
     AutoFavorite_Rarity  = {
-        COMMON    = false,
-        UNCOMMON  = false,
-        RARE      = false,
-        EPIC      = false,
-        LEGENDARY = false,
-        MYTHIC    = false,
+        Common    = false,
+        Uncommon  = false,
+        Rare      = false,
+        Epic      = false,
+        Legendary = false,
+        Mythic    = false,
         SECRET    = false,
     },
 
@@ -888,7 +888,7 @@ local Farm = {
         Snow        = false,
         Wind        = false,
         Radiant     = false,
-        ["Shark Hunt"] = false,
+        Shark Hunt  = false,
     },
 
     AutoSell_Enabled     = false,
@@ -903,12 +903,12 @@ local Farm = {
 --========================================================
 local FishIdToRarity = {}
 local tierToRarity = {
-    [1] = "COMMON",
-    [2] = "UNCOMMON",
-    [3] = "RARE",
-    [4] = "EPIC",
-    [5] = "LEGENDARY",
-    [6] = "MYTHIC",
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
     [7] = "SECRET",
 }
 
@@ -923,7 +923,7 @@ do
                     local tier = tonumber(data.Data.Tier) or 0
                     local rarity = data.Data.Rarity
                     if not rarity then
-                        rarity = tierToRarity[tier] or "UNKNOWN"
+                        rarity = tierToRarity[tier] or "Unknown"
                     end
                     if id then
                         FishIdToRarity[id] = string.upper(tostring(rarity))
@@ -983,7 +983,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
 
     -- AUTO FAVORITE
     if Farm.AutoFavorite_Enabled and itemId then
-        local rarity = FishIdToRarity[itemId] or "UNKNOWN"
+        local rarity = FishIdToRarity[itemId] or "Unknown"
         rarity = string.upper(rarity)
         if Farm.AutoFavorite_Rarity[rarity] then
             pcall(function()
@@ -1054,7 +1054,7 @@ end)
 tgAutoFav:Set(false)
 
 local rarityList = {
-    "Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"
+    "Common","Uncommon","Rare","Epic","Legendary","Mythic","SECRET"
 }
 
 local ddAutoFavorite = PageFarm:CreateMultiDropdown(
