@@ -1,5 +1,6 @@
 --========================================================
--- AEGISHUB UI LIBRARY - BIGGER UI
+-- AEGISHUB - FISH IT (FINAL)
+-- UI LIB + FARM + TELEPORT + MISC
 --========================================================
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -13,14 +14,15 @@ local TweenService       = game:GetService("TweenService")
 local CoreGui            = game:GetService("CoreGui")
 local LocalPlayer        = Players.LocalPlayer
 local VirtualUser        = game:GetService("VirtualUser")
+local Stats              = game:GetService("Stats")
 
 ----------------------------------------------------------------
--- ============== UI LIBRARY (Polished v2) =====================
+-- STYLE COLORS
 ----------------------------------------------------------------
 local ACCENT      = Color3.fromRGB(110,175,255)
 local ACCENT_TEXT = Color3.fromRGB(227,229,255)
-local BG_DARK     = Color3.fromRGB(42,44,56)
-local BG_CARD     = Color3.fromRGB(30,31,41)
+local BG_DARK     = Color3.fromRGB(38,40,52)
+local BG_CARD     = Color3.fromRGB(32,33,42)
 
 local function protect(inst)
     if syn and syn.protect_gui then
@@ -38,435 +40,613 @@ end
 
 local library = {}
 
+--========================================================
+-- PART 1 - UI LIBRARY
+--========================================================
 function library:CreateWindow(name, version, icon)
-    name,version,icon = name or "AegisHub", version or "Premium", icon or 10044538000
+    name    = name    or "AegisHub"
+    version = version or "Premium"
+    icon    = icon    or 10044538000
 
-    -- ScreenGui
     local Gui = Instance.new("ScreenGui")
-    Gui.Name = "AegisHub_UIv2"
+    Gui.Name = "AegisHub_UIv3"
     Gui.IgnoreGuiInset = false
-    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     Gui.ResetOnSpawn = false
+    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     Gui.DisplayOrder = 9999
     protect(Gui)
     Gui.Parent = CoreGui
 
-    -- Scale kecil utk layar kecil
-    local function calcScale()
-        local cam = Workspace.CurrentCamera
-        local vp = cam and cam.ViewportSize or Vector2.new(1280,720)
-        local shortest = math.min(vp.X, vp.Y)
-        if shortest <= 720 then return 0.85 elseif shortest <= 900 then return 0.92 else return 1 end
-    end
-    local SCALE = calcScale()
+    -- UI SCALE BESAR
+    local SCALE = 1.25
 
-    -- Overlay toggle (bulat di samping, buat show/hide window)
+    ------------------------------------------------------------
+    -- OVERLAY TOGGLE (SHOW/HIDE WINDOW)
+    ------------------------------------------------------------
     local Overlay = Instance.new("ImageButton")
-    Overlay.Name="AegisHubOverlay"; Overlay.Parent=Gui
-    Overlay.Size=UDim2.fromOffset(40,40); Overlay.AutoButtonColor=true
+    Overlay.Name="AegisHub_Overlay"
+    Overlay.Parent=Gui
+    Overlay.Size=UDim2.fromOffset(45,45)
     Overlay.BackgroundColor3=Color3.fromRGB(32,34,46)
-    Overlay.Image="rbxassetid://10045753138"; Overlay.ImageColor3=ACCENT
+    Overlay.Image="rbxassetid://10045753138"
+    Overlay.ImageColor3=ACCENT
     Instance.new("UICorner", Overlay).CornerRadius = UDim.new(1,0)
-    local os=Instance.new("UIStroke",Overlay); os.Transparency=.85; os.Color=Color3.fromRGB(255,255,255)
+    local os = Instance.new("UIStroke", Overlay)
+    os.Color = Color3.fromRGB(255,255,255)
+    os.Transparency = 0.8
 
-    local cam = Workspace.CurrentCamera
-    local ox = Gui:GetAttribute("ovx") or 12
-    local oy = Gui:GetAttribute("ovy") or math.floor((cam.ViewportSize.Y/2)-20)
-    Overlay.Position = UDim2.fromOffset(ox, oy)
+    -- posisi awal overlay
+    Overlay.Position = UDim2.fromOffset(16, Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize.Y*0.5 or 200)
 
+    -- drag overlay
     do
-        local dragging, start, origin
-        Overlay.InputBegan:Connect(function(i)
-            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-                dragging=true; start=i.Position; origin=Overlay.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState==Enum.UserInputState.End then
-                        dragging=false
-                        Gui:SetAttribute("ovx", Overlay.Position.X.Offset)
-                        Gui:SetAttribute("ovy", Overlay.Position.Y.Offset)
+        local dragging = false
+        local dragStart, startPos
+        Overlay.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = Overlay.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
                     end
                 end)
             end
         end)
-        UIS.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-                local d=i.Position-start
-                local vp=Workspace.CurrentCamera.ViewportSize
-                local nx = math.clamp(origin.X.Offset + d.X, 4, vp.X-44)
-                local ny = math.clamp(origin.Y.Offset + d.Y, 4, vp.Y-44)
-                Overlay.Position = UDim2.fromOffset(nx, ny)
+        UIS.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                Overlay.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
             end
         end)
     end
 
-    -- Window
+    ------------------------------------------------------------
+    -- MAIN WINDOW
+    ------------------------------------------------------------
     local Window = Instance.new("Frame")
-    protect(Window)
-    Window.Parent=Gui
-    Window.BackgroundColor3=BG_DARK
-    Window.ClipsDescendants=false
-    Window.Size=UDim2.fromOffset(math.floor(520*SCALE), math.floor(340*SCALE))
-    Window.Position=UDim2.new(.5, -Window.Size.X.Offset/2, .52, -Window.Size.Y.Offset/2)
-    Instance.new("UICorner",Window).CornerRadius=UDim.new(0,6)
+    Window.Parent = Gui
+    Window.BackgroundColor3 = BG_DARK
+    Window.ClipsDescendants = false
+    Window.Size = UDim2.fromOffset(600*SCALE, 380*SCALE)
+    Window.Position = UDim2.new(.5, -300*SCALE, .5, -190*SCALE)
+    Instance.new("UICorner", Window).CornerRadius = UDim.new(0,8)
 
-    -- Title bar
-    local Title=Instance.new("Frame",Window)
-    Title.BackgroundTransparency=1
-    Title.Size=UDim2.new(1,0,0,math.floor(30*SCALE))
+    local hidden = false
+    Overlay.MouseButton1Click:Connect(function()
+        hidden = not hidden
+        Window.Visible = not hidden
+        tw(Overlay,0.12,{ImageColor3 = hidden and Color3.fromRGB(180,180,180) or ACCENT})
+    end)
 
-    local Icon=Instance.new("ImageLabel",Title)
-    Icon.BackgroundTransparency=1
-    Icon.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE))
-    Icon.Position=UDim2.new(0,8,0,6)
-    Icon.Image="rbxassetid://"..tostring(icon)
-    Icon.ImageColor3=ACCENT
+    ------------------------------------------------------------
+    -- TITLE BAR
+    ------------------------------------------------------------
+    local Title = Instance.new("Frame", Window)
+    Title.BackgroundTransparency = 1
+    Title.Size = UDim2.new(1,0,0,34*SCALE)
 
-    local TitleText=Instance.new("TextLabel",Title)
-    TitleText.BackgroundTransparency=1
-    TitleText.Position=UDim2.new(0,30,0,0)
-    TitleText.Size=UDim2.new(1,-30,1,0)
-    TitleText.Font=Enum.Font.GothamMedium
-    TitleText.TextSize=math.floor(12*SCALE)
-    TitleText.TextXAlignment=Enum.TextXAlignment.Left
-    TitleText.TextColor3=Color3.new(1,1,1)
-    TitleText.Text=(name .. " - " .. version)
+    local Icon = Instance.new("ImageLabel", Title)
+    Icon.BackgroundTransparency = 1
+    Icon.Size     = UDim2.fromOffset(20*SCALE,20*SCALE)
+    Icon.Position = UDim2.new(0,10,0,7)
+    Icon.Image = "rbxassetid://"..icon
+    Icon.ImageColor3 = ACCENT
 
-    local Under=Instance.new("Frame",Title)
-    Under.BorderSizePixel=0; Under.BackgroundColor3=ACCENT
-    Under.Size=UDim2.new(1,0,0,1); Under.Position=UDim2.new(0,0,1,0)
+    local TitleText = Instance.new("TextLabel", Title)
+    TitleText.BackgroundTransparency = 1
+    TitleText.Position = UDim2.new(0,40,0,0)
+    TitleText.Size = UDim2.new(1,-40,1,0)
+    TitleText.Font = Enum.Font.GothamMedium
+    TitleText.TextSize = 16*SCALE
+    TitleText.TextColor3 = Color3.new(1,1,1)
+    TitleText.TextXAlignment = Enum.TextXAlignment.Left
+    TitleText.Text = name.." | "..version
 
-    -- Tombol X (tutup menu utama)
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Name = "CloseButton"
-    CloseBtn.Parent = Title
+    local Under = Instance.new("Frame", Title)
+    Under.BackgroundColor3 = ACCENT
+    Under.BorderSizePixel = 0
+    Under.Size = UDim2.new(1,0,0,2)
+    Under.Position = UDim2.new(0,0,1,-2)
+
+    local CloseBtn = Instance.new("TextButton", Title)
+    CloseBtn.AnchorPoint = Vector2.new(1,0)
+    CloseBtn.Position = UDim2.new(1,-8,0,6)
+    CloseBtn.Size = UDim2.fromOffset(22*SCALE,22*SCALE)
     CloseBtn.BackgroundTransparency = 1
-    CloseBtn.BorderSizePixel = 0
-    CloseBtn.AnchorPoint = Vector2.new(1, 0)
-    CloseBtn.Position = UDim2.new(1, -6, 0, 4)
-    CloseBtn.Size = UDim2.new(0, math.floor(18 * SCALE), 0, math.floor(18 * SCALE))
     CloseBtn.Font = Enum.Font.GothamBold
     CloseBtn.Text = "X"
-    CloseBtn.TextSize = math.floor(14 * SCALE)
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-    CloseBtn.AutoButtonColor = false
-
+    CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
+    CloseBtn.TextSize = 16*SCALE
     CloseBtn.MouseButton1Click:Connect(function()
-        if Gui and Gui.Parent then
-            Gui:Destroy() -- hanya menu utama & tombol overlay
-        end
+        Gui:Destroy()
     end)
 
-    -- Drag window
-    do local dragging,start,origin
-        Title.InputBegan:Connect(function(i)
-            if (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) and not UIS:GetFocusedTextBox() then
-                dragging=true; start=i.Position; origin=Window.Position
-                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
+    -- drag window
+    do
+        local dragging, dragStart, startPos
+        Title.InputBegan:Connect(function(input)
+            if (input.UserInputType == Enum.UserInputType.MouseButton1
+                or input.UserInputType == Enum.UserInputType.Touch)
+                and not UIS:GetFocusedTextBox() then
+                dragging = true
+                dragStart = input.Position
+                startPos = Window.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
             end
         end)
-        UIS.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-                local d=i.Position-start
-                Window.Position=UDim2.new(origin.X.Scale,origin.X.Offset+d.X,origin.Y.Scale,origin.Y.Offset+d.Y)
+        UIS.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+                or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                Window.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
+                )
             end
         end)
     end
 
-    -- Overlay toggle show/hide window
-    local hidden=false
-    Overlay.MouseButton1Click:Connect(function()
-        hidden=not hidden; Window.Visible=not hidden
-        tw(Overlay,.12,{ImageColor3 = hidden and Color3.fromRGB(200,200,200) or ACCENT})
-    end)
+    ------------------------------------------------------------
+    -- LEFT TABS RAIL
+    ------------------------------------------------------------
+    local TabsRail = Instance.new("Frame", Window)
+    TabsRail.BackgroundColor3 = Color3.fromRGB(39,40,51)
+    TabsRail.Position = UDim2.new(0,8,0,38*SCALE)
+    TabsRail.Size = UDim2.new(0,150*SCALE,1,-46*SCALE)
+    Instance.new("UICorner", TabsRail).CornerRadius = UDim.new(0,8)
 
-    -- Tabs rail
-    local TabsRail=Instance.new("Frame",Window)
-    TabsRail.BackgroundColor3=Color3.fromRGB(39,40,51)
-    TabsRail.Position=UDim2.new(0,6,0,math.floor(36*SCALE))
-    TabsRail.Size=UDim2.new(0,math.floor(136*SCALE),1,-math.floor(42*SCALE))
-    Instance.new("UICorner",TabsRail).CornerRadius=UDim.new(0,6)
+    local trlbl = Instance.new("TextLabel", TabsRail)
+    trlbl.BackgroundTransparency = 1
+    trlbl.Position = UDim2.new(0,10,0,4)
+    trlbl.Size = UDim2.new(1,-20,0,20*SCALE)
+    trlbl.Font = Enum.Font.GothamBlack
+    trlbl.TextSize = 13*SCALE
+    trlbl.TextXAlignment = Enum.TextXAlignment.Left
+    trlbl.TextColor3 = Color3.new(1,1,1)
+    trlbl.Text = "Sections"
 
-    local trlbl=Instance.new("TextLabel",TabsRail)
-    trlbl.BackgroundTransparency=1
-    trlbl.Size=UDim2.new(1,-8,0,math.floor(22*SCALE))
-    trlbl.Position=UDim2.new(0,8,0,0)
-    trlbl.Font=Enum.Font.GothamBlack; trlbl.Text="Sections"
-    trlbl.TextSize=math.floor(11*SCALE); trlbl.TextXAlignment=Enum.TextXAlignment.Left
-    trlbl.TextColor3=Color3.new(1,1,1)
+    local trlist = Instance.new("UIListLayout", TabsRail)
+    trlist.Padding = UDim.new(0,6)
+    trlist.SortOrder = Enum.SortOrder.LayoutOrder
+    trlist.HorizontalAlignment = Enum.HorizontalAlignment.Right
 
-    local trlist=Instance.new("UIListLayout",TabsRail)
-    trlist.Padding=UDim.new(0,math.floor(4*SCALE))
-    trlist.SortOrder=Enum.SortOrder.LayoutOrder
-    trlist.HorizontalAlignment=Enum.HorizontalAlignment.Right
+    local firstShown = false
 
     ------------------------------------------------------------
-    -- Tab/Page API
+    -- PAGE FACTORY
     ------------------------------------------------------------
-    local firstShown=false
-
     local function makePage(title)
         title = title or "Page"
 
-        local Page=Instance.new("ScrollingFrame",Window)
-        Page.Name="Page"; Page.Active=true; Page.ScrollBarThickness=4; Page.ScrollBarImageColor3=ACCENT
-        Page.AutomaticCanvasSize=Enum.AutomaticSize.Y; Page.CanvasSize=UDim2.new(0,0,0,0)
-        Page.BackgroundColor3=BG_DARK
-        Page.Position=UDim2.new(0,math.floor(150*SCALE),0,math.floor(36*SCALE))
-        Page.Size=UDim2.new(1,-math.floor(156*SCALE),1,-math.floor(42*SCALE))
-        Page.Visible=false
-        Instance.new("UICorner",Page).CornerRadius=UDim.new(0,6)
-        local pad=Instance.new("UIPadding",Page)
-        pad.PaddingTop=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingLeft=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingRight=UDim.new(0,math.floor(6*SCALE))
-        pad.PaddingBottom=UDim.new(0,math.floor(6*SCALE))
-        local vlist=Instance.new("UIListLayout",Page)
-        vlist.Padding=UDim.new(0,math.floor(6*SCALE))
-        vlist.SortOrder=Enum.SortOrder.LayoutOrder
-        vlist.HorizontalAlignment=Enum.HorizontalAlignment.Center
+        local Page = Instance.new("ScrollingFrame", Window)
+        Page.Name = "Page"
+        Page.Active = true
+        Page.ScrollBarThickness = 4
+        Page.ScrollBarImageColor3 = ACCENT
+        Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        Page.CanvasSize = UDim2.new(0,0,0,0)
+        Page.BackgroundColor3 = BG_DARK
+        Page.Position = UDim2.new(0, 170*SCALE, 0, 38*SCALE)
+        Page.Size = UDim2.new(1, -178*SCALE, 1, -46*SCALE)
+        Page.Visible = false
+        Instance.new("UICorner", Page).CornerRadius = UDim.new(0,8)
 
-        local TabBtn=Instance.new("TextButton",TabsRail)
-        TabBtn.BackgroundTransparency=1
-        TabBtn.Size=UDim2.new(1,-8,0,math.floor(18*SCALE))
-        TabBtn.Text=title; TabBtn.Font=Enum.Font.Gotham
-        TabBtn.TextSize=math.floor(11*SCALE); TabBtn.TextColor3=Color3.new(1,1,1)
-        TabBtn.TextTransparency=.5
+        local pad = Instance.new("UIPadding", Page)
+        pad.PaddingTop    = UDim.new(0,8)
+        pad.PaddingLeft   = UDim.new(0,8)
+        pad.PaddingRight  = UDim.new(0,8)
+        pad.PaddingBottom = UDim.new(0,8)
 
-        local indicator=Instance.new("Frame",TabBtn)
-        indicator.BackgroundColor3=ACCENT
-        indicator.Size=UDim2.new(0,2,1,-4)
-        indicator.Position=UDim2.new(0,-8,0,2)
-        indicator.BorderSizePixel=0
-        indicator.Visible=false
+        local vlist = Instance.new("UIListLayout", Page)
+        vlist.Padding = UDim.new(0,8)
+        vlist.SortOrder = Enum.SortOrder.LayoutOrder
+        vlist.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+        -- tab button
+        local TabBtn = Instance.new("TextButton", TabsRail)
+        TabBtn.BackgroundTransparency = 1
+        TabBtn.Size = UDim2.new(1,-10,0,22*SCALE)
+        TabBtn.Font = Enum.Font.Gotham
+        TabBtn.TextSize = 13*SCALE
+        TabBtn.TextXAlignment = Enum.TextXAlignment.Left
+        TabBtn.TextColor3 = Color3.new(1,1,1)
+        TabBtn.TextTransparency = 0.4
+        TabBtn.Text = title
+
+        local indicator = Instance.new("Frame", TabBtn)
+        indicator.BackgroundColor3 = ACCENT
+        indicator.BorderSizePixel = 0
+        indicator.Size = UDim2.new(0,3,1,-6)
+        indicator.Position = UDim2.new(0,0,0,3)
+        indicator.Visible = false
 
         local function selectThis()
             for _,v in ipairs(Window:GetChildren()) do
-                if v:IsA("ScrollingFrame") and v.Name=="Page" then v.Visible=false end
+                if v:IsA("ScrollingFrame") and v.Name == "Page" then
+                    v.Visible = false
+                end
             end
             for _,btn in ipairs(TabsRail:GetChildren()) do
                 if btn:IsA("TextButton") then
-                    btn.TextTransparency = .5
-                    local ind = btn:FindFirstChildWhichIsA("Frame")
-                    if ind then ind.Visible=false end
+                    btn.TextTransparency = 0.4
+                    local ind = btn:FindFirstChildOfClass("Frame")
+                    if ind then ind.Visible = false end
                 end
             end
-            TabBtn.TextTransparency=0
-            Page.Visible=true
-            indicator.Visible=true
+            TabBtn.TextTransparency = 0
+            indicator.Visible = true
+            Page.Visible = true
         end
         TabBtn.MouseButton1Click:Connect(selectThis)
-        if not firstShown then firstShown=true; selectThis() end
+        if not firstShown then firstShown = true; selectThis() end
 
+        --------------------------------------------------------
+        -- CARD HELPER
+        --------------------------------------------------------
         local function Card(baseH)
-            local fr=Instance.new("Frame",Page)
-            fr.BackgroundColor3=BG_CARD
-            fr.Size=UDim2.new(1,0,0,math.floor((baseH or 40)*SCALE))
+            local fr = Instance.new("Frame", Page)
+            fr.BackgroundColor3 = BG_CARD
+            fr.Size = UDim2.new(1,0,0,(baseH or 50)*SCALE)
             fr.AutomaticSize = Enum.AutomaticSize.Y
-            fr.ClipsDescendants=false
-            Instance.new("UICorner",fr).CornerRadius=UDim.new(0,6)
+            fr.ClipsDescendants = false
+            Instance.new("UICorner", fr).CornerRadius = UDim.new(0,8)
             return fr
         end
 
+        --------------------------------------------------------
+        -- PAGE API
+        --------------------------------------------------------
         local PageAPI = {}
 
         function PageAPI:CreateLabel(text)
             local lb = Instance.new("TextLabel")
             lb.Parent = Page
             lb.BackgroundTransparency = 1
-            lb.Size = UDim2.new(1, -8, 0, math.floor(16 * SCALE))
-            lb.Position = UDim2.new(0, 8, 0, 0)
+            lb.Size = UDim2.new(1,-6,0,20*SCALE)
             lb.Font = Enum.Font.GothamBlack
-            lb.TextSize = math.floor(12 * SCALE)
+            lb.TextSize = 14*SCALE
             lb.TextXAlignment = Enum.TextXAlignment.Left
-            lb.TextColor3 = Color3.new(1, 1, 1)
+            lb.TextColor3 = Color3.new(1,1,1)
             lb.Text = string.upper(text or "LABEL")
-            return { UpdateLabel=function(_,t) lb.Text=string.upper(t or "") end }
+            return {
+                UpdateLabel = function(_, t)
+                    lb.Text = string.upper(t or "")
+                end
+            }
         end
 
-        function PageAPI:CreateButton(name,desc,cb)
-            cb=cb or function() end
-            local fr=Card(40)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-100,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(name or "BUTTON"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr)
-            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-100,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local run=Instance.new("TextButton",fr)
-            run.BackgroundColor3=Color3.fromRGB(24,25,32); run.Size=UDim2.new(0,84,0,24); run.Position=UDim2.new(1,-100,0,6)
-            run.Text="RUN"; run.Font=Enum.Font.GothamSemibold; run.TextSize=math.floor(11*SCALE); run.TextColor3=Color3.new(1,1,1)
-            Instance.new("UICorner",run).CornerRadius=UDim.new(0,8)
+        function PageAPI:CreateButton(name, desc, cb)
+            cb = cb or function() end
+            local fr = Card(52)
+
+            local t = Instance.new("TextLabel", fr)
+            t.BackgroundTransparency = 1
+            t.Position = UDim2.new(0,10,0,6)
+            t.Size = UDim2.new(1,-120,0,20*SCALE)
+            t.Font = Enum.Font.GothamBlack
+            t.TextSize = 14*SCALE
+            t.TextColor3 = Color3.new(1,1,1)
+            t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Text = string.upper(name or "BUTTON")
+
+            local d = Instance.new("TextLabel", fr)
+            d.BackgroundTransparency = 1
+            d.Position = UDim2.new(0,10,0,26)
+            d.Size = UDim2.new(1,-120,0,18*SCALE)
+            d.Font = Enum.Font.Gotham
+            d.TextSize = 13*SCALE
+            d.TextColor3 = Color3.fromRGB(180,180,180)
+            d.TextXAlignment = Enum.TextXAlignment.Left
+            d.Text = desc or ""
+
+            local run = Instance.new("TextButton", fr)
+            run.BackgroundColor3 = Color3.fromRGB(24,25,32)
+            run.Size = UDim2.new(0,90,0,26*SCALE)
+            run.Position = UDim2.new(1,-100,0,10)
+            run.Font = Enum.Font.GothamSemibold
+            run.Text = "RUN"
+            run.TextSize = 13*SCALE
+            run.TextColor3 = Color3.new(1,1,1)
+            Instance.new("UICorner", run).CornerRadius = UDim.new(0,8)
+
             run.MouseButton1Click:Connect(cb)
             return {}
         end
 
-        function PageAPI:CreateToggle(title,desc,cb)
-            cb=cb or function() end
-            local fr=Card(40)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Position=UDim2.new(0,8,0,2); t.Size=UDim2.new(1,-70,0,math.floor(18*SCALE))
-            t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.new(1,1,1); t.Text=string.upper(title or "TOGGLE"); t.TextXAlignment=Enum.TextXAlignment.Left
-            local d=Instance.new("TextLabel",fr)
-            d.BackgroundTransparency=1; d.Position=UDim2.new(0,8,0,math.floor(20*SCALE)); d.Size=UDim2.new(1,-70,0,math.floor(16*SCALE))
-            d.Font=Enum.Font.Gotham; d.TextSize=math.floor(11*SCALE); d.TextColor3=Color3.fromRGB(170,170,170); d.TextXAlignment=Enum.TextXAlignment.Left; d.Text=desc or ""
-            local track=Instance.new("Frame",fr)
-            track.BackgroundColor3=Color3.fromRGB(24,25,32); track.Size=UDim2.fromOffset(math.floor(50*SCALE),math.floor(22*SCALE)); track.Position=UDim2.new(1,-math.floor(62*SCALE),0,math.floor(8*SCALE))
-            Instance.new("UICorner",track).CornerRadius=UDim.new(1,0)
-            local dot=Instance.new("Frame",track)
-            dot.Size=UDim2.fromOffset(math.floor(18*SCALE),math.floor(18*SCALE)); dot.Position=UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)); dot.BackgroundColor3=ACCENT; dot.BackgroundTransparency=.6
-            Instance.new("UICorner",dot).CornerRadius=UDim.new(1,0)
-
-            local btn=Instance.new("TextButton",fr); btn.BackgroundTransparency=1; btn.Size=UDim2.new(1,0,1,0); btn.Text=""
-            local on=false
-            local function apply()
-                tw(dot,.12,{
-                    Position=on and UDim2.new(1,-math.floor(20*SCALE),0,math.floor(2*SCALE))
-                               or UDim2.new(0,math.floor(2*SCALE),0,math.floor(2*SCALE)),
-                    BackgroundTransparency=on and 0 or .6
-                })
-                cb(on)
+        --------------------------------------------------------
+        -- TOGGLE  (bisa dipanggil: (title, desc, cb) atau (title, cb))
+        --------------------------------------------------------
+        function PageAPI:CreateToggle(title, arg2, arg3)
+            local desc, cb
+            if typeof(arg2) == "string" or arg2 == nil then
+                desc = arg2
+                cb   = arg3
+            else
+                desc = ""
+                cb   = arg2
             end
-            btn.MouseButton1Click:Connect(function() on=not on; apply() end)
-            return { Set=function(_,v) if v~=on then on=v; apply() end end }
+            cb = cb or function() end
+
+            local fr = Card(52)
+
+            local t = Instance.new("TextLabel", fr)
+            t.BackgroundTransparency = 1
+            t.Position = UDim2.new(0,10,0,6)
+            t.Size = UDim2.new(1,-90,0,20*SCALE)
+            t.Font = Enum.Font.GothamBlack
+            t.TextSize = 14*SCALE
+            t.TextColor3 = Color3.new(1,1,1)
+            t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Text = string.upper(title or "TOGGLE")
+
+            local d = Instance.new("TextLabel", fr)
+            d.BackgroundTransparency = 1
+            d.Position = UDim2.new(0,10,0,26)
+            d.Size = UDim2.new(1,-90,0,18*SCALE)
+            d.Font = Enum.Font.Gotham
+            d.TextSize = 13*SCALE
+            d.TextColor3 = Color3.fromRGB(180,180,180)
+            d.TextXAlignment = Enum.TextXAlignment.Left
+            d.Text = desc or ""
+
+            local track = Instance.new("Frame", fr)
+            track.BackgroundColor3 = Color3.fromRGB(24,25,32)
+            track.Size = UDim2.fromOffset(60*SCALE,26*SCALE)
+            track.Position = UDim2.new(1,-70,0,12)
+            Instance.new("UICorner", track).CornerRadius = UDim.new(1,0)
+
+            local dot = Instance.new("Frame", track)
+            dot.Size = UDim2.fromOffset(22*SCALE,22*SCALE)
+            dot.Position = UDim2.new(0,2,0,2)
+            dot.BackgroundColor3 = ACCENT
+            dot.BackgroundTransparency = 0.6
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
+
+            local btn = Instance.new("TextButton", fr)
+            btn.BackgroundTransparency = 1
+            btn.Size = UDim2.new(1,0,1,0)
+            btn.Text = ""
+
+            local on = false
+            local function apply()
+                tw(dot,0.12,{
+                    Position = on and UDim2.new(1,-(24*SCALE),0,2) or UDim2.new(0,2,0,2),
+                    BackgroundTransparency = on and 0 or 0.6
+                })
+                pcall(cb,on)
+            end
+
+            btn.MouseButton1Click:Connect(function()
+                on = not on
+                apply()
+            end)
+
+            return {
+                Set = function(_,v)
+                    v = not not v
+                    if v ~= on then
+                        on = v
+                        apply()
+                    end
+                end
+            }
         end
 
-        function PageAPI:CreateBox(placeholder,_,cb)
-            cb=cb or function() end
-            local fr=Card(32)
-            local t=Instance.new("TextLabel",fr)
-            t.BackgroundTransparency=1; t.Font=Enum.Font.GothamBlack; t.TextSize=math.floor(12*SCALE); t.TextColor3=Color3.fromRGB(200,205,230)
-            t.Text=string.upper(placeholder or "INPUT"); t.TextXAlignment=Enum.TextXAlignment.Left; t.Position=UDim2.new(0,8,0,0); t.Size=UDim2.new(1,-8,0,18)
-            local tb=Instance.new("TextBox",fr)
-            tb.BackgroundColor3=Color3.fromRGB(24,25,32); tb.Position=UDim2.new(0,8,0,20); tb.Size=UDim2.new(1,-16,0,26)
-            tb.ClearTextOnFocus=false; tb.Text=""; tb.Font=Enum.Font.Gotham; tb.TextSize=math.floor(11*SCALE); tb.TextColor3=Color3.new(1,1,1); tb.PlaceholderText=placeholder or ""; tb.PlaceholderColor3=ACCENT_TEXT
-            Instance.new("UICorner",tb).CornerRadius=UDim.new(0,8)
-            tb.FocusLost:Connect(function() cb(tb.Text) end)
-            return { SetText=function(_,t2) tb.Text=t2 or "" end }
+        --------------------------------------------------------
+        -- INPUT BOX
+        --------------------------------------------------------
+        function PageAPI:CreateBox(placeholder, _, cb)
+            cb = cb or function() end
+            local fr = Card(60)
+
+            local t = Instance.new("TextLabel", fr)
+            t.BackgroundTransparency = 1
+            t.Position = UDim2.new(0,10,0,6)
+            t.Size = UDim2.new(1,-20,0,20*SCALE)
+            t.Font = Enum.Font.GothamBlack
+            t.TextSize = 14*SCALE
+            t.TextColor3 = Color3.fromRGB(220,225,245)
+            t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Text = string.upper(placeholder or "INPUT")
+
+            local tb = Instance.new("TextBox", fr)
+            tb.BackgroundColor3 = Color3.fromRGB(24,25,32)
+            tb.Position = UDim2.new(0,10,0,30)
+            tb.Size = UDim2.new(1,-20,0,26*SCALE)
+            tb.ClearTextOnFocus = false
+            tb.Text = ""
+            tb.Font = Enum.Font.Gotham
+            tb.TextSize = 13*SCALE
+            tb.TextColor3 = Color3.new(1,1,1)
+            tb.PlaceholderText = placeholder or ""
+            tb.PlaceholderColor3 = ACCENT_TEXT
+            Instance.new("UICorner", tb).CornerRadius = UDim.new(0,8)
+
+            tb.FocusLost:Connect(function()
+                pcall(cb, tb.Text)
+            end)
+
+            return {
+                SetText = function(_, txt)
+                    tb.Text = txt or ""
+                end
+            }
         end
 
+        --------------------------------------------------------
+        -- SIMPLE DROPDOWN
+        --------------------------------------------------------
         function PageAPI:CreateDropdown(title, options, onChanged)
-            options=options or {}; onChanged=onChanged or function() end
-            local fr=Card(28); fr.Name="Dropdown"
-            local ttl=Instance.new("TextLabel",fr)
-            ttl.BackgroundTransparency=1; ttl.Position=UDim2.new(0,8,0,0); ttl.Size=UDim2.new(1,-40,0,18)
-            ttl.Font=Enum.Font.GothamBlack; ttl.TextSize=math.floor(12*SCALE); ttl.TextColor3=Color3.new(1,1,1); ttl.Text=string.upper(title)
-            local caret=Instance.new("TextLabel",fr)
-            caret.BackgroundTransparency=1; caret.Size=UDim2.fromOffset(math.floor(16*SCALE),math.floor(16*SCALE)); caret.Position=UDim2.new(1,-math.floor(24*SCALE),0,0)
-            caret.Font=Enum.Font.GothamBlack; caret.Text="v"; caret.TextSize=math.floor(11*SCALE); caret.TextColor3=ACCENT
+            options   = options   or {}
+            onChanged = onChanged or function() end
 
-            local holder=Instance.new("Frame",fr); holder.BackgroundColor3=Color3.fromRGB(26,26,32)
-            holder.Position=UDim2.new(0,6,0,20); holder.Size=UDim2.new(1,-12,0,0)
-            holder.AutomaticSize=Enum.AutomaticSize.Y; holder.Visible=false
-            Instance.new("UICorner",holder).CornerRadius=UDim.new(0,8)
-            Instance.new("UIListLayout",holder).Padding=UDim.new(0,4)
-            local pad=Instance.new("UIPadding",holder); pad.PaddingTop=UDim.new(0,6); pad.PaddingBottom=UDim.new(0,6); pad.PaddingLeft=UDim.new(0,6); pad.PaddingRight=UDim.new(0,6)
+            local fr = Card(60)
+            fr.Name = "Dropdown"
 
-            local current=nil
+            local ttl = Instance.new("TextLabel", fr)
+            ttl.BackgroundTransparency = 1
+            ttl.Position = UDim2.new(0,10,0,6)
+            ttl.Size = UDim2.new(1,-40,0,20*SCALE)
+            ttl.Font = Enum.Font.GothamBlack
+            ttl.TextSize = 14*SCALE
+            ttl.TextColor3 = Color3.new(1,1,1)
+            ttl.TextXAlignment = Enum.TextXAlignment.Left
+            ttl.Text = string.upper(title)
+
+            local caret = Instance.new("TextLabel", fr)
+            caret.BackgroundTransparency = 1
+            caret.Size = UDim2.fromOffset(20*SCALE,20*SCALE)
+            caret.Position = UDim2.new(1,-26*SCALE,0,26)
+            caret.Font = Enum.Font.GothamBlack
+            caret.Text = "v"
+            caret.TextSize = 14*SCALE
+            caret.TextColor3 = ACCENT
+
+            local holder = Instance.new("Frame", fr)
+            holder.BackgroundColor3 = Color3.fromRGB(26,26,32)
+            holder.Position = UDim2.new(0,10,0,34*SCALE)
+            holder.Size = UDim2.new(1,-20,0,0)
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+            holder.Visible = false
+            Instance.new("UICorner", holder).CornerRadius = UDim.new(0,8)
+            local hlist = Instance.new("UIListLayout", holder)
+            hlist.Padding = UDim.new(0,4)
+            local pad = Instance.new("UIPadding", holder)
+            pad.PaddingTop    = UDim.new(0,6)
+            pad.PaddingBottom = UDim.new(0,6)
+            pad.PaddingLeft   = UDim.new(0,6)
+            pad.PaddingRight  = UDim.new(0,6)
+
+            local current = nil
+
             local function rebuild(list)
-                for _,c in ipairs(holder:GetChildren()) do if c:IsA("TextButton") then c:Destroy() end end
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy() end
+                end
                 for _,opt in ipairs(list) do
-                    local b=Instance.new("TextButton",holder)
-                    b.Size=UDim2.new(1,0,0,24); b.BackgroundColor3=BG_CARD
-                    b.Text=opt; b.Font=Enum.Font.Gotham; b.TextSize=math.floor(11*SCALE); b.TextColor3=Color3.new(1,1,1)
-                    Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+                    local b = Instance.new("TextButton", holder)
+                    b.Size = UDim2.new(1,0,0,24*SCALE)
+                    b.BackgroundColor3 = BG_CARD
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = 13*SCALE
+                    b.TextColor3 = Color3.new(1,1,1)
+                    b.TextXAlignment = Enum.TextXAlignment.Left
+                    b.Text = tostring(opt)
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
                     b.MouseButton1Click:Connect(function()
-                        current=opt; ttl.Text=string.upper(("%s : %s"):format(title,opt))
-                        holder.Visible=false; tw(caret,.12,{Rotation=0})
-                        onChanged(opt)
+                        current = opt
+                        ttl.Text = string.upper(("%s : %s"):format(title, tostring(opt)))
+                        holder.Visible = false
+                        tw(caret,0.12,{Rotation = 0})
+                        pcall(onChanged, opt)
                     end)
                 end
             end
             rebuild(options)
 
-            local open=false
-            local header=Instance.new("TextButton",fr)
-            header.BackgroundTransparency=1; header.Size=UDim2.new(1,0,0,20); header.Position=UDim2.new(0,0,0,0); header.Text=""
+            local open = false
+            local header = Instance.new("TextButton", fr)
+            header.BackgroundTransparency = 1
+            header.Size = UDim2.new(1,-20,0,26*SCALE)
+            header.Position = UDim2.new(0,10,0,26)
+            header.Text = ""
             header.MouseButton1Click:Connect(function()
-                open=not open; holder.Visible=open; tw(caret,.12,{Rotation=open and 180 or 0})
+                open = not open
+                holder.Visible = open
+                tw(caret,0.12,{Rotation = open and 180 or 0})
             end)
 
             return {
-                SetValue=function(_,v) current=v; ttl.Text=string.upper(("%s : %s"):format(title,tostring(v))) end,
-                GetValue=function() return current end,
-                SetOptions=function(_,opts) rebuild(opts or {}) end
+                SetValue = function(_, v)
+                    current = v
+                    ttl.Text = string.upper(("%s : %s"):format(title, tostring(v)))
+                end,
+                GetValue = function()
+                    return current
+                end,
+                SetOptions = function(_, opts)
+                    options = opts or {}
+                    rebuild(options)
+                end
             }
         end
 
-                ----------------------------------------------------------------
+        --------------------------------------------------------
         -- MULTI SELECT DROPDOWN
-        ----------------------------------------------------------------
+        --------------------------------------------------------
         function PageAPI:CreateMultiDropdown(title, options, onToggle)
-            options   = options   or {}
-            onToggle  = onToggle  or function() end
+            options  = options  or {}
+            onToggle = onToggle or function() end
 
-            -- Frame utama (card)
-            local fr = Instance.new("Frame", Page)
-            fr.BackgroundColor3 = BG_CARD
-            fr.Size = UDim2.new(1, 0, 0, math.floor(64 * SCALE))
-            fr.AutomaticSize = Enum.AutomaticSize.Y
-            fr.ClipsDescendants = false
-            Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 8)
+            local fr = Card(70)
 
-            -- Judul
             local ttl = Instance.new("TextLabel", fr)
             ttl.BackgroundTransparency = 1
-            ttl.Position = UDim2.new(0, 10, 0, 4)
-            ttl.Size = UDim2.new(1, -40, 0, math.floor(22 * SCALE))
+            ttl.Position = UDim2.new(0,10,0,6)
+            ttl.Size = UDim2.new(1,-20,0,20*SCALE)
             ttl.Font = Enum.Font.GothamBlack
-            ttl.TextSize = math.floor(14 * SCALE)
-            ttl.TextColor3 = Color3.new(1, 1, 1)
+            ttl.TextSize = 14*SCALE
+            ttl.TextColor3 = Color3.new(1,1,1)
             ttl.TextXAlignment = Enum.TextXAlignment.Left
             ttl.Text = string.upper(title or "MULTI SELECT")
 
-            -- Summary value (teks pilihan yg aktif)
             local valueLabel = Instance.new("TextLabel", fr)
             valueLabel.BackgroundTransparency = 1
-            valueLabel.Position = UDim2.new(0, 12, 0, 30)
-            valueLabel.Size = UDim2.new(1, -40, 0, math.floor(22 * SCALE))
+            valueLabel.Position = UDim2.new(0,12,0,30)
+            valueLabel.Size = UDim2.new(1,-40,0,22*SCALE)
             valueLabel.Font = Enum.Font.Gotham
-            valueLabel.TextSize = math.floor(13 * SCALE)
+            valueLabel.TextSize = 13*SCALE
             valueLabel.TextColor3 = ACCENT_TEXT
             valueLabel.TextXAlignment = Enum.TextXAlignment.Left
             valueLabel.Text = "None"
 
-            -- caret
             local caret = Instance.new("TextLabel", fr)
             caret.BackgroundTransparency = 1
-            caret.Size = UDim2.fromOffset(math.floor(18 * SCALE), math.floor(18 * SCALE))
-            caret.Position = UDim2.new(1, -math.floor(28 * SCALE), 0, 30)
+            caret.Size = UDim2.fromOffset(20*SCALE,20*SCALE)
+            caret.Position = UDim2.new(1,-26*SCALE,0,30)
             caret.Font = Enum.Font.GothamBlack
             caret.Text = "v"
-            caret.TextSize = math.floor(13 * SCALE)
+            caret.TextSize = 14*SCALE
             caret.TextColor3 = ACCENT
 
-            -- klik area head
             local headBtn = Instance.new("TextButton", fr)
             headBtn.BackgroundTransparency = 1
-            headBtn.Position = UDim2.new(0, 8, 0, 26)
-            headBtn.Size = UDim2.new(1, -16, 0, math.floor(28 * SCALE))
+            headBtn.Position = UDim2.new(0,8,0,26)
+            headBtn.Size = UDim2.new(1,-16,0,28*SCALE)
             headBtn.Text = ""
 
-            -- holder list opsi
             local holder = Instance.new("Frame", fr)
-            holder.BackgroundColor3 = Color3.fromRGB(26, 26, 32)
-            holder.Position = UDim2.new(0, 10, 0, math.floor(60 * SCALE))
-            holder.Size = UDim2.new(1, -20, 0, 0)
+            holder.BackgroundColor3 = Color3.fromRGB(26,26,32)
+            holder.Position = UDim2.new(0,10,0,60*SCALE)
+            holder.Size = UDim2.new(1,-20,0,0)
             holder.AutomaticSize = Enum.AutomaticSize.Y
             holder.Visible = false
-            Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
-
+            Instance.new("UICorner", holder).CornerRadius = UDim.new(0,8)
             local hl = Instance.new("UIListLayout", holder)
-            hl.Padding = UDim.new(0, math.floor(4 * SCALE))
-
+            hl.Padding = UDim.new(0,4)
             local pad = Instance.new("UIPadding", holder)
-            pad.PaddingTop    = UDim.new(0, math.floor(6 * SCALE))
-            pad.PaddingBottom = UDim.new(0, math.floor(6 * SCALE))
-            pad.PaddingLeft   = UDim.new(0, math.floor(6 * SCALE))
-            pad.PaddingRight  = UDim.new(0, math.floor(6 * SCALE))
+            pad.PaddingTop    = UDim.new(0,6)
+            pad.PaddingBottom = UDim.new(0,6)
+            pad.PaddingLeft   = UDim.new(0,6)
+            pad.PaddingRight  = UDim.new(0,6)
 
-            -- state
-            local selected = {}      -- [opt] = true/false
-            local buttons  = {}      -- [opt] = button (buat update tanda centang)
+            local selected = {}
+            local buttons  = {}
 
             local function updateSummary()
                 local list = {}
@@ -487,47 +667,45 @@ function library:CreateWindow(name, version, icon)
                     if c:IsA("TextButton") then c:Destroy() end
                 end
                 buttons = {}
-
                 for _,opt in ipairs(list) do
                     local b = Instance.new("TextButton", holder)
-                    b.Size = UDim2.new(1, 0, 0, math.floor(24 * SCALE))
+                    b.Size = UDim2.new(1,0,0,24*SCALE)
                     b.BackgroundColor3 = BG_CARD
                     b.Font = Enum.Font.Gotham
-                    b.TextSize = math.floor(13 * SCALE)
-                    b.TextColor3 = Color3.new(1, 1, 1)
+                    b.TextSize = 13*SCALE
+                    b.TextColor3 = Color3.new(1,1,1)
                     b.TextXAlignment = Enum.TextXAlignment.Left
                     b.Text = tostring(opt)
-                    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
 
-                    local tickLabel = Instance.new("TextLabel", b)
-                    tickLabel.BackgroundTransparency = 1
-                    tickLabel.AnchorPoint = Vector2.new(1,0.5)
-                    tickLabel.Position = UDim2.new(1, -8, 0.5, 0)
-                    tickLabel.Size = UDim2.fromOffset(16,16)
-                    tickLabel.Font = Enum.Font.GothamBold
-                    tickLabel.TextSize = math.floor(14 * SCALE)
-                    tickLabel.TextColor3 = ACCENT
-                    tickLabel.Text = selected[opt] and "✓" or ""
+                    local tick = Instance.new("TextLabel", b)
+                    tick.BackgroundTransparency = 1
+                    tick.AnchorPoint = Vector2.new(1,0.5)
+                    tick.Position = UDim2.new(1,-8,0.5,0)
+                    tick.Size = UDim2.fromOffset(18,18)
+                    tick.Font = Enum.Font.GothamBold
+                    tick.TextSize = 14*SCALE
+                    tick.TextColor3 = ACCENT
+                    tick.Text = selected[opt] and "✓" or ""
 
-                    buttons[opt] = {button=b, tick=tickLabel}
+                    buttons[opt] = {button=b, tick=tick}
 
                     b.MouseButton1Click:Connect(function()
                         selected[opt] = not selected[opt]
-                        tickLabel.Text = selected[opt] and "✓" or ""
+                        tick.Text = selected[opt] and "✓" or ""
                         updateSummary()
-                        onToggle(opt, selected[opt])
+                        pcall(onToggle, opt, selected[opt])
                     end)
                 end
                 updateSummary()
             end
-
             rebuild(options)
 
             local open = false
             headBtn.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
-                tw(caret, 0.12, {Rotation = open and 180 or 0})
+                tw(caret,0.12,{Rotation = open and 180 or 0})
             end)
 
             return {
@@ -544,12 +722,12 @@ function library:CreateWindow(name, version, icon)
                 GetSelectedList = function()
                     local list = {}
                     for _,opt in ipairs(options) do
-                        if selected[opt] then table.insert(list, opt) end
+                        if selected[opt] then table.insert(list,opt) end
                     end
                     return list
                 end,
                 SetSummaryText = function(_, txt)
-                    valueLabel.Text = txt
+                    valueLabel.Text = txt or "None"
                 end,
                 SetOptions = function(_, opts)
                     options = opts or {}
@@ -558,27 +736,30 @@ function library:CreateWindow(name, version, icon)
             }
         end
 
-
+        --------------------------------------------------------
+        -- SLIDER
+        --------------------------------------------------------
         function PageAPI:CreateSlider(title, min, max, cb)
             min = tonumber(min) or 0
             max = tonumber(max) or 100
             cb  = cb or function() end
 
-            local fr = Card(44)
-            local t  = Instance.new("TextLabel", fr)
+            local fr = Card(60)
+
+            local t = Instance.new("TextLabel", fr)
             t.BackgroundTransparency = 1
-            t.Position = UDim2.new(0,8,0,2)
-            t.Size = UDim2.new(1,-8,0,18)
+            t.Position = UDim2.new(0,10,0,6)
+            t.Size = UDim2.new(1,-80,0,20*SCALE)
             t.Font = Enum.Font.GothamBlack
-            t.TextSize = math.floor(12*SCALE)
+            t.TextSize = 14*SCALE
             t.TextColor3 = Color3.new(1,1,1)
-            t.Text = string.upper(title or "SLIDER")
             t.TextXAlignment = Enum.TextXAlignment.Left
+            t.Text = string.upper(title or "SLIDER")
 
             local bar = Instance.new("Frame", fr)
             bar.BackgroundColor3 = Color3.fromRGB(24,25,32)
-            bar.Position = UDim2.new(0,8,0,22)
-            bar.Size = UDim2.new(1,-16,0,8)
+            bar.Position = UDim2.new(0,10,0,30)
+            bar.Size = UDim2.new(1,-80,0,8*SCALE)
             bar.BorderSizePixel = 0
             Instance.new("UICorner", bar).CornerRadius = UDim.new(0,8)
 
@@ -590,17 +771,17 @@ function library:CreateWindow(name, version, icon)
 
             local valLbl = Instance.new("TextLabel", fr)
             valLbl.BackgroundTransparency = 1
-            valLbl.Size = UDim2.new(0,60,0,16)
-            valLbl.Position = UDim2.new(1,-68,0,2)
+            valLbl.Size = UDim2.new(0,60,0,18*SCALE)
+            valLbl.Position = UDim2.new(1,-64,0,4)
             valLbl.Font = Enum.Font.Gotham
-            valLbl.TextSize = math.floor(11*SCALE)
+            valLbl.TextSize = 13*SCALE
             valLbl.TextColor3 = ACCENT_TEXT
             valLbl.TextXAlignment = Enum.TextXAlignment.Right
 
             local value = min
             local function render()
-                local alpha = (value - min) / math.max(1, (max-min))
-                fill.Size = UDim2.new(math.clamp(alpha,0,1), 0, 1, 0)
+                local alpha = (value - min) / math.max(1,(max-min))
+                fill.Size = UDim2.new(math.clamp(alpha,0,1),0,1,0)
                 valLbl.Text = tostring(math.floor(value))
             end
             render()
@@ -621,27 +802,29 @@ function library:CreateWindow(name, version, icon)
                     local abs = bar.AbsolutePosition
                     local size = bar.AbsoluteSize
                     local mx = UIS:GetMouseLocation().X
-                    local pct = math.clamp((mx - abs.X) / size.X, 0, 1)
-                    value = math.floor(min + pct * (max-min))
+                    local pct = math.clamp((mx - abs.X) / size.X,0,1)
+                    value = math.floor(min + pct*(max-min))
                     render()
-                    cb(value)
+                    pcall(cb,value)
                 end
             end)
 
             return {
                 Set = function(_,v)
-                    value = math.clamp(tonumber(v) or value, min, max)
+                    value = math.clamp(tonumber(v) or value,min,max)
                     render()
-                    cb(value)
+                    pcall(cb,value)
                 end
             }
         end
 
         return PageAPI
-    end
+    end -- makePage
 
+    ------------------------------------------------------------
+    -- WINDOW API
+    ------------------------------------------------------------
     local winAPI = {}
-
     function winAPI:CreateTab(title)
         local tabObj = {}
         function tabObj:CreateFrame(pageTitle)
@@ -650,11 +833,11 @@ function library:CreateWindow(name, version, icon)
         return setmetatable(tabObj, {__index = tabObj})
     end
 
-    return setmetatable({}, { __index = winAPI })
+    return setmetatable({}, {__index = winAPI})
 end
 
--- Buat window
-local win = library:CreateWindow("AegisHub - Fish It", "Premium", 10044538000)
+-- BUAT WINDOW
+local win = library:CreateWindow("AegisHub - Fish It", "Premium Version", 10044538000)
 
 --========================================================
 -- PART 2 - FARM (Auto Favorite + Auto Sell + Auto Enchant + Weather)
@@ -672,30 +855,23 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
--- REMOTE yang dipakai (TANPA Auto Fish)
+-- REMOTE (NO AUTO FISH)
 local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
-
 local RE_ObtainedNewFish  = net:WaitForChild("RE/ObtainedNewFishNotification")
 local RE_FavoriteItem     = net:WaitForChild("RE/FavoriteItem")
 local RF_SellAllItems     = net:WaitForChild("RF/SellAllItems")
-
 local RF_PurchaseWeather  = net:WaitForChild("RF/PurchaseWeatherEvent")
 local RE_ActivateEnchant  = net:WaitForChild("RE/ActivateEnchantingAltar")
 
---========================================================
--- TAB FARM (MAIN)
---========================================================
+-- TAB FARM
 local TabFarm   = win:CreateTab("Main")
-local PageFarm  = TabFarm:CreateFrame("Main")
+local PageFarm  = TabFarm:CreateFrame("Farm")
 PageFarm:CreateLabel("MAIN MENU")
 
---========================================================
--- STATE FARM (TANPA AUTO FISH)
---========================================================
+-- STATE
 local Farm = {
-    -- FAVORITE
-    AutoFavorite_Enabled    = false,
-    AutoFavorite_Rarity     = {
+    AutoFavorite_Enabled = false,
+    AutoFavorite_Rarity  = {
         COMMON    = false,
         UNCOMMON  = false,
         RARE      = false,
@@ -705,9 +881,8 @@ local Farm = {
         SECRET    = false,
     },
 
-    -- WEATHER
-    AutoWeather_Enabled     = false,
-    AutoWeather             = {
+    AutoWeather_Enabled  = false,
+    AutoWeather          = {
         Storm       = false,
         Cloudy      = false,
         Snow        = false,
@@ -716,17 +891,15 @@ local Farm = {
         ["Shark Hunt"] = false,
     },
 
-    -- AUTO SELL
-    AutoSell_Enabled        = false,
-    AutoSell_Threshold      = 30,
-    AutoSell_Delay          = 1.0,
+    AutoSell_Enabled     = false,
+    AutoSell_Threshold   = 30,
+    AutoSell_Delay       = 1.0,
 
-    -- AUTO ENCHANT
-    AutoEnchant_LastRun     = 0,
+    AutoEnchant_LastRun  = 0,
 }
 
 --========================================================
--- RARITY MAP (FishId → Rarity) untuk Auto Favorite
+-- FISH RARITY MAP
 --========================================================
 local FishIdToRarity = {}
 local tierToRarity = {
@@ -762,20 +935,13 @@ do
 end
 
 --========================================================
--- HELPER AUTOFAVORITE & WEATHER
+-- WEATHER LOOP
 --========================================================
-
--- Helper: kalau toggle global ON, tapi semua false ya sudah, script tidak favorite apa-apa.
-local function refreshAutoFavoriteEnabled()
-    -- AutoFavorite_Enabled dikontrol dari toggle UI, jadi di sini cukup dibiarkan.
-end
-
--- Weather loop per jenis weather
 local function randomDelay(min, max)
-    return math.random(min * 100, max * 100) / 100
+    return math.random(min*100, max*100)/100
 end
 
-local WeatherThreads = {} -- name -> thread
+local WeatherThreads = {}
 
 local function startWeatherLoop(weatherName)
     if WeatherThreads[weatherName] then return end
@@ -784,11 +950,11 @@ local function startWeatherLoop(weatherName)
         while Farm.AutoWeather_Enabled and Farm.AutoWeather[weatherName] do
             pcall(function()
                 RF_PurchaseWeather:InvokeServer(weatherName)
-                print("[AutoWeather] Beli weather:", weatherName)
+                print("[AutoWeather] buy:", weatherName)
             end)
 
-            local baseDuration = 900 -- 15 menit durasi weather
-            local extraDelay   = randomDelay(1, 5)
+            local baseDuration = 900
+            local extraDelay   = randomDelay(1,5)
             local totalWait    = baseDuration + extraDelay
 
             local t0 = tick()
@@ -804,7 +970,7 @@ local function startWeatherLoop(weatherName)
 end
 
 --========================================================
--- AUTO FAVORITE + AUTO SELL (via ObtainedNewFish)
+-- AUTO FAVORITE + AUTO SELL
 --========================================================
 local AutoSell_Count    = 0
 local AutoSell_Cooldown = false
@@ -815,9 +981,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
     local uuid    = invItem.UUID
     if not uuid then return end
 
-    ----------------------------------------------------------------
-    -- AUTO FAVORITE BY RARITY
-    ----------------------------------------------------------------
+    -- AUTO FAVORITE
     if Farm.AutoFavorite_Enabled and itemId then
         local rarity = FishIdToRarity[itemId] or "UNKNOWN"
         rarity = string.upper(rarity)
@@ -828,9 +992,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
         end
     end
 
-    ----------------------------------------------------------------
-    -- AUTO SELL DENGAN DELAY (SELL ALL)
-    ----------------------------------------------------------------
+    -- AUTO SELL
     if Farm.AutoSell_Enabled then
         AutoSell_Count += 1
         local limit = tonumber(Farm.AutoSell_Threshold) or 30
@@ -851,89 +1013,69 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, data)
 end)
 
 --========================================================
--- AUTO ENCHANT ROD (teleport ke altar, slot 5)
+-- AUTO ENCHANT (TP KE ALTAR)
 --========================================================
-local ENCHANT_POSITION = Vector3.new(3231, -1303, 1402) -- posisi altar (dari decompile, sesuaikan kalau beda)
+local ENCHANT_POSITION = Vector3.new(3231,-1303,1402)
 
 local function AutoEnchantRod()
     local chars = Workspace2:FindFirstChild("Characters")
     local char  = chars and chars:FindFirstChild(LocalPlayer2.Name)
     local hrp   = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then
-        warn("[AutoEnchant] HRP tidak ditemukan")
+        warn("[AutoEnchant] HRP not found")
         return
     end
 
-    print("[AutoEnchant] Pastikan Enchant Stone ada di slot 5")
-
     local originalCFrame = hrp.CFrame
-
     task.wait(0.5)
-    hrp.CFrame = CFrame.new(ENCHANT_POSITION + Vector3.new(0, 5, 0))
+    hrp.CFrame = CFrame.new(ENCHANT_POSITION + Vector3.new(0,5,0))
     task.wait(1.0)
 
     pcall(function()
-        RE_EquipHotbar:FireServer(5) -- stone di slot 5
+        RE_EquipHotbar:FireServer(5)
         task.wait(0.5)
         RE_ActivateEnchant:FireServer()
     end)
 
     task.wait(7)
     hrp.CFrame = originalCFrame
-
-    print("[AutoEnchant] Selesai")
 end
 
 --========================================================
--- UI: FARM
+-- UI: FARM PAGE
 --========================================================
 
-------------------------------------------------------------
--- 1. AUTO FAVORITE BY RARITY (TOGGLE + MULTI SELECT)
-------------------------------------------------------------
-PageFarm:CreateLabel("Auto Favorite")
+-- AUTO FAVORITE
+PageFarm:CreateLabel("AUTO FAVORITE")
 
--- Toggle global Auto Favorite
 local tgAutoFav = PageFarm:CreateToggle("Auto Favorite", function(on)
     Farm.AutoFavorite_Enabled = on
 end)
 tgAutoFav:Set(false)
 
 local rarityList = {
-    "COMMON",
-    "UNCOMMON",
-    "RARE",
-    "EPIC",
-    "LEGENDARY",
-    "MYTHIC",
-    "SECRET",
+    "COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"
 }
 
 local ddAutoFavorite = PageFarm:CreateMultiDropdown(
     "Select Rarity to Favorite",
     rarityList,
-    function(opt, state)
+    function(opt,state)
         local key = string.upper(opt)
         if Farm.AutoFavorite_Rarity[key] ~= nil then
             Farm.AutoFavorite_Rarity[key] = state
         end
-        refreshAutoFavoriteEnabled()
     end
 )
 ddAutoFavorite:SetSummaryText("None selected")
 
-------------------------------------------------------------
--- 2. AUTO BUY WEATHER (TOGGLE + MULTI SELECT)
-------------------------------------------------------------
-PageFarm:CreateLabel("Auto Buy Weather")
+-- AUTO WEATHER
+PageFarm:CreateLabel("AUTO BUY WEATHER")
 
--- Toggle global Auto Weather
 local tgAutoWeather = PageFarm:CreateToggle("Auto Weather", function(on)
     Farm.AutoWeather_Enabled = on
-
-    -- kalau di-on-kan, start loop untuk semua yg sudah dicentang
     if on then
-        for name, flag in pairs(Farm.AutoWeather) do
+        for name,flag in pairs(Farm.AutoWeather) do
             if flag then
                 startWeatherLoop(name)
             end
@@ -943,18 +1085,13 @@ end)
 tgAutoWeather:Set(false)
 
 local weatherList = {
-    "Storm",
-    "Cloudy",
-    "Snow",
-    "Wind",
-    "Radiant",
-    "Shark Hunt",
+    "Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"
 }
 
 local ddWeather = PageFarm:CreateMultiDropdown(
     "Select Weather(s)",
     weatherList,
-    function(opt, state)
+    function(opt,state)
         if Farm.AutoWeather[opt] ~= nil then
             Farm.AutoWeather[opt] = state
             if state and Farm.AutoWeather_Enabled then
@@ -965,24 +1102,17 @@ local ddWeather = PageFarm:CreateMultiDropdown(
 )
 ddWeather:SetSummaryText("Off")
 
-------------------------------------------------------------
--- 3. AUTO SELL (SELL ALL)
-------------------------------------------------------------
-PageFarm:CreateLabel("Auto Sell (Sell All)")
+-- AUTO SELL
+PageFarm:CreateLabel("AUTO SELL (SELL ALL)")
 
 local ddAutoSell = PageFarm:CreateDropdown("Auto Sell Mode", {
-    "Off",
-    "10 Fish",
-    "20 Fish",
-    "30 Fish",
-    "50 Fish"
+    "Off","10 Fish","20 Fish","30 Fish","50 Fish"
 }, function(opt)
     if opt == "Off" then
-        Farm.AutoSell_Enabled   = false
-        AutoSell_Count          = 0
+        Farm.AutoSell_Enabled = false
+        AutoSell_Count = 0
         return
     end
-
     Farm.AutoSell_Enabled = true
     if opt == "10 Fish" then
         Farm.AutoSell_Threshold = 10
@@ -1003,18 +1133,15 @@ PageFarm:CreateBox("Sell Delay setelah SellAll (detik)", function(txt)
     end
 end)
 
-------------------------------------------------------------
--- 4. AUTO ENCHANT (TRIGGER SEKALI)
-------------------------------------------------------------
-PageFarm:CreateLabel("Auto Enchant")
+-- AUTO ENCHANT
+PageFarm:CreateLabel("AUTO ENCHANT")
 
 local ddAutoEnchant = PageFarm:CreateDropdown("Auto Enchant Action", {
-    "Idle",
-    "Run once now"
+    "Idle","Run once now"
 }, function(opt)
     if opt == "Run once now" then
         if tick() - Farm.AutoEnchant_LastRun < 5 then
-            warn("[AutoEnchant] Tunggu sebentar sebelum menjalankan lagi.")
+            warn("[AutoEnchant] wait a bit.")
             return
         end
         Farm.AutoEnchant_LastRun = tick()
@@ -1028,19 +1155,16 @@ ddAutoEnchant:SetValue("Idle")
 -- PART 3 - TELEPORT + MISC + FPS/PING OVERLAY
 --========================================================
 
-local VirtualUser = game:GetService("VirtualUser")
-local Stats       = game:GetService("Stats")
-
 --------------------------------------------------------
 -- TELEPORT TAB
 --------------------------------------------------------
-local function tpTo(pos: Vector3)
+local function tpTo(pos)
     if not pos then return end
     local plr = LocalPlayer
     local ch  = plr and (plr.Character or plr.CharacterAdded:Wait())
     local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
     if hrp then
-        hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+        hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0))
     end
 end
 
@@ -1048,7 +1172,6 @@ local TabTP  = win:CreateTab("Teleport")
 local PageTP = TabTP:CreateFrame("Teleport")
 PageTP:CreateLabel("TELEPORT MENU")
 
--- Island list
 local islands = {
     ["Weather Machine"]            = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"]            = Vector3.new(3157,-1303,1439),
@@ -1071,7 +1194,7 @@ local islands = {
     ["Fisherman Island"]           = Vector3.new(-3,17,2840),
 }
 local islandList = {}
-for name in pairs(islands) do table.insert(islandList, name) end
+for name in pairs(islands) do table.insert(islandList,name) end
 table.sort(islandList)
 
 PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
@@ -1079,7 +1202,7 @@ PageTP:CreateDropdown("Teleport Island", islandList, function(choice)
     if v then tpTo(v) end
 end)
 
--- Scan NPC models
+-- NPC list
 local function scanNPC_Models()
     local found = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
@@ -1089,7 +1212,10 @@ local function scanNPC_Models()
                 local hasPrompt = false
                 if not hasHum then
                     for _,d in ipairs(m:GetDescendants()) do
-                        if d:IsA("ProximityPrompt") then hasPrompt = true break end
+                        if d:IsA("ProximityPrompt") then
+                            hasPrompt = true
+                            break
+                        end
                     end
                 end
                 if hasHum or hasPrompt then
@@ -1099,7 +1225,7 @@ local function scanNPC_Models()
         end
     end
     local list = {}
-    for k in pairs(found) do table.insert(list, k) end
+    for k in pairs(found) do table.insert(list,k) end
     table.sort(list)
     return list
 end
@@ -1107,19 +1233,21 @@ end
 local npcList = scanNPC_Models()
 local ddNPC = PageTP:CreateDropdown("Teleport NPC", npcList, function(nm)
     if not nm or nm == "" then return end
-    local me   = LocalPlayer
-    local ch   = me and (me.Character or me.CharacterAdded:Wait())
-    local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
+    local me  = LocalPlayer
+    local ch  = me and (me.Character or me.CharacterAdded:Wait())
+    local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
     local best,dist
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
-            if string.find(string.lower(m.Name), string.lower(nm), 1, true) then
+            if string.find(string.lower(m.Name), string.lower(nm),1,true) then
                 local p = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
                 if p then
                     local d = (p.Position - hrp.Position).Magnitude
-                    if not dist or d < dist then best = p; dist = d end
+                    if not dist or d < dist then
+                        best,dist = p,d
+                    end
                 end
             end
         end
@@ -1127,53 +1255,40 @@ local ddNPC = PageTP:CreateDropdown("Teleport NPC", npcList, function(nm)
     if best then tpTo(best.Position) end
 end)
 
--- Players dropdown
+-- Teleport player
 local function playersList()
     local t = {}
     for _,pl in ipairs(Players:GetPlayers()) do
-        if pl ~= LocalPlayer then table.insert(t, pl.Name) end
+        if pl ~= LocalPlayer then table.insert(t,pl.Name) end
     end
     table.sort(t)
     return t
 end
 
-local plrList = playersList()
-local ddPlayer = PageTP:CreateDropdown("Teleport Player", plrList, function(nm)
+local ddPlayer = PageTP:CreateDropdown("Teleport Player", playersList(), function(nm)
     local p = Players:FindFirstChild(nm)
     if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
         tpTo(p.Character.HumanoidRootPart.Position)
     end
 end)
 
--- Refresh NPC & Player lists berkala
 task.spawn(function()
     while true do
         task.wait(8)
-        -- NPC refresh
-        local newNPC = scanNPC_Models()
         if ddNPC and ddNPC.SetOptions then
-            ddNPC:SetOptions(newNPC)
+            ddNPC:SetOptions(scanNPC_Models())
         end
-        -- Player refresh
-        local newPL = playersList()
         if ddPlayer and ddPlayer.SetOptions then
-            ddPlayer:SetOptions(newPL)
+            ddPlayer:SetOptions(playersList())
         end
     end
 end)
 
-Players.PlayerAdded:Connect(function()
-    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
-end)
-Players.PlayerRemoving:Connect(function()
-    if ddPlayer and ddPlayer.SetOptions then ddPlayer:SetOptions(playersList()) end
-end)
-
 --------------------------------------------------------
--- MISC TAB (ANTI AFK, FPS BOOST, LIGHTING, DLL)
+-- MISC TAB
 --------------------------------------------------------
-local TabMisc   = win:CreateTab("Misc")
-local PageMisc  = TabMisc:CreateFrame("Misc")
+local TabMisc  = win:CreateTab("Misc")
+local PageMisc = TabMisc:CreateFrame("Misc")
 PageMisc:CreateLabel("MISC / PERFORMANCE")
 
 local MiscState = {
@@ -1192,9 +1307,8 @@ local Saved = {
     FogEnd        = nil,
 }
 
--- ANTI AFK
+-- Anti AFK
 local AntiAFK_Conn
-
 local function EnableAntiAFK()
     if AntiAFK_Conn then AntiAFK_Conn:Disconnect() end
     AntiAFK_Conn = LocalPlayer.Idled:Connect(function()
@@ -1204,14 +1318,13 @@ local function EnableAntiAFK()
         VirtualUser:Button2Up(Vector2.new(0,0), cam and cam.CFrame or CFrame.new())
     end)
 end
-
 local function DisableAntiAFK()
-    if AntiAFK_Conn then AntiAFK_Conn:Disconnect(); AntiAFK_Conn = nil end
+    if AntiAFK_Conn then AntiAFK_Conn:Disconnect(); AntiAFK_Conn=nil end
 end
 
--- FPS BOOST HELPERS
+-- Helpers
 local function ApplySmoothPlastic()
-    for _, v in ipairs(game:GetDescendants()) do
+    for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("BasePart") then
             v.Material = Enum.Material.SmoothPlastic
             v.Reflectance = 0
@@ -1220,7 +1333,7 @@ local function ApplySmoothPlastic()
 end
 
 local function DisableTextures()
-    for _, v in ipairs(game:GetDescendants()) do
+    for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("Decal") or v:IsA("Texture") then
             v.Transparency = 1
         end
@@ -1235,14 +1348,14 @@ local function LightingSimplify()
         Saved.FogEnd = Lighting.FogEnd
     end
     if #Saved.PostEffects == 0 then
-        for _, eff in ipairs(Lighting:GetChildren()) do
+        for _,eff in ipairs(Lighting:GetChildren()) do
             if eff:IsA("PostEffect") then
-                table.insert(Saved.PostEffects, {ref = eff, enabled = eff.Enabled})
+                table.insert(Saved.PostEffects, {ref=eff, enabled=eff.Enabled})
             end
         end
     end
 
-    for _, eff in ipairs(Lighting:GetChildren()) do
+    for _,eff in ipairs(Lighting:GetChildren()) do
         if eff:IsA("PostEffect") then
             eff.Enabled = false
         end
@@ -1251,12 +1364,12 @@ local function LightingSimplify()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 1e10
     Lighting.Brightness = 1
-    Lighting.EnvironmentDiffuseScale  = 0
+    Lighting.EnvironmentDiffuseScale = 0
     Lighting.EnvironmentSpecularScale = 0
 end
 
 local function ResetLighting()
-    for _, item in ipairs(Saved.PostEffects) do
+    for _,item in ipairs(Saved.PostEffects) do
         if item.ref and item.ref.Parent then
             item.ref.Enabled = item.enabled
         end
@@ -1273,7 +1386,7 @@ local function KillCharacterAnimation(char)
     if not char then return end
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if humanoid then
-        for _, track in ipairs(humanoid:GetPlayingAnimationTracks()) do
+        for _,track in ipairs(humanoid:GetPlayingAnimationTracks()) do
             pcall(function() track:Stop() end)
         end
         local animator = humanoid:FindFirstChildOfClass("Animator")
@@ -1282,13 +1395,11 @@ local function KillCharacterAnimation(char)
         end
     end
     local animate = char:FindFirstChild("Animate")
-    if animate then
-        pcall(function() animate:Destroy() end)
-    end
+    if animate then pcall(function() animate:Destroy() end) end
 end
 
 local function KillAllHumanoidAnimations()
-    for _, hum in ipairs(game:GetDescendants()) do
+    for _,hum in ipairs(game:GetDescendants()) do
         if hum:IsA("Humanoid") then
             KillCharacterAnimation(hum.Parent)
         end
@@ -1296,7 +1407,7 @@ local function KillAllHumanoidAnimations()
 end
 
 local function KillParticlesAndLights()
-    for _, v in ipairs(game:GetDescendants()) do
+    for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("ParticleEmitter")
         or v:IsA("Trail")
         or v:IsA("Fire")
@@ -1314,37 +1425,32 @@ local function KillParticlesAndLights()
 
     local terrain = Workspace:FindFirstChildOfClass("Terrain")
     if terrain then
-        terrain.WaterWaveSize        = 0
-        terrain.WaterWaveSpeed       = 0
-        terrain.WaterReflectance     = 0
-        terrain.WaterTransparency    = 0
+        terrain.WaterWaveSize     = 0
+        terrain.WaterWaveSpeed    = 0
+        terrain.WaterReflectance  = 0
+        terrain.WaterTransparency = 0
     end
 end
 
 local function UltraNoEffectsApply()
     KillAllHumanoidAnimations()
     KillParticlesAndLights()
-
     local function onChar(char)
-        task.delay(1, function()
+        task.delay(1,function()
             if MiscState.UltraNoEffects then
                 KillCharacterAnimation(char)
             end
         end)
     end
-
-    if LocalPlayer.Character then
-        onChar(LocalPlayer.Character)
-    end
+    if LocalPlayer.Character then onChar(LocalPlayer.Character) end
     LocalPlayer.CharacterAdded:Connect(onChar)
 end
 
 local function FPSBoostApply()
-    if MiscState.SmoothPlastic   then ApplySmoothPlastic()   end
-    if MiscState.TexturesOff     then DisableTextures()      end
-    if MiscState.LightingSimple  then LightingSimplify()     end
-    if MiscState.UltraNoEffects  then UltraNoEffectsApply()  end
-
+    if MiscState.SmoothPlastic   then ApplySmoothPlastic()  end
+    if MiscState.TexturesOff     then DisableTextures()     end
+    if MiscState.LightingSimple  then LightingSimplify()    end
+    if MiscState.UltraNoEffects  then UltraNoEffectsApply() end
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 end
 
@@ -1354,22 +1460,15 @@ local function ApplyFPSCap()
     end
 end
 
--- UI DROPDOWNS MISC
-
--- Anti AFK
+-- UI dropdowns misc
 local ddAntiAFK = PageMisc:CreateDropdown("Anti AFK", {"Off","On"}, function(opt)
     MiscState.AntiAFK = (opt == "On")
-    if MiscState.AntiAFK then
-        EnableAntiAFK()
-    else
-        DisableAntiAFK()
-    end
+    if MiscState.AntiAFK then EnableAntiAFK() else DisableAntiAFK() end
 end)
 ddAntiAFK:SetValue("On")
 MiscState.AntiAFK = true
 EnableAntiAFK()
 
--- FPS Boost
 local ddFPSBoost = PageMisc:CreateDropdown("FPS Boost (Aggressive)", {"Off","On"}, function(opt)
     MiscState.FPSBoost = (opt == "On")
     if MiscState.FPSBoost then
@@ -1382,7 +1481,6 @@ ddFPSBoost:SetValue("On")
 MiscState.FPSBoost = true
 FPSBoostApply()
 
--- Lighting Simplify
 local ddLighting = PageMisc:CreateDropdown("Lighting Simplify", {"Off","On"}, function(opt)
     MiscState.LightingSimple = (opt == "On")
     if MiscState.LightingSimple then
@@ -1395,40 +1493,30 @@ ddLighting:SetValue("On")
 MiscState.LightingSimple = true
 LightingSimplify()
 
--- Textures/Decals
 local ddTextures = PageMisc:CreateDropdown("Textures / Decals", {"Keep","Hide All"}, function(opt)
     MiscState.TexturesOff = (opt == "Hide All")
-    if MiscState.TexturesOff then
-        DisableTextures()
-    end
+    if MiscState.TexturesOff then DisableTextures() end
 end)
 ddTextures:SetValue("Hide All")
 MiscState.TexturesOff = true
 DisableTextures()
 
--- SmoothPlastic
 local ddSmooth = PageMisc:CreateDropdown("Part Material", {"Default","SmoothPlastic"}, function(opt)
     MiscState.SmoothPlastic = (opt == "SmoothPlastic")
-    if MiscState.SmoothPlastic then
-        ApplySmoothPlastic()
-    end
+    if MiscState.SmoothPlastic then ApplySmoothPlastic() end
 end)
 ddSmooth:SetValue("SmoothPlastic")
 MiscState.SmoothPlastic = true
 ApplySmoothPlastic()
 
--- Ultra No Effects
 local ddUltra = PageMisc:CreateDropdown("ULTRA: No Anim/Particles", {"Off","On (One-way)"}, function(opt)
     MiscState.UltraNoEffects = (opt == "On (One-way)")
-    if MiscState.UltraNoEffects then
-        UltraNoEffectsApply()
-    end
+    if MiscState.UltraNoEffects then UltraNoEffectsApply() end
 end)
 ddUltra:SetValue("On (One-way)")
 MiscState.UltraNoEffects = true
 UltraNoEffectsApply()
 
--- FPS Cap Dropdown
 local ddFPSCap = PageMisc:CreateDropdown("FPS Cap", {"60","90","120","144","240","Unlimited"}, function(opt)
     if opt == "Unlimited" then
         MiscState.FPSCapValue = 1000
@@ -1441,7 +1529,6 @@ ddFPSCap:SetValue("120")
 MiscState.FPSCapValue = 120
 ApplyFPSCap()
 
--- Reset Lighting action
 local ddResetLight = PageMisc:CreateDropdown("Lighting Action", {"Idle","Reset Lighting Now"}, function(opt)
     if opt == "Reset Lighting Now" then
         ResetLighting()
@@ -1451,41 +1538,32 @@ end)
 ddResetLight:SetValue("Idle")
 
 --------------------------------------------------------
--- FPS + PING OVERLAY (TEXT, DRAGGABLE)
+-- FPS + PING TEXT OVERLAY
 --------------------------------------------------------
 local guiParent = (gethui and gethui()) or CoreGui
-
 local oldOverlay = guiParent:FindFirstChild("FPS_PING_TEXT_ONLY")
-if oldOverlay then
-    oldOverlay:Destroy()
-end
+if oldOverlay then oldOverlay:Destroy() end
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FPS_PING_TEXT_ONLY"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-if syn and syn.protect_gui then
-    syn.protect_gui(screenGui)
-end
+protect(screenGui)
 screenGui.Parent = guiParent
 
 local holder = Instance.new("Frame")
 holder.Name = "Holder"
 holder.Parent = screenGui
 holder.BackgroundTransparency = 1
-holder.BorderSizePixel = 0
-holder.AnchorPoint = Vector2.new(0, 0)
-holder.Position = UDim2.new(0, 0, 0, 6)
-holder.Size = UDim2.new(0, 320, 0, 20)
+holder.Size = UDim2.new(0,320,0,20)
+holder.Position = UDim2.new(0,10,0,6)
 
 task.spawn(function()
-    task.wait(0.15)
-    local cam3 = Workspace.CurrentCamera
-    if cam3 then
-        local vp = cam3.ViewportSize
-        holder.Position = UDim2.new(0, (vp.X - holder.AbsoluteSize.X) / 2, 0, 6)
-    else
-        holder.Position = UDim2.new(0, 10, 0, 6)
+    task.wait(0.1)
+    local cam = Workspace.CurrentCamera
+    if cam then
+        local vp = cam.ViewportSize
+        holder.Position = UDim2.new(0,(vp.X-holder.AbsoluteSize.X)/2,0,6)
     end
 end)
 
@@ -1493,33 +1571,29 @@ local hList = Instance.new("UIListLayout", holder)
 hList.FillDirection = Enum.FillDirection.Horizontal
 hList.SortOrder = Enum.SortOrder.LayoutOrder
 hList.VerticalAlignment = Enum.VerticalAlignment.Center
-hList.Padding = UDim.new(0, 6)
+hList.Padding = UDim.new(0,6)
 
 local infoLabel = Instance.new("TextLabel")
-infoLabel.Name = "InfoLabel"
 infoLabel.Parent = holder
 infoLabel.BackgroundTransparency = 1
-infoLabel.BorderSizePixel = 0
-infoLabel.Size = UDim2.new(0, 320, 0, 20)
+infoLabel.Size = UDim2.new(0,320,0,20)
 infoLabel.Font = Enum.Font.Code
 infoLabel.TextSize = 14
 infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoLabel.TextColor3 = Color3.fromRGB(255,255,255)
 infoLabel.TextStrokeTransparency = 0.5
-infoLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+infoLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
 infoLabel.Text = "FPS: ... | Ping: ..."
 
--- drag overlay
+-- drag holder
 do
     local dragging = false
     local dragStart, startPos
-
     holder.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = holder.Position
-
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragging = false
@@ -1527,36 +1601,33 @@ do
             end)
         end
     end)
-
     UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             local newX = startPos.X.Offset + delta.X
             local newY = startPos.Y.Offset + delta.Y
-
-            local cam3 = Workspace.CurrentCamera
-            if cam3 then
-                local vp = cam3.ViewportSize
-                newX = math.clamp(newX, 0, vp.X - holder.AbsoluteSize.X)
-                newY = math.clamp(newY, 0, vp.Y - holder.AbsoluteSize.Y)
+            local cam = Workspace.CurrentCamera
+            if cam then
+                local vp = cam.ViewportSize
+                newX = math.clamp(newX,0,vp.X-holder.AbsoluteSize.X)
+                newY = math.clamp(newY,0,vp.Y-holder.AbsoluteSize.Y)
             end
-
-            holder.Position = UDim2.new(0, newX, 0, newY)
+            holder.Position = UDim2.new(0,newX,0,newY)
         end
     end)
 end
 
--- FPS smoothing
+-- fps smoothing
 local fps = 0
 local avgFPS = 0
 local alphaFPS = 0.15
-
 RunService.RenderStepped:Connect(function(dt)
-    local instFPS = 1 / math.max(dt, 1/1000)
+    local inst = 1/math.max(dt,1/1000)
     if avgFPS == 0 then
-        avgFPS = instFPS
+        avgFPS = inst
     else
-        avgFPS = avgFPS + (instFPS - avgFPS) * alphaFPS
+        avgFPS = avgFPS + (inst-avgFPS)*alphaFPS
     end
     fps = avgFPS
 end)
@@ -1566,27 +1637,23 @@ local function getPingMs()
     local ok = pcall(function()
         pingStat = Stats.Network.ServerStatsItem["Data Ping"]
     end)
-
     if ok and pingStat then
         local str = pingStat:GetValueString() or ""
-        local num = tonumber(string.match(str, "(%d+)"))
-        return num or 0
+        local n = tonumber(string.match(str,"(%d+)"))
+        return n or 0
     end
-
     return 0
 end
 
 task.spawn(function()
     while screenGui.Parent do
-        local fpsRounded = math.floor(fps + 0.5)
+        local fpsRounded = math.floor(fps+0.5)
         local pingMs = getPingMs()
-
         if pingMs > 0 then
-            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: " .. tostring(pingMs) .. " ms"
+            infoLabel.Text = "FPS: "..fpsRounded.." | Ping: "..pingMs.." ms"
         else
-            infoLabel.Text = "FPS: " .. tostring(fpsRounded) .. " | Ping: N/A"
+            infoLabel.Text = "FPS: "..fpsRounded.." | Ping: N/A"
         end
-
         task.wait(0.25)
     end
 end)
@@ -1596,4 +1663,4 @@ PageMisc:CreateDropdown("Stats Overlay", {"On","Off"}, function(opt)
     if screenGui then
         screenGui.Enabled = (opt == "On")
     end
-end)
+end):SetValue("On")
