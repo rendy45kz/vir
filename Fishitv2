@@ -1059,7 +1059,7 @@ local rarityList = {
 
 local ddAutoFavorite = PageFarm:CreateMultiDropdown(
     "Select Rarity to Favorite",
-    tierToRarity,
+    rarityList,
     function(opt,state)
         local key = string.upper(opt)
         if Farm.AutoFavorite_Rarity[key] ~= nil then
