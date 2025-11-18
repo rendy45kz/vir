@@ -1,5 +1,5 @@
 --========================================================
--- AEGISHUB - FISH IT (FINAL)
+-- AEGISHUB - FISH IT (FINAL + CAMERA ZOOM)
 -- UI LIB + FARM + TELEPORT + MISC
 --========================================================
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -369,7 +369,7 @@ function library:CreateWindow(name, version, icon)
         end
 
         --------------------------------------------------------
-        -- TOGGLE  (bisa dipanggil: (title, desc, cb) atau (title, cb))
+        -- TOGGLE  (bisa: (title, desc, cb) atau (title, cb))
         --------------------------------------------------------
         function PageAPI:CreateToggle(title, arg2, arg3)
             local desc, cb
@@ -1299,6 +1299,9 @@ local MiscState = {
     SmoothPlastic  = false,
     UltraNoEffects = false,
     FPSCapValue    = 190,
+
+    -- CAMERA
+    CameraMaxZoom  = 250,
 }
 
 local Saved = {
@@ -1306,6 +1309,21 @@ local Saved = {
     GlobalShadows = nil,
     FogEnd        = nil,
 }
+
+-- === CAMERA ZOOM HELPER ===
+local function ApplyCameraZoom()
+    local lp = LocalPlayer
+    if not lp then return end
+    -- minimal zoom (dekat) & maksimal zoom (jauh) untuk scroll wheel
+    lp.CameraMinZoomDistance = 2
+    lp.CameraMaxZoomDistance = MiscState.CameraMaxZoom or 250
+end
+
+ApplyCameraZoom()
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    ApplyCameraZoom()
+end)
 
 -- Anti AFK
 local AntiAFK_Conn
@@ -1460,15 +1478,33 @@ local function ApplyFPSCap()
     end
 end
 
--- UI dropdowns misc
+-- =======================
+-- UI MISC
+-- =======================
+
+-- CAMERA SECTION
+PageMisc:CreateLabel("CAMERA / ZOOM")
+
+local camSlider = PageMisc:CreateSlider("Max Zoom (scroll)", 50, 600, function(val)
+    MiscState.CameraMaxZoom = val
+    ApplyCameraZoom()
+end)
+camSlider:Set(MiscState.CameraMaxZoom)
+
+-- Anti AFK
 local ddAntiAFK = PageMisc:CreateDropdown("Anti AFK", {"Off","On"}, function(opt)
     MiscState.AntiAFK = (opt == "On")
-    if MiscState.AntiAFK then EnableAntiAFK() else DisableAntiAFK() end
+    if MiscState.AntiAFK then
+        EnableAntiAFK()
+    else
+        DisableAntiAFK()
+    end
 end)
 ddAntiAFK:SetValue("On")
 MiscState.AntiAFK = true
 EnableAntiAFK()
 
+-- FPS Boost
 local ddFPSBoost = PageMisc:CreateDropdown("FPS Boost (Aggressive)", {"Off","On"}, function(opt)
     MiscState.FPSBoost = (opt == "On")
     if MiscState.FPSBoost then
@@ -1481,6 +1517,7 @@ ddFPSBoost:SetValue("On")
 MiscState.FPSBoost = true
 FPSBoostApply()
 
+-- Lighting Simplify
 local ddLighting = PageMisc:CreateDropdown("Lighting Simplify", {"Off","On"}, function(opt)
     MiscState.LightingSimple = (opt == "On")
     if MiscState.LightingSimple then
@@ -1493,30 +1530,40 @@ ddLighting:SetValue("On")
 MiscState.LightingSimple = true
 LightingSimplify()
 
+-- Textures/Decals
 local ddTextures = PageMisc:CreateDropdown("Textures / Decals", {"Keep","Hide All"}, function(opt)
     MiscState.TexturesOff = (opt == "Hide All")
-    if MiscState.TexturesOff then DisableTextures() end
+    if MiscState.TexturesOff then
+        DisableTextures()
+    end
 end)
 ddTextures:SetValue("Hide All")
 MiscState.TexturesOff = true
 DisableTextures()
 
+-- SmoothPlastic
 local ddSmooth = PageMisc:CreateDropdown("Part Material", {"Default","SmoothPlastic"}, function(opt)
     MiscState.SmoothPlastic = (opt == "SmoothPlastic")
-    if MiscState.SmoothPlastic then ApplySmoothPlastic() end
+    if MiscState.SmoothPlastic then
+        ApplySmoothPlastic()
+    end
 end)
 ddSmooth:SetValue("SmoothPlastic")
 MiscState.SmoothPlastic = true
 ApplySmoothPlastic()
 
+-- Ultra No Effects
 local ddUltra = PageMisc:CreateDropdown("ULTRA: No Anim/Particles", {"Off","On (One-way)"}, function(opt)
     MiscState.UltraNoEffects = (opt == "On (One-way)")
-    if MiscState.UltraNoEffects then UltraNoEffectsApply() end
+    if MiscState.UltraNoEffects then
+        UltraNoEffectsApply()
+    end
 end)
 ddUltra:SetValue("On (One-way)")
 MiscState.UltraNoEffects = true
 UltraNoEffectsApply()
 
+-- FPS Cap Dropdown
 local ddFPSCap = PageMisc:CreateDropdown("FPS Cap", {"60","90","120","144","240","Unlimited"}, function(opt)
     if opt == "Unlimited" then
         MiscState.FPSCapValue = 1000
@@ -1529,6 +1576,7 @@ ddFPSCap:SetValue("120")
 MiscState.FPSCapValue = 120
 ApplyFPSCap()
 
+-- Reset Lighting action
 local ddResetLight = PageMisc:CreateDropdown("Lighting Action", {"Idle","Reset Lighting Now"}, function(opt)
     if opt == "Reset Lighting Now" then
         ResetLighting()
