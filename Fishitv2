@@ -1054,7 +1054,7 @@ end)
 tgAutoFav:Set(false)
 
 local rarityList = {
-    "COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"
+    "Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"
 }
 
 local ddAutoFavorite = PageFarm:CreateMultiDropdown(
