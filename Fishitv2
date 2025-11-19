@@ -551,8 +551,8 @@ function library:CreateWindow(title)
     return win
 end
 
-BUAT WINDOW
-local win = library:CreateWindow("AegisHub - Fish It", "Premium Version", 10044538000)
+-- BUAT WINDOW
+local win = library:CreateWindow("AegisHub - Fish It")
 
 
 ----------------------------------------------------------------
