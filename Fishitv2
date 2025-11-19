@@ -1,7 +1,6 @@
 ----------------------------------------------------------------
 -- AegisHub UI – Compact Gamer UI (Venyx-like, small & clean)
--- Fully compatible with Farm / Misc / Teleport system
--- No blur, no big shapes, super fast rendering
+-- Fixed dropdown layout, multi dropdown, minimize, floating toggle
 ----------------------------------------------------------------
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -11,15 +10,15 @@ local CoreGui          = game:GetService("CoreGui")
 
 local library = {}
 local theme = {
-    bg     = Color3.fromRGB(18,18,18),   -- main background
-    card   = Color3.fromRGB(25,25,25),   -- frame panel
-    stroke = Color3.fromRGB(60,60,60),   -- outlines
+    bg     = Color3.fromRGB(18,18,18),
+    card   = Color3.fromRGB(25,25,25),
+    stroke = Color3.fromRGB(60,60,60),
     text   = Color3.fromRGB(240,240,240),
     accent = Color3.fromRGB(110,175,255),
 }
 
 local function tween(obj, dur, props)
-    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad), props)
+    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingStyle.Quad), props)
 end
 
 --------------------------------------------------------------------------------
@@ -30,6 +29,7 @@ function library:CreateWindow(title)
     gui.Name = "AegisHubCompact"
     gui.Parent = CoreGui
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.ResetOnSpawn = false
 
     local main = Instance.new("Frame")
     main.Parent = gui
@@ -37,6 +37,9 @@ function library:CreateWindow(title)
     main.Position = UDim2.new(.5, -260, .5, -180)
     main.BackgroundColor3 = theme.bg
     main.BorderSizePixel = 0
+
+    local corner = Instance.new("UICorner", main)
+    corner.CornerRadius = UDim.new(0, 6)
 
     local stroke = Instance.new("UIStroke", main)
     stroke.Thickness = 1
@@ -50,7 +53,7 @@ function library:CreateWindow(title)
 
     local tlabel = Instance.new("TextLabel")
     tlabel.Parent = top
-    tlabel.Size = UDim2.new(1,-60,1,0)
+    tlabel.Size = UDim2.new(1,-80,1,0)
     tlabel.Position = UDim2.new(0,10,0,0)
     tlabel.BackgroundTransparency = 1
     tlabel.Text = tostring(title)
@@ -59,10 +62,22 @@ function library:CreateWindow(title)
     tlabel.TextSize = 16
     tlabel.TextColor3 = theme.text
 
+    -- Minimize button
+    local minimize = Instance.new("TextButton")
+    minimize.Parent = top
+    minimize.Size = UDim2.new(0,22,1,0)
+    minimize.Position = UDim2.new(1,-62,0,0)
+    minimize.Text = "-"
+    minimize.TextColor3 = theme.text
+    minimize.BackgroundTransparency = 1
+    minimize.Font = Enum.Font.GothamBold
+    minimize.TextSize = 18
+
+    -- Close button
     local close = Instance.new("TextButton")
     close.Parent = top
-    close.Size = UDim2.new(0,40,1,0)
-    close.Position = UDim2.new(1,-40,0,0)
+    close.Size = UDim2.new(0,30,1,0)
+    close.Position = UDim2.new(1,-30,0,0)
     close.Text = "X"
     close.TextColor3 = Color3.fromRGB(255,70,70)
     close.BackgroundTransparency = 1
@@ -91,7 +106,7 @@ function library:CreateWindow(title)
             end
         end)
         UserInputService.InputChanged:Connect(function(i)
-            if dragging then
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
                 local delta = i.Position - start
                 main.Position = UDim2.new(
                     offset.X.Scale,
@@ -116,6 +131,7 @@ function library:CreateWindow(title)
     local slist = Instance.new("UIListLayout", sidebar)
     slist.SortOrder = Enum.SortOrder.LayoutOrder
     slist.Padding = UDim.new(0,6)
+    slist.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
     ------------------------------------------
     -- RIGHT SIDE PAGE HOLDER
@@ -127,29 +143,109 @@ function library:CreateWindow(title)
     holder.BackgroundTransparency = 1
 
     ---------------------------------------------------------------------
+    -- FLOATING TOGGLE BUTTON (HIDE/SHOW) – draggable
+    ---------------------------------------------------------------------
+    local floatBtn = Instance.new("Frame")
+    floatBtn.Parent = gui
+    floatBtn.Size = UDim2.new(0,34,0,34)
+    floatBtn.Position = UDim2.new(0, 10, 0.5, -17)
+    floatBtn.BackgroundColor3 = theme.card
+    floatBtn.BorderSizePixel = 0
+    local fbCorner = Instance.new("UICorner", floatBtn)
+    fbCorner.CornerRadius = UDim.new(1,0)
+
+    local fbStroke = Instance.new("UIStroke", floatBtn)
+    fbStroke.Thickness = 1
+    fbStroke.Color = theme.stroke
+
+    local fbBtn = Instance.new("TextButton")
+    fbBtn.Parent = floatBtn
+    fbBtn.Size = UDim2.new(1,0,1,0)
+    fbBtn.BackgroundTransparency = 1
+    fbBtn.Text = "≡"
+    fbBtn.Font = Enum.Font.GothamBold
+    fbBtn.TextSize = 18
+    fbBtn.TextColor3 = theme.accent
+
+    local winHidden = false
+
+    fbBtn.MouseButton1Click:Connect(function()
+        winHidden = not winHidden
+        main.Visible = not winHidden
+    end)
+
+    -- drag floating button
+    do
+        local dragging, start, offset
+        floatBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                start = i.Position
+                offset = floatBtn.Position
+            end
+        end)
+        floatBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                local delta = i.Position - start
+                local newX = offset.X.Offset + delta.X
+                local newY = offset.Y.Offset + delta.Y
+
+                local cam = workspace.CurrentCamera
+                if cam then
+                    local vp = cam.ViewportSize
+                    newX = math.clamp(newX, 0, vp.X - floatBtn.AbsoluteSize.X)
+                    newY = math.clamp(newY, 0, vp.Y - floatBtn.AbsoluteSize.Y)
+                end
+
+                floatBtn.Position = UDim2.new(0, newX, 0, newY)
+            end
+        end)
+    end
+
+    -- Minimize = sembunyikan konten, tapi window masih ada
+    minimize.MouseButton1Click:Connect(function()
+        local target = not holder.Visible
+        holder.Visible = target
+        sidebar.Visible = target
+    end)
+
+    ---------------------------------------------------------------------
     -- TAB CREATOR
     ---------------------------------------------------------------------
     local win = {}
+    local firstTab = true
 
     function win:CreateTab(name)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1,-12,0,32)
-        tabBtn.Position = UDim2.new(0,6,0,0)
-        tabBtn.BackgroundColor3 = theme.card
+        tabBtn.Size = UDim2.new(1,-20,0,28)
+        tabBtn.BackgroundColor3 = theme.bg
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.Font = Enum.Font.Gotham
         tabBtn.TextSize = 14
         tabBtn.TextColor3 = theme.text
 
+        local underline = Instance.new("Frame", tabBtn)
+        underline.AnchorPoint = Vector2.new(0.5,1)
+        underline.Position = UDim2.new(0.5,0,1,0)
+        underline.Size = UDim2.new(0,0,0,2)
+        underline.BorderSizePixel = 0
+        underline.BackgroundColor3 = theme.accent
+
         local page = Instance.new("ScrollingFrame")
         page.Parent = holder
         page.Size = UDim2.new(1,0,1,0)
         page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 4
+        page.ScrollBarThickness = 3
         page.Visible = false
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        page.CanvasSize = UDim2.new(0,0,0,0)
 
         local plist = Instance.new("UIListLayout", page)
         plist.SortOrder = Enum.SortOrder.LayoutOrder
@@ -158,24 +254,38 @@ function library:CreateWindow(title)
         pad.PaddingTop = UDim.new(0,8)
         pad.PaddingLeft = UDim.new(0,8)
         pad.PaddingRight = UDim.new(0,8)
+        pad.PaddingBottom = UDim.new(0,8)
 
-        tabBtn.MouseButton1Click:Connect(function()
+        local function selectThis()
             for _,pg in ipairs(holder:GetChildren()) do
-                if pg:IsA("ScrollingFrame") then pg.Visible=false end
+                if pg:IsA("ScrollingFrame") then
+                    pg.Visible = false
+                end
+            end
+            for _,b in ipairs(sidebar:GetChildren()) do
+                if b:IsA("TextButton") then
+                    b.TextColor3 = theme.text
+                    local ul = b:FindFirstChildOfClass("Frame")
+                    if ul then ul.Size = UDim2.new(0,0,0,2) end
+                end
             end
             page.Visible = true
-        end)
+            tabBtn.TextColor3 = theme.accent
+            underline.Size = UDim2.new(1,0,0,2)
+        end
 
-        page.Visible = (#holder:GetChildren() == 1)
+        tabBtn.MouseButton1Click:Connect(selectThis)
+
+        if firstTab then
+            firstTab = false
+            selectThis()
+        end
 
         ------------------------------------------------------------
         -- COMPONENT API (Toggle, Slider, Dropdown, etc.)
         ------------------------------------------------------------
         local api = {}
 
-        ---------------------
-        -- Label
-        ---------------------
         function api:Label(text)
             local lbl = Instance.new("TextLabel")
             lbl.Parent = page
@@ -185,6 +295,7 @@ function library:CreateWindow(title)
             lbl.Font = Enum.Font.GothamBold
             lbl.TextSize = 14
             lbl.TextColor3 = theme.text
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
         end
 
         ---------------------
@@ -231,16 +342,20 @@ function library:CreateWindow(title)
 
             local state = false
 
-            click.MouseButton1Click:Connect(function()
-                state = not state
+            local function apply()
                 tick.Text = state and "✓" or ""
                 callback(state)
+            end
+
+            click.MouseButton1Click:Connect(function()
+                state = not state
+                apply()
             end)
 
             return {
                 Set = function(_,v)
-                    state = v
-                    tick.Text = state and "✓" or ""
+                    state = v and true or false
+                    apply()
                 end
             }
         end
@@ -250,24 +365,37 @@ function library:CreateWindow(title)
         ---------------------
         function api:Slider(text, min, max, default, callback)
             callback = callback or function() end
+            min = min or 0
+            max = max or 100
             default = default or min
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,38)
+            fr.Size = UDim2.new(1,-4,0,40)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
             lbl.Text = text
-            lbl.Size = UDim2.new(1,-8,0,18)
+            lbl.Size = UDim2.new(1,-60,0,18)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.TextColor3 = theme.text
             lbl.Font = Enum.Font.Gotham
             lbl.TextSize = 13
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local valLbl = Instance.new("TextLabel")
+            valLbl.Parent = fr
+            valLbl.Size = UDim2.new(0,50,0,18)
+            valLbl.Position = UDim2.new(1,-54,0,0)
+            valLbl.BackgroundTransparency = 1
+            valLbl.Font = Enum.Font.Gotham
+            valLbl.TextSize = 13
+            valLbl.TextColor3 = theme.accent
+            valLbl.TextXAlignment = Enum.TextXAlignment.Right
+            valLbl.Text = tostring(default)
 
             local bar = Instance.new("Frame", fr)
             bar.Size = UDim2.new(1,-16,0,6)
@@ -283,11 +411,17 @@ function library:CreateWindow(title)
             local dragging = false
             local value = default
 
-            local function update(px)
-                local pct = math.clamp((px - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+            local function updateByPct(pct)
+                pct = math.clamp(pct, 0, 1)
                 value = math.floor(min + pct*(max-min))
                 fill.Size = UDim2.new(pct,0,1,0)
+                valLbl.Text = tostring(value)
                 callback(value)
+            end
+
+            local function update(px)
+                local pct = (px - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X,1)
+                updateByPct(pct)
             end
 
             bar.InputBegan:Connect(function(i)
@@ -302,15 +436,19 @@ function library:CreateWindow(title)
             end)
 
             UserInputService.InputChanged:Connect(function(i)
-                if dragging then update(i.Position.X) end
+                if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                    update(i.Position.X)
+                end
             end)
+
+            -- set default
+            local defaultPct = (default-min)/(max-min)
+            updateByPct(defaultPct)
 
             return {
                 Set = function(_, v)
                     local pct = (v-min)/(max-min)
-                    fill.Size = UDim2.new(pct,0,1,0)
-                    value = v
-                    callback(v)
+                    updateByPct(pct)
                 end
             }
         end
@@ -370,15 +508,17 @@ function library:CreateWindow(title)
         end
 
         ---------------------
-        -- Dropdown (Single Select)
+        -- Dropdown (Single Select) – auto grow
         ---------------------
         function api:Dropdown(text, list, callback)
             callback = callback or function() end
             local selected = nil
+            local options = list or {}
 
             local fr = Instance.new("Frame")
             fr.Parent = page
             fr.Size = UDim2.new(1,-4,0,32)
+            fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
 
@@ -409,6 +549,8 @@ function library:CreateWindow(title)
             holder.BackgroundColor3 = theme.bg
             holder.BorderSizePixel = 0
             holder.Visible = false
+            holder.AutomaticSize = Enum.AutomaticSize.Y
+
             local hlist = Instance.new("UIListLayout", holder)
             hlist.Padding = UDim.new(0,2)
 
@@ -419,49 +561,64 @@ function library:CreateWindow(title)
             headBtn.BackgroundTransparency = 1
             headBtn.Text = ""
 
+            local function rebuild(newOptions)
+                options = newOptions or {}
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy() end
+                end
+
+                for _,opt in ipairs(options) do
+                    local b = Instance.new("TextButton")
+                    b.Parent = holder
+                    b.Size = UDim2.new(1,0,0,26)
+                    b.BackgroundColor3 = theme.card
+                    b.BorderSizePixel = 0
+                    b.Text = opt
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = 13
+                    b.TextColor3 = theme.text
+
+                    b.MouseButton1Click:Connect(function()
+                        selected = opt
+                        lbl.Text = text.." : "..opt
+                        holder.Visible = false
+                        open = false
+                        callback(opt)
+                    end)
+                end
+            end
+
+            rebuild(options)
+
             headBtn.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
             end)
 
-            for _,opt in ipairs(list) do
-                local b = Instance.new("TextButton")
-                b.Parent = holder
-                b.Size = UDim2.new(1,0,0,26)
-                b.BackgroundColor3 = theme.card
-                b.BorderSizePixel = 0
-                b.Text = opt
-                b.Font = Enum.Font.Gotham
-                b.TextSize = 13
-                b.TextColor3 = theme.text
-
-                b.MouseButton1Click:Connect(function()
-                    lbl.Text = text.." : "..opt
-                    selected = opt
-                    holder.Visible = false
-                    open = false
-                    callback(opt)
-                end)
-            end
-
             return {
                 Set = function(_, opt)
                     selected = opt
-                    lbl.Text = text.." : "..opt
+                    lbl.Text = text.." : "..tostring(opt)
+                end,
+                SetOptions = function(_, newList)
+                    rebuild(newList)
                 end
             }
         end
 
         ---------------------
-        -- Multi Dropdown
+        -- Multi Dropdown – auto grow
         ---------------------
         function api:MultiDropdown(text, list, callback)
             callback = callback or function() end
 
+            local options = list or {}
             local selected = {}
+
             local fr = Instance.new("Frame")
             fr.Parent = page
             fr.Size = UDim2.new(1,-4,0,36)
+            fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
 
@@ -490,7 +647,9 @@ function library:CreateWindow(title)
             holder.BackgroundColor3 = theme.bg
             holder.Visible = false
             holder.BorderSizePixel = 0
+            holder.AutomaticSize = Enum.AutomaticSize.Y
             local hlist = Instance.new("UIListLayout", holder)
+            hlist.Padding = UDim.new(0,2)
 
             local open = false
             local headBtn = Instance.new("TextButton")
@@ -510,37 +669,53 @@ function library:CreateWindow(title)
                     if v then table.insert(list2,k) end
                 end
                 table.sort(list2)
-                if #list2 == 0 then lbl.Text = text.." : None"
-                else lbl.Text = text.." : "..table.concat(list2,", ") end
+                if #list2 == 0 then
+                    lbl.Text = text.." : None"
+                else
+                    lbl.Text = text.." : "..table.concat(list2,", ")
+                end
             end
 
-            for _,opt in ipairs(list) do
-                local b = Instance.new("TextButton")
-                b.Parent = holder
-                b.Size = UDim2.new(1,0,0,24)
-                b.BackgroundColor3 = theme.card
-                b.BorderSizePixel = 0
-                b.Text = opt
-                b.Font = Enum.Font.Gotham
-                b.TextSize = 13
-                b.TextColor3 = theme.text
+            local function rebuild(newOptions)
+                options = newOptions or {}
+                for _,c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy() end
+                end
 
-                b.MouseButton1Click:Connect(function()
-                    selected[opt] = not selected[opt]
-                    callback(opt, selected[opt])
-                    updateText()
-                end)
+                for _,opt in ipairs(options) do
+                    local b = Instance.new("TextButton")
+                    b.Parent = holder
+                    b.Size = UDim2.new(1,0,0,24)
+                    b.BackgroundColor3 = theme.card
+                    b.BorderSizePixel = 0
+                    b.Text = opt
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = 13
+                    b.TextColor3 = theme.text
+
+                    b.MouseButton1Click:Connect(function()
+                        selected[opt] = not selected[opt]
+                        callback(opt, selected[opt])
+                        updateText()
+                    end)
+                end
+                updateText()
             end
+
+            rebuild(options)
 
             return {
                 Set = function(_, opt, state)
-                    selected[opt] = state
+                    selected[opt] = state and true or false
                     updateText()
                 end,
                 List = function()
                     local t={}
                     for k,v in pairs(selected) do if v then table.insert(t,k) end end
                     return t
+                end,
+                SetOptions = function(_, newOptions)
+                    rebuild(newOptions)
                 end
             }
         end
@@ -550,6 +725,7 @@ function library:CreateWindow(title)
 
     return win
 end
+
 
 -- BUAT WINDOW
 local win = library:CreateWindow("AegisHub - Fish It")
@@ -831,8 +1007,9 @@ local RunService   = game:GetService("RunService")
 local Stats        = game:GetService("Stats")
 
 ------------------------------------------------------------
--- TELEPORT
+-- TELEPORT TAB
 ------------------------------------------------------------
+
 local function tpTo(pos)
     if not pos then return end
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -847,6 +1024,7 @@ local TabTP = win:CreateTab("Teleport")
 TabTP:Label("Teleport to Island")
 
 local islands = {
+    ["Fisherman Island"] = Vector3.new(-3,17,2840),
     ["Weather Machine"] = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"] = Vector3.new(3157,-1303,1439),
     ["Tropical Grove"] = Vector3.new(-2038,3,3650),
@@ -861,11 +1039,15 @@ local islands = {
     ["Lost Shore"] = Vector3.new(-3663,38,-989),
     ["Sisyphus"] = Vector3.new(-3792,-135,-986),
     ["Crystal Cavern"] = Vector3.new(-2026,-440,7428),
-    ["Halloween"] = Vector3.new(2127,78,3334),
+    ["Ancient Ruin"] = Vector3.new(6040.64, -578.44, 4715.02),
     ["Ancient Underground Cave"] = Vector3.new(2102,-91,-709),
     ["Ancient Inside Temple"] = Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"] = Vector3.new(1268,78,-183),
-    ["Fisherman Island"] = Vector3.new(-3,17,2840),
+    ["Ancient Jungle"] = Vector3.new(1268,78,-183),   
+    ["Crystalline Passage"] = Vector3.new(6049.71, -538.90, 4385.69),
+    ["Arrow Artifact"] = Vector3.new(881.40, 6.34, -346.27),
+    ["Crescent Artifact"] = Vector3.new(1404.67, 5.08, 120.55),
+    ["Diamond Artifact"] = Vector3.new(1841.52, 2.76, -300.38),
+    ["Hourglass Diamond Artifac"] = Vector3.new(1466.40, 3.19, -846.62),
 }
 
 local islandList = {}
@@ -885,29 +1067,43 @@ local function scanNPC()
     local list = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and not Players:GetPlayerFromCharacter(m) then
-            if m:FindFirstChildOfClass("Humanoid") or m:FindFirstChildWhichIsA("ProximityPrompt", true) then
+            if m:FindFirstChildOfClass("Humanoid") 
+            or m:FindFirstChildWhichIsA("ProximityPrompt", true) then
                 table.insert(list, m.Name)
             end
         end
     end
+    table.sort(list)
     return list
 end
 
 local function findNPCPosition(name)
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and m.Name == name then
-            local prt = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+            local prt = m:FindFirstChild("HumanoidRootPart") 
+                or m.PrimaryPart 
+                or m:FindFirstChildWhichIsA("BasePart")
             if prt then return prt.Position end
         end
     end
 end
 
-local npcs = scanNPC()
-table.sort(npcs)
+local npcList = scanNPC()
 
-TabTP:Dropdown("NPC List", npcs, function(opt)
+local npcDropdown = TabTP:Dropdown("NPC List", npcList, function(opt)
     local pos = findNPCPosition(opt)
     if pos then tpTo(pos) end
+end)
+
+-- REFRESH TANPA BUAT DROPDOWN BARU
+task.spawn(function()
+    while true do
+        task.wait(8)
+        local new = scanNPC()
+        if npcDropdown and npcDropdown.SetOptions then
+            npcDropdown:SetOptions(new)
+        end
+    end
 end)
 
 ------------------------------------------------------------
