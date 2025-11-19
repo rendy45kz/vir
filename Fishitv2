@@ -786,17 +786,21 @@ function library:CreateWindow(name, version, icon)
             end
             render()
 
-            local dragging = false
+local dragging = false
             bar.InputBegan:Connect(function(io)
-                if io.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = true
-                end
-            end)
-            bar.InputEnded:Connect(function(io)
-                if io.UserInputType == Enum.UserInputType.MouseButton1 then
-                    dragging = false
-                end
-            end)
+    if io.UserInputType == Enum.UserInputType.MouseButton1
+    or io.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+    end
+end)
+
+bar.InputEnded:Connect(function(io)
+    if io.UserInputType == Enum.UserInputType.MouseButton1
+    or io.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
             RunService.RenderStepped:Connect(function()
                 if dragging then
                     local abs = bar.AbsolutePosition
