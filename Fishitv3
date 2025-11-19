@@ -1,556 +1,3589 @@
--- AegisHub • Fish It • Rayfield UI (Custom Brand + Auto-Scale + Overlay Toggle)
--- Aman di Delta Android. Semua fitur aslinya dipertahankan.
+--========================================================--
+-- 🎣 FISH IT - by @diketjup (Refined by bubb)
+--========================================================--
 
----------------------------------------------------------------------
--- SERVICES
----------------------------------------------------------------------
+-- anti double execute
+if getgenv().FISHIT_LOADED then return end
+getgenv().FISHIT_LOADED = true
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- =========================
+-- // Services & Globals
+-- =========================
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui")
-local RS = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local VirtualUser = game:GetService("VirtualUser")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
 
----------------------------------------------------------------------
--- BRAND & THEME (ubah sesuka hati)
----------------------------------------------------------------------
-local BRAND_NAME   = "AegisHub • Fish It"
-local BRAND_SHORT  = "AegisHub"
-local LOGO_ID      = "rbxassetid://6031071053" -- ganti ke logo kamu
-local THEME = {
-  bg        = Color3.fromRGB(18,20,28),
-  glass     = Color3.fromRGB(24,26,36),
-  panel     = Color3.fromRGB(28,30,44),
-  text      = Color3.fromRGB(235,240,255),
-  subtext   = Color3.fromRGB(195,202,225),
-  stroke    = Color3.fromRGB(220,230,255),
-  accent    = Color3.fromRGB(140,120,255), -- violet
-  accent2   = Color3.fromRGB(0,220,255),   -- cyan
-  on        = Color3.fromRGB(46,160,67),
-  off       = Color3.fromRGB(110,110,120),
-}
-local FONT_MAIN = Enum.Font.Gotham
-local FONT_SEMI = Enum.Font.GothamSemibold
+local LocalPlayer = Players.LocalPlayer
+local player = LocalPlayer
 
--- Auto scale target (akan di-clamp)
-local BASE_W, BASE_H   = 1600, 900
-local MIN_SCALE, MAX_SCALE = 0.45, 1.20
-local userScale = nil -- kalau nil => auto; kalau angka => pakai manual dari slider Misc
-
----------------------------------------------------------------------
--- UTIL
----------------------------------------------------------------------
-local TARGET_PLACE = 121864768012064
-local function mount(gui)
-  if syn and syn.protect_gui then pcall(syn.protect_gui, gui) end
-  for _,p in ipairs({(gethui and gethui()) or nil, CoreGui, LocalPlayer:FindFirstChild("PlayerGui")}) do
-    if p and p:IsDescendantOf(game) then
-      if pcall(function() gui.Parent = p end) then
-        if gui:IsA("ScreenGui") then gui.DisplayOrder = 1_000_000; gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end
-        return
-      end
-    end
-  end
-end
-
-local function setAllFontsAndColors(root)
-  for _,d in ipairs(root:GetDescendants()) do
-    if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
-      d.Font = FONT_MAIN
-      d.TextColor3 = THEME.text
-      d.TextWrapped = true
-      d.TextScaled = true
-      if not d:FindFirstChildOfClass("UITextSizeConstraint") then
-        local c = Instance.new("UITextSizeConstraint")
-        c.MinTextSize = 10
-        c.MaxTextSize = 18
-        c.Parent = d
-      end
-    elseif d:IsA("Frame") or d:IsA("ScrollingFrame") then
-      if d.BackgroundTransparency < 1 then
-        d.BackgroundColor3 = THEME.glass
-      end
-      if not d:FindFirstChildOfClass("UIStroke") then
-        local st = Instance.new("UIStroke")
-        st.Thickness = 1
-        st.Color = THEME.stroke
-        st.Transparency = 0.85
-        st.Parent = d
-      end
-    end
-  end
-end
-
-local function computeAutoScale()
-  local cam = workspace.CurrentCamera
-  local vp = cam and cam.ViewportSize or Vector2.new(BASE_W,BASE_H)
-  local s = math.min(vp.X/BASE_W, vp.Y/BASE_H)
-  return math.clamp(s, MIN_SCALE, MAX_SCALE)
-end
-
----------------------------------------------------------------------
--- STATUS OVERLAY (ringkas)
----------------------------------------------------------------------
-local OSG = Instance.new("ScreenGui"); OSG.Name="AegisHub_Status"; OSG.ResetOnSpawn=false; OSG.IgnoreGuiInset=true; mount(OSG)
-local SB = Instance.new("TextLabel", OSG)
-SB.Position = UDim2.new(0,10,0,10); SB.Size = UDim2.fromOffset(360,48)
-SB.BackgroundColor3 = THEME.panel; SB.BackgroundTransparency = 0.15
-SB.TextColor3 = THEME.text; SB.Font = FONT_SEMI; SB.TextScaled = true; SB.TextXAlignment = Enum.TextXAlignment.Left
-SB.Text = BRAND_SHORT..": init…"
-Instance.new("UICorner", SB).CornerRadius = UDim.new(0,8)
-local SStroke = Instance.new("UIStroke", SB); SStroke.Thickness=1; SStroke.Color=THEME.stroke; SStroke.Transparency=0.8
-local function setStatus(t) SB.Text = BRAND_SHORT..": "..t end
-setStatus("memuat UI…")
-
----------------------------------------------------------------------
--- HUD KECIL (pojok kanan)
----------------------------------------------------------------------
-local HUD_SG = Instance.new("ScreenGui"); HUD_SG.Name="AegisHub_HUD"; HUD_SG.ResetOnSpawn=false; HUD_SG.IgnoreGuiInset=true; mount(HUD_SG)
-local HUDFrame = Instance.new("Frame", HUD_SG)
-HUDFrame.AnchorPoint=Vector2.new(1,1); HUDFrame.Position=UDim2.new(1,-10,1,-10); HUDFrame.Size=UDim2.fromOffset(340,24)
-HUDFrame.BackgroundColor3=THEME.panel; HUDFrame.BackgroundTransparency=0.2
-Instance.new("UICorner", HUDFrame).CornerRadius=UDim.new(0,8)
-local HUDStroke = Instance.new("UIStroke", HUDFrame); HUDStroke.Thickness=1; HUDStroke.Color=THEME.stroke; HUDStroke.Transparency=0.85
-local HUD = Instance.new("TextLabel", HUDFrame)
-HUD.Size = UDim2.fromScale(1,1); HUD.BackgroundTransparency=1; HUD.Font=FONT_SEMI
-HUD.TextScaled=true; HUD.TextColor3=THEME.text; HUD.TextXAlignment=Enum.TextXAlignment.Right; HUD.Text=BRAND_SHORT.." • …"
-local function setHUD(t) HUD.Text = t end
-
----------------------------------------------------------------------
--- ANTI AFK
----------------------------------------------------------------------
-local AFKConn
-local function setAntiAFK(on)
-  if on then
-    if AFKConn then AFKConn:Disconnect() end
-    AFKConn = LocalPlayer.Idled:Connect(function()
-      pcall(function()
-        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-        task.wait(0.6)
-        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-      end)
-    end)
-  else
-    if AFKConn then AFKConn:Disconnect(); AFKConn=nil end
-  end
-end
-setAntiAFK(true)
-
----------------------------------------------------------------------
--- STATE & DELAYS
----------------------------------------------------------------------
-local state = {
-  SPEED=5, perfectCast=true, AFon=false, AFfishing=false,
-  reelPreset=1.2, completePreset=2.5, reelOverride=nil, completeOverride=nil,
-  protectTiers={Common=false,Uncommon=false,Rare=false,Epic=false,Legendary=true,Mythic=true,Secret=true},
-  AutoSell={on=false, threshold=60, last=0},
-}
-local function clamp(n,a,b) return (n<a and a) or (n>b and b) or n end
-local function effDelays()
-  local c=(state.completeOverride or state.completePreset)/state.SPEED
-  local r=(state.reelOverride or state.reelPreset)/state.SPEED
-  return clamp(c,0.35,12), clamp(r,0.15,6)
-end
-
----------------------------------------------------------------------
--- RAYFIELD (dual source)
----------------------------------------------------------------------
+-- =========================
+-- // Rayfield UI Loader
+-- =========================
 local Rayfield
 do
-  local ok1,lib1=pcall(function() return loadstring(game:HttpGet('https://sirius.menu/rayfield',true))() end)
-  if ok1 and lib1 then Rayfield=lib1 else
-    local ok2,lib2=pcall(function() return loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source',true))() end)
-    if ok2 and lib2 then Rayfield=lib2 end
-  end
-end
-if not Rayfield then
-  setStatus("gagal memuat UI"); setHUD(BRAND_SHORT.." • UI gagal dimuat"); return
+	local ok, lib = pcall(function()
+		return loadstring(game:HttpGet("https://sirius.menu/rayfield", true))()
+	end)
+	if not ok or not lib then
+		warn("Gagal memuat Rayfield UI.")
+		return
+	end
+	Rayfield = lib
 end
 
----------------------------------------------------------------------
--- WINDOW & TABS
----------------------------------------------------------------------
 local Window = Rayfield:CreateWindow({
-  Name = BRAND_NAME, Icon = 0,
-  LoadingTitle = BRAND_SHORT, LoadingSubtitle = "Fish It",
-  Theme = "Default",
-  DisableRayfieldPrompts = true, DisableBuildWarnings = true,
-  ConfigurationSaving = { Enabled = false, FolderName = nil, FileName = "AegisHub_FishIt" },
-  Discord = { Enabled = false, Invite = "noinvitelink", RememberJoins = true },
-  KeySystem = false,
+	Name = "🎣 FISH IT - by @diketjup BETA TEST!",
+	LoadingTitle = "Ready...",
+	LoadingSubtitle = "don't expect more",
+	ConfigurationSaving = { Enabled = false }
 })
 
-local tabMain = Window:CreateTab("Main")
-local tabInv  = Window:CreateTab("Inventory")
-local tabTP   = Window:CreateTab("Teleport")
-local tabMisc = Window:CreateTab("Misc")
-local lblStatus = tabMain:CreateLabel("Rod: ?  |  Reel: -  |  Cmpl: -  |  Spd: 5x")
-
--- SEMBUNYIKAN STATUS BOX KALAU SUKSES
-task.delay(1.0, function() if OSG then OSG.Enabled=false end end)
-
----------------------------------------------------------------------
--- APPLY CUSTOM SKIN + AUTOSCALE KE RAYFIELD
----------------------------------------------------------------------
--- tunggu ScreenGui "Rayfield"
-local RFSG = nil
-for _=1,200 do
-  RFSG = CoreGui:FindFirstChild("Rayfield", true)
-  if RFSG then break end
-  task.wait(0.05)
-end
-
--- tambahkan UIScale + styling
-local RFScale = nil
-if RFSG then
-  RFScale = Instance.new("UIScale")
-  RFScale.Name = "AegisHub_Scale"
-  RFScale.Scale = userScale or computeAutoScale()
-  RFScale.Parent = RFSG
-
-  -- auto scale tiap frame (kecuali user set manual)
-  RS:BindToRenderStep("AegisHub_RayfieldScale", Enum.RenderPriority.First.Value, function()
-    if RFScale and (userScale == nil) then
-      RFScale.Scale = computeAutoScale()
-    end
-  end)
-
-  -- branding + warna
-  setAllFontsAndColors(RFSG)
-
-  -- judul besar biasanya ada pada TextLabel paling atas
-  pcall(function()
-    local title = RFSG:FindFirstChildOfClass("TextLabel")
-    if title then title.Text = BRAND_NAME end
-  end)
-end
-
----------------------------------------------------------------------
--- REMOTES / ANIMS / MODULES
----------------------------------------------------------------------
-local net, RF_ChargeFishingRod, RF_RequestMinigame, RE_FishingCompleted, RE_EquipHotbar, RE_RepText, RF_SellAll
-local animator, AIdle, AReel, AShake
-local Replion, ItemUtility
-
-task.spawn(function()
-  local function gw(obj,name,t) return obj:FindFirstChild(name) or obj:WaitForChild(name,t or 10) end
-  local okNet, netOrErr = pcall(function()
-    local p=gw(ReplicatedStorage,"Packages",10); p=gw(p,"_Index",10); p=gw(p,"sleitnick_net@0.2.0",10); return gw(p,"net",10)
-  end)
-  if okNet then
-    net=netOrErr
-    RF_ChargeFishingRod=net:FindFirstChild("RF/ChargeFishingRod")
-    RF_RequestMinigame=net:FindFirstChild("RF/RequestFishingMinigameStarted")
-    RE_FishingCompleted=net:FindFirstChild("RE/FishingCompleted")
-    RE_EquipHotbar=net:FindFirstChild("RE/EquipToolFromHotbar")
-    RE_RepText=net:FindFirstChild("RE/ReplicateTextEffect")
-    RF_SellAll=net:FindFirstChild("RF/SellAllItems")
-  end
-  local character=LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-  local humanoid=character:WaitForChild("Humanoid")
-  animator=humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
-  local okIdle,RodIdle=pcall(function() return ReplicatedStorage.Modules.Animations.FishingRodReelIdle end)
-  local okReel,RodReel=pcall(function() return ReplicatedStorage.Modules.Animations.EasyFishReelStart end)
-  local okShake,RodShake=pcall(function() return ReplicatedStorage.Modules.Animations.CastFromFullChargePosition1Hand end)
-  AIdle=okIdle and animator:LoadAnimation(RodIdle) or nil
-  AReel=okReel and animator:LoadAnimation(RodReel) or nil
-  AShake=okShake and animator:LoadAnimation(RodShake) or nil
-
-  local okR,modR=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
-  if okR then Replion=modR end
-  local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
-  if okU then ItemUtility=modU end
-end)
-
----------------------------------------------------------------------
--- ROD PRESETS
----------------------------------------------------------------------
-local RodDelays = {
-  ["Ares Rod"]={custom=1.12,bypass=1.45},["Angler Rod"]={custom=1.12,bypass=1.45},
-  ["Ghostfinn Rod"]={custom=1.12,bypass=1.45},["Astral Rod"]={custom=1.90,bypass=1.45},
-  ["Chrome Rod"]={custom=2.30,bypass=2.00},["Steampunk Rod"]={custom=2.50,bypass=2.30},
-  ["Lucky Rod"]={custom=3.50,bypass=3.60},["Midnight Rod"]={custom=3.30,bypass=3.40},
-  ["Demascus Rod"]={custom=3.90,bypass=3.80},["Grass Rod"]={custom=3.80,bypass=3.90},
-  ["Luck Rod"]={custom=4.20,bypass=4.10},["Carbon Rod"]={custom=4.00,bypass=3.80},
-  ["Lava Rod"]={custom=4.20,bypass=4.10},["Starter Rod"]={custom=4.30,bypass=4.20},
+-- =========================
+-- // Config
+-- =========================
+local Config = {
+	AutoFishing = false,
+	Delay = 1,
+	AutoRespawn = false,
+	RespawnInterval = 60 * 60, -- default 1 jam
 }
-local function getEquippedRodName()
-  local pg=LocalPlayer:FindFirstChild("PlayerGui")
-  local display=pg and pg:FindFirstChild("Backpack") and pg.Backpack:FindFirstChild("Display")
-  if not display then return nil end
-  for _,tile in ipairs(display:GetChildren()) do
-    local ok,lbl=pcall(function() return tile.Inner.Tags.ItemName end)
-    if ok and lbl and lbl:IsA("TextLabel") and RodDelays[lbl.Text] then return lbl.Text end
-  end
-  return nil
-end
-local function refreshRodDelays()
-  local rod=getEquippedRodName()
-  if rod and RodDelays[rod] then
-    state.completePreset=RodDelays[rod].custom
-    state.reelPreset=RodDelays[rod].bypass
-  else
-    state.completePreset=10; state.reelPreset=1
-  end
+
+-- =========================
+-- // Remotes (helper rebind)
+-- =========================
+local function GetNetRemote(name)
+	local ok, net = pcall(function()
+		return ReplicatedStorage:WaitForChild("Packages")
+			:WaitForChild("_Index")
+			:WaitForChild("sleitnick_net@0.2.0")
+			:WaitForChild("net")
+	end)
+	if not ok or not net then return nil end
+	return net:FindFirstChild(name)
 end
 
----------------------------------------------------------------------
--- AUTO-FINISH DARI TEXT EFFECT
----------------------------------------------------------------------
-task.spawn(function()
-  repeat task.wait() until RE_RepText ~= nil
-  if not RE_RepText then return end
-  RE_RepText.OnClientEvent:Connect(function(data)
-    if not (state.AFon and state.AFfishing) then return end
-    if not (data and data.TextData and data.TextData.EffectType=="Exclaim") then return end
-    local head=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
-    if head and data.Container==head then
-      task.spawn(function()
-        local _,rEff=effDelays()
-        task.wait(rEff)
-        pcall(function() if RE_FishingCompleted then RE_FishingCompleted:FireServer() end end)
-      end)
-    end
-  end)
+local EquipTool = GetNetRemote("RE/EquipToolFromHotbar")
+local EquipTool = GetNetRemote("RE/UnequipToolFromHotbar")
+local ChargeRod = GetNetRemote("RF/ChargeFishingRod")
+local StartMini = GetNetRemote("RF/RequestFishingMinigameStarted")
+local FinishFish = GetNetRemote("RE/FishingCompleted")
+
+local function RebindRemotes()
+	pcall(function()
+		EquipTool = GetNetRemote("RE/EquipToolFromHotbar") or EquipTool
+		EquipTool = GetNetRemote("RE/UnequipToolFromHotbar") or UnquipTool
+		ChargeRod = GetNetRemote("RF/ChargeFishingRod") or ChargeRod
+		StartMini = GetNetRemote("RF/RequestFishingMinigameStarted") or StartMini
+		FinishFish = GetNetRemote("RE/FishingCompleted") or FinishFish
+	end)
+	print("[AutoFish] Remotes rebound:", EquipTool and "Equip OK" or "Equip NIL",
+		ChargeRod and "Charge OK" or "Charge NIL",
+		StartMini and "StartMini OK" or "StartMini NIL",
+		FinishFish and "Finish OK" or "Finish NIL")
+end
+
+-- initial bind attempt
+RebindRemotes()
+
+-- Rebind & siapin ulang ketika CharacterAdded (dipakai sesudah respawn)
+player.CharacterAdded:Connect(function(char)
+    task.defer(function()
+        RebindRemotes()
+        -- kasih sedikit waktu model spawn
+        task.wait(0.8)
+        local ok, _ = pcall(function()
+            if EquipTool then EquipTool:FireServer(1) end -- pegang rod lagi
+        end)
+    end)
 end)
 
----------------------------------------------------------------------
--- AUTOFISH CORE
----------------------------------------------------------------------
+
+-- =========================
+-- // Utility helpers
+-- =========================
+local function GetNow()
+	if workspace and workspace.GetServerTimeNow then
+		local ok, res = pcall(function() return workspace:GetServerTimeNow() end)
+		if ok and res then return res end
+	end
+	return tick()
+end
+
+local function Notify(title, content, dur)
+	if Rayfield and Rayfield.Notify then
+		Rayfield:Notify({Title = title, Content = content, Duration = dur or 3})
+	end
+end
+
+-- -- =========================
+-- -- // Auto-disable on respawn + rebind
+-- -- =========================
+-- player.CharacterAdded:Connect(function()
+-- 	-- disable autofish for safety on respawn
+-- 	if Config.AutoFishing then
+-- 		Config.AutoFishing = false
+-- 		-- update toggle UI later via callback reference if needed
+-- 		Notify("💀 Respawn", "AutoFishing dimatikan. Nyalakan lagi setelah siap.", 3)
+-- 		print("[AutoFish] CharacterAdded -> AutoFishing OFF (safety)")
+-- 	end
+-- 	-- slight delay then rebind remotes
+-- 	task.delay(1.5, RebindRemotes)
+-- end)
+
+-- =========================
+-- // TestStartMini (debug)
+-- =========================
+local function TestStartMini(x,y)
+	x = x or -0.75; y = y or 0.99
+	if not StartMini then
+		Notify("TestStartMini", "StartMini remote NIL", 4)
+		return false, "StartMini NIL"
+	end
+	local ok, res = pcall(function()
+		-- try InvokeServer if available, else FireServer fallback
+		if type(StartMini.InvokeServer) == "function" then
+			return StartMini:InvokeServer(x,y)
+		else
+			StartMini:FireServer(x,y)
+			return "fired"
+		end
+	end)
+	Notify("TestStartMini", "ok=" .. tostring(ok) .. " | res=" .. tostring(res), 4)
+	print("[TestStartMini] ok:", ok, "res:", res)
+	return ok, res
+end
+
+-- =========================
+-- // Robust AutoFishing Loop (emulator-safe)
+-- =========================
+local function AutoFishingLoop_Robust()
+	task.spawn(function()
+		print("[AutoFish] Loop started")
+		while Config.AutoFishing do
+			local okCycle = pcall(function()
+				-- ensure remotes
+				if not (EquipTool and ChargeRod and StartMini and FinishFish) then
+					Notify("⚠️ Remote Missing", "Mencoba rebind remotes...", 3)
+					RebindRemotes()
+					task.wait(2)
+					return
+				end
+
+				-- ensure character HRP valid
+				local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				if not hrp then
+					warn("[AutoFish] HRP not found")
+					task.wait(1)
+					return
+				end
+
+				-- Equip rod
+				pcall(function() EquipTool:FireServer(1) end)
+				task.wait(0.15)
+
+				-- Charge (Invoke preferred, fallback Fire)
+				local now = GetNow()
+				local okCharge, chargeRes = pcall(function() 
+					if type(ChargeRod.InvokeServer) == "function" then
+						return ChargeRod:InvokeServer(now)
+					else
+						ChargeRod:FireServer(now)
+						return "fired"
+					end
+				end)
+				if not okCharge then
+					warn("[AutoFish] ChargeRod failed:", tostring(chargeRes))
+				end
+				task.wait(0.15)
+
+				-- prepare XY (randomized)
+				local baseX, baseY = -0.75, 0.99
+				local x = baseX + math.random(-500,500)/10000000
+				local y = baseY + math.random(-500,500)/10000000
+
+				-- Try StartMini via Invoke, fallback to Fire
+				local okStart, startRes = pcall(function()
+					if type(StartMini.InvokeServer) == "function" then
+						return StartMini:InvokeServer(x,y)
+					else
+						StartMini:FireServer(x,y)
+						return "fired"
+					end
+				end)
+
+				if not okStart then
+					-- fallback FireServer attempt if Invoke failed
+					warn("[AutoFish] StartMini.Invoke failed:", tostring(startRes))
+					local okFire, fireRes = pcall(function() 
+						if type(StartMini.FireServer) == "function" then
+							StartMini:FireServer(x,y)
+							return true
+						end
+						return false
+					end)
+					print("[AutoFish] StartMini Fire fallback ok:", okFire, "res:", fireRes)
+				else
+					print("[AutoFish] StartMini ok:", tostring(startRes))
+				end
+
+				-- WAIT for server to process (configurable)
+				task.wait((Config.Delay or 0.3) + 0.15)
+
+				-- FinishFish (FireServer)
+				local okFinish, finishRes = pcall(function()
+					return FinishFish:FireServer()
+				end)
+				if okFinish then
+					print("[AutoFish] FinishFish fired OK")
+				else
+					warn("[AutoFish] FinishFish failed:", tostring(finishRes))
+				end
+
+				-- short cooldown
+				task.wait(0.1)
+			end)
+
+			if not okCycle then
+				warn("[AutoFish] Cycle pcall failed, continuing next cycle")
+				task.wait(1)
+			end
+		end
+		print("[AutoFish] Loop ended")
+	end)
+end
+
+
+-- === AutoFish helpers (start/stop) ===
 local function StartAutoFish()
-  if state.AFon then return end
-  state.AFon=true; refreshRodDelays()
-  task.spawn(function()
-    while state.AFon do
-      pcall(function()
-        state.AFfishing=true
-        if RE_EquipHotbar then RE_EquipHotbar:FireServer(1) end
-        task.wait(0.05)
-        local ts=workspace:GetServerTimeNow()
-        if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(ts) end
-        task.wait(0.2)
-        if AShake then AShake:Play() end
-        pcall(function() if RF_ChargeFishingRod then RF_ChargeFishingRod:InvokeServer(workspace:GetServerTimeNow()) end end)
-        local bx,by=-0.7499996423721313,1
-        local x = state.perfectCast and (bx+(math.random(-500,500)/1e7)) or (math.random(-1000,1000)/1000)
-        local y = state.perfectCast and (by+(math.random(-500,500)/1e7)) or (math.random(0,1000)/1000)
-        if AIdle then AIdle:Play() end
-        if RF_RequestMinigame then RF_RequestMinigame:InvokeServer(x,y) end
-        local cEff=effDelays()
-        task.wait(cEff)
-        state.AFfishing=false
-        refreshRodDelays()
-      end)
-      task.wait(0.05)
-    end
-  end)
+    if Config.AutoFishing then return end
+    Config.AutoFishing = true
+    if autoToggle and autoToggle.Set then autoToggle:Set(true) end
+    task.spawn(AutoFishingLoop_Robust)
+    Notify("🎣 AutoFishing", "Dilanjutkan.", 2)
 end
+
 local function StopAutoFish()
-  state.AFon=false; state.AFfishing=false
-  pcall(function() if AIdle then AIdle:Stop() end; if AReel then AReel:Stop() end; if AShake then AShake:Stop() end end)
+    if not Config.AutoFishing then return end
+    Config.AutoFishing = false
+    if autoToggle and autoToggle.Set then autoToggle:Set(false) end
+    Notify("🎣 AutoFishing", "Dijeda sementara…", 2)
 end
 
----------------------------------------------------------------------
--- INVENTORY HELPERS
----------------------------------------------------------------------
-task.spawn(function()
-  local okR,modR=pcall(function() return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("replion")) end)
-  if okR then Replion=modR end
-  local okU,modU=pcall(function() return require(ReplicatedStorage:WaitForChild("Modules"):WaitForChild("ItemUtility")) end)
-  if okU then ItemUtility=modU end
+-- Expose name used in UI callbacks
+AutoFishingLoop = AutoFishingLoop_Robust
+TestStartMini = TestStartMini
+RebindRemotes = RebindRemotes
+
+------------------------------------------------------------
+-- 🎣 Tab Auto
+------------------------------------------------------------
+local TabAuto = Window:CreateTab("🎣 Auto Fishing")
+
+local autoToggle = TabAuto:CreateToggle({
+	Name = "Auto Fishing V1 (instan)",
+	CurrentValue = false,
+	Callback = function(val)
+		Config.AutoFishing = val
+		if val then
+			Notify("🎣 AutoFishing", "Dinyalakan — mencoba loop.", 2)
+			task.spawn(AutoFishingLoop_Robust)
+		else
+			Notify("🎣 AutoFishing", "Dimatikan.", 2)
+		end
+	end
+})
+
+TabAuto:CreateButton({
+	Name = "🔬 Test Auto Fishing",
+	Callback = function()
+		TestStartMini(-0.75, 0.99)
+	end
+})
+
+TabAuto:CreateButton({
+	Name = "💰 Sell All Fish",
+	Callback = function()
+		local sell = GetNetRemote("RF/SellAllItems")
+		if sell then
+			local ok = pcall(function()
+				sell:InvokeServer()
+			end)
+			if ok then
+				Rayfield:Notify({
+					Title = "💰 Semua Ikan Terjual",
+					Content = "Duit udah masuk kantong 🤑",
+					Duration = 3
+				})
+			else
+				Rayfield:Notify({
+					Title = "⚠️ Gagal Jual",
+					Content = "Event gagal diakses 😢",
+					Duration = 3
+				})
+			end
+		end
+	end
+})
+
+TabAuto:CreateSlider({
+	Name = "Delay between actions",
+	Range = {0.8, 3},
+	Increment = 0.1,
+	CurrentValue = Config.Delay,
+	Callback = function(v) Config.Delay = v end
+})
+
+
+------------------------------------------------------------
+-- 💜 ANTI-AFK HYBRID UNIVERSAL (PC + ANDROID) by bubb 😏🔥
+-- 100% Compatible with GPU Suspend
+------------------------------------------------------------
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local IsMobile = UserInputService.TouchEnabled
+local AntiAFK_Active = false
+
+------------------------------------------------------------
+-- 📱 MOBILE / ANDROID: Touch Simulation (BEST)
+------------------------------------------------------------
+local function MobileActivity()
+	pcall(function()
+		-- Aman, tidak butuh rendering
+		UserInputService:TouchTap(Vector2.new(150,150))
+	end)
+end
+
+------------------------------------------------------------
+-- 💻 PC: VirtualUser (Strongest)
+------------------------------------------------------------
+local function PCActivity()
+	pcall(function()
+		VirtualUser:CaptureController()
+		VirtualUser:ClickButton2(Vector2.new())
+	end)
+end
+
+------------------------------------------------------------
+-- 🔄 MAIN LOOP
+------------------------------------------------------------
+local function AntiAFKLoop()
+	task.spawn(function()
+		while AntiAFK_Active do
+
+			if IsMobile then
+				-- Android-safe cycle
+				MobileActivity()
+				task.wait(12)   -- tidak terlalu cepat, aman
+			else
+				-- PC cycle
+				PCActivity()
+				task.wait(10)
+			end
+
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- 🔘 TOGGLE UI
+------------------------------------------------------------
+local AntiAFK_Toggle = TabAuto:CreateToggle({
+	Name = "💤 Anti-AFK (Hybrid Universal)",
+	CurrentValue = false,
+	Flag = "AntiAFK_Hybrid",
+	Callback = function(Value)
+		if Value then
+			if AntiAFK_Active then return end
+			AntiAFK_Active = true
+
+			if IsMobile then
+				Notify("💤 Anti-AFK", "Mode ANDROID aktif (Touch Simulation)", 3)
+			else
+				Notify("💤 Anti-AFK", "Mode PC aktif (VirtualUser)", 3)
+			end
+
+			AntiAFKLoop()
+
+		else
+			AntiAFK_Active = false
+			Notify("🛑 Anti-AFK", "Dimatikan.", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- ⚡ AUTO START after UI Ready
+------------------------------------------------------------
+task.defer(function()
+	AntiAFK_Active = true
+	AntiAFK_Toggle:Set(true)
+	AntiAFKLoop()
 end)
-local function protectByTiers()
-  if not (Replion and ItemUtility) then return end
-  local Data=Replion.Client:WaitReplion("Data")
-  local items=Data and Data:Get({"Inventory","Items"})
-  if type(items)~="table" then return end
-  for _,it in ipairs(items) do
-    local base=ItemUtility:GetItemData(it.Id)
-    local tier=base and base.Data and tostring(base.Data.Tier)
-    if tier and state.protectTiers[tier] and not it.Favorited then it.Favorited=true end
-  end
-end
-local function sellAllNonFav()
-  protectByTiers(); task.wait(0.15)
-  if RF_SellAll then pcall(function() RF_SellAll:InvokeServer() end) end
-end
-task.spawn(function()
-  while true do
-    if state.AutoSell.on and (os.time()-state.AutoSell.last>=45) and Replion then
-      local cnt=0; local Data=Replion.Client:WaitReplion("Data"); local items=Data and Data:Get({"Inventory","Items"})
-      if type(items)=="table" then for _,it in ipairs(items) do if not it.Favorited then cnt += (it.Count or 1) end end end
-      if cnt>=state.AutoSell.threshold then sellAllNonFav(); state.AutoSell.last=os.time() end
-    end
-    task.wait(8)
-  end
-end)
 
----------------------------------------------------------------------
--- FPS BOOST
----------------------------------------------------------------------
-local function BoostFPS(on)
-  if on then
-    for _,v in ipairs(game:GetDescendants()) do
-      if v:IsA("BasePart") then v.Material=Enum.Material.SmoothPlastic; v.Reflectance=0
-      elseif v:IsA("Decal") or v:IsA("Texture") then v.Transparency=1 end
-    end
-    for _,e in ipairs(Lighting:GetChildren()) do if e:IsA("PostEffect") then e.Enabled=false end end
-    Lighting.GlobalShadows=false; Lighting.FogEnd=1e9
-    settings().Rendering.QualityLevel="Level01"
-  end
+
+
+
+
+--------------------------------------------------------------------
+-- 🟣 GPU SUSPEND PRO (Ultra Battery Saver + Full Black Screen)
+-- by bubb 😏🔥
+--------------------------------------------------------------------
+
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local CoreGui = game:GetService("CoreGui")
+
+local GpuSuspended = false
+local FullBlackOverlay = nil
+
+------------------------------------------------------------
+-- 🌑 FULL BLACK OVERLAY
+------------------------------------------------------------
+local function CreateFullBlackOverlay()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "FullBlackOverlay"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    gui.Parent = CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 1, 0)
+    frame.BackgroundColor3 = Color3.new(0, 0, 0)
+    frame.BackgroundTransparency = 0
+    frame.BorderSizePixel = 0
+    frame.ZIndex = 99999999
+    frame.Parent = gui
+
+    return gui
 end
 
----------------------------------------------------------------------
--- TELEPORT DATA
----------------------------------------------------------------------
-local islandCoords={
-  ["Weather Machine"]=Vector3.new(-1471,-3,1929),["Esoteric Depths"]=Vector3.new(3157,-1303,1439),
-  ["Tropical Grove"]=Vector3.new(-2038,3,3650),["Stingray Shores"]=Vector3.new(-32,4,2773),
-  ["Kohana Volcano"]=Vector3.new(-519,24,189),["Coral Reefs"]=Vector3.new(-3095,1,2177),
-  ["Crater Island"]=Vector3.new(968,1,4854),["Kohana"]=Vector3.new(-658,3,719),
-  ["Winter Fest"]=Vector3.new(1611,4,3280),["Isoteric Island"]=Vector3.new(1987,4,1400),
-  ["Treasure Hall"]=Vector3.new(-3600,-267,-1558),["Lost Shore"]=Vector3.new(-3663,38,-989),
-  ["Sishypus Statue"]=Vector3.new(-3792,-135,-986),
-}
-local tpNames={}; for n,_ in pairs(islandCoords) do table.insert(tpNames,n) end; table.sort(tpNames)
+------------------------------------------------------------
+-- 🧊 GPU SUSPEND PRO ENGINE
+------------------------------------------------------------
+local function GpuSuspend(enable)
+    GpuSuspended = enable
 
----------------------------------------------------------------------
--- CONTROLS (Tetap sama, hanya styling Rayfield sudah di-skin)
----------------------------------------------------------------------
-tabMain:CreateToggle({ Name="Auto Fish", CurrentValue=false, Callback=function(v) if v then StartAutoFish() else StopAutoFish() end end })
-tabMain:CreateToggle({ Name="Perfect Cast", CurrentValue=true, Callback=function(v) state.perfectCast=v end })
-tabMain:CreateInput({
-  Name="Speed x (1–5)", PlaceholderText="5", RemoveTextAfterFocusLost=false,
-  Callback=function(t) local n=tonumber(t) or 5; state.SPEED=math.clamp(math.floor(n+0.5),1,5) end
-})
-tabMain:CreateInput({ Name="Reel Delay (opt.)", PlaceholderText="ex: 1.45", RemoveTextAfterFocusLost=false, Callback=function(t) state.reelOverride=tonumber(t) end })
-tabMain:CreateInput({ Name="Complete Delay (opt.)", PlaceholderText="ex: 3.20", RemoveTextAfterFocusLost=false, Callback=function(t) state.completeOverride=tonumber(t) end })
+    if enable then
+        ------------------------------------------------
+        -- 🔌 Matikan semua rendering 3D
+        ------------------------------------------------
+        RunService:Set3dRenderingEnabled(false)
 
-tabInv:CreateToggle({ Name="Auto Sell", CurrentValue=false, Callback=function(v) state.AutoSell.on=v end })
-tabInv:CreateInput({ Name="Threshold", PlaceholderText="60", RemoveTextAfterFocusLost=false, Callback=function(t) local n=tonumber(t); if n then state.AutoSell.threshold=math.max(1,math.floor(n)) end end })
-tabInv:CreateButton({ Name="Protect High Tiers", Callback=function() state.protectTiers.Legendary=true; state.protectTiers.Mythic=true; state.protectTiers.Secret=true; protectByTiers() end })
-tabInv:CreateButton({ Name="Sell Non-Fav", Callback=sellAllNonFav })
-for _,tier in ipairs({"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"}) do
-  tabInv:CreateToggle({ Name="Protect "..tier, CurrentValue=state.protectTiers[tier] or false, Callback=function(v) state.protectTiers[tier]=v end })
-end
+        ------------------------------------------------
+        -- ☁ Matikan efek GPU berat
+        ------------------------------------------------
+        for _, effect in ipairs(Lighting:GetChildren()) do
+            if effect:IsA("PostEffect")
+            or effect:IsA("BloomEffect")
+            or effect:IsA("DepthOfFieldEffect")
+            or effect:IsA("SunRaysEffect")
+            or effect:IsA("ColorCorrectionEffect") then
+                effect.Enabled = false
+            end
+        end
 
-local currentTP = tpNames[1]
-tabTP:CreateDropdown({ Name="Location", Options=tpNames, CurrentOption=currentTP, MultipleOptions=false, Callback=function(opt) currentTP=type(opt)=="table" and opt[1] or opt end })
-tabTP:CreateButton({
-  Name="Go",
-  Callback=function()
-    local pos=islandCoords[currentTP]
-    local charFolder=workspace:FindFirstChild("Characters")
-    local char=charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-    local hrp=char and (char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart",2))
-    if hrp and pos then hrp.CFrame=CFrame.new(pos+Vector3.new(0,5,0)) end
-  end
-})
+        ------------------------------------------------
+        -- 🌑 Blackout screen
+        ------------------------------------------------
+        if not FullBlackOverlay then
+            FullBlackOverlay = CreateFullBlackOverlay()
+        else
+            FullBlackOverlay.Enabled = true
+        end
 
--- Misc + **Scale manual seperti ImGui**
-tabMisc:CreateToggle({ Name="Anti-AFK", CurrentValue=true, Callback=function(v) setAntiAFK(v) end })
-tabMisc:CreateToggle({ Name="FPS Boost", CurrentValue=false, Callback=function(v) BoostFPS(v) end })
-tabMisc:CreateButton({ Name="Rejoin", Callback=function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
-tabMisc:CreateButton({
-  Name="Server Hop",
-  Callback=function()
-    local placeId=game.PlaceId; local servers,cursor={}, ""
-    for _=1,3 do
-      local url="https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"..(cursor~="" and("&cursor="..cursor) or "")
-      local ok,res=pcall(function() return HttpService:JSONDecode(game:HttpGet(url)) end)
-      if ok and res and res.data then
-        for _,sv in ipairs(res.data) do if sv.playing<sv.maxPlayers and sv.id~=game.JobId then table.insert(servers,sv.id) end end
-        cursor=res.nextPageCursor or ""; if #servers>0 then break end
-      else break end
-    end
-    if #servers>0 then TeleportService:TeleportToPlaceInstance(placeId, servers[math.random(1,#servers)], LocalPlayer) end
-  end
-})
-
--- Slider scale manual (0.5x – 1.2x). Set ke 0 untuk kembali AUTO.
-tabMisc:CreateSlider({
-  Name = "UI Scale (0 = Auto)",
-  Range = {0, 120}, Increment = 5, Suffix = "%",
-  CurrentValue = 0,
-  Callback = function(v)
-    if v == 0 then
-      userScale = nil
     else
-      userScale = math.clamp(v/100, MIN_SCALE, MAX_SCALE)
+        ------------------------------------------------
+        -- 🔄 Pulihkan rendering
+        ------------------------------------------------
+        RunService:Set3dRenderingEnabled(true)
+
+        ------------------------------------------------
+        -- 🌞 Hilangkan blackout
+        ------------------------------------------------
+        if FullBlackOverlay then
+            FullBlackOverlay.Enabled = false
+        end
     end
-    if RFScale then RFScale.Scale = userScale or computeAutoScale() end
-  end
+end
+
+------------------------------------------------------------
+-- 🔘 RAYFIELD TOGGLE
+------------------------------------------------------------
+TabAuto:CreateToggle({
+    Name = "🔋 Disable 3D Rendering",
+    CurrentValue = false,
+    Flag = "GpuSuspendToggle",
+    Callback = function(value)
+        GpuSuspend(value)
+    end
 })
 
-if game.PlaceId~=TARGET_PLACE then
-  tabMisc:CreateButton({ Name="Teleport to Fish It", Callback=function() TeleportService:Teleport(TARGET_PLACE, LocalPlayer) end })
+--------------------------------------------------------------------
+-- 🔌 AUTO RECONNECT (Same Server First, Else New Server)
+-- by bubb 😏
+--------------------------------------------------------------------
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+_G.AutoReconnect = false
+_G.LastServerId = game.JobId -- simpan server saat ini saat script load
+
+--------------------------------------------------------------------
+-- 🌐 Cek server masih ada atau tidak
+--------------------------------------------------------------------
+local function CheckServerValid(jobId)
+	local ok, result = pcall(function()
+		return TeleportService:GetPlayerPlaceInstanceAsync(game.PlaceId, jobId)
+	end)
+
+	-- Kalau gagal fetch info = server sudah tidak valid
+	if not ok or not result then
+		return false
+	end
+
+	-- Kalau server full atau error
+	if result.MaxPlayers and result.CurrentPlayers and result.CurrentPlayers >= result.MaxPlayers then
+		return false
+	end
+
+	return true
 end
 
-pcall(function() Rayfield:LoadConfiguration() end)
+--------------------------------------------------------------------
+-- 🔁 Fungsi utama reconnect
+--------------------------------------------------------------------
+local function AutoReconnectLoop()
+	task.spawn(function()
+		while _G.AutoReconnect do
 
----------------------------------------------------------------------
--- LIVE HUD + LABEL
----------------------------------------------------------------------
-local function safeSetLabel(txt) if lblStatus and type(lblStatus.Set)=="function" then pcall(function() lblStatus:Set(txt) end) end end
-RS.RenderStepped:Connect(function()
-  local rod=getEquippedRodName() or "?"
-  local cEff,rEff=effDelays()
-  setHUD(string.format("Rod:%s  |  Reel:%.2fs  |  Cmpl:%.2fs  |  %s", rod, rEff, cEff, state.AFon and "ON" or "OFF"))
-  safeSetLabel(("Rod: %s  |  Reel: %.2fs  |  Cmpl: %.2fs  |  Spd: %dx"):format(rod, rEff, cEff, state.SPEED))
-end)
+			-- tunggu sampai player ke-kick / connection putus
+			if LocalPlayer.Parent == nil then
+				Rayfield:Notify({
+					Title = "🔌 Reconnecting...",
+					Content = "Menunggu server lama…",
+					Duration = 3
+				})
 
----------------------------------------------------------------------
--- REFRESH PRESET SAAT BACKPACK UPDATE
----------------------------------------------------------------------
+				local sameServer = CheckServerValid(_G.LastServerId)
+
+				if sameServer then
+					-- 🔄 Reconnect ke server yang sama
+					TeleportService:TeleportToPlaceInstance(
+						game.PlaceId,
+						_G.LastServerId,
+						LocalPlayer
+					)
+
+				else
+					-- 🆕 Server lama hilang → masuk server baru
+					Rayfield:Notify({
+						Title = "🌐 Server Lama Tidak Ada",
+						Content = "Masuk server baru ya bubb 😏",
+						Duration = 3
+					})
+
+					TeleportService:Teleport(game.PlaceId, LocalPlayer)
+				end
+
+				break
+			end
+
+			task.wait(2)
+		end
+	end)
+end
+
+--------------------------------------------------------------------
+-- 🔘 Toggle Auto Reconnect
+--------------------------------------------------------------------
+TabAuto:CreateToggle({
+	Name = "🔌 Auto Reconnect",
+	CurrentValue = false,
+	Flag = "AutoReconnectToggle",
+	Callback = function(state)
+		_G.AutoReconnect = state
+
+		if state then
+			_G.LastServerId = game.JobId -- update id saat ini
+			Rayfield:Notify({
+				Title = "🔌 Auto Reconnect Aktif",
+				Content = "Akan kembali ke server ini dulu, atau ke server baru jika hilang.",
+				Duration = 4
+			})
+			AutoReconnectLoop()
+		else
+			Rayfield:Notify({
+				Title = "🛑 Auto Reconnect Dimatikan",
+				Content = "Tidak akan reconnect otomatis lagi.",
+				Duration = 3
+			})
+		end
+	end
+})
+
+
+
+------------------------------------------------------------
+-- 🌍 TAB TELEPORT
+------------------------------------------------------------
+local TabTeleport = Window:CreateTab("🌍 Teleport Menu")
+
+------------------------------------------------------------
+-- 🗺️ DAFTAR LOKASI TELEPORT
+------------------------------------------------------------
+local teleportLocations = {
+    { Name = "Fisherman Island 🐟", CFrame = CFrame.new(128.62, 3.53, 2783.18) },
+    { Name = "Kohana Volcano 🌋", CFrame = CFrame.new(-572.879456, 22.4521465, 148.355331) },
+    { Name = "Sisyphus Statue 🗿",  CFrame = CFrame.new(-3727.16, -135.07, -1014.40) },
+    { Name = "Coral Reefs 🐠",  CFrame = CFrame.new(-3114.78198, 1.32066584, 2237.52295) },
+    { Name = "Esoteric Depths 🌊",  CFrame = CFrame.new(3248.37109, -1301.53027, 1403.82727) },
+    { Name = "Enchant Altar 🔮",  CFrame = CFrame.new(3234.54, -1302.85, 1399.92) },
+    { Name = "Crater Island 🌋",  CFrame = CFrame.new(987.96, 3.30, 5148.49) },
+    { Name = "Lost Isle 🌀",  CFrame = CFrame.new(-3618.15698, 240.836655, -1317.45801) },
+    { Name = "Weather Machine 🌦️",  CFrame = CFrame.new(-1488.51196, 83.1732635, 1876.30298) },
+    { Name = "Tropical Grove 🌴",  CFrame = CFrame.new(-2095.34106, 197.199997, 3718.08008) },
+    { Name = "Treasure Room 💰",  CFrame = CFrame.new(-3606.34985, -266.57373, -1580.97339) },
+    { Name = "Kohana 🏝️",  CFrame = CFrame.new(-663.904236, 3.04580712, 718.796875) },
+    { Name = "Underground Cellar 🕳️", CFrame = CFrame.new(2135.89, -91.20, -698.50) },
+    { Name = "Ancient Jungle 🌿", CFrame = CFrame.new(1483.11, 11.14, -300.08) },
+    { Name = "Sacred Temple ⛩️", CFrame = CFrame.new(1506.53, -22.13, -640.17) },
+    { Name = "Ancient Ruin 🕸️", CFrame = CFrame.new(6040.64, -578.44, 4715.02) },
+    { Name = "Crystalline Passage ⛓️", CFrame = CFrame.new(6049.71, -538.90, 4385.69) },
+    { Name = "Arrow Artifact 🔺", CFrame = CFrame.new(881.40, 6.34, -346.27) },
+    { Name = "Crescent Artifact 🌙", CFrame = CFrame.new(1404.67, 5.08, 120.55) },
+    { Name = "Diamond Artifact 🔷", CFrame = CFrame.new(1841.52, 2.76, -300.38) },
+    { Name = "Hourglass Diamond Artifact 🔶", CFrame = CFrame.new(1466.40, 3.19, -846.62) },
+}
+
+------------------------------------------------------------
+-- 📍 Dropdown Teleport Lokasi
+------------------------------------------------------------
+local locationNames = {}
+for _, loc in ipairs(teleportLocations) do table.insert(locationNames, loc.Name) end
+table.sort(locationNames, function(a,b) return a:lower() < b:lower() end)
+
+local selectedLocation = nil
+local dropdown = TabTeleport:CreateDropdown({
+	Name = "📍 Pilih Lokasi",
+	Options = locationNames,
+	CurrentOption = {},
+	MultipleOptions = false,
+	Callback = function(Value)
+		selectedLocation = typeof(Value) == "table" and Value[1] or Value
+		Notify("📍 Lokasi Dipilih", "Kamu pilih: " .. tostring(selectedLocation), 2)
+	end
+})
+
+TabTeleport:CreateButton({
+	Name = "🚀 Teleport Now",
+	Callback = function()
+		if not selectedLocation then
+			Notify("⚠️ Pilih Lokasi", "Pilih lokasi dulu.", 2)
+			return
+		end
+
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if not hrp then
+			Notify("⚠️ Gagal Teleport", "Karakter belum siap.", 2)
+			return
+		end
+
+		local currentRotation = hrp.CFrame - hrp.CFrame.Position
+
+		for _, loc in ipairs(teleportLocations) do
+			if loc.Name == selectedLocation then
+				pcall(function()
+					hrp.CFrame = CFrame.new(loc.CFrame.Position) * currentRotation
+				end)
+				Notify("✨ Teleport Sukses", loc.Name, 2)
+				return
+			end
+		end
+		Notify("⚠️ Error", "Lokasi tidak ditemukan (internal).", 2)
+	end
+})
+
+------------------------------------------------------------
+-- 🌬️ Radar & Diving Gear
+------------------------------------------------------------
+local EquipOxy = GetNetRemote("RF/EquipOxygenTank")
+local UnequipOxy = GetNetRemote("RF/UnequipOxygenTank")
+local Radar = GetNetRemote("RF/UpdateFishingRadar")
+
+local function ToggleRadar(state)
+    pcall(function() Radar:InvokeServer(state) end)
+end
+
+TabTeleport:CreateToggle({
+    Name = "📡 Enable Radar",
+    CurrentValue = false,
+    Callback = function(Value) ToggleRadar(Value) end
+})
+
+local function ToggleDivingGear(state)
+    pcall(function()
+        if state then
+            EquipTool:FireServer(2)
+            EquipOxy:InvokeServer(105)
+        else
+            UnequipOxy:InvokeServer()
+        end
+    end)
+end
+
+TabTeleport:CreateToggle({
+    Name = "🤿 Enable Diving Gear",
+    CurrentValue = false,
+    Callback = function(Value) ToggleDivingGear(Value) end
+})
+
+------------------------------------------------------------
+-- 🧭 Manual Teleport (Koordinat)
+------------------------------------------------------------
+TabTeleport:CreateSection("🧭 Manual Coordinate Teleport")
+local customCoords = ""
+
+TabTeleport:CreateInput({
+    Name = "Koordinat (x, y, z)",
+    PlaceholderText = "Contoh: 123.4, 5.6, 789.0",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text) customCoords = Text end
+})
+
+TabTeleport:CreateButton({
+    Name = "🚀 Teleport ke Koordinat",
+    Callback = function()
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            Notify("⚠️ Gagal Teleport", "Karakter belum siap.", 3)
+            return
+        end
+
+        local x, y, z = string.match(customCoords or "", "([%-%d%.]+)%s*,%s*([%-%d%.]+)%s*,%s*([%-%d%.]+)")
+        if not (x and y and z) then
+            Notify("⚠️ Format Salah", "Gunakan format: x, y, z", 3)
+            return
+        end
+
+        x, y, z = tonumber(x), tonumber(y), tonumber(z)
+        local currentRotation = hrp.CFrame - hrp.CFrame.Position
+        pcall(function() hrp.CFrame = CFrame.new(Vector3.new(x, y, z)) * currentRotation end)
+        Notify("🚀 Teleport Manual", string.format("X: %.2f | Y: %.2f | Z: %.2f", x, y, z), 3)
+    end
+})
+
+------------------------------------------------------------
+-- ⚙️ ADMIN EVENT FEATURES (Auto Teleport + Return to Last Pos)
+------------------------------------------------------------
+TabTeleport:CreateSection("⚙️ Admin Event Features")
+
+local adminHours = {3, 7, 11, 15, 19, 23}
+local AutoAdminEnabled = false
+local nextEventLabel
+local lastCFrameBeforeEvent = nil
+
+-- 🕒 GMT+7
+local function getGMT7Now()
+	local utcNow = os.time(os.date("!*t"))
+	local gmt7Epoch = utcNow + 7 * 3600
+	local t = os.date("!*t", gmt7Epoch)
+	return t, gmt7Epoch
+end
+
+local function formatHMS(totalSeconds)
+	totalSeconds = math.max(0, math.floor(totalSeconds))
+	local h = math.floor(totalSeconds / 3600)
+	local m = math.floor((totalSeconds % 3600) / 60)
+	local s = totalSeconds % 60
+	return string.format("%dH %dM %dS", h, m, s)
+end
+
+local function getNextAdminEvent(nowT, nowEpoch)
+	local secondsSinceMidnight = nowT.hour * 3600 + nowT.min * 60 + nowT.sec
+	local midnightEpoch = nowEpoch - secondsSinceMidnight
+	for _, hour in ipairs(adminHours) do
+		local eventSeconds = hour * 3600
+		if eventSeconds > secondsSinceMidnight then
+			return midnightEpoch + eventSeconds, hour
+		end
+	end
+	local tomorrowMidnight = midnightEpoch + 24 * 3600
+	return tomorrowMidnight + adminHours[1] * 3600, adminHours[1]
+end
+
+-- 📍 Lokasi teleport Admin Event
+local adminEventCFrame = CFrame.new(6040.99, -578.44, 4715.02) * CFrame.Angles(0, math.rad(354.2), 0)
+
+-- 🚀 Teleport ke Admin Event
+local function TeleportToAdminEvent()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		Notify("⚠️ Gagal Teleport", "Karakter belum siap.", 3)
+		return
+	end
+
+	-- simpan posisi terakhir sebelum teleport
+	lastCFrameBeforeEvent = hrp.CFrame
+
+	-- teleport ke lokasi event
+	hrp.CFrame = adminEventCFrame
+	Notify("🎟️ Teleport Admin Event", "Kamu sudah sampai di lokasi event!", 3)
+
+	-- setelah bbrp menit (360 detik), balik ke posisi awal
+	task.delay(630, function()
+		if lastCFrameBeforeEvent and hrp then
+			pcall(function()
+				hrp.CFrame = lastCFrameBeforeEvent
+				Notify("🕒 Selesai Event", "Kembali ke posisi sebelumnya 😴", 4)
+			end)
+		end
+	end)
+end
+
+-- ⏳ Label countdown
+nextEventLabel = TabTeleport:CreateLabel("Event Countdown: --H --M --S")
+
+-- 🔁 Loop update countdown & auto teleport
 task.spawn(function()
-  local pg=LocalPlayer:WaitForChild("PlayerGui")
-  local display=pg:WaitForChild("Backpack"):WaitForChild("Display")
-  display.ChildAdded:Connect(function()
-    task.wait(0.05)
-    local rod=getEquippedRodName()
-    if rod and RodDelays[rod] then
-      state.completePreset=RodDelays[rod].custom
-      state.reelPreset=RodDelays[rod].bypass
-    end
-  end)
+	while task.wait(1) do
+		local nowT, nowEpoch = getGMT7Now()
+		local nextEventEpoch, nextHour = getNextAdminEvent(nowT, nowEpoch)
+		local diff = nextEventEpoch - nowEpoch
+		nextEventLabel:Set(string.format("Event Countdown: %s", formatHMS(diff)))
+
+		-- 🕒 Auto teleport 5 detik sebelum event
+		if AutoAdminEnabled and diff <= 10 and diff > 0 then
+			-- keamanan biar gak teleport berkali-kali
+			AutoAdminEnabled = false
+			Notify("🎟️ Auto Admin Event", 3)
+			
+			task.wait(5)
+			TeleportToAdminEvent()
+			
+			-- aktifkan lagi otomatis setelah 2 menit (biar event berikutnya masih jalan)
+			task.delay(120, function()
+				AutoAdminEnabled = true
+			end)
+		end
+	end
 end)
 
----------------------------------------------------------------------
--- OVERLAY LOGO (draggable) UNTUK SHOW/HIDE WINDOW RAYFIELD
----------------------------------------------------------------------
-local OverlaySG = Instance.new("ScreenGui"); OverlaySG.Name="AegisHub_Overlay"; OverlaySG.IgnoreGuiInset=true; OverlaySG.ResetOnSpawn=false; mount(OverlaySG)
-local LogoBtn = Instance.new("ImageButton", OverlaySG)
-LogoBtn.Position = UDim2.new(0,14,0,14); LogoBtn.Size = UDim2.fromOffset(46,46)
-LogoBtn.BackgroundColor3 = THEME.panel; LogoBtn.Image = LOGO_ID; LogoBtn.AutoButtonColor = true
-Instance.new("UICorner", LogoBtn).CornerRadius = UDim.new(1,0)
-local glow = Instance.new("UIStroke", LogoBtn); glow.Thickness=1.2; glow.Color=THEME.accent2; glow.Transparency=0.3
 
--- drag
-do
-  local dragging, start, startPos
-  LogoBtn.InputBegan:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-      dragging = true; start = i.Position; startPos = LogoBtn.Position
-      i.Changed:Connect(function() if i.UserInputState == Enum.UserInputState.End then dragging=false end end)
-    end
-  end)
-  UIS.InputChanged:Connect(function(i)
-    if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-      local d = i.Position - start
-      LogoBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
-    end
-  end)
+-- 🎛️ Toggle Auto Admin Event
+TabTeleport:CreateToggle({
+	Name = "Auto Admin Event (Teleport + Return)",
+	CurrentValue = false,
+	Callback = function(Value)
+		AutoAdminEnabled = Value
+		if Value then
+			Notify("🎟️ Auto Admin Event", "Akan otomatis teleport ke event.", 3)
+		else
+			Notify("💤 Auto Admin Event", "Mode otomatis dimatikan.", 3)
+		end
+	end
+})
+
+
+
+------------------------------------------------------------
+-- 🚀 Teleport ke Admin Event (Manual Tanpa Kembali)
+------------------------------------------------------------
+local function TeleportToAdminEvent_Manual()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then
+		Notify("⚠️ Gagal Teleport", "Karakter belum siap untuk teleport.", 3)
+		return
+	end
+
+	-- langsung teleport tanpa menyimpan posisi
+	pcall(function()
+		hrp.CFrame = adminEventCFrame
+	end)
+
+	Notify("🚀 Teleport Admin Event (Manual)", "Kamu sudah sampai di lokasi event, bubb 💋", 3)
 end
 
--- toggle show/hide
-local rfVisible = true
-local function setRFVisible(v)
-  rfVisible = v
-  if RFSG then RFSG.Enabled = v end
+------------------------------------------------------------
+-- 🧭 Tombol Manual Teleport (Tanpa Balik)
+------------------------------------------------------------
+TabTeleport:CreateButton({
+	Name = "🚀 Teleport Manual (Tanpa Balik)",
+	Callback = function()
+		TeleportToAdminEvent_Manual()
+	end
+})
+
+
+
+------------------------------------------------------------
+-- 🌦️ TAB WEATHER CONTROL
+------------------------------------------------------------
+local TabCuaca = Window:CreateTab("🌦️ Weather Control")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RFPurchaseWeatherEvent = ReplicatedStorage
+	:WaitForChild("Packages")
+	._Index["sleitnick_net@0.2.0"]
+	.net["RF/PurchaseWeatherEvent"]
+
+-- Daftar Cuaca
+local weatherOptions = {
+	{ Name = "Wind (10.000)", Value = "Wind", Price = 10000 },
+	{ Name = "Cloudy (20.000)", Value = "Cloudy", Price = 20000 },
+	{ Name = "Storm (35.000)", Value = "Storm", Price = 35000 },
+	{ Name = "Snow (15.000)", Value = "Snow", Price = 15000 },
+	{ Name = "Radiant (50.000)", Value = "Radiant", Price = 50000 },
+	{ Name = "Shark Hunt (300.000)", Value = "Shark Hunt", Price = 300000 },
+}
+
+-- Buat daftar nama untuk dropdown
+local weatherNames = {}
+for _, w in ipairs(weatherOptions) do
+	table.insert(weatherNames, w.Name)
 end
-LogoBtn.MouseButton1Click:Connect(function() setRFVisible(not rfVisible) end)
+
+local selectedWeathers = {}
+local AutoBuyEnabled = false
+
+-- Dropdown multi-select
+TabCuaca:CreateDropdown({
+	Name = "🌤️ Pilih Cuaca",
+	Options = weatherNames,
+	CurrentOption = {},
+	MultipleOptions = true,
+	Callback = function(Values)
+		selectedWeathers = {}
+		for _, v in ipairs(Values) do
+			for _, w in ipairs(weatherOptions) do
+				if v == w.Name then
+					table.insert(selectedWeathers, w)
+				end
+			end
+		end
+
+		-- delay 2 detik sebelum tampil notif
+		task.delay(2, function()
+			if #selectedWeathers > 0 then
+				local names = {}
+				for _, w in ipairs(selectedWeathers) do
+					table.insert(names, "✅ " .. w.Value)
+				end
+			end
+		end)
+	end
+})
+
+-- Tombol beli semua cuaca
+TabCuaca:CreateButton({
+	Name = "💸 Beli Cuaca",
+	Callback = function()
+		if #selectedWeathers == 0 then
+			-- Notify("⚠️ Belum ada cuaca dipilih", "Pilih dulu minimal 1 cuaca, bubb 💋", 3)
+			return
+		end
+
+		for i, w in ipairs(selectedWeathers) do
+			pcall(function()
+				RFPurchaseWeatherEvent:InvokeServer(w.Value)
+				task.wait((#selectedWeathers > 1) and 3 or 0.25) -- jeda 1 detik kalau >1
+			end)
+		end
+
+		-- Notify("🌦️ Pembelian Cuaca", "Semua cuaca terpilih telah dibeli ✅", 3)
+	end
+})
+
+
+------------------------------------------------------------
+-- ⚙️ AutoBuy Cuaca
+------------------------------------------------------------
+TabCuaca:CreateToggle({
+	Name = "🕒 AutoBuy Cuaca",
+	CurrentValue = false,
+	Callback = function(Value)
+		AutoBuyEnabled = Value
+
+		if Value then
+			Notify("🛒 AutoBuy dan Aktivate Cuaca", "", 3)
+			task.spawn(function()
+				while AutoBuyEnabled do
+					if #selectedWeathers > 0 then
+						for i, w in ipairs(selectedWeathers) do
+							pcall(function()
+								RFPurchaseWeatherEvent:InvokeServer(w.Value)
+								task.wait((#selectedWeathers > 1) and 3 or 0.25) -- jeda 1 detik jika >1 cuaca
+							end)
+						end
+					end
+					task.wait(30) -- delay antar-loop utama
+				end
+			end)
+		else
+			Notify("💤 AutoBuy Cuaca Dimatikan", "Tidak lagi membeli otomatis.", 3)
+		end
+	end
+})
+
+
+------------------------------------------------------------
+-- ♻️ TAB 3: RESPAWN TOOLS
+------------------------------------------------------------
+local TabRespawn = Window:CreateTab("♻️ Respawn Tools")
+-- TabRespawn:CreateSection("♻️ Respawn Tool")
+
+------------------------------------------------------------
+-- ⚙️ Variables
+------------------------------------------------------------
+local autoRespawnEnabled = false
+local respawnInterval = 3600 -- default 60 menit
+local respawnCount = 0
+local countdownLabel
+local sliderDelayTask
+
+------------------------------------------------------------
+-- 🧠 Helper Functions
+------------------------------------------------------------
+local function formatTime(seconds)
+	local h = math.floor(seconds / 3600)
+	local m = math.floor((seconds % 3600) / 60)
+	local s = math.floor(seconds % 60)
+
+	if h > 0 then
+		return string.format("%dh %dm %ds", h, m, s)
+	elseif m > 0 then
+		return string.format("%dm %ds", m, s)
+	else
+		return string.format("%ds", s)
+	end
+end
+
+local function safeGetHRP()
+	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+------------------------------------------------------------
+-- 🧩 CORE LOGIC (UID-BASED RARITY DETECTION SYSTEM)
+------------------------------------------------------------
+
+-- 🔧 Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local player = game.Players.LocalPlayer
+
+------------------------------------------------------------
+-- 📡 Remote Event Auto-Detect (biar aman di semua versi)
+------------------------------------------------------------
+local function getFishEvent()
+	local Packages = ReplicatedStorage:WaitForChild("Packages")
+	for _, pkg in ipairs(Packages._Index:GetChildren()) do
+		if pkg:FindFirstChild("net") then
+			local net = pkg.net
+			if net:FindFirstChild("RE/ObtainedNewFishNotification") then
+				return net["RE/ObtainedNewFishNotification"]
+			end
+		end
+	end
+	warn("[FishIt] ⚠️ RE/ObtainedNewFishNotification tidak ditemukan.")
+	return nil
+end
+
+local REObtainedNewFishNotification = getFishEvent()
+
+------------------------------------------------------------
+-- 🧠 UID Table Berdasarkan ItemId
+------------------------------------------------------------
+local FishUID = {
+	Mythic = {
+		15,21,34,35,47,52,54,75,97,98,122,137,146,147,150,185,205,
+		215,240,247,249,263,264,273,308,314,316,336,347,352,355,357,367,371,372,373
+	},
+	Legendary = {
+		14,16,22,24,25,36,37,48,53,73,86,110,138,152,199,207,208,
+		224,236,243,274,283,286,296,299,307,311,317,334,338.346,356,365,366,369,370
+	}
+}
+
+------------------------------------------------------------
+-- 🧩 Fungsi Deteksi Rarity
+------------------------------------------------------------
+local function getRarityFromUID(id)
+	for _, v in ipairs(FishUID.Mythic) do if v == id then return "Mythic" end end
+	for _, v in ipairs(FishUID.Legendary) do if v == id then return "Legendary" end end
+	return "Common"
+end
+
+------------------------------------------------------------
+-- ⚙️ Variabel Global Tracking
+------------------------------------------------------------
+local rarityCounts = { Mythic = 0, Legendary = 0 }
+local isRespawning = false
+local leaderstats = player:WaitForChild("leaderstats")
+local AllTimeCaught = leaderstats:WaitForChild("Caught")
+local sessionStartCaught = AllTimeCaught.Value
+
+------------------------------------------------------------
+-- 🪄 Fungsi Notify Aman
+------------------------------------------------------------
+local function Notify(title, content, duration)
+	pcall(function()
+		Rayfield:Notify({
+			Title = title,
+			Content = content,
+			Duration = duration or 3
+		})
+	end)
+end
+
+-- ✅ Inisialisasi Remote & Fungsi Toggle
+local Autofish = GetNetRemote("RF/UpdateAutoFishingState")
+local CurrentValue = false
+
+local function ToggleAutoFishing(state)
+    pcall(function()
+        Autofish:InvokeServer(state)
+        CurrentValue = state
+        print("[AutoFishing]", state and "ON 🎣" or "OFF 💤")
+    end)
+end
+
+-- Simpan RespawnNow asli
+local OldRespawnNow = RespawnNow
+-- Override RespawnNow
+function RespawnNow(force)
+    -- ❌ Jika proteksi aktif dan bukan manual → blokir
+    if protectRareEnabled and protectActive and not force then
+        print("[PROTECT] Respawn diblokir (auto). Manual boleh.")
+        UpdateProtectLabel()
+        return
+    end
+
+    -- ✔ Jika manual → bypass
+    if force then
+        print("[FORCE] Manual respawn diizinkan (bypass proteksi).")
+    end
+
+    -- Jalankan respawn asli
+    OldRespawnNow()
+end
+
+
+-- ✅ Fungsi Respawn Lengkap
+function RespawnNow()
+    if isRespawning then return end
+    isRespawning = true
+
+    task.spawn(function()
+        ----------------------------------------------------------------
+        -- ⛔ Matikan AutoFishing saat proses respawn mulai
+        ----------------------------------------------------------------
+        task.spawn(function()
+            task.wait(2)
+            ToggleAutoFishing(false)
+        end)
+
+        local willResume = Config and Config.AutoFishing
+        if StopAutoFish then StopAutoFish() end
+
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            Notify("❌ Gagal Respawn", "HumanoidRootPart tidak ditemukan.", 3)
+            isRespawning = false
+            return
+        end
+
+        local lastCFrame = hrp.CFrame
+
+        local function doRespawnOnce(idx)
+            local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+            local newChar = player.CharacterAdded:Wait()
+            newChar:WaitForChild("HumanoidRootPart", 10)
+            task.wait(1)
+            Notify("♻️ Respawn", ("Respawn #%d selesai"):format(idx), 2)
+        end
+
+        -- Respawn #1
+        doRespawnOnce(1)
+        task.wait(0.3)
+
+        -- Jual ikan
+        local sell = GetNetRemote and GetNetRemote("RF/SellAllItems")
+        if sell then
+            pcall(function()
+                sell:InvokeServer()
+                Notify("💰 Jual Ikan", "Semua ikan sudah dijual.", 2)
+            end)
+        end
+
+        task.wait(1)
+
+        -- Respawn #2
+        doRespawnOnce(2)
+        task.wait(0.3)
+
+        -- Balik ke posisi semula
+        local newHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if newHRP then
+            newHRP.CFrame = lastCFrame
+            Notify("📍 Kembali ke posisi & arah", "Sudah balik ke orientasi sebelumnya.", 3)
+        end
+
+        ----------------------------------------------------------------
+        -- ✅ Kroscek sebelum nyalakan AutoFishing lagi
+        ----------------------------------------------------------------
+        task.wait(0.5)
+        if CurrentValue == true then
+            print("[AutoFishing] ⚠️ Detected still ON before re-enable — resetting state...")
+            ToggleAutoFishing(false)
+            task.wait(0.3)
+        end
+
+        -- Sekarang nyalakan kembali
+        ToggleAutoFishing(true)
+        Notify("🎣 AutoFishing", "AutoFishing kembali diaktifkan.", 3)
+
+        ----------------------------------------------------------------
+        -- 🎣 Equip pancing
+        ----------------------------------------------------------------
+        local equipRodEvent = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"]
+            .net["RE/EquipToolFromHotbar"]
+        if equipRodEvent then
+            pcall(function()
+                equipRodEvent:FireServer(1)
+            end)
+        end
+
+        ----------------------------------------------------------------
+        -- 🔄 Reset counter rarity
+        ----------------------------------------------------------------
+        task.wait(0.2)
+        rarityCounts = { Mythic = 0, Legendary = 0 }
+        sessionStartCaught = AllTimeCaught.Value
+
+        ----------------------------------------------------------------
+        -- 💫 Reset Anti-Stuck Counter setelah Respawn (FIX FINAL)
+        ----------------------------------------------------------------
+        if antiStuckEnabled then
+            task.spawn(function()
+                task.wait(1)
+                fishSinceLastRare = 0
+                lastCaughtForStuck = AllTimeCaught.Value
+                print("[Anti-Stuck Reset] AllTimeCaught:", AllTimeCaught.Value)
+                stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+                Rayfield:Notify({
+                    Title = "🔄 Anti-Stuck Reset",
+                    Content = "Jumlah ikan tanpa rare berhasil direset setelah respawn ♻️",
+                    Duration = 3
+                })
+            end)
+        end
+
+        isRespawning = false
+    end)
+end
+
+
+------------------------------------------------------------
+-- 🔄 Listener Utama (UID Detection Event)
+------------------------------------------------------------
+local function connectFishListener()
+	if REObtainedNewFishNotification then
+		REObtainedNewFishNotification.OnClientEvent:Connect(function(_, _, fishData)
+			if isRespawning or not fishData or not fishData.ItemId then return end
+
+			local rarity = getRarityFromUID(fishData.ItemId)
+			if rarity == "Mythic" then rarityCounts.Mythic += 1 end
+			if rarity == "Legendary" then rarityCounts.Legendary += 1 end
+
+			-- 🔁 reset counter anti-stuck kalau dapat rare
+			if rarity == "Mythic" or rarity == "Legendary" then
+				fishSinceLastRare = 0
+			end
+
+			local totalRare = rarityCounts.Mythic + rarityCounts.Legendary
+			if rarityLabel then
+				rarityLabel:Set(string.format(
+					"🟠 Legendary: %d | 🔴 Mythic: %d | 🎣 Legendary + Mythic: %d",
+					rarityCounts.Legendary,
+					rarityCounts.Mythic,
+					totalRare
+				))
+			end
+
+			-- trigger rules (akan ditentukan di Bagian 2)
+			if HandleRarityTrigger then
+				HandleRarityTrigger(rarityCounts, RespawnNow)
+			end
+		end)
+	else
+		Notify("⚠️ Event Ikan Tidak Ditemukan", "Pastikan game masih sinkron dengan ReplicatedStorage", 5)
+	end
+end
+
+connectFishListener()
+
+------------------------------------------------------------
+-- ⚙️ UI & MODE CONTROL SECTION (4 Mode Lengkap)
+------------------------------------------------------------
+TabRespawn:CreateSection("🐉 Auto Respawn by Rarity UID")
+
+-- 🔢 Default Threshold Value
+local legendThreshold = 7
+local mythicThreshold = 2
+local comboLegendNeeded = 2
+local comboMythicNeeded = 1
+
+-- 🎛️ Mode Toggles
+local enableLegendaryMode = false
+local enableMythicMode = false
+local enableMythicBeforeLegendaryMode = false
+local enableComboMode = false
+
+------------------------------------------------------------
+-- 🧠 Fungsi Trigger Utama (HandleRarityTrigger)
+------------------------------------------------------------
+function HandleRarityTrigger(counts, RespawnNow)
+	if isRespawning then return end
+	local leg = counts.Legendary
+	local myt = counts.Mythic
+	local total = leg + myt
+
+	if enableLegendaryMode and leg >= legendThreshold then
+		Notify("🟠 Legendary Respawn", string.format("Mendapat %d Legendary – respawn!", leg), 3)
+		return RespawnNow()
+	end
+
+	if enableMythicMode and myt >= mythicThreshold then
+		Notify("🔴 Mythic Respawn", string.format("Mendapat %d Mythic – respawn!", myt), 3)
+		return RespawnNow()
+	end
+
+	if enableMythicBeforeLegendaryMode and myt >= 2 and leg < legendThreshold then
+		Notify("🐉 Trigger", "2 Mythic didapat sebelum 7 Legendary – respawn 💀", 4)
+		return RespawnNow()
+	end
+
+	local waitingComboNotified = false
+
+	if enableComboMode then
+		if myt > 1 and leg < comboLegendNeeded then
+			Notify("🔴 Mythic Priority", string.format("Mendapat %d Mythic sebelum %d Legendary – respawn!", myt, comboLegendNeeded), 4)
+			waitingComboNotified = false
+			return RespawnNow()
+		end
+
+		if leg > comboLegendNeeded and myt == 0 then
+			if not waitingComboNotified then
+				waitingComboNotified = true
+			end
+			return
+		end
+
+		if leg > comboLegendNeeded and myt >= 1 then
+			Notify("⚡ Combo Triggered", string.format("%d Legendary + %d Mythic – respawn!", leg, myt), 4)
+			waitingComboNotified = false
+			return RespawnNow()
+		end
+
+		if leg == comboLegendNeeded and myt == comboMythicNeeded then
+			Notify("💥 Combo Aktif", string.format("%d Legendary + %d Mythic – pantau Mythic berikutnya ⚡", leg, myt), 3)
+			waitingComboNotified = false
+			return
+		end
+	end
+end
+
+------------------------------------------------------------
+-- 🏷️ Label Status
+------------------------------------------------------------
+rarityLabel = TabRespawn:CreateLabel("🟠 Legendary: 0 | 🔴 Mythic: 0 | 🎣 Legendary + Mythic: 0")
+
+------------------------------------------------------------
+-- 🟠 Mode 1 – Legendary
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "🟠 Batas Legendary untuk Respawn",
+	Range = {1, 15},
+	Increment = 1,
+	CurrentValue = 5,
+	Callback = function(v)
+		legendThreshold = v
+		Notify("🟠 Threshold Legendary Diubah", string.format("Respawn saat mendapat %d Legendary", v), 3)
+	end
+})
+
+TabRespawn:CreateToggle({
+	Name = "🟠 Aktifkan Auto Respawn Legendary",
+	CurrentValue = false,
+	Callback = function(v)
+		enableLegendaryMode = v
+		rarityCounts = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🟠 Mode Legendary Aktif", "Respawn otomatis jika batas Legend tercapai.", 4)
+		else
+			Notify("🧊 Mode Legendary Mati", "Berhenti pantau ikan legendary.", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🔴 Mode 2 – Mythic
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "🔴 Batas Mythic untuk Respawn",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = 3,
+	Callback = function(v)
+		mythicThreshold = v
+		Notify("🔴 Threshold Mythic Diubah", string.format("Respawn saat mendapat %d Mythic", v), 3)
+	end
+})
+
+TabRespawn:CreateToggle({
+	Name = "🔴 Aktifkan Auto Respawn Mythic",
+	CurrentValue = false,
+	Callback = function(v)
+		enableMythicMode = v
+		rarityCounts = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🔴 Mode Mythic Aktif", "Respawn otomatis jika batas Mythic tercapai.", 4)
+		else
+			Notify("🧊 Mode Mythic Mati", "Berhenti pantau ikan mythic.", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🐉 Mode 3 – 2 Mythic Before Legendary
+------------------------------------------------------------
+TabRespawn:CreateToggle({
+	Name = "🐉 Respawn jika dapat Mythic sebelum Legendary penuh",
+	CurrentValue = false,
+	Callback = function(v)
+		enableMythicBeforeLegendaryMode = v
+		rarityCounts = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🐉 Mode Aktif", "Respawn jika 2 Mythic muncul lebih awal.", 4)
+		else
+			Notify("🧊 Mode Mati", "Berhenti pantau Mythic awal.", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 💥 Mode 4 – Combo (Legendary + Mythic Priority)
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "🟠 Jumlah Legendary Combo",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = 2,
+	Callback = function(v)
+		comboLegendNeeded = v
+		Notify("🟠 Combo Legendary Diubah", string.format("Dibutuhkan %d Legendary dalam combo", v), 3)
+	end
+})
+
+TabRespawn:CreateSlider({
+	Name = "🔴 Jumlah Mythic Combo",
+	Range = {1, 5},
+	Increment = 1,
+	CurrentValue = 1,
+	Callback = function(v)
+		comboMythicNeeded = v
+		Notify("🔴 Combo Mythic Diubah", string.format("Dibutuhkan %d Mythic dalam combo", v), 3)
+	end
+})
+
+TabRespawn:CreateToggle({
+	Name = "💥 Mode Kombinasi (Legendary + Mythic Priority)",
+	CurrentValue = false,
+	Callback = function(v)
+		enableComboMode = v
+		rarityCounts = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("💥 Mode Combo Aktif", string.format("Respawn setelah %d Legendary & %d Mythic (Mythic prioritas) ⚡", comboLegendNeeded, comboMythicNeeded), 4)
+		else
+			Notify("🧊 Mode Combo Mati", "Pantauan combo dinonaktifkan 💤", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🐟 Auto Respawn Berdasarkan Jumlah Ikan (Reset Setelah Respawn)
+------------------------------------------------------------
+local fishBasedRespawnEnabled = false
+local lastCaught = 0
+local caughtThreshold = 1000
+local leaderstats = player:WaitForChild("leaderstats")
+local AllTimeCaught = leaderstats:WaitForChild("Caught")
+
+------------------------------------------------------------
+-- 📈 Label Progress
+------------------------------------------------------------
+local fishProgressLabel = TabRespawn:CreateLabel("🐟 Next respawn after: 0 / " .. caughtThreshold)
+
+------------------------------------------------------------
+-- 🧠 Fungsi Restart Counter (dipanggil setelah respawn)
+------------------------------------------------------------
+local function ResetFishCounter()
+    lastCaught = AllTimeCaught.Value
+    fishProgressLabel:Set(string.format("🐟 Next respawn after: 0 / %d (0%%)", caughtThreshold))
+    Rayfield:Notify({
+        Title = "♻️ Counter Reset",
+        Content = "Progress ikan telah direset setelah respawn 🎣",
+        Duration = 3
+    })
+end
+
+------------------------------------------------------------
+-- 🔄 Listener Reset Setelah Respawn
+------------------------------------------------------------
+player.CharacterAdded:Connect(function(newChar)
+    if not fishBasedRespawnEnabled then return end
+    task.spawn(function()
+        newChar:WaitForChild("HumanoidRootPart", 10)
+        task.wait(1)
+        ResetFishCounter()
+    end)
+end)
+
+------------------------------------------------------------
+-- 🧩 LOOP AUTO-RESPAWN
+------------------------------------------------------------
+task.spawn(function()
+    while task.wait(1) do
+        if not fishBasedRespawnEnabled then
+            fishProgressLabel:Set("🐟 Next respawn after: -- / --")
+            continue
+        end
+
+        local now = AllTimeCaught.Value
+        local diff = now - lastCaught
+        local percent = math.min(100, math.floor((diff / caughtThreshold) * 100))
+
+        fishProgressLabel:Set(string.format("🐟 Next respawn after: %d / %d (%d%%)", diff, caughtThreshold, percent))
+
+        if diff >= caughtThreshold then
+            Rayfield:Notify({
+                Title = "♻️ Auto Respawn Triggered",
+                Content = string.format("Menangkap %d ikan, respawn dimulai 🐟", diff),
+                Duration = 4
+            })
+
+            RespawnNow()
+            ResetFishCounter()
+        end
+    end
+end)
+
+------------------------------------------------------------
+-- 🎛️ TOGGLE ENABLE / DISABLEk
+------------------------------------------------------------
+TabRespawn:CreateToggle({
+    Name = "🐟 Auto Respawn by Fish Count",
+    CurrentValue = false,
+    Callback = function(Value)
+        fishBasedRespawnEnabled = Value
+        if Value then
+            ResetFishCounter()
+            Rayfield:Notify({
+                Title = "🐟 Auto Respawn Aktif",
+                Content = string.format("Respawn otomatis tiap %d ikan 🎣", caughtThreshold),
+                Duration = 4
+            })
+        else
+            Rayfield:Notify({
+                Title = "❌ Auto Respawn Mati",
+                Content = "Respawn berdasarkan ikan dimatikan 💋",
+                Duration = 3
+            })
+        end
+    end
+})
+
+------------------------------------------------------------
+-- 🎚️ SLIDER
+------------------------------------------------------------
+local sliderNotifyDelay
+TabRespawn:CreateSlider({
+    Name = "🎚️ Set Jumlah Ikan per Respawn",
+    Range = {100, 5000},
+    Increment = 100,
+    CurrentValue = caughtThreshold,
+    Callback = function(Value)
+        caughtThreshold = math.floor(Value)
+        if sliderNotifyDelay then
+            task.cancel(sliderNotifyDelay)
+        end
+        sliderNotifyDelay = task.delay(2, function()
+            Rayfield:Notify({
+                Title = "🎣 Batas Ikan Diubah",
+                Content = string.format("Respawn setiap %d ikan tertangkap 🐟", caughtThreshold),
+                Duration = 3
+            })
+        end)
+    end
+})
+
+
+------------------------------------------------------------
+-- 💫 ANTI-STUCK SYSTEM (RESET DENGAN TOGGLE AUTO-REFRESH)
+------------------------------------------------------------
+local antiStuckEnabled = false
+local noRareLimit = 300
+local fishSinceLastRare = 0
+local lastCaughtForStuck = AllTimeCaught.Value
+local stuckProgressLabel = TabRespawn:CreateLabel("💫 Ikan tanpa rare: -- / --")
+
+-- Simpan referensi toggle biar bisa diubah dari script
+local toggleAntiStuck
+
+------------------------------------------------------------
+-- 🧩 Fungsi Aktifkan/Matikan Anti-Stuck (biar bisa dipanggil internal)
+------------------------------------------------------------
+local function SetAntiStuckState(state)
+	antiStuckEnabled = state
+	if state then
+		fishSinceLastRare = 0
+		lastCaughtForStuck = AllTimeCaught.Value
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+	else
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: -- / --")
+	end
+end
+
+------------------------------------------------------------
+-- 🧿 TOGGLE UTAMA
+------------------------------------------------------------
+toggleAntiStuck = TabRespawn:CreateToggle({
+	Name = "💫 Aktifkan Anti-Stuck (No Rare Respawn)",
+	CurrentValue = false,
+	Callback = function(v)
+		SetAntiStuckState(v)
+		if v then
+			Rayfield:Notify({
+				Title = "💫 Anti-Stuck Aktif",
+				Content = string.format("Respawn jika tidak ada rare dalam %d ikan 🐟", noRareLimit),
+				Duration = 4
+			})
+		else
+			Rayfield:Notify({
+				Title = "🧊 Anti-Stuck Dimatikan",
+				Content = "Pantauan ikan tanpa rare dihentikan 💋",
+				Duration = 3
+			})
+		end
+	end
+})
+------------------------------------------------------------
+-- 🎚️ SLIDER
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "🐟 Batas Ikan Tanpa Rare Sebelum Respawn",
+	Range = {100, 5000},
+	Increment = 100,
+	CurrentValue = noRareLimit,
+	Callback = function(v)
+		noRareLimit = math.floor(v)
+
+		if antiStuckEnabled then
+			stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+		end
+
+		-- ⏳ Tambahkan delay 2 detik sebelum notifikasi muncul
+		task.spawn(function()
+			task.wait(2)
+			Rayfield:Notify({
+				Title = "🐟 Batas Diubah",
+				Content = "Respawn otomatis jika tidak ada rare dalam " .. noRareLimit .. " ikan.",
+				Duration = 3
+			})
+		end)
+	end
+})
+
+------------------------------------------------------------
+-- 🔁 LOOP ANTI-STUCK (REALTIME FIX)
+------------------------------------------------------------
+local function StartAntiStuckLoop()
+	-- Hentikan loop lama kalau ada
+	if _G.AntiStuckLoop then
+		task.cancel(_G.AntiStuckLoop)
+	end
+
+	-- Reset label & counter dulu
+	fishSinceLastRare = 0
+	lastCaughtForStuck = AllTimeCaught.Value
+	stuckProgressLabel:Set(string.format("💫 Ikan tanpa rare: %d / %d (0%%)", fishSinceLastRare, noRareLimit))
+
+	-- 🧠 Pastikan kita dengarkan event perubahan jumlah ikan
+	if _G.AntiStuckConn then
+		_G.AntiStuckConn:Disconnect()
+	end
+
+	_G.AntiStuckConn = AllTimeCaught.Changed:Connect(function(newValue)
+		if not antiStuckEnabled then return end
+
+		local diff = newValue - lastCaughtForStuck
+		if diff <= 0 then return end
+
+		fishSinceLastRare += diff
+		lastCaughtForStuck = newValue
+
+		local percent = math.min(100, math.floor((fishSinceLastRare / noRareLimit) * 100))
+		stuckProgressLabel:Set(string.format("💫 Ikan tanpa rare: %d / %d (%d%%)", fishSinceLastRare, noRareLimit, percent))
+
+		-- Jika sudah lewat batas dan belum dapat rare → respawn
+		if fishSinceLastRare >= noRareLimit then
+			if (rarityCounts.Legendary < legendThreshold) and (rarityCounts.Mythic < mythicThreshold) then
+				Rayfield:Notify({
+					Title = "😴 Tidak Ada Rare",
+					Content = string.format("Sudah %d ikan tanpa Legendary/Mythic, respawn otomatis 🌀", noRareLimit),
+					Duration = 4
+				})
+				RespawnNow() -- bisa juga diganti RespawnNowRandom() kalau mau random
+				task.wait(0.5)
+				fishSinceLastRare = 0
+				lastCaughtForStuck = AllTimeCaught.Value
+			else
+				fishSinceLastRare = 0
+				lastCaughtForStuck = AllTimeCaught.Value
+				stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+			end
+		end
+	end)
+
+	Rayfield:Notify({
+		Title = "💫 Anti-Stuck Aktif",
+		Content = "Sistem pemantau ikan tanpa rare sedang berjalan real-time 🐟",
+		Duration = 4
+	})
+end
+
+
+------------------------------------------------------------
+-- 🧠 Listener: Mulai ulang loop setelah respawn
+------------------------------------------------------------
+player.CharacterAdded:Connect(function(newChar)
+	if not antiStuckEnabled then return end
+
+	task.spawn(function()
+		newChar:WaitForChild("HumanoidRootPart", 10)
+		task.wait(1)
+
+		fishSinceLastRare = 0
+		lastCaughtForStuck = AllTimeCaught.Value
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+
+		Rayfield:Notify({
+			Title = "🔄 Anti-Stuck Reset",
+			Content = "Counter direset & loop dimulai ulang setelah respawn ♻️",
+			Duration = 3
+		})
+
+		StartAntiStuckLoop()
+	end)
+end)
+
+------------------------------------------------------------
+-- 🧩 Jalankan loop pertama kali
+------------------------------------------------------------
+StartAntiStuckLoop()
+
+
+------------------------------------------------------------
+-- 🛡️ PROTEKSI RESPAWN DENGAN SLIDER & LABEL DINAMIS
+------------------------------------------------------------
+local protectRespawnEnabled = false
+local protectMinFishLimit = 500
+local protectMaxFishLimit = 4000
+local lastProtectCaught = AllTimeCaught.Value
+
+-- Threshold proteksi (bisa diatur lewat slider)
+local protectLegendaryNeeded = 3
+local protectMythicNeeded = 2
+local protectComboLegendNeeded = 2
+local protectComboMythicNeeded = 1
+
+-- Counter rare session
+local protectCounts = { Legendary = 0, Mythic = 0 }
+
+-- Label dinamis
+local protectProgressLabel = TabRespawn:CreateLabel(
+	"🛡️ Progress Proteksi: 🔴 OFF | 0/500 | 0/4000 | 🟠 Legendary: 0 | 🔴 Mythic: 0"
+)
+
+------------------------------------------------------------
+-- 🧠 Helper Update Label
+------------------------------------------------------------
+local function UpdateProtectLabel()
+	local status = protectRespawnEnabled and "🟢 ON" or "🔴 OFF"
+	local diff = AllTimeCaught.Value - lastProtectCaught
+	protectProgressLabel:Set(string.format(
+		"🛡️ Progress Proteksi: %s | %d/%d | %d/%d | 🟠 %d | 🔴 %d",
+		status,
+		math.min(diff, protectMinFishLimit),
+		protectMinFishLimit,
+		math.min(diff, protectMaxFishLimit),
+		protectMaxFishLimit,
+		protectCounts.Legendary,
+		protectCounts.Mythic
+	))
+end
+
+------------------------------------------------------------
+-- 🧠 Reset Counter Proteksi
+------------------------------------------------------------
+local function ResetProtectCounter()
+	lastProtectCaught = AllTimeCaught.Value
+	protectCounts = { Legendary = 0, Mythic = 0 }
+	UpdateProtectLabel()
+	Rayfield:Notify({
+		Title = "🛡️ Proteksi Direset",
+		Content = "Counter proteksi direset setelah respawn ♻️",
+		Duration = 3
+	})
+end
+
+------------------------------------------------------------
+-- 🔁 Reset Setelah Respawn
+------------------------------------------------------------
+player.CharacterAdded:Connect(function(newChar)
+	if not protectRespawnEnabled then return end
+	task.spawn(function()
+		newChar:WaitForChild("HumanoidRootPart", 10)
+		task.wait(1)
+		ResetProtectCounter()
+	end)
+end)
+
+------------------------------------------------------------
+-- 📊 Update Realtime Progress
+------------------------------------------------------------
+task.spawn(function()
+	while task.wait(1) do
+		if not protectRespawnEnabled then
+			UpdateProtectLabel()
+			continue
+		end
+
+		UpdateProtectLabel()
+
+		local diff = AllTimeCaught.Value - lastProtectCaught
+		if diff >= protectMaxFishLimit then
+			Rayfield:Notify({
+				Title = "⏰ Batas Maksimum Tercapai",
+				Content = string.format("Sudah %d ikan tanpa trigger proteksi — respawn otomatis 💫", protectMaxFishLimit),
+				Duration = 4
+			})
+			RespawnNow()
+			ResetProtectCounter()
+		end
+	end
+end)
+
+------------------------------------------------------------
+-- 📡 Listener Proteksi Rare
+------------------------------------------------------------
+local function connectProtectListener()
+	if REObtainedNewFishNotification then
+		REObtainedNewFishNotification.OnClientEvent:Connect(function(_, _, fishData)
+			if not protectRespawnEnabled or not fishData or not fishData.ItemId then return end
+
+			local rarity = getRarityFromUID(fishData.ItemId)
+			if rarity == "Legendary" then protectCounts.Legendary += 1 end
+			if rarity == "Mythic" then protectCounts.Mythic += 1 end
+			UpdateProtectLabel()
+
+			local totalCaught = AllTimeCaught.Value - lastProtectCaught
+
+			-- Aktif hanya sebelum batas minimum
+			if totalCaught <= protectMinFishLimit then
+				-- 🟠 Legendary-only
+				if protectCounts.Legendary >= protectLegendaryNeeded then
+					Rayfield:Notify({
+						Title = "🟠 Proteksi Legendary",
+						Content = string.format("Mendapat %d Legendary sebelum %d ikan 🎯 — respawn!", protectCounts.Legendary, protectMinFishLimit),
+						Duration = 4
+					})
+					RespawnNow()
+					ResetProtectCounter()
+					return
+				end
+
+				-- 🔴 Mythic-only
+				if protectCounts.Mythic >= protectMythicNeeded then
+					Rayfield:Notify({
+						Title = "🔴 Proteksi Mythic",
+						Content = string.format("Mendapat %d Mythic sebelum %d ikan 🐉 — respawn!", protectCounts.Mythic, protectMinFishLimit),
+						Duration = 4
+					})
+					RespawnNow()
+					ResetProtectCounter()
+					return
+				end
+
+				-- ⚡ Kombinasi (Legend + Mythic)
+				if protectCounts.Legendary >= protectComboLegendNeeded and protectCounts.Mythic >= protectComboMythicNeeded then
+					Rayfield:Notify({
+						Title = "⚡ Combo Proteksi Respawn",
+						Content = string.format("%d Legendary + %d Mythic sebelum %d ikan — respawn ⚡", protectCounts.Legendary, protectCounts.Mythic, protectMinFishLimit),
+						Duration = 4
+					})
+					RespawnNow()
+					ResetProtectCounter()
+					return
+				end
+			end
+		end)
+	else
+		Notify("⚠️ Event Proteksi Tidak Ditemukan", "Pastikan RE/ObtainedNewFishNotification valid", 5)
+	end
+end
+
+connectProtectListener()
+
+------------------------------------------------------------
+-- 🎚️ Slider: Batas Minimum
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "🔰 Batas Minimum Proteksi (Default 500)",
+	Range = {100, 2000},
+	Increment = 50,
+	CurrentValue = protectMinFishLimit,
+	Callback = function(v)
+		protectMinFishLimit = math.floor(v)
+		UpdateProtectLabel()
+		Rayfield:Notify({
+			Title = "⚙️ Batas Minimum Diperbarui",
+			Content = string.format("Proteksi berlaku untuk %d ikan pertama 🎣", protectMinFishLimit),
+			Duration = 3
+		})
+	end
+})
+
+------------------------------------------------------------
+-- 🎚️ Slider: Batas Maksimum
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "⏰ Batas Maksimum (Default 4000)",
+	Range = {500, 10000},
+	Increment = 100,
+	CurrentValue = protectMaxFishLimit,
+	Callback = function(v)
+		protectMaxFishLimit = math.floor(v)
+		UpdateProtectLabel()
+		Rayfield:Notify({
+			Title = "⏰ Batas Maksimum Diperbarui",
+			Content = string.format("Respawn otomatis jika sudah mencapai %d ikan 🐟", protectMaxFishLimit),
+			Duration = 3
+		})
+	end
+})
+
+------------------------------------------------------------
+-- 🎚️ SLIDER PROTEKSI KHUSUS (3 Trigger)
+------------------------------------------------------------
+-- 🟠 Legendary Trigger
+TabRespawn:CreateSlider({
+	Name = "🟠 Proteksi Legendary Trigger",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = protectLegendaryNeeded,
+	Callback = function(v)
+		protectLegendaryNeeded = math.floor(v)
+		Rayfield:Notify({
+			Title = "🟠 Proteksi Legendary Diubah",
+			Content = string.format("Respawn jika mendapat %d Legendary sebelum batas proteksi 🎯", protectLegendaryNeeded),
+			Duration = 3
+		})
+	end
+})
+
+-- 🔴 Mythic Trigger
+TabRespawn:CreateSlider({
+	Name = "🔴 Proteksi Mythic Trigger",
+	Range = {1, 5},
+	Increment = 1,
+	CurrentValue = protectMythicNeeded,
+	Callback = function(v)
+		protectMythicNeeded = math.floor(v)
+		Rayfield:Notify({
+			Title = "🔴 Proteksi Mythic Diubah",
+			Content = string.format("Respawn jika mendapat %d Mythic sebelum batas proteksi 🐉", protectMythicNeeded),
+			Duration = 3
+		})
+	end
+})
+
+-- ⚡ Combo Trigger
+TabRespawn:CreateSlider({
+	Name = "⚡ Proteksi Kombinasi (Legend + Mythic)",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = protectComboLegendNeeded,
+	Callback = function(v)
+		protectComboLegendNeeded = math.floor(v)
+		Rayfield:Notify({
+			Title = "⚡ Proteksi Kombinasi Diubah",
+			Content = string.format("Respawn jika mendapat %d Legendary + %d Mythic sebelum batas proteksi ⚡", protectComboLegendNeeded, protectComboMythicNeeded),
+			Duration = 3
+		})
+	end
+})
+
+------------------------------------------------------------
+-- 🔘 Toggle Proteksi Respawn
+------------------------------------------------------------
+TabRespawn:CreateToggle({
+	Name = "🛡️ Aktifkan Proteksi Respawn (Rare Sebelum 500 / Maks 4000)",
+	CurrentValue = false,
+	Callback = function(v)
+		protectRespawnEnabled = v
+		if v then
+			ResetProtectCounter()
+			UpdateProtectLabel()
+			Rayfield:Notify({
+				Title = "🛡️ Proteksi Aktif",
+				Content = string.format("Respawn otomatis jika rare muncul sebelum %d ikan, atau otomatis di %d ikan 🐟", protectMinFishLimit, protectMaxFishLimit),
+				Duration = 4
+			})
+		else
+			UpdateProtectLabel()
+			Rayfield:Notify({
+				Title = "🧊 Proteksi Dimatikan",
+				Content = "Sistem proteksi respawn dinonaktifkan 💋",
+				Duration = 3
+			})
+		end
+	end
+})
+
+
+------------------------------------------------------------
+-- ⏱️ Timer Countdown Loop
+------------------------------------------------------------
+local function startCountdown()
+	task.spawn(function()
+		local remaining = respawnInterval
+		while autoRespawnEnabled and remaining > 0 do
+			countdownLabel:Set("🕐 Next respawn in: " .. formatTime(remaining))
+			task.wait(1)
+			remaining -= 1
+		end
+		countdownLabel:Set("🕐 Next respawn in: --")
+
+		if autoRespawnEnabled then
+			RespawnNow()
+			task.wait(3)
+			startCountdown()
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- 🕒 Label Countdown
+------------------------------------------------------------
+countdownLabel = TabRespawn:CreateLabel("🕐 Next respawn in: --")
+
+------------------------------------------------------------
+-- 🔘 Toggle Auto Respawn
+------------------------------------------------------------
+TabRespawn:CreateToggle({
+	Name = "♻️ Auto Respawn Loop",
+	CurrentValue = false,
+	Callback = function(Value)
+		autoRespawnEnabled = Value
+		if Value then
+			Rayfield:Notify({
+				Title = "♻️ Auto Respawn Aktif",
+				Content = string.format("Respawn otomatis tiap %.0f menit 😴", respawnInterval / 60),
+				Duration = 4
+			})
+			startCountdown()
+		else
+			countdownLabel:Set("🕐 Next respawn in: --")
+			Rayfield:Notify({
+				Title = "❌ Auto Respawn Dimatikan",
+				Content = "Respawn otomatis dihentikan 💋",
+				Duration = 3
+			})
+		end
+	end
+})
+
+------------------------------------------------------------
+-- ⏱️ Interval Respawn Slider
+------------------------------------------------------------
+TabRespawn:CreateSlider({
+	Name = "⏱️ Interval Respawn (menit)",
+	Range = {1, 300},
+	Increment = 1,
+	CurrentValue = respawnInterval / 60,
+	Callback = function(Value)
+		respawnInterval = Value * 60
+		if sliderDelayTask then
+			task.cancel(sliderDelayTask)
+		end
+		sliderDelayTask = task.delay(2, function()
+			Rayfield:Notify({
+				Title = "⏱️ Interval Diperbarui",
+				Content = string.format("Respawn tiap %.0f menit (%s)", Value, formatTime(Value * 60)),
+				Duration = 3
+			})
+			sliderDelayTask = nil
+		end)
+	end
+})
+
+------------------------------------------------------------
+-- 🔘 Tombol Manual Respawn
+------------------------------------------------------------
+TabRespawn:CreateButton({
+	Name = "🔄 Respawn Sekarang (Manual)",
+	Callback = function()
+		RespawnNow(true)
+	end
+})
+
+------------------------------------------------------------
+-- ♻️ TAB: RESPAWN RANDOM
+------------------------------------------------------------
+local TabRespawnRandom = Window:CreateTab("♻️ Respawn Random")
+
+------------------------------------------------------------
+-- 🌍 Daftar Lokasi Teleport
+------------------------------------------------------------
+local teleportList = {
+    {-562.25,8.75,-66.47,185.0},{-931.43,21.14,592.11,261.6},{-939.05,16.75,634.41,268.2},
+    {-903.29,16.75,632.26,88.4},{-860.46,18.75,466.78,88.4},{-916.71,19.06,456.30,273.6},
+    {-993.95,15.78,403.85,190.1},{-930.88,17.50,401.24,225.5},{-922.42,24.50,370.41,267.9},
+    {-828.11,17.50,407.45,118.6},{-840.55,43.10,366.13,85.4},{-830.04,53.50,216.11,85.4},
+    {-654.26,17.25,449.99,268.6},{-587.11,17.25,457.99,77.0},{-603.49,3.10,558.02,59.8},
+    {-654.82,2.20,543.63,276.0},{-623.54,2.79,698.67,90.4},{-370.80,6.63,520.69,354.5},
+    {-394.43,13.75,477.15,182.9},{-358.07,4.75,487.52,182.8},{-2957.63,66.40,2208.07,89.7},
+    {-2940.75,66.25,2209.77,266.3},{-3103.87,6.42,2217.77,254.8},{-3140.96,2.34,2125.65,3.3},
+    {-3206.86,3.12,2105.37,13.9},{-3237.18,10.07,2131.59,59.9},{-3271.77,2.50,2231.10,105.4},
+    {-3240.85,7.15,2277.41,143.2},{-3030.59,2.52,2287.01,86.9},{-2921.72,3.25,2082.21,75.2},
+    {-2753.68,4.01,2105.15,263.1},{3188.01,-1302.10,1366.95,248.7},{3230.64,-1302.10,1455.41,342.4},
+    {3263.51,-1302.10,1333.10,154.9},{3304.97,-1302.10,1421.34,70.5},{3273.58,-1301.53,1384.71,297.3},
+    {3250.72,-1293.51,1435.31,26.5},{3218.36,-1293.80,1365.76,206.1},{198.37,3.22,2799.67,321.9},
+    {260.08,3.19,2948.22,285.2},{220.60,3.22,3052.32,247.5},{82.94,3.26,3141.14,192.0},
+    {-23.63,3.18,3139.72,176.4},{-95.85,3.01,3104.86,182.4},{-135.75,3.26,3053.96,79.7},
+    {-80.68,3.26,2874.68,28.7},{-168.03,3.26,2961.94,231.4},{-214.13,3.26,2909.88,90.5},
+    {-107.88,3.26,2848.26,277.8},{-108.14,32.23,2847.89,258.5},{-86.81,18.53,2834.54,181.4},
+    {-86.88,18.53,2814.65,358.6},{-175.75,3.26,2775.72,47.8},{39.09,3.22,2762.25,8.0},
+    {85.93,9.57,2691.10,93.2},{-2110.59,6.27,3689.77,342.6},{-2095.57,6.27,3654.41,148.1},{-2002.13,4.03,3682.70,312.2},{-2012.50,5.77,3756.10,165.9},
+    {-2043.80,4.75,3819.17,31.5},{-2054.07,9.00,3777.46,175.5},{-2110.96,6.33,3813.89,275.1},
+    {-2071.43,7.61,3845.78,28.9},{-2151.83,2.38,3670.99,29.3},{-2164.80,2.83,3639.15,220.1},
+    {-1539.16,2.87,1916.74,190.6},{-1493.22,3.50,1915.87,152.1},{-1557.82,8.74,1797.09,35.6},
+    {-1635.25,8.13,1874.11,75.8},{-2146.44,53.49,3676.09,1.2},{-2175.29,53.49,3637.36,247.3},
+	{-2129.36,53.49,3633.35,139.4}
+}
+
+------------------------------------------------------------
+-- 🔀 Random offset 0.01 - 0.09 (biar gak keliatan fix)
+------------------------------------------------------------
+local function randomizeCoord(num)
+	return num + math.random(1,5)/100
+end
+
+------------------------------------------------------------
+-- ⚙️ State Khusus TAB RANDOM
+------------------------------------------------------------
+local autoRespawnRandomEnabled = false
+local respawnRandomInterval = 3600 -- detik
+local respawnRandomCount = 0
+local countdownLabelRandom
+local sliderDelayTaskRandom
+
+-- counter rarity khusus tab random
+local rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+local isRespawningRandom = false
+
+-- flag untuk Mode Combo (biar notifnya gak spam)
+local waitingComboNotifiedRandom = false
+
+
+-- ✅ Inisialisasi Remote & Fungsi Toggle
+local Autofish = GetNetRemote("RF/UpdateAutoFishingState")
+local CurrentValueRandom = false
+
+local function ToggleAutoFishing(state)
+    pcall(function()
+        Autofish:InvokeServer(state)
+        CurrentValueRandom = state
+        print("[AutoFishing Random]", state and "ON 🎣" or "OFF 💤")
+    end)
+end
+
+------------------------------------------------------------
+-- 🎣 Fungsi RespawnNowRandom (Dua Kali Respawn + Teleport Random + Reset)
+------------------------------------------------------------
+local function RespawnNowRandom()
+	if isRespawningRandom then return end
+	isRespawningRandom = true
+
+	task.spawn(function()
+		------------------------------------------------------------
+		-- ⛔ Matikan AutoFishing saat proses respawn mulai
+		------------------------------------------------------------
+		task.spawn(function()
+			task.wait(2) -- kasih waktu dikit biar karakter kebentuk
+			ToggleAutoFishing(false)
+		end)
+
+		local willResume = Config and Config.AutoFishing
+		if StopAutoFish then StopAutoFish() end
+
+		local hrp = safeGetHRP()
+		if not hrp then
+			Notify("❌ Gagal Respawn (Random)", "HumanoidRootPart tidak ditemukan.", 3)
+			isRespawningRandom = false
+			return
+		end
+
+		local lastCFrame = hrp.CFrame
+		local function doRespawnOnce(idx)
+			local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			if hum then hum.Health = 0 end
+			local newChar = LocalPlayer.CharacterAdded:Wait()
+			newChar:WaitForChild("HumanoidRootPart", 10)
+			task.wait(1)
+			Notify("♻️ Respawn (Random)", ("Respawn #%d selesai"):format(idx), 2)
+		end
+
+		-- Respawn #1
+		doRespawnOnce(1)
+		task.wait(0.3)
+
+		-- 💰 Jual ikan
+		local sell = GetNetRemote and GetNetRemote("RF/SellAllItems")
+		if sell then
+			pcall(function()
+				sell:InvokeServer()
+				Notify("💰 Jual Ikan", "Semua ikan sudah dijual.", 2)
+			end)
+		end
+
+		task.wait(1)
+		doRespawnOnce(2)
+		task.wait(0.4)
+
+		------------------------------------------------------------
+		-- 🚀 Teleport Random
+		------------------------------------------------------------
+		if #teleportList > 0 then
+			local spot = teleportList[math.random(1, #teleportList)]
+			local x = randomizeCoord(spot[1])
+			local y = randomizeCoord(spot[2])
+			local z = randomizeCoord(spot[3])
+			local rot = spot[4] or 0
+
+			local newChar = LocalPlayer.Character
+			local newHRP = newChar and newChar:FindFirstChild("HumanoidRootPart")
+			if newHRP then
+				newHRP.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(rot), 0)
+				Notify("🚀 Teleport Random", string.format("X=%.2f Y=%.2f Z=%.2f | %.1f°", x, y, z, rot), 4)
+			else
+				Notify("⚠️ Gagal Teleport", "HRP tidak ditemukan setelah respawn.", 3)
+			end
+		else
+			Notify("⚠️ Gagal Teleport", "Daftar teleport kosong.", 3)
+		end
+
+		------------------------------------------------------------
+		-- 🎣 Equip rod kembali
+		------------------------------------------------------------
+		task.wait(0.5)
+		local rs = game:GetService("ReplicatedStorage")
+		local equipRodEvent = rs.Packages._Index["sleitnick_net@0.2.0"].net["RE/EquipToolFromHotbar"]
+		if equipRodEvent then
+			pcall(function()
+				equipRodEvent:FireServer(1)
+			end)
+		end
+
+		------------------------------------------------------------
+        -- ✅ Cross-check sebelum nyalakan AutoFishing lagi
+        ------------------------------------------------------------
+		task.wait(0.5)
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		if char and char:FindFirstChild("HumanoidRootPart") then
+			if CurrentValueRandom == true then
+				print("[AutoFishing Random] ⚠️ Masih ON sebelum re-enable — resetting state...")
+				ToggleAutoFishing(false)
+				task.wait(0.3)
+			end
+
+			ToggleAutoFishing(true)
+			Notify("🎣 AutoFishing", "AutoFishing kembali diaktifkan.", 3)
+		else
+			print("[AutoFishing Random] ❌ Gagal nyalain ulang — karakter belum siap.")
+			Notify("⚠️ AutoFishing", "Karakter belum siap untuk AutoFishing.", 3)
+		end
+
+		------------------------------------------------------------
+		-- 💫 Reset Counter Rare
+		------------------------------------------------------------
+		task.wait(0.2)
+		rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+		sessionStartCaught = AllTimeCaught and AllTimeCaught.Value or 0
+
+		------------------------------------------------------------
+		-- 💫 Reset Anti-Stuck
+		------------------------------------------------------------
+		if antiStuckEnabled then
+			task.spawn(function()
+				task.wait(1)
+				fishSinceLastRare = 0
+				lastCaughtForStuck = AllTimeCaught and AllTimeCaught.Value or 0
+				print("[Anti-Stuck Reset Random] AllTimeCaught:", lastCaughtForStuck)
+				if stuckProgressLabel then
+					stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+				end
+				Rayfield:Notify({
+					Title = "🔄 Anti-Stuck Reset (Random)",
+					Content = "Jumlah ikan tanpa rare direset setelah respawn random ♻️",
+					Duration = 3
+				})
+			end)
+		end
+
+		------------------------------------------------------------
+		-- 🟠 Balik orientasi ke arah terakhir
+		------------------------------------------------------------
+		local newHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if newHRP and lastCFrame then
+			local x, y, z = lastCFrame:ToEulerAnglesYXZ()
+			newHRP.CFrame = CFrame.new(newHRP.Position) * CFrame.Angles(x, y, z)
+		end
+
+		isRespawningRandom = false
+	end)
+end
+
+
+------------------------------------------------------------
+-- 🧠 Trigger Rarity (Versi RANDOM)
+------------------------------------------------------------
+-- default threshold sama seperti TabRespawn biasa
+local legendThresholdRandom       = 7
+local mythicThresholdRandom       = 2
+local comboLegendNeededRandom     = 2
+local comboMythicNeededRandom     = 1
+
+local enableLegendaryModeRandom           = false
+local enableMythicModeRandom              = false
+local enableMythicBeforeLegendaryModeRandom = false
+local enableComboModeRandom               = false
+
+local rarityLabelRandom -- dideklarasi dulu, diisi setelah UI dibuat
+
+local function HandleRarityTriggerRandom(counts, respawnFunc)
+	if isRespawningRandom then return end
+
+	local leg = counts.Legendary
+	local myt = counts.Mythic
+
+	-- Mode 1 – Legendary
+	if enableLegendaryModeRandom and leg >= legendThresholdRandom then
+		Notify("🟠 Legendary Respawn (Random)", string.format("Mendapat %d Legendary – respawn!", leg), 3)
+		return respawnFunc()
+	end
+
+	-- Mode 2 – Mythic
+	if enableMythicModeRandom and myt >= mythicThresholdRandom then
+		Notify("🔴 Mythic Respawn (Random)", string.format("Mendapat %d Mythic – respawn!", myt), 3)
+		return respawnFunc()
+	end
+
+	-- Mode 3 – 2 Mythic sebelum Legendary penuh
+	if enableMythicBeforeLegendaryModeRandom and myt >= 2 and leg < legendThresholdRandom then
+		Notify("🐉 Trigger (Random)", "2 Mythic didapat sebelum Legendary penuh – respawn 💀", 4)
+		return respawnFunc()
+	end
+
+	-- Mode 4 – Combo Smart (prioritas Mythic)
+	if enableComboModeRandom then
+		-- kalau Mythic > 1 sebelum L cukup → respawn langsung
+		if myt > 1 and leg < comboLegendNeededRandom then
+			Notify("🔴 Mythic Priority (Random)",
+				string.format("Mendapat %d Mythic sebelum %d Legendary – respawn!", myt, comboLegendNeededRandom), 4)
+			waitingComboNotifiedRandom = false
+			return respawnFunc()
+		end
+
+		-- Legendary > comboLegendNeeded, belum ada Mythic → tunggu Mythic
+		if leg > comboLegendNeededRandom and myt == 0 then
+			-- satu kali info (kalau mau, bisa di-uncomment)
+			-- if not waitingComboNotifiedRandom then
+			-- 	Notify("🎣 Combo Waiting (Random)", string.format("%d Legendary, menunggu Mythic pertama...", leg), 3)
+			-- 	waitingComboNotifiedRandom = true
+			-- end
+			return
+		end
+
+		-- jika sudah dapat Mythic setelah Legendary cukup
+		if leg > comboLegendNeededRandom and myt >= 1 then
+			Notify("⚡ Combo Triggered (Random)",
+				string.format("%d Legendary + %d Mythic – respawn!", leg, myt), 4)
+			waitingComboNotifiedRandom = false
+			return respawnFunc()
+		end
+
+		-- kombinasi ideal pertama (misal 2L + 1M)
+		if leg == comboLegendNeededRandom and myt == comboMythicNeededRandom then
+			Notify("💥 Combo Aktif (Random)",
+				string.format("%d Legendary + %d Mythic – pantau Mythic berikutnya ⚡", leg, myt), 3)
+			waitingComboNotifiedRandom = false
+			return
+		end
+	end
+end
+
+------------------------------------------------------------
+-- 🔄 Listener Ikan (menggunakan UID → rarity, versi RANDOM)
+------------------------------------------------------------
+local function connectFishListenerRandom()
+	if REObtainedNewFishNotification then
+		REObtainedNewFishNotification.OnClientEvent:Connect(function(_, _, fishData)
+			if isRespawningRandom or not fishData or not fishData.ItemId then return end
+
+			local rarity = getRarityFromUID(fishData.ItemId)
+			if rarity == "Mythic" then
+				rarityCountsRandom.Mythic += 1
+			elseif rarity == "Legendary" then
+				rarityCountsRandom.Legendary += 1
+			end
+
+			local totalRare = rarityCountsRandom.Mythic + rarityCountsRandom.Legendary
+			if rarityLabelRandom then
+				rarityLabelRandom:Set(string.format(
+					"🟠 Legendary: %d | 🔴 Mythic: %d | 🎣 Legendary + Mythic: %d",
+					rarityCountsRandom.Legendary,
+					rarityCountsRandom.Mythic,
+					totalRare
+				))
+			end
+
+			-- trigger rules khusus random
+			HandleRarityTriggerRandom(rarityCountsRandom, RespawnNowRandom)
+		end)
+	else
+		Notify("⚠️ Event Ikan (Random) Tidak Ditemukan", "Pastikan game masih sinkron dengan ReplicatedStorage", 5)
+	end
+end
+
+connectFishListenerRandom()
+
+------------------------------------------------------------
+-- ⚙️ UI & MODE CONTROL SECTION (Sama seperti TabRespawn)
+------------------------------------------------------------
+TabRespawnRandom:CreateSection("🐉 Auto Respawn Random by Rarity UID")
+
+------------------------------------------------------------
+-- 🏷️ Label Status Rarity
+------------------------------------------------------------
+rarityLabelRandom = TabRespawnRandom:CreateLabel(
+	"🟠 Legendary: 0 | 🔴 Mythic: 0 | 🎣 Legendary + Mythic: 0"
+)
+
+------------------------------------------------------------
+-- 🟠 Mode 1 – Legendary (Random)
+------------------------------------------------------------
+TabRespawnRandom:CreateSlider({
+	Name = "🟠 Batas Legendary untuk Respawn (Random)",
+	Range = {1, 15},
+	Increment = 1,
+	CurrentValue = legendThresholdRandom,
+	Callback = function(v)
+		legendThresholdRandom = v
+		Notify("🟠 Threshold Legendary (Random) Diubah",
+			string.format("Respawn saat mendapat %d Legendary", v), 3)
+	end
+})
+
+TabRespawnRandom:CreateToggle({
+	Name = "🟠 Aktifkan Auto Respawn Legendary (Random)",
+	CurrentValue = false,
+	Callback = function(v)
+		enableLegendaryModeRandom = v
+		rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🟠 Mode Legendary Random Aktif",
+				"Respawn random otomatis jika batas Legendary tercapai.", 4)
+		else
+			Notify("🧊 Mode Legendary Random Mati",
+				"Berhenti pantau ikan Legendary (Random).", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🔴 Mode 2 – Mythic (Random)
+------------------------------------------------------------
+TabRespawnRandom:CreateSlider({
+	Name = "🔴 Batas Mythic untuk Respawn (Random)",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = mythicThresholdRandom,
+	Callback = function(v)
+		mythicThresholdRandom = v
+		Notify("🔴 Threshold Mythic (Random) Diubah",
+			string.format("Respawn saat mendapat %d Mythic", v), 3)
+	end
+})
+
+TabRespawnRandom:CreateToggle({
+	Name = "🔴 Aktifkan Auto Respawn Mythic (Random)",
+	CurrentValue = false,
+	Callback = function(v)
+		enableMythicModeRandom = v
+		rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🔴 Mode Mythic Random Aktif",
+				"Respawn random otomatis jika batas Mythic tercapai.", 4)
+		else
+			Notify("🧊 Mode Mythic Random Mati",
+				"Berhenti pantau ikan Mythic (Random).", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🐉 Mode 3 – 2 Mythic Before Legendary (Random)
+------------------------------------------------------------
+TabRespawnRandom:CreateToggle({
+	Name = "🐉 Respawn jika dapat Mythic sebelum Legendary penuh (Random)",
+	CurrentValue = false,
+	Callback = function(v)
+		enableMythicBeforeLegendaryModeRandom = v
+		rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("🐉 Mode Random Aktif",
+				"Respawn random jika 2 Mythic muncul lebih awal.", 4)
+		else
+			Notify("🧊 Mode Random Mati",
+				"Berhenti pantau Mythic awal (Random).", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 💥 Mode 4 – Combo (Legendary + Mythic Priority) RANDOM
+------------------------------------------------------------
+TabRespawnRandom:CreateSlider({
+	Name = "🟠 Jumlah Legendary Combo (Random)",
+	Range = {1, 10},
+	Increment = 1,
+	CurrentValue = comboLegendNeededRandom,
+	Callback = function(v)
+		comboLegendNeededRandom = v
+		Notify("🟠 Combo Legendary Random Diubah",
+			string.format("Dibutuhkan %d Legendary dalam combo (Random)", v), 3)
+	end
+})
+
+TabRespawnRandom:CreateSlider({
+	Name = "🔴 Jumlah Mythic Combo (Random)",
+	Range = {1, 5},
+	Increment = 1,
+	CurrentValue = comboMythicNeededRandom,
+	Callback = function(v)
+		comboMythicNeededRandom = v
+		Notify("🔴 Combo Mythic Random Diubah",
+			string.format("Dibutuhkan %d Mythic dalam combo (Random)", v), 3)
+	end
+})
+
+TabRespawnRandom:CreateToggle({
+	Name = "💥 Mode Kombinasi (Legendary + Mythic Priority) Random",
+	CurrentValue = false,
+	Callback = function(v)
+		enableComboModeRandom = v
+		rarityCountsRandom = { Mythic = 0, Legendary = 0 }
+		if v then
+			Notify("💥 Mode Combo Random Aktif", string.format(
+				"Respawn random setelah %d Legendary & %d Mythic (Mythic prioritas) ⚡",
+				comboLegendNeededRandom, comboMythicNeededRandom
+			), 4)
+		else
+			Notify("🧊 Mode Combo Random Mati",
+				"Pantauan combo Random dinonaktifkan 💤", 3)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🐟 Auto Respawn by Fish Count (Random)
+------------------------------------------------------------
+local fishBasedRespawnEnabledRandom = false
+local lastCaughtRandom = 0
+local caughtThresholdRandom = 1000 -- default tiap 1000 ikan
+
+local fishProgressLabelRandom = TabRespawnRandom:CreateLabel(
+	"🐟 Next respawn after: 0 / " .. caughtThresholdRandom
+)
+
+task.spawn(function()
+    while task.wait(1) do
+        if not fishBasedRespawnEnabledRandom then
+            fishProgressLabelRandom:Set("🐟 Next respawn after: -- / --")
+            continue
+        end
+
+        local now = AllTimeCaught.Value
+        local diff = now - lastCaughtRandom
+        local percent = math.min(100, math.floor((diff / caughtThresholdRandom) * 100))
+
+        fishProgressLabelRandom:Set(string.format(
+			"🐟 Next respawn after: %d / %d (%d%%)",
+			diff, caughtThresholdRandom, percent
+		))
+    end
+end)
+
+TabRespawnRandom:CreateToggle({
+    Name = "🐟 Auto Respawn by Fish Count (Random)",
+    CurrentValue = false,
+    Callback = function(Value)
+        fishBasedRespawnEnabledRandom = Value
+        if Value then
+            lastCaughtRandom = AllTimeCaught.Value
+            Rayfield:Notify({
+                Title = "🐟 Auto Respawn Random Aktif",
+                Content = string.format("Respawn random otomatis tiap %d ikan 🎣", caughtThresholdRandom),
+                Duration = 4
+            })
+        else
+            Rayfield:Notify({
+                Title = "❌ Auto Respawn Random Mati",
+                Content = "Respawn random berdasarkan ikan dimatikan 💋",
+                Duration = 3
+            })
+        end
+    end
+})
+
+local sliderNotifyDelayRandom
+TabRespawnRandom:CreateSlider({
+    Name = "🎚️ Set Jumlah Ikan per Respawn (Random)",
+    Range = {100, 5000},
+    Increment = 100,
+    CurrentValue = caughtThresholdRandom,
+    Callback = function(Value)
+        caughtThresholdRandom = math.floor(Value)
+
+        if sliderNotifyDelayRandom then
+            task.cancel(sliderNotifyDelayRandom)
+        end
+
+        sliderNotifyDelayRandom = task.delay(2, function()
+            Rayfield:Notify({
+                Title = "🎣 Batas Ikan (Random) Diubah",
+                Content = string.format("Respawn random setiap %d ikan tertangkap 🐟", caughtThresholdRandom),
+                Duration = 3
+            })
+        end)
+    end
+})
+
+-- loop utama cek ikan (Random)
+task.spawn(function()
+    lastCaughtRandom = AllTimeCaught.Value
+    while task.wait(5) do
+        if not fishBasedRespawnEnabledRandom then continue end
+
+        local nowCaught = AllTimeCaught.Value
+        local diff = nowCaught - lastCaughtRandom
+
+        if diff >= caughtThresholdRandom then
+            Rayfield:Notify({
+                Title = "♻️ Auto Respawn Random Triggered",
+                Content = string.format("Menangkap %d ikan, respawn random dimulai 🐟", diff),
+                Duration = 4
+            })
+            RespawnNowRandom()
+            lastCaughtRandom = nowCaught
+        end
+    end
+end)
+
+
+------------------------------------------------------------
+-- 💫 ANTI-STUCK SYSTEM (RESET DENGAN TOGGLE AUTO-REFRESH)
+------------------------------------------------------------
+local antiStuckEnabled = false
+local noRareLimit = 300
+local fishSinceLastRare = 0
+local lastCaughtForStuck = AllTimeCaught.Value
+local stuckProgressLabel = TabRespawnRandom:CreateLabel("💫 Ikan tanpa rare: -- / --")
+
+-- Simpan referensi toggle biar bisa diubah dari script
+local toggleAntiStuck
+
+------------------------------------------------------------
+-- 🧩 Fungsi Aktifkan/Matikan Anti-Stuck (biar bisa dipanggil internal)
+------------------------------------------------------------
+local function SetAntiStuckState(state)
+	antiStuckEnabled = state
+	if state then
+		fishSinceLastRare = 0
+		lastCaughtForStuck = AllTimeCaught.Value
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+	else
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: -- / --")
+	end
+end
+
+------------------------------------------------------------
+-- 🧿 TOGGLE UTAMA
+------------------------------------------------------------
+toggleAntiStuck = TabRespawnRandom:CreateToggle({
+	Name = "💫 Aktifkan Anti-Stuck (No Rare Respawn)",
+	CurrentValue = false,
+	Callback = function(v)
+		SetAntiStuckState(v)
+		if v then
+			Rayfield:Notify({
+				Title = "💫 Anti-Stuck Aktif",
+				Content = string.format("Respawn jika tidak ada rare dalam %d ikan 🐟", noRareLimit),
+				Duration = 4
+			})
+		else
+			Rayfield:Notify({
+				Title = "🧊 Anti-Stuck Dimatikan",
+				Content = "Pantauan ikan tanpa rare dihentikan 💋",
+				Duration = 3
+			})
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🎚️ SLIDER
+------------------------------------------------------------
+TabRespawnRandom:CreateSlider({
+	Name = "🐟 Batas Ikan Tanpa Rare Sebelum Respawn",
+	Range = {100, 5000},
+	Increment = 100,
+	CurrentValue = noRareLimit,
+	Callback = function(v)
+		noRareLimit = math.floor(v)
+
+		if antiStuckEnabled then
+			stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+		end
+
+		-- ⏳ Tambahkan delay 2 detik sebelum notifikasi muncul
+		task.spawn(function()
+			task.wait(2)
+			Rayfield:Notify({
+				Title = "🐟 Batas Diubah",
+				Content = "Respawn otomatis jika tidak ada rare dalam " .. noRareLimit .. " ikan.",
+				Duration = 3
+			})
+		end)
+	end
+})
+
+------------------------------------------------------------
+-- 🔁 LOOP ANTI-STUCK
+------------------------------------------------------------
+local function StartAntiStuckLoop()
+	if _G.AntiStuckLoop then
+		task.cancel(_G.AntiStuckLoop)
+	end
+
+	_G.AntiStuckLoop = task.spawn(function()
+		while task.wait(1) do
+			if not antiStuckEnabled then continue end
+
+			local now = AllTimeCaught.Value
+			local diff = now - lastCaughtForStuck
+
+			if diff > 0 then
+				fishSinceLastRare += diff
+				lastCaughtForStuck = now
+
+				local percent = math.min(100, math.floor((fishSinceLastRare / noRareLimit) * 100))
+				stuckProgressLabel:Set(string.format("💫 Ikan tanpa rare: %d / %d (%d%%)", fishSinceLastRare, noRareLimit, percent))
+
+				if fishSinceLastRare >= noRareLimit then
+					if (rarityCounts.Legendary < legendThreshold) and (rarityCounts.Mythic < mythicThreshold) then
+						Rayfield:Notify({
+							Title = "😴 Tidak Ada Rare",
+							Content = string.format("Sudah %d ikan tanpa Legendary/Mythic, respawn otomatis 🌀", noRareLimit),
+							Duration = 4
+						})
+
+						RespawnNow()
+
+						-- hentikan loop sementara agar gak konflik pas respawn
+						task.wait(0.2)
+						break
+					else
+						fishSinceLastRare = 0
+						lastCaughtForStuck = AllTimeCaught.Value
+						stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+					end
+				end
+			end
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- 🧠 Listener: Mulai ulang loop setelah respawn
+------------------------------------------------------------
+player.CharacterAdded:Connect(function(newChar)
+	if not antiStuckEnabled then return end
+
+	task.spawn(function()
+		newChar:WaitForChild("HumanoidRootPart", 10)
+		task.wait(1)
+
+		fishSinceLastRare = 0
+		lastCaughtForStuck = AllTimeCaught.Value
+		stuckProgressLabel:Set("💫 Ikan tanpa rare: 0 / " .. noRareLimit .. " (0%)")
+
+		Rayfield:Notify({
+			Title = "🔄 Anti-Stuck Reset",
+			Content = "Counter direset & loop dimulai ulang setelah respawn ♻️",
+			Duration = 3
+		})
+
+		StartAntiStuckLoop()
+	end)
+end)
+
+------------------------------------------------------------
+-- 🧩 Jalankan loop pertama kali
+------------------------------------------------------------
+StartAntiStuckLoop()
+
+------------------------------------------------------------
+-- ⏱️ Timer Countdown Loop (Random)
+------------------------------------------------------------
+local function startCountdownRandom()
+	task.spawn(function()
+		local remaining = respawnRandomInterval
+		while autoRespawnRandomEnabled and remaining > 0 do
+			countdownLabelRandom:Set("🕐 Next respawn (Random) in: " .. formatTime(remaining))
+			task.wait(1)
+			remaining -= 1
+		end
+		countdownLabelRandom:Set("🕐 Next respawn (Random) in: --")
+
+		if autoRespawnRandomEnabled then
+			RespawnNowRandom()
+			task.wait(3)
+			startCountdownRandom()
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- 🕒 Label Countdown RANDOM
+------------------------------------------------------------
+countdownLabelRandom = TabRespawnRandom:CreateLabel("🕐 Next respawn (Random) in: --")
+
+------------------------------------------------------------
+-- 🔘 Toggle Auto Respawn RANDOM
+------------------------------------------------------------
+TabRespawnRandom:CreateToggle({
+	Name = "♻️ Auto Respawn Loop (Random)",
+	CurrentValue = false,
+	Callback = function(Value)
+		autoRespawnRandomEnabled = Value
+		if Value then
+			Rayfield:Notify({
+				Title = "♻️ Auto Respawn Random Aktif",
+				Content = string.format("Respawn random otomatis tiap %.0f menit 😴", respawnRandomInterval / 60),
+				Duration = 4
+			})
+			startCountdownRandom()
+		else
+			countdownLabelRandom:Set("🕐 Next respawn (Random) in: --")
+			Rayfield:Notify({
+				Title = "❌ Auto Respawn Random Dimatikan",
+				Content = "Respawn random otomatis dihentikan 💋",
+				Duration = 3
+			})
+		end
+	end
+})
+
+------------------------------------------------------------
+-- ⏱️ Interval Respawn Slider (Random)
+------------------------------------------------------------
+TabRespawnRandom:CreateSlider({
+	Name = "⏱️ Interval Respawn Random (menit)",
+	Range = {1, 300},
+	Increment = 1,
+	CurrentValue = respawnRandomInterval / 60,
+	Callback = function(Value)
+		respawnRandomInterval = Value * 60
+
+		if sliderDelayTaskRandom then
+			task.cancel(sliderDelayTaskRandom)
+		end
+
+		sliderDelayTaskRandom = task.delay(2, function()
+			Rayfield:Notify({
+				Title = "⏱️ Interval Random Diperbarui",
+				Content = string.format("Respawn random tiap %.0f menit (%s)", Value, formatTime(Value * 60)),
+				Duration = 3
+			})
+			sliderDelayTaskRandom = nil
+		end)
+	end
+})
+
+------------------------------------------------------------
+-- 🔘 Tombol Manual Respawn (Random)
+------------------------------------------------------------
+TabRespawnRandom:CreateButton({
+	Name = "🔄 Respawn Sekarang (Random)",
+	Callback = function()
+		RespawnNowRandom()
+	end
+})
+
+
+local function randomizeCoord(num)
+	return num + math.random(1, 9) / 100
+end
+
+local function TeleportRandomOnly()
+	local hrp = safeGetHRP()
+	if not hrp then
+		Notify("⚠️ Gagal Teleport", "Karakter belum siap, HRP tidak ditemukan.", 3)
+		return
+	end
+
+	local spot = teleportList[math.random(1, #teleportList)]
+	local x = randomizeCoord(spot[1])
+	local y = randomizeCoord(spot[2])
+	local z = randomizeCoord(spot[3])
+	local rot = spot[4]
+
+	pcall(function()
+		hrp.CFrame = CFrame.new(x, y, z) * CFrame.Angles(0, math.rad(rot), 0)
+	end)
+
+	Notify("🚀 Teleport Random", string.format("X=%.2f | Y=%.2f | Z=%.2f | %.1f°", x, y, z, rot), 3)
+end
+
+------------------------------------------------------------
+-- 🚀 Tombol Teleport Random (tanpa respawn)
+------------------------------------------------------------
+TabRespawnRandom:CreateButton({
+	Name = "🚀 Teleport Random (Acak Lokasi)",
+	Callback = function()
+		TeleportRandomOnly()
+	end
+})
+
+
+
+------------------------------------------------------------
+-- 🧭 TAB 4: Tools & Utilities
+------------------------------------------------------------
+local TabTeleport = Window:CreateTab("🧭 Tools & Utilities")
+local RunService = game:GetService("RunService")
+
+------------------------------------------------------------
+-- 🧭 Fungsi Arah Kompas 16 Derajat (22.5° Interval)
+------------------------------------------------------------
+local function getCompass16(deg)
+	local directions = {
+		"N", "NNE", "NE", "ENE",
+		"E", "ESE", "SE", "SSE",
+		"S", "SSW", "SW", "WSW",
+		"W", "WNW", "NW", "NNW"
+	}
+	local index = math.floor((deg + 11.25) / 22.5) % 16 + 1
+	return directions[index]
+end
+
+------------------------------------------------------------
+-- 📍 Real-time Coordinates + Arah 16-Kompas 🌸
+------------------------------------------------------------
+local coordsVisible = true
+local coordsLabel = TabTeleport:CreateLabel("📍 Real-time Coordinates (Enabled)")
+
+TabTeleport:CreateButton({
+	Name = "👁️ Show / Hide Coordinates",
+	Callback = function()
+		coordsVisible = not coordsVisible
+		if coordsVisible then
+			coordsLabel:Set("📍 Real-time Coordinates (Enabled)")
+			Rayfield:Notify({Title="Coordinates",Content="Real-time Coordinates 💚",Duration=2})
+		else
+			coordsLabel:Set("📍 Coordinates hidden ❌")
+			Rayfield:Notify({Title="Coordinates",Content="Coordinates hidden 👁️‍🗨️",Duration=2})
+		end
+	end
+})
+
+TabTeleport:CreateButton({
+	Name = "📋 Copy Coordinates",
+	Callback = function()
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if root then
+			local pos = root.Position
+			setclipboard(string.format("%.2f, %.2f, %.2f", pos.X,pos.Y,pos.Z))
+			Rayfield:Notify({
+				Title = "Copied! 💾",
+				Content = string.format("Koordinat: X=%.2f | Y=%.2f | Z=%.2f", pos.X, pos.Y, pos.Z),
+				Duration = 2
+			})
+		else
+			Rayfield:Notify({
+				Title = "Gagal 😢",
+				Content = "Karakter belum terload ya, bubb 💋",
+				Duration = 2
+			})
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 📋 Copy Coordinates + Heading (tanpa arah & simbol °)
+------------------------------------------------------------
+TabTeleport:CreateButton({
+	Name = "🧭 Copy Coordinates + Heading",
+	Callback = function()
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if root then
+			local pos = root.Position
+			local lookVector = root.CFrame.LookVector
+			local heading = math.deg(math.atan2(-lookVector.X, -lookVector.Z))
+			if heading < 0 then heading = heading + 360 end
+
+			-- Format: X, Y, Z <spasi> heading
+			local result = string.format("%.2f, %.2f, %.2f %.1f", pos.X, pos.Y, pos.Z, heading)
+
+			setclipboard(result)
+			Rayfield:Notify({
+				Title = "Copied! 💾",
+				Content = "Koordinat & Derajat disalin!\n" .. result,
+				Duration = 2
+			})
+		else
+			Rayfield:Notify({
+				Title = "Gagal 😢",
+				Content = "Karakter belum terload ya, bubb 💋",
+				Duration = 2
+			})
+		end
+	end
+})
+
+--------------------------------------
+-- 🔄 Real-time Update: Koordinat
+--------------------------------------
+RunService.Heartbeat:Connect(function()
+	if not coordsVisible then return end
+	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		local pos = root.Position
+		local lookVector = root.CFrame.LookVector
+		local heading = math.deg(math.atan2(-lookVector.X, -lookVector.Z))
+		if heading < 0 then heading = heading + 360 end
+
+		local arah16 = getCompass16(heading)
+		coordsLabel:Set(string.format("📍 X: %.2f | Y: %.2f | Z: %.2f || %.1f° %s", pos.X, pos.Y, pos.Z, heading, arah16))
+	else
+		coordsLabel:Set("📍 Waiting for character...")
+	end
+end)
+
+
+------------------------------------------------------------
+-- 💾 Position Manager
+------------------------------------------------------------
+TabTeleport:CreateSection("💾 Position Manager")
+getgenv().savedPos = getgenv().savedPos or nil
+
+TabTeleport:CreateButton({
+	Name = "💾 Save Current Position",
+	Callback = function()
+		local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			-- simpan CFrame (posisi + rotasi)
+			getgenv().savedCFrame = hrp.CFrame
+			local pos = hrp.Position
+			Rayfield:Notify({
+				Title = "Position Saved 💾",
+				Content = string.format("X: %.2f | Y: %.2f | Z: %.2f", pos.X, pos.Y, pos.Z),
+				Duration = 3
+			})
+		end
+	end
+})
+
+TabTeleport:CreateButton({
+	Name = "⚡ Teleport to Saved Position",
+	Callback = function()
+		local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if getgenv().savedCFrame and hrp then
+			-- langsung set ke posisi & arah semula
+			hrp.CFrame = getgenv().savedCFrame
+			Rayfield:Notify({
+				Title = "Teleport ⚡",
+				Content = "Kembali ke posisi & arah tersimpan 😎",
+				Duration = 2
+			})
+		else
+			Rayfield:Notify({
+				Title = "Belum ada posisi 😢",
+				Content = "Tekan Save dulu ya sayang 💋",
+				Duration = 2
+			})
+		end
+	end
+})
+
+LocalPlayer.CharacterAdded:Connect(function()
+	if getgenv().savedCFrame then
+		Rayfield:Notify({
+			Title = "💾 Position Safe",
+			Content = "Respawn detected, posisi & arah aman 😘",
+			Duration = 3
+		})
+	end
+end)
+
+------------------------------------------------------------
+-- 🔁 SERVER TOOLS (DELTA PRIORITY MODE 💫)
+------------------------------------------------------------
+TabTeleport:CreateSection("🔁 Server Tools")
+
+-- Services
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = game.Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+
+------------------------------------------------------------
+-- 🧠 Fungsi Aman untuk Teleport (Hybrid Delta + Roblox)
+------------------------------------------------------------
+local function SafeTeleport(jobId, isPrivate)
+	local success, err = pcall(function()
+		--------------------------------------------------------
+		-- 🔍 1️⃣ Jika pakai Delta Executor
+		--------------------------------------------------------
+		if identifyexecutor and identifyexecutor():lower():find("delta") then
+			local DeltaTP = getgenv().Delta or getgenv().delta
+			if DeltaTP and typeof(DeltaTP) == "table" and DeltaTP.Teleport then
+				Rayfield:Notify({
+					Title = "🌀 Delta Detected",
+					Content = "Menggunakan teleport handler bawaan Delta 😎",
+					Duration = 3
+				})
+				if isPrivate then
+					DeltaTP.Teleport(game.PlaceId) -- Delta handle private dengan aman
+				else
+					DeltaTP.Teleport(game.PlaceId, jobId)
+				end
+				return
+			end
+		end
+
+		--------------------------------------------------------
+		-- 🔒 2️⃣ Jika di Private Server & BUKAN Delta
+		--------------------------------------------------------
+		if isPrivate then
+			local privateId = game.PrivateServerId
+			local accessCode = game.PrivateServerAccessCode
+
+			if privateId and privateId ~= "" then
+				Rayfield:Notify({
+					Title = "🔒 Private Server",
+					Content = "Rejoining private server kamu sendiri 💫",
+					Duration = 3
+				})
+				TeleportService:TeleportToPrivateServer(game.PlaceId, privateId, {LocalPlayer}, accessCode)
+			else
+				Rayfield:Notify({
+					Title = "⚠️ Private ID / AccessCode Kosong",
+					Content = "Tidak bisa rejoin private server tanpa AccessCode 😢",
+					Duration = 4
+				})
+				error("PrivateServerId atau AccessCode tidak ditemukan.")
+			end
+
+		--------------------------------------------------------
+		-- 🌐 3️⃣ Kalau di Public Server
+		--------------------------------------------------------
+		else
+			Rayfield:Notify({
+				Title = "🌐 Public Server",
+				Content = "Rejoining server publik yang sama 🎣",
+				Duration = 3
+			})
+			TeleportService:TeleportToPlaceInstance(game.PlaceId, jobId, LocalPlayer)
+		end
+	end)
+
+	--------------------------------------------------------
+	-- ⚠️ Error Handler
+	--------------------------------------------------------
+	if not success then
+		warn("[Teleport Error]:", err)
+		Rayfield:Notify({
+			Title = "Teleport Gagal 🚫",
+			Content = "Server mungkin penuh / restricted.\nError: " .. tostring(err),
+			Duration = 5
+		})
+		pcall(function()
+			local ui = game:GetService("CoreGui"):FindFirstChild("Rayfield")
+			if ui then ui.Enabled = false; task.wait(0.4); ui.Enabled = true end
+		end)
+	end
+end
+
+------------------------------------------------------------
+-- 💻 AUTO REJOIN (Roblox PC Friendly)
+------------------------------------------------------------
+_G.JobID = nil
+_G.AutoRetryTeleport = false
+
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+------------------------------------------------------------
+-- 🚀 Fungsi Auto Retry
+------------------------------------------------------------
+local function TryTeleport(jobId)
+	task.spawn(function()
+		while _G.AutoRetryTeleport and _G.JobID do
+			pcall(function()
+				Rayfield:Notify({
+					Title = "🔁 Mencoba Join…",
+					Content = "Job ID: " .. jobId,
+					Duration = 2
+				})
+				
+				TeleportService:TeleportToPlaceInstance(
+					game.PlaceId,
+					jobId,
+					LocalPlayer
+				)
+			end)
+
+			-- Delay antar percobaan
+			task.wait(3)
+		end
+	end)
+end
+
+------------------------------------------------------------
+-- 🔤 Input Job ID
+------------------------------------------------------------
+TabTeleport:CreateInput({
+	Name = "🔤 Join via Job ID (Auto Retry PC)",
+	PlaceholderText = "Masukkan Job ID (contoh: 3d62b1a9...)",
+	RemoveTextAfterFocusLost = false,
+	Callback = function(jobId)
+		if not jobId or #jobId < 6 then
+			Rayfield:Notify({
+				Title = "Job ID Invalid ⚠️",
+				Content = "Masukkan minimal 6 karakter ya bubb 💋",
+				Duration = 3
+			})
+			return
+		end
+		
+		_G.JobID = jobId
+
+		Rayfield:Notify({
+			Title = "🎯 Job ID Diset",
+			Content = "Sekarang tinggal aktifin Auto Retry ya, bubb 😏",
+			Duration = 3
+		})
+	end
+})
+
+------------------------------------------------------------
+-- 🔘 Toggle Auto Retry On/Off
+------------------------------------------------------------
+TabTeleport:CreateToggle({
+	Name = "🔁 Auto Retry Teleport",
+	CurrentValue = false,
+	Flag = "AutoRetryTeleport",
+	Callback = function(state)
+		_G.AutoRetryTeleport = state
+
+		if state then
+			if not _G.JobID then
+				Rayfield:Notify({
+					Title = "⚠️ Tidak Ada Job ID",
+					Content = "Masukkan Job ID dulu ya bubb 😏",
+					Duration = 3
+				})
+				_G.AutoRetryTeleport = false
+				return
+			end
+
+			Rayfield:Notify({
+				Title = "🔁 Auto Retry Aktif",
+				Content = "Akan mencoba masuk terus ke Job ID: " .. _G.JobID,
+				Duration = 4
+			})
+
+			TryTeleport(_G.JobID)
+
+		else
+			Rayfield:Notify({
+				Title = "🛑 Auto Retry Dimatikan",
+				Content = "Berhenti mencoba join.",
+				Duration = 3
+			})
+		end
+	end
+})
+
+
+
+------------------------------------------------------------
+-- 🔁 SMART REJOIN BUTTON (PUBLIC / PRIVATE AUTO)
+------------------------------------------------------------
+TabTeleport:CreateButton({
+	Name = "🔁 Rejoin Server (Smart Mode)",
+	Callback = function()
+		local isPrivate = (game.PrivateServerId and game.PrivateServerId ~= "")
+		if isPrivate then
+			Rayfield:Notify({
+				Title = "🔒 Private Server Detected",
+				Content = "Sedang mencoba rejoin private server...",
+				Duration = 3
+			})
+			SafeTeleport(nil, true)
+		else
+			Rayfield:Notify({
+				Title = "🌐 Public Server Detected",
+				Content = "Rejoining server publik yang sama 🎣",
+				Duration = 3
+			})
+			SafeTeleport(game.JobId, false)
+		end
+	end
+})
+
+------------------------------------------------------------
+-- ⛔ STOP SERVER HOP
+------------------------------------------------------------
+TabTeleport:CreateButton({
+	Name = "⛔ Stop Hopping",
+	Callback = function()
+		serverHopRunning = false
+		Rayfield:Notify({
+			Title = "Server Hop",
+			Content = "Berhenti auto hop 🚫",
+			Duration = 2
+		})
+	end
+})
+
+------------------------------------------------------------
+-- 🌐 Tab Server Info
+------------------------------------------------------------
+local TabServer = Window:CreateTab("🌐 Server Info")
+TabServer:CreateSection("📡 Informasi Server Saat Ini")
+
+-- Variabel untuk tombol copy agar tidak dobel
+local copyJobButton = nil
+
+-- Tombol utama untuk lihat info server
+TabServer:CreateButton({
+	Name = "🔍 Lihat Info Server Saat Ini",
+	Callback = function()
+		-- Ambil data server
+		local jobId = game.JobId ~= "" and game.JobId or "N/A"
+		local placeId = game.PlaceId
+		local universeId = game.GameId
+		local players = game.Players:GetPlayers()
+		local playerCount = #players
+		local maxPlayers = game.Players.MaxPlayers
+
+		-- Gabung daftar nama pemain
+		local playerNames = {}
+		for _, p in ipairs(players) do
+			table.insert(playerNames, string.format("• %s (@%s)", p.DisplayName, p.Name))
+		end
+
+		-- Format teks info
+		local infoText = string.format(
+			"🗺️ **Game Info:**\nPlaceId: %s\nUniverseId: %s\n\n🆔 **Server:**\nJobId: %s\n👥 Pemain: %d/%d\n\n🎮 **Daftar Pemain:**\n%s",
+			tostring(placeId),
+			tostring(universeId),
+			tostring(jobId),
+			playerCount,
+			maxPlayers,
+			table.concat(playerNames, "\n")
+		)
+
+		-- Tampilkan langsung info server di UI
+		TabServer:CreateParagraph({
+			Title = "🌍 Server Info",
+			Content = infoText
+		})
+
+		-- Notifikasi sukses
+		Rayfield:Notify({
+			Title = "✅ Info Server Ditampilkan",
+			Content = string.format("Berhasil menampilkan %d pemain di server 😎", playerCount),
+			Duration = 3
+		})
+
+		-- Tambahkan tombol Copy Job ID (kalau belum ada)
+		if not copyJobButton then
+			copyJobButton = TabServer:CreateButton({
+				Name = "📋 Copy Job ID",
+				Callback = function()
+					if jobId ~= "N/A" then
+						setclipboard(jobId)
+						Rayfield:Notify({
+							Title = "📋 Copied!",
+							Content = string.format("💾 Copy Job ID: %s", jobId),
+							Duration = 3
+						})
+					else
+						Rayfield:Notify({
+							Title = "⚠️ Gagal Menyalin",
+							Content = "Job ID tidak ditemukan (kemungkinan private server) 😢",
+							Duration = 3
+						})
+					end
+				end
+			})
+		end
+	end
+})
+
+------------------------------------------------------------
+-- 🎣 Tab Statistic
+------------------------------------------------------------
+-- local TabStatistic = Window:CreateTab("🎣 Tas & Statistik")
+
+-- local fishBagLabel = TabStatistic:CreateLabel("📦 Memuat data tas ikan...")
+-- local totalCaughtLabel = TabStatistic:CreateLabel("🐟 Total Caught: --")
+-- local rareLabel = TabStatistic:CreateLabel("Rarest Fish: --")
+
+-- TabStatistic:CreateButton({
+--     Name = "🔄 Refresh Sekarang",
+--     Callback = function()
+--         SafeUpdateFishInfo()
+--     end,
+-- })
+
+-- repeat task.wait() until game:IsLoaded()
+-- local player = game.Players.LocalPlayer
+
+-- local leaderstats = player:WaitForChild("leaderstats")
+-- local AllTimeCaught = leaderstats:WaitForChild("Caught")
+-- local RarestFish = leaderstats:WaitForChild("Rarest Fish")
+
+-- ------------------------------------------------------------
+-- -- 🧩 Ambil GUI Bag (safe)
+-- ------------------------------------------------------------
+-- local function GetFishBagGUI()
+--     local bagLabel
+--     pcall(function()
+--         local gui = player:WaitForChild("PlayerGui", 2)
+--         if gui then
+--             bagLabel = gui:FindFirstChild("Backpack", true)
+--                      and gui.Backpack.Display.Rods.BagSize
+--         end
+--     end)
+
+--     if bagLabel and bagLabel.Text and bagLabel.Text:find("/") then
+--         local cur, max = bagLabel.Text:match("(%d+)%s*/%s*([%d,%.%,]+)")
+--         if cur and max then
+--             cur = tonumber((cur:gsub("[^%d]", ""))) or 0
+--             max = tonumber((max:gsub("[^%d]", ""))) or 4500
+--             return cur, max
+--         end
+--     end
+
+--     return nil, nil  -- supaya fungsi atas tahu GUI belum siap
+-- end
+
+-- ------------------------------------------------------------
+-- -- 🧠 Update Fish Info (SAFE MODE)
+-- ------------------------------------------------------------
+-- function SafeUpdateFishInfo()
+--     pcall(function()
+--         local current, max = GetFishBagGUI()
+--         if not current or not max then
+--             fishBagLabel:Set("🎣 Fish Bag: (GUI belum siap)")
+--             return
+--         end
+        
+--         local percent = math.floor((current / max) * 1000) / 10
+
+--         fishBagLabel:Set(string.format("🎣 Fish Bag: %d / %d (%.1f%% full)", current, max, percent))
+--         totalCaughtLabel:Set(string.format("🐠 Total Caught: %d", AllTimeCaught.Value))
+--         rareLabel:Set(string.format("Rarest Fish: %s", RarestFish.Value))
+--     end)
+-- end
+
+-- ------------------------------------------------------------
+-- -- 🔁 Loop Aman (Anti 429)
+-- ------------------------------------------------------------
+-- task.spawn(function()
+--     while task.wait(math.random(6, 10)) do
+--         SafeUpdateFishInfo()
+--     end
+-- end)
+
+-- -- first load
+-- SafeUpdateFishInfo()
+
+
+-- final ready notif
+Notify("🎣 SC FISH IT by @diketjup", "", 5)
+
+-- End of script
+
+-- 5
+-- 3
+-- 2
+-- 1
+-- 1000
+-- 2000
+-- 60
+
+
+-- ngeluh capek/speak up nyari settingan? padahal udh disediain form diskusi tinggal scroll sesuaiin sm akun + rod lu
+-- device tiap org beda beda TOLOL, ada yg pake pc/android/rf/ios bahkan segala mcm dengan latency yg beda juga pasti nya
+-- mau dibikin disama ratakan semua dengan device developer biar dpt 5-6 notif sama kyk di anoncment? mikir lah mau narik angin kalau misal settingan ga cocok dan gabisa diatur sendiri sm kita sbg customer? mauu narik angin mau? 1 kali klik settingan default by developer?
+-- malas atau iq lu yg kurang dan ga sampe?
+
+-- lu ny aja yg alay ngeluh segala mcm capek nyari settingan, org lain pasti juga ada yg ngeluh kek lu tapi ga se alay ini
+
+
