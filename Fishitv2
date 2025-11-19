@@ -1,6 +1,5 @@
 ----------------------------------------------------------------
--- AegisHub UI – Compact Gamer UI (Venyx-like, small & clean)
--- Fixed dropdown layout, multi dropdown, minimize, floating toggle
+-- AegisHub UI – Compact Gamer UI (fixed dropdown + overlay)
 ----------------------------------------------------------------
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -18,7 +17,7 @@ local theme = {
 }
 
 local function tween(obj, dur, props)
-    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingStyle.Quad), props)
+    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
 end
 
 --------------------------------------------------------------------------------
@@ -29,8 +28,8 @@ function library:CreateWindow(title)
     gui.Name = "AegisHubCompact"
     gui.Parent = CoreGui
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.ResetOnSpawn = false
 
+    -- main window
     local main = Instance.new("Frame")
     main.Parent = gui
     main.Size = UDim2.new(0, 520, 0, 340)
@@ -38,13 +37,56 @@ function library:CreateWindow(title)
     main.BackgroundColor3 = theme.bg
     main.BorderSizePixel = 0
 
-    local corner = Instance.new("UICorner", main)
-    corner.CornerRadius = UDim.new(0, 6)
-
     local stroke = Instance.new("UIStroke", main)
     stroke.Thickness = 1
     stroke.Color = theme.stroke
 
+    -- draggable overlay toggle (bulat kecil di samping)
+    local overlayBtn = Instance.new("TextButton")
+    overlayBtn.Parent = gui
+    overlayBtn.Size = UDim2.new(0, 32, 0, 32)
+    overlayBtn.Position = UDim2.new(0, 12, 0.5, -16)
+    overlayBtn.Text = "≡"
+    overlayBtn.Font = Enum.Font.GothamBold
+    overlayBtn.TextSize = 18
+    overlayBtn.TextColor3 = theme.text
+    overlayBtn.BackgroundColor3 = theme.card
+    overlayBtn.BorderSizePixel = 0
+    overlayBtn.Visible = false
+
+    do -- drag overlay
+        local dragging, start, offset
+        overlayBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1
+               or i.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                start    = i.Position
+                offset   = overlayBtn.Position
+                i.Changed:Connect(function()
+                    if i.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+                or i.UserInputType == Enum.UserInputType.Touch) then
+                local d = i.Position - start
+                overlayBtn.Position = UDim2.new(
+                    offset.X.Scale, offset.X.Offset + d.X,
+                    offset.Y.Scale, offset.Y.Offset + d.Y
+                )
+            end
+        end)
+    end
+
+    overlayBtn.MouseButton1Click:Connect(function()
+        main.Visible = true
+        overlayBtn.Visible = false
+    end)
+
+    -- title bar
     local top = Instance.new("Frame")
     top.Parent = main
     top.Size = UDim2.new(1,0,0,32)
@@ -62,22 +104,27 @@ function library:CreateWindow(title)
     tlabel.TextSize = 16
     tlabel.TextColor3 = theme.text
 
-    -- Minimize button
-    local minimize = Instance.new("TextButton")
-    minimize.Parent = top
-    minimize.Size = UDim2.new(0,22,1,0)
-    minimize.Position = UDim2.new(1,-62,0,0)
-    minimize.Text = "-"
-    minimize.TextColor3 = theme.text
-    minimize.BackgroundTransparency = 1
-    minimize.Font = Enum.Font.GothamBold
-    minimize.TextSize = 18
+    -- minimize button
+    local mini = Instance.new("TextButton")
+    mini.Parent = top
+    mini.Size = UDim2.new(0,24,1,0)
+    mini.Position = UDim2.new(1,-64,0,0)
+    mini.Text = "-"
+    mini.TextColor3 = Color3.fromRGB(200,200,200)
+    mini.BackgroundTransparency = 1
+    mini.Font = Enum.Font.GothamBold
+    mini.TextSize = 18
 
-    -- Close button
+    mini.MouseButton1Click:Connect(function()
+        main.Visible = false
+        overlayBtn.Visible = true
+    end)
+
+    -- close button
     local close = Instance.new("TextButton")
     close.Parent = top
-    close.Size = UDim2.new(0,30,1,0)
-    close.Position = UDim2.new(1,-30,0,0)
+    close.Size = UDim2.new(0,40,1,0)
+    close.Position = UDim2.new(1,-40,0,0)
     close.Text = "X"
     close.TextColor3 = Color3.fromRGB(255,70,70)
     close.BackgroundTransparency = 1
@@ -94,25 +141,25 @@ function library:CreateWindow(title)
     do
         local dragging, start, offset
         top.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then
+            if i.UserInputType == Enum.UserInputType.MouseButton1
+               or i.UserInputType == Enum.UserInputType.Touch then
                 dragging = true
-                start = i.Position
-                offset = main.Position
-            end
-        end)
-        top.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
+                start    = i.Position
+                offset   = main.Position
+                i.Changed:Connect(function()
+                    if i.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
             end
         end)
         UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - start
+            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+                or i.UserInputType == Enum.UserInputType.Touch) then
+                local d = i.Position - start
                 main.Position = UDim2.new(
-                    offset.X.Scale,
-                    offset.X.Offset + delta.X,
-                    offset.Y.Scale,
-                    offset.Y.Offset + delta.Y
+                    offset.X.Scale, offset.X.Offset + d.X,
+                    offset.Y.Scale, offset.Y.Offset + d.Y
                 )
             end
         end)
@@ -143,87 +190,14 @@ function library:CreateWindow(title)
     holder.BackgroundTransparency = 1
 
     ---------------------------------------------------------------------
-    -- FLOATING TOGGLE BUTTON (HIDE/SHOW) – draggable
-    ---------------------------------------------------------------------
-    local floatBtn = Instance.new("Frame")
-    floatBtn.Parent = gui
-    floatBtn.Size = UDim2.new(0,34,0,34)
-    floatBtn.Position = UDim2.new(0, 10, 0.5, -17)
-    floatBtn.BackgroundColor3 = theme.card
-    floatBtn.BorderSizePixel = 0
-    local fbCorner = Instance.new("UICorner", floatBtn)
-    fbCorner.CornerRadius = UDim.new(1,0)
-
-    local fbStroke = Instance.new("UIStroke", floatBtn)
-    fbStroke.Thickness = 1
-    fbStroke.Color = theme.stroke
-
-    local fbBtn = Instance.new("TextButton")
-    fbBtn.Parent = floatBtn
-    fbBtn.Size = UDim2.new(1,0,1,0)
-    fbBtn.BackgroundTransparency = 1
-    fbBtn.Text = "≡"
-    fbBtn.Font = Enum.Font.GothamBold
-    fbBtn.TextSize = 18
-    fbBtn.TextColor3 = theme.accent
-
-    local winHidden = false
-
-    fbBtn.MouseButton1Click:Connect(function()
-        winHidden = not winHidden
-        main.Visible = not winHidden
-    end)
-
-    -- drag floating button
-    do
-        local dragging, start, offset
-        floatBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                start = i.Position
-                offset = floatBtn.Position
-            end
-        end)
-        floatBtn.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-                local delta = i.Position - start
-                local newX = offset.X.Offset + delta.X
-                local newY = offset.Y.Offset + delta.Y
-
-                local cam = workspace.CurrentCamera
-                if cam then
-                    local vp = cam.ViewportSize
-                    newX = math.clamp(newX, 0, vp.X - floatBtn.AbsoluteSize.X)
-                    newY = math.clamp(newY, 0, vp.Y - floatBtn.AbsoluteSize.Y)
-                end
-
-                floatBtn.Position = UDim2.new(0, newX, 0, newY)
-            end
-        end)
-    end
-
-    -- Minimize = sembunyikan konten, tapi window masih ada
-    minimize.MouseButton1Click:Connect(function()
-        local target = not holder.Visible
-        holder.Visible = target
-        sidebar.Visible = target
-    end)
-
-    ---------------------------------------------------------------------
     -- TAB CREATOR
     ---------------------------------------------------------------------
     local win = {}
-    local firstTab = true
 
     function win:CreateTab(name)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1,-20,0,28)
+        tabBtn.Size = UDim2.new(1,-12,0,32)
         tabBtn.BackgroundColor3 = theme.bg
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
@@ -231,21 +205,17 @@ function library:CreateWindow(title)
         tabBtn.TextSize = 14
         tabBtn.TextColor3 = theme.text
 
-        local underline = Instance.new("Frame", tabBtn)
-        underline.AnchorPoint = Vector2.new(0.5,1)
-        underline.Position = UDim2.new(0.5,0,1,0)
-        underline.Size = UDim2.new(0,0,0,2)
-        underline.BorderSizePixel = 0
-        underline.BackgroundColor3 = theme.accent
+        local tabStroke = Instance.new("UIStroke", tabBtn)
+        tabStroke.Thickness = 1
+        tabStroke.Color = theme.stroke
 
         local page = Instance.new("ScrollingFrame")
         page.Parent = holder
         page.Size = UDim2.new(1,0,1,0)
         page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 3
+        page.ScrollBarThickness = 4
         page.Visible = false
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        page.CanvasSize = UDim2.new(0,0,0,0)
 
         local plist = Instance.new("UIListLayout", page)
         plist.SortOrder = Enum.SortOrder.LayoutOrder
@@ -254,38 +224,31 @@ function library:CreateWindow(title)
         pad.PaddingTop = UDim.new(0,8)
         pad.PaddingLeft = UDim.new(0,8)
         pad.PaddingRight = UDim.new(0,8)
-        pad.PaddingBottom = UDim.new(0,8)
 
-        local function selectThis()
+        tabBtn.MouseButton1Click:Connect(function()
             for _,pg in ipairs(holder:GetChildren()) do
-                if pg:IsA("ScrollingFrame") then
-                    pg.Visible = false
-                end
-            end
-            for _,b in ipairs(sidebar:GetChildren()) do
-                if b:IsA("TextButton") then
-                    b.TextColor3 = theme.text
-                    local ul = b:FindFirstChildOfClass("Frame")
-                    if ul then ul.Size = UDim2.new(0,0,0,2) end
-                end
+                if pg:IsA("ScrollingFrame") then pg.Visible=false end
             end
             page.Visible = true
-            tabBtn.TextColor3 = theme.accent
-            underline.Size = UDim2.new(1,0,0,2)
+        end)
+
+        -- first tab auto-selected
+        local numPages = 0
+        for _,pg in ipairs(holder:GetChildren()) do
+            if pg:IsA("ScrollingFrame") then numPages = numPages + 1 end
         end
-
-        tabBtn.MouseButton1Click:Connect(selectThis)
-
-        if firstTab then
-            firstTab = false
-            selectThis()
+        if numPages == 1 then
+            page.Visible = true
         end
 
         ------------------------------------------------------------
-        -- COMPONENT API (Toggle, Slider, Dropdown, etc.)
+        -- COMPONENT API
         ------------------------------------------------------------
         local api = {}
 
+        ---------------------
+        -- Label
+        ---------------------
         function api:Label(text)
             local lbl = Instance.new("TextLabel")
             lbl.Parent = page
@@ -371,31 +334,20 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,40)
+            fr.Size = UDim2.new(1,-4,0,38)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
             lbl.Text = text
-            lbl.Size = UDim2.new(1,-60,0,18)
+            lbl.Size = UDim2.new(1,-8,0,18)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.TextColor3 = theme.text
             lbl.Font = Enum.Font.Gotham
             lbl.TextSize = 13
             lbl.TextXAlignment = Enum.TextXAlignment.Left
-
-            local valLbl = Instance.new("TextLabel")
-            valLbl.Parent = fr
-            valLbl.Size = UDim2.new(0,50,0,18)
-            valLbl.Position = UDim2.new(1,-54,0,0)
-            valLbl.BackgroundTransparency = 1
-            valLbl.Font = Enum.Font.Gotham
-            valLbl.TextSize = 13
-            valLbl.TextColor3 = theme.accent
-            valLbl.TextXAlignment = Enum.TextXAlignment.Right
-            valLbl.Text = tostring(default)
 
             local bar = Instance.new("Frame", fr)
             bar.Size = UDim2.new(1,-16,0,6)
@@ -411,17 +363,16 @@ function library:CreateWindow(title)
             local dragging = false
             local value = default
 
-            local function updateByPct(pct)
-                pct = math.clamp(pct, 0, 1)
+            local function setFromPct(pct)
+                pct = math.clamp(pct,0,1)
                 value = math.floor(min + pct*(max-min))
                 fill.Size = UDim2.new(pct,0,1,0)
-                valLbl.Text = tostring(value)
                 callback(value)
             end
 
             local function update(px)
-                local pct = (px - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X,1)
-                updateByPct(pct)
+                local pct = (px - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+                setFromPct(pct)
             end
 
             bar.InputBegan:Connect(function(i)
@@ -431,24 +382,27 @@ function library:CreateWindow(title)
                     update(i.Position.X)
                 end
             end)
-            bar.InputEnded:Connect(function()
-                dragging = false
+            bar.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 
+                or i.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                end
             end)
 
             UserInputService.InputChanged:Connect(function(i)
-                if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+                if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
+                    or i.UserInputType == Enum.UserInputType.Touch) then
                     update(i.Position.X)
                 end
             end)
 
             -- set default
-            local defaultPct = (default-min)/(max-min)
-            updateByPct(defaultPct)
+            setFromPct((default-min)/(max-min))
 
             return {
                 Set = function(_, v)
-                    local pct = (v-min)/(max-min)
-                    updateByPct(pct)
+                    v = math.clamp(v or value, min, max)
+                    setFromPct((v-min)/(max-min))
                 end
             }
         end
@@ -508,12 +462,12 @@ function library:CreateWindow(title)
         end
 
         ---------------------
-        -- Dropdown (Single Select) – auto grow
+        -- Dropdown (Single Select)  **FIXED**
         ---------------------
         function api:Dropdown(text, list, callback)
             callback = callback or function() end
+            list = list or {}
             local selected = nil
-            local options = list or {}
 
             local fr = Instance.new("Frame")
             fr.Parent = page
@@ -524,7 +478,7 @@ function library:CreateWindow(title)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
-            lbl.Size = UDim2.new(1,-30,1,0)
+            lbl.Size = UDim2.new(1,-30,0,32)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.Font = Enum.Font.Gotham
@@ -535,7 +489,7 @@ function library:CreateWindow(title)
 
             local arrow = Instance.new("TextLabel")
             arrow.Parent = fr
-            arrow.Size = UDim2.new(0,20,1,0)
+            arrow.Size = UDim2.new(0,20,0,32)
             arrow.Position = UDim2.new(1,-20,0,0)
             arrow.BackgroundTransparency = 1
             arrow.Text = "v"
@@ -544,7 +498,7 @@ function library:CreateWindow(title)
 
             local holder = Instance.new("Frame")
             holder.Parent = fr
-            holder.Position = UDim2.new(0,0,1,2)
+            holder.Position = UDim2.new(0,0,0,32)
             holder.Size = UDim2.new(1,0,0,0)
             holder.BackgroundColor3 = theme.bg
             holder.BorderSizePixel = 0
@@ -557,17 +511,15 @@ function library:CreateWindow(title)
             local open = false
             local headBtn = Instance.new("TextButton")
             headBtn.Parent = fr
-            headBtn.Size = UDim2.new(1,0,1,0)
+            headBtn.Size = UDim2.new(1,0,0,32)
             headBtn.BackgroundTransparency = 1
             headBtn.Text = ""
 
-            local function rebuild(newOptions)
-                options = newOptions or {}
+            local function rebuild(opts)
                 for _,c in ipairs(holder:GetChildren()) do
                     if c:IsA("TextButton") then c:Destroy() end
                 end
-
-                for _,opt in ipairs(options) do
+                for _,opt in ipairs(opts) do
                     local b = Instance.new("TextButton")
                     b.Parent = holder
                     b.Size = UDim2.new(1,0,0,26)
@@ -587,8 +539,7 @@ function library:CreateWindow(title)
                     end)
                 end
             end
-
-            rebuild(options)
+            rebuild(list)
 
             headBtn.MouseButton1Click:Connect(function()
                 open = not open
@@ -598,21 +549,22 @@ function library:CreateWindow(title)
             return {
                 Set = function(_, opt)
                     selected = opt
-                    lbl.Text = text.." : "..tostring(opt)
+                    lbl.Text = text.." : "..opt
                 end,
-                SetOptions = function(_, newList)
-                    rebuild(newList)
+                SetOptions = function(_, opts)
+                    list = opts or {}
+                    rebuild(list)
                 end
             }
         end
 
         ---------------------
-        -- Multi Dropdown – auto grow
+        -- Multi Dropdown  **FIXED**
         ---------------------
         function api:MultiDropdown(text, list, callback)
             callback = callback or function() end
+            list = list or {}
 
-            local options = list or {}
             local selected = {}
 
             local fr = Instance.new("Frame")
@@ -624,7 +576,7 @@ function library:CreateWindow(title)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
-            lbl.Size = UDim2.new(1,-30,1,0)
+            lbl.Size = UDim2.new(1,-30,0,32)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.TextColor3 = theme.text
@@ -634,7 +586,7 @@ function library:CreateWindow(title)
             lbl.Text = text.." : None"
 
             local arrow = Instance.new("TextLabel", fr)
-            arrow.Size = UDim2.new(0,20,1,0)
+            arrow.Size = UDim2.new(0,20,0,32)
             arrow.Position = UDim2.new(1,-20,0,0)
             arrow.Font = Enum.Font.GothamBold
             arrow.TextColor3 = theme.accent
@@ -642,7 +594,7 @@ function library:CreateWindow(title)
             arrow.BackgroundTransparency = 1
 
             local holder = Instance.new("Frame", fr)
-            holder.Position = UDim2.new(0,0,1,2)
+            holder.Position = UDim2.new(0,0,0,32)
             holder.Size = UDim2.new(1,0,0,0)
             holder.BackgroundColor3 = theme.bg
             holder.Visible = false
@@ -655,7 +607,7 @@ function library:CreateWindow(title)
             local headBtn = Instance.new("TextButton")
             headBtn.Parent = fr
             headBtn.BackgroundTransparency = 1
-            headBtn.Size = UDim2.new(1,0,1,0)
+            headBtn.Size = UDim2.new(1,0,0,32)
             headBtn.Text = ""
 
             headBtn.MouseButton1Click:Connect(function()
@@ -676,13 +628,11 @@ function library:CreateWindow(title)
                 end
             end
 
-            local function rebuild(newOptions)
-                options = newOptions or {}
+            local function rebuild(opts)
                 for _,c in ipairs(holder:GetChildren()) do
                     if c:IsA("TextButton") then c:Destroy() end
                 end
-
-                for _,opt in ipairs(options) do
+                for _,opt in ipairs(opts) do
                     local b = Instance.new("TextButton")
                     b.Parent = holder
                     b.Size = UDim2.new(1,0,0,24)
@@ -702,7 +652,7 @@ function library:CreateWindow(title)
                 updateText()
             end
 
-            rebuild(options)
+            rebuild(list)
 
             return {
                 Set = function(_, opt, state)
@@ -714,8 +664,9 @@ function library:CreateWindow(title)
                     for k,v in pairs(selected) do if v then table.insert(t,k) end end
                     return t
                 end,
-                SetOptions = function(_, newOptions)
-                    rebuild(newOptions)
+                SetOptions = function(_, opts)
+                    list = opts or {}
+                    rebuild(list)
                 end
             }
         end
@@ -726,14 +677,13 @@ function library:CreateWindow(title)
     return win
 end
 
-
+----------------------------------------------------------------
 -- BUAT WINDOW
+----------------------------------------------------------------
 local win = library:CreateWindow("AegisHub - Fish It")
-
 
 ----------------------------------------------------------------
 -- PART 2 — FARM SYSTEM (Auto Favorite / Sell / Weather / Enchant)
--- Fully synchronized with new Compact UI
 ----------------------------------------------------------------
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -765,26 +715,22 @@ local TabFarm  = win:CreateTab("Farm")
 -- STATE FARM
 ----------------------------------------------------------------
 local Farm = {
-    -- FAVORITE
     AutoFavoriteEnabled = false,
     FavoriteRarity = {
-        Common=true, Uncommon=false, Rare=false, Epic=false,
-        Legendary=false, Mythic=false, SECRET=false,
+        COMMON=true, UNCOMMON=false, RARE=false, EPIC=false,
+        LEGENDARY=false, MYTHIC=false, SECRET=false,
     },
 
-    -- AUTO SELL
     AutoSellEnabled  = false,
     AutoSellThreshold = 30,
     AutoSellDelay     = 1.0,
 
-    -- WEATHER
     AutoWeatherEnabled = false,
     AutoWeatherList = {
         ["Storm"]=false, ["Cloudy"]=false, ["Snow"]=false,
         ["Wind"]=false, ["Radiant"]=false, ["Shark Hunt"]=false,
     },
 
-    -- ENCHANT
     AutoEnchant_LastRun = 0,
 }
 
@@ -793,8 +739,8 @@ local Farm = {
 ----------------------------------------------------------------
 local FishIdToRarity = {}
 local tierToRarity = {
-    [1]="Common",[2]="Uncommon",[3]="Rare",
-    [4]="Epic",[5]="Legendary",[6]="Mythic",[7]="SECRET"
+    [1]="COMMON",[2]="UNCOMMON",[3]="RARE",
+    [4]="EPIC",[5]="LEGENDARY",[6]="MYTHIC",[7]="SECRET"
 }
 
 local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
@@ -806,9 +752,8 @@ if itemsFolder then
                 local id   = data.Data.Id
                 local tier = tonumber(data.Data.Tier) or 0
                 local rar  = data.Data.Rarity or tierToRarity[tier]
-
                 if id then
-                    FishIdToRarity[id] = string.upper(rar or "Common")
+                    FishIdToRarity[id] = string.upper(rar or "COMMON")
                 end
             end
         end
@@ -826,11 +771,9 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
 
-    ------------------------------------------------------------
     -- AUTO FAVORITE
-    ------------------------------------------------------------
     if Farm.AutoFavoriteEnabled and itemId then
-        local rarity = FishIdToRarity[itemId] or "Common"
+        local rarity = FishIdToRarity[itemId] or "COMMON"
         if Farm.FavoriteRarity[rarity] then
             pcall(function()
                 RE_FavoriteItem:FireServer(uuid)
@@ -838,9 +781,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
         end
     end
 
-    ------------------------------------------------------------
     -- AUTO SELL ALL
-    ------------------------------------------------------------
     if Farm.AutoSellEnabled then
         autoSellCount += 1
         if autoSellCount >= Farm.AutoSellThreshold and not autoSellCooldown then
@@ -871,15 +812,12 @@ local function StartWeatherLoop(weather)
 
     WeatherThreads[weather] = task.spawn(function()
         while Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather] do
-            
             pcall(function()
                 RF_PurchaseWeather:InvokeServer(weather)
             end)
 
-            -- Weather lasts 15 minutes approx
             local dur = 900 + randomDelay(2,6)
             local t0 = tick()
-
             while tick() - t0 < dur do
                 if not (Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather]) then
                     break
@@ -929,14 +867,13 @@ local tgFav = farmUI:Toggle("Enable Auto Favorite", function(v)
     Farm.AutoFavoriteEnabled = v
 end)
 
-local rarityList = {"Common","Uncommon","Rare","Epic","Legendary","MYTHIC","SECRET"}
+local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
 
 local ddFav = farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
     Farm.FavoriteRarity[r] = state
 end)
 
 ----------------------------------------------------------------
-
 farmUI:Label("Auto Sell (Sell All)")
 
 farmUI:Dropdown("Sell Mode", {
@@ -958,12 +895,10 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
 end)
 
 ----------------------------------------------------------------
-
 farmUI:Label("Auto Weather (Multi Select)")
 
 farmUI:Toggle("Enable Auto Weather", function(v)
     Farm.AutoWeatherEnabled = v
-
     if v then
         for name,flag in pairs(Farm.AutoWeatherList) do
             if flag then StartWeatherLoop(name) end
@@ -972,7 +907,7 @@ farmUI:Toggle("Enable Auto Weather", function(v)
 end)
 
 local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
-farmUI:MultiDropdown("Weather List", weatherList, function(opt,state)
+local ddWeather = farmUI:MultiDropdown("Weather List", weatherList, function(opt,state)
     Farm.AutoWeatherList[opt] = state
     if state and Farm.AutoWeatherEnabled then
         StartWeatherLoop(opt)
@@ -980,7 +915,6 @@ farmUI:MultiDropdown("Weather List", weatherList, function(opt,state)
 end)
 
 ----------------------------------------------------------------
-
 farmUI:Label("Auto Enchant")
 
 farmUI:Dropdown("Enchant Action", {
@@ -998,18 +932,14 @@ end)
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
 ----------------------------------------------------------------
 
-local Players      = game:GetService("Players")
-local LocalPlayer  = Players.LocalPlayer
-local Workspace    = game:GetService("Workspace")
 local Lighting     = game:GetService("Lighting")
 local VirtualUser  = game:GetService("VirtualUser")
 local RunService   = game:GetService("RunService")
 local Stats        = game:GetService("Stats")
 
 ------------------------------------------------------------
--- TELEPORT TAB
+-- TELEPORT
 ------------------------------------------------------------
-
 local function tpTo(pos)
     if not pos then return end
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -1024,7 +954,6 @@ local TabTP = win:CreateTab("Teleport")
 TabTP:Label("Teleport to Island")
 
 local islands = {
-    ["Fisherman Island"] = Vector3.new(-3,17,2840),
     ["Weather Machine"] = Vector3.new(-1471,-3,1929),
     ["Esoteric Depths"] = Vector3.new(3157,-1303,1439),
     ["Tropical Grove"] = Vector3.new(-2038,3,3650),
@@ -1039,22 +968,18 @@ local islands = {
     ["Lost Shore"] = Vector3.new(-3663,38,-989),
     ["Sisyphus"] = Vector3.new(-3792,-135,-986),
     ["Crystal Cavern"] = Vector3.new(-2026,-440,7428),
-    ["Ancient Ruin"] = Vector3.new(6040.64, -578.44, 4715.02),
+    ["Halloween"] = Vector3.new(2127,78,3334),
     ["Ancient Underground Cave"] = Vector3.new(2102,-91,-709),
     ["Ancient Inside Temple"] = Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"] = Vector3.new(1268,78,-183),   
-    ["Crystalline Passage"] = Vector3.new(6049.71, -538.90, 4385.69),
-    ["Arrow Artifact"] = Vector3.new(881.40, 6.34, -346.27),
-    ["Crescent Artifact"] = Vector3.new(1404.67, 5.08, 120.55),
-    ["Diamond Artifact"] = Vector3.new(1841.52, 2.76, -300.38),
-    ["Hourglass Diamond Artifac"] = Vector3.new(1466.40, 3.19, -846.62),
+    ["Ancient Jungle"] = Vector3.new(1268,78,-183),
+    ["Fisherman Island"] = Vector3.new(-3,17,2840),
 }
 
 local islandList = {}
 for name in pairs(islands) do table.insert(islandList,name) end
 table.sort(islandList)
 
-TabTP:Dropdown("Select Island", islandList, function(opt)
+local ddIsland = TabTP:Dropdown("Select Island", islandList, function(opt)
     tpTo(islands[opt])
 end)
 
@@ -1067,43 +992,30 @@ local function scanNPC()
     local list = {}
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and not Players:GetPlayerFromCharacter(m) then
-            if m:FindFirstChildOfClass("Humanoid") 
-            or m:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                table.insert(list, m.Name)
+            if m:FindFirstChildOfClass("Humanoid") or m:FindFirstChildWhichIsA("ProximityPrompt", true) then
+                list[m.Name] = true
             end
         end
     end
-    table.sort(list)
-    return list
+    local out = {}
+    for k in pairs(list) do table.insert(out,k) end
+    table.sort(out)
+    return out
 end
 
 local function findNPCPosition(name)
     for _,m in ipairs(Workspace:GetDescendants()) do
         if m:IsA("Model") and m.Name == name then
-            local prt = m:FindFirstChild("HumanoidRootPart") 
-                or m.PrimaryPart 
-                or m:FindFirstChildWhichIsA("BasePart")
+            local prt = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
             if prt then return prt.Position end
         end
     end
 end
 
 local npcList = scanNPC()
-
-local npcDropdown = TabTP:Dropdown("NPC List", npcList, function(opt)
+local ddNPC = TabTP:Dropdown("NPC List", npcList, function(opt)
     local pos = findNPCPosition(opt)
     if pos then tpTo(pos) end
-end)
-
--- REFRESH TANPA BUAT DROPDOWN BARU
-task.spawn(function()
-    while true do
-        task.wait(8)
-        local new = scanNPC()
-        if npcDropdown and npcDropdown.SetOptions then
-            npcDropdown:SetOptions(new)
-        end
-    end
 end)
 
 ------------------------------------------------------------
@@ -1120,7 +1032,7 @@ local function playerList()
     return t
 end
 
-TabTP:Dropdown("Choose Player", playerList(), function(name)
+local ddPlayer = TabTP:Dropdown("Choose Player", playerList(), function(name)
     local pl = Players:FindFirstChild(name)
     if pl and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
         tpTo(pl.Character.HumanoidRootPart.Position)
@@ -1128,43 +1040,24 @@ TabTP:Dropdown("Choose Player", playerList(), function(name)
 end)
 
 ------------------------------------------------------------
--- AUTO REFRESH LISTS
+-- AUTO REFRESH NPC & PLAYER LIST (TANPA BUAT DROPDOWN BARU)
 ------------------------------------------------------------
 task.spawn(function()
     while true do
         task.wait(8)
-        npcs = scanNPC()
-        if #npcs>0 then
-            if TabTP then
-                TabTP:Dropdown("NPC List", npcs, function(opt)
-                    local pos=findNPCPosition(opt)
-                    if pos then tpTo(pos) end
-                end)
-            end
-        end
+        local newNPC = scanNPC()
+        ddNPC:SetOptions(newNPC)
+
+        local newPL = playerList()
+        ddPlayer:SetOptions(newPL)
     end
 end)
 
 Players.PlayerAdded:Connect(function()
-    if TabTP then
-        TabTP:Dropdown("Choose Player", playerList(), function(name)
-            local pl = Players:FindFirstChild(name)
-            if pl and pl.Character then
-                tpTo(pl.Character.HumanoidRootPart.Position)
-            end
-        end)
-    end
+    ddPlayer:SetOptions(playerList())
 end)
-
 Players.PlayerRemoving:Connect(function()
-    if TabTP then
-        TabTP:Dropdown("Choose Player", playerList(), function(name)
-            local pl = Players:FindFirstChild(name)
-            if pl and pl.Character then
-                tpTo(pl.Character.HumanoidRootPart.Position)
-            end
-        end)
-    end
+    ddPlayer:SetOptions(playerList())
 end)
 
 ------------------------------------------------------------
@@ -1201,7 +1094,6 @@ local Misc = {
     FPSCap       = 120,
 }
 
--- REMOVE TEXTURES
 local function HideAllTextures()
     for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("Decal") or v:IsA("Texture") then
@@ -1210,7 +1102,6 @@ local function HideAllTextures()
     end
 end
 
--- SMOOTH PART MATERIAL
 local function ApplySmoothPlastic()
     for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("BasePart") then
@@ -1219,14 +1110,12 @@ local function ApplySmoothPlastic()
     end
 end
 
--- NO LIGHTING
 local function ApplyNoLighting()
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 1e10
     Lighting.Brightness = 1
 end
 
--- REMOVE EFFECTS
 local function RemoveEffects()
     for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("ParticleEmitter")
@@ -1240,9 +1129,6 @@ local function RemoveEffects()
     end
 end
 
-------------------------------------------------------------
--- UI BUTTONS / TOGGLES
-------------------------------------------------------------
 TabMisc:Toggle("Hide Textures", function(v)
     Misc.HideTextures = v
     if v then HideAllTextures() end
