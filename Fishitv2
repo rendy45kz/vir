@@ -768,8 +768,8 @@ local Farm = {
     -- FAVORITE
     AutoFavoriteEnabled = false,
     FavoriteRarity = {
-        COMMON=true, UNCOMMON=false, RARE=false, EPIC=false,
-        LEGENDARY=false, MYTHIC=false, SECRET=false,
+        Common=true, Uncommon=false, Rare=false, Epic=false,
+        Legendary=false, Mythic=false, SECRET=false,
     },
 
     -- AUTO SELL
@@ -793,8 +793,8 @@ local Farm = {
 ----------------------------------------------------------------
 local FishIdToRarity = {}
 local tierToRarity = {
-    [1]="COMMON",[2]="UNCOMMON",[3]="RARE",
-    [4]="EPIC",[5]="LEGENDARY",[6]="MYTHIC",[7]="SECRET"
+    [1]="Common",[2]="Uncommon",[3]="Rare",
+    [4]="Epic",[5]="Legendary",[6]="Mythic",[7]="SECRET"
 }
 
 local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
@@ -808,7 +808,7 @@ if itemsFolder then
                 local rar  = data.Data.Rarity or tierToRarity[tier]
 
                 if id then
-                    FishIdToRarity[id] = string.upper(rar or "COMMON")
+                    FishIdToRarity[id] = string.upper(rar or "Common")
                 end
             end
         end
@@ -830,7 +830,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     -- AUTO FAVORITE
     ------------------------------------------------------------
     if Farm.AutoFavoriteEnabled and itemId then
-        local rarity = FishIdToRarity[itemId] or "COMMON"
+        local rarity = FishIdToRarity[itemId] or "Common"
         if Farm.FavoriteRarity[rarity] then
             pcall(function()
                 RE_FavoriteItem:FireServer(uuid)
@@ -929,7 +929,7 @@ local tgFav = farmUI:Toggle("Enable Auto Favorite", function(v)
     Farm.AutoFavoriteEnabled = v
 end)
 
-local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
+local rarityList = {"Common","Uncommon","Rare","Epic","Legendary","MYTHIC","SECRET"}
 
 local ddFav = farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
     Farm.FavoriteRarity[r] = state
