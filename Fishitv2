@@ -551,6 +551,10 @@ function library:CreateWindow(title)
     return win
 end
 
+BUAT WINDOW
+local win = library:CreateWindow("AegisHub - Fish It", "Premium Version", 10044538000)
+
+
 ----------------------------------------------------------------
 -- PART 2 — FARM SYSTEM (Auto Favorite / Sell / Weather / Enchant)
 -- Fully synchronized with new Compact UI
