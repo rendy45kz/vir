@@ -928,7 +928,7 @@ _G.Aegis_AutoFish_Rebind   = RebindRemotes
 -- =========================
 local TabAuto = win:CreateTab("Auto")
 
-TabAuto:Label("Auto Fishing (Instant / Perfect)")
+TabAuto:Label("Auto Fishing (Instant)")
 
 local autoToggle  -- forward declare agar bisa dipakai di Start/Stop
 local function StartAutoFish()
@@ -964,14 +964,6 @@ TabAuto:Box("Delay Finish (sec, ex: 0.4)", function(txt)
         AutoFishConfig.Delay = n
         SimpleNotify("Delay set to "..tostring(n).."s")
     end
-end)
-
-TabAuto:Button("Test StartMinigame Once", function()
-    -- 1x cycle untuk test (tanpa ubah AutoFishing flag)
-    SimpleNotify("Test 1x cycle...")
-    task.spawn(function()
-        DoOnePerfectCycle()
-    end)
 end)
 
 
