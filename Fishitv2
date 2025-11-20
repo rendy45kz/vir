@@ -970,16 +970,16 @@ autoToggle = TabAuto:Toggle("Enable Auto Fishing (Instant)", function(on)
     end
 end)
 
--- Slider delay antar cast (semakin kecil semakin instan / risk)
-TabAuto:Slider("Delay antara Start & Finish (detik)", 0, 3, AutoFishConfig.Delay, function(v)
-    AutoFishConfig.Delay = v
+-- INPUT untuk delay (detik)
+TabAuto:Box("Delay antara Start & Finish (contoh: 0.35)", function(txt)
+    local n = tonumber(txt)
+    if n and n >= 0 then
+        AutoFishConfig.Delay = n
+        print("[AutoFish] Delay di-set ke:", n)
+    else
+        print("[AutoFish] Input delay tidak valid:", txt)
+    end
 end)
-
--- Tombol test manual
-TabAuto:Button("Test Start Minigame (-0.75, 0.99)", function()
-    TestStartMini(-0.75, 0.99)
-end)
-
 
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
