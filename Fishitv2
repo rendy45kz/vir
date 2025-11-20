@@ -733,6 +733,254 @@ local Players          = game:GetService("Players")
 local Workspace        = game:GetService("Workspace")
 local LocalPlayer      = Players.LocalPlayer
 
+----------------------------------------------------------------
+-- PART X – AUTO FISH / INSTANT FISHING (AegisHub Compact UI)
+----------------------------------------------------------------
+
+-- =========================
+-- // Config
+-- =========================
+local AutoFishConfig = {
+    AutoFishing = false,
+    Delay       = 0.35,   -- delay antara StartMini dan Finish (bisa diatur lewat slider)
+}
+
+-- =========================
+-- // Remotes helper
+-- =========================
+local function GetNetRemote(name)
+    local ok, net = pcall(function()
+        return ReplicatedStorage
+            :WaitForChild("Packages")
+            :WaitForChild("_Index")
+            :WaitForChild("sleitnick_net@0.2.0")
+            :WaitForChild("net")
+    end)
+    if not ok or not net then return nil end
+    return net:FindFirstChild(name)
+end
+
+-- REMOTE (versi bersih, tidak tumpuk nama)
+local RE_EquipHotbar   = GetNetRemote("RE/EquipToolFromHotbar")
+local RF_ChargeRod     = GetNetRemote("RF/ChargeFishingRod")
+local RF_StartMinigame = GetNetRemote("RF/RequestFishingMinigameStarted")
+local RE_FinishFishing = GetNetRemote("RE/FishingCompleted")
+
+local function RebindRemotes()
+    pcall(function()
+        RE_EquipHotbar   = GetNetRemote("RE/EquipToolFromHotbar")      or RE_EquipHotbar
+        RF_ChargeRod     = GetNetRemote("RF/ChargeFishingRod")        or RF_ChargeRod
+        RF_StartMinigame = GetNetRemote("RF/RequestFishingMinigameStarted") or RF_StartMinigame
+        RE_FinishFishing = GetNetRemote("RE/FishingCompleted")        or RE_FinishFishing
+    end)
+    print("[AutoFish] Rebind remotes:",
+        RE_EquipHotbar   and "Equip OK"   or "Equip NIL",
+        RF_ChargeRod     and "Charge OK"  or "Charge NIL",
+        RF_StartMinigame and "Start OK"   or "Start NIL",
+        RE_FinishFishing and "Finish OK"  or "Finish NIL"
+    )
+end
+
+-- Initial bind
+RebindRemotes()
+
+-- Rebind setelah respawn + equip rod lagi
+LocalPlayer.CharacterAdded:Connect(function()
+    task.defer(function()
+        RebindRemotes()
+        task.wait(0.8)
+        if RE_EquipHotbar then
+            pcall(function()
+                RE_EquipHotbar:FireServer(1) -- pegang rod slot 1
+            end)
+        end
+    end)
+end)
+
+-- =========================
+-- // Utility
+-- =========================
+local function GetNow()
+    if Workspace and Workspace.GetServerTimeNow then
+        local ok, res = pcall(function()
+            return Workspace:GetServerTimeNow()
+        end)
+        if ok and res then return res end
+    end
+    return tick()
+end
+
+local function Notify(tag, msg)
+    -- Tidak pakai Rayfield; cukup print saja biar aman
+    print(("[AegisHub][%s] %s"):format(tag or "Info", msg or ""))
+end
+
+-- =========================
+-- // TestStartMini (debug manual)
+-- =========================
+local function TestStartMini(x, y)
+    x = x or -0.75
+    y = y or 0.99
+
+    if not RF_StartMinigame then
+        Notify("TestStartMini", "RF_StartMinigame NIL")
+        return
+    end
+
+    local ok, res = pcall(function()
+        if type(RF_StartMinigame.InvokeServer) == "function" then
+            return RF_StartMinigame:InvokeServer(x, y)
+        else
+            RF_StartMinigame:FireServer(x, y)
+            return "fired"
+        end
+    end)
+
+    print("[TestStartMini] ok:", ok, "res:", res)
+    if ok then
+        Notify("TestStartMini", "Berhasil kirim StartMinigame")
+    else
+        Notify("TestStartMini", "Gagal: " .. tostring(res))
+    end
+end
+
+-- =========================
+-- // AutoFishing Loop (Instant)
+-- =========================
+local function AutoFishingLoop()
+    task.spawn(function()
+        print("[AutoFish] Loop started")
+        while AutoFishConfig.AutoFishing do
+            local okCycle, err = pcall(function()
+                -- pastikan remotes ada
+                if not (RE_EquipHotbar and RF_ChargeRod and RF_StartMinigame and RE_FinishFishing) then
+                    Notify("⚠️ Remote", "Remote hilang, mencoba rebind...")
+                    RebindRemotes()
+                    task.wait(2)
+                    return
+                end
+
+                -- pastikan character & HRP siap
+                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then
+                    warn("[AutoFish] HRP tidak ditemukan")
+                    task.wait(1)
+                    return
+                end
+
+                -- Equip rod di slot 1
+                pcall(function()
+                    RE_EquipHotbar:FireServer(1)
+                end)
+                task.wait(0.15)
+
+                -- Charge rod
+                local now = GetNow()
+                local okCharge, resCharge = pcall(function()
+                    if type(RF_ChargeRod.InvokeServer) == "function" then
+                        return RF_ChargeRod:InvokeServer(now)
+                    else
+                        RF_ChargeRod:FireServer(now)
+                        return "fired"
+                    end
+                end)
+                if not okCharge then
+                    warn("[AutoFish] ChargeRod gagal:", tostring(resCharge))
+                end
+                task.wait(0.12)
+
+                -- Random posisi minigame
+                local baseX, baseY = -0.75, 0.99
+                local x = baseX + math.random(-500, 500) / 1e7
+                local y = baseY + math.random(-500, 500) / 1e7
+
+                -- Start minigame
+                local okStart, resStart = pcall(function()
+                    if type(RF_StartMinigame.InvokeServer) == "function" then
+                        return RF_StartMinigame:InvokeServer(x, y)
+                    else
+                        RF_StartMinigame:FireServer(x, y)
+                        return "fired"
+                    end
+                end)
+                if not okStart then
+                    warn("[AutoFish] StartMinigame gagal:", tostring(resStart))
+                end
+
+                -- Tunggu delay configurable (instant = kecil)
+                task.wait((AutoFishConfig.Delay or 0.3))
+
+                -- Selesaikan fishing (instant complete)
+                local okFinish, resFinish = pcall(function()
+                    return RE_FinishFishing:FireServer()
+                end)
+                if not okFinish then
+                    warn("[AutoFish] FinishFishing gagal:", tostring(resFinish))
+                end
+
+                -- Cooldown singkat antar cast
+                task.wait(0.1)
+            end)
+
+            if not okCycle then
+                warn("[AutoFish] cycle error:", err)
+                task.wait(1)
+            end
+        end
+        print("[AutoFish] Loop ended")
+    end)
+end
+
+-- Helper Start/Stop (buat dipanggil UI)
+local autoToggle -- dideklarasi dulu biar bisa dipakai di fungsi
+
+local function StartAutoFish()
+    if AutoFishConfig.AutoFishing then return end
+    AutoFishConfig.AutoFishing = true
+    if autoToggle and autoToggle.Set then
+        autoToggle:Set(true)
+    end
+    Notify("🎣 AutoFishing", "Dinyalakan (Instant Mode)")
+    AutoFishingLoop()
+end
+
+local function StopAutoFish()
+    if not AutoFishConfig.AutoFishing then return end
+    AutoFishConfig.AutoFishing = false
+    if autoToggle and autoToggle.Set then
+        autoToggle:Set(false)
+    end
+    Notify("🎣 AutoFishing", "Dimatikan")
+end
+
+----------------------------------------------------------------
+-- 🎣 TAB UI – AUTO FISHING (PAKAI COMPACT UI MU)
+----------------------------------------------------------------
+local TabAuto = win:CreateTab("Auto")
+
+TabAuto:Label("Auto Fishing (Instant)")
+
+-- Toggle utama
+autoToggle = TabAuto:Toggle("Enable Auto Fishing (Instant)", function(on)
+    if on then
+        StartAutoFish()
+    else
+        StopAutoFish()
+    end
+end)
+
+-- Slider delay antar cast (semakin kecil semakin instan / risk)
+TabAuto:Slider("Delay antara Start & Finish (detik)", 0, 3, AutoFishConfig.Delay, function(v)
+    AutoFishConfig.Delay = v
+end)
+
+-- Tombol test manual
+TabAuto:Button("Test Start Minigame (-0.75, 0.99)", function()
+    TestStartMini(-0.75, 0.99)
+end)
+
+
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
@@ -1027,39 +1275,100 @@ local ddIsland = TabTP:Dropdown("Select Island", islandList, function(opt)
 end)
 
 ------------------------------------------------------------
--- TELEPORT NPC
+-- TELEPORT NPC  (scan workspace, pilih NPC terdekat)
 ------------------------------------------------------------
 TabTP:Label("Teleport to NPC")
 
-local function scanNPC()
-    local list = {}
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and not Players:GetPlayerFromCharacter(m) then
-            if m:FindFirstChildOfClass("Humanoid") or m:FindFirstChildWhichIsA("ProximityPrompt", true) then
-                list[m.Name] = true
+-- Scan semua Model yang:
+--  - BUKAN karakter player
+--  - Punya Humanoid ATAU punya ProximityPrompt di dalamnya
+local function scanNPC_Models()
+    local found = {}
+    for _, m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and #m.Name >= 3 then
+            -- abaikan karakter player
+            if Players:GetPlayerFromCharacter(m) == nil then
+                local hasHumanoid = m:FindFirstChildOfClass("Humanoid") ~= nil
+                local hasPrompt = false
+
+                if not hasHumanoid then
+                    for _, d in ipairs(m:GetDescendants()) do
+                        if d:IsA("ProximityPrompt") then
+                            hasPrompt = true
+                            break
+                        end
+                    end
+                end
+
+                if hasHumanoid or hasPrompt then
+                    found[m.Name] = true
+                end
             end
         end
     end
-    local out = {}
-    for k in pairs(list) do table.insert(out,k) end
-    table.sort(out)
-    return out
+
+    local list = {}
+    for name in pairs(found) do
+        table.insert(list, name)
+    end
+    table.sort(list)
+    return list
 end
 
-local function findNPCPosition(name)
-    for _,m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and m.Name == name then
-            local prt = m:FindFirstChild("HumanoidRootPart") or m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
-            if prt then return prt.Position end
+local npcList    = scanNPC_Models()
+local currentNPC = npcList[1]
+
+-- Dropdown pakai UI AegisHub Compact (Single select)
+local ddNPC = TabTP:Dropdown("NPC List", npcList, function(nm)
+    currentNPC = nm
+    if not nm or nm == "" then return end
+
+    local me   = Players.LocalPlayer
+    local ch   = me and (me.Character or me.CharacterAdded:Wait())
+    local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    -- cari instance NPC terdekat yang namanya mengandung teks yg dipilih
+    local best, dist
+    local targetLower = string.lower(nm)
+    for _, m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
+            if string.find(string.lower(m.Name), targetLower, 1, true) then
+                local p = m:FindFirstChild("HumanoidRootPart") 
+                       or m.PrimaryPart 
+                       or m:FindFirstChildWhichIsA("BasePart")
+                if p then
+                    local d = (p.Position - hrp.Position).Magnitude
+                    if not dist or d < dist then
+                        best  = p
+                        dist  = d
+                    end
+                end
+            end
         end
     end
+
+    if best then
+        tpTo(best.Position)
+    end
+end)
+
+-- set default value di dropdown kalau ada NPC
+if currentNPC and ddNPC and ddNPC.Set then
+    ddNPC:Set(currentNPC)
 end
 
-local npcList = scanNPC()
-local ddNPC = TabTP:Dropdown("NPC List", npcList, function(opt)
-    local pos = findNPCPosition(opt)
-    if pos then tpTo(pos) end
+-- OPTIONAL: auto-refresh daftar NPC setiap beberapa detik TANPA bikin dropdown baru
+task.spawn(function()
+    while true do
+        task.wait(8)
+        if ddNPC and ddNPC.SetOptions then
+            local newList = scanNPC_Models()
+            ddNPC:SetOptions(newList)
+        end
+    end
 end)
+
 
 ------------------------------------------------------------
 -- TELEPORT PLAYER
