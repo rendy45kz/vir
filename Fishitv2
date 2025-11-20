@@ -1,5 +1,5 @@
 ----------------------------------------------------------------
--- AegisHub UI – Compact Gamer UI (fixed dropdown + overlay)
+-- AegisHub UI – Compact Gamer UI (smaller + new elegant theme)
 ----------------------------------------------------------------
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -8,12 +8,14 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui          = game:GetService("CoreGui")
 
 local library = {}
+
+-- Tema baru: sedikit lebih terang & kalem
 local theme = {
-    bg     = Color3.fromRGB(18,18,18),
-    card   = Color3.fromRGB(25,25,25),
-    stroke = Color3.fromRGB(60,60,60),
-    text   = Color3.fromRGB(240,240,240),
-    accent = Color3.fromRGB(110,175,255),
+    bg     = Color3.fromRGB(14, 16, 24),   -- background utama
+    card   = Color3.fromRGB(24, 26, 36),   -- panel / kartu
+    stroke = Color3.fromRGB(60, 70, 100),  -- garis luar
+    text   = Color3.fromRGB(235, 239, 255),
+    accent = Color3.fromRGB(140, 190, 255), -- biru lembut
 }
 
 local function tween(obj, dur, props)
@@ -29,11 +31,11 @@ function library:CreateWindow(title)
     gui.Parent = CoreGui
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-    -- main window
+    -- main window (diperkecil)
     local main = Instance.new("Frame")
     main.Parent = gui
-    main.Size = UDim2.new(0, 520, 0, 340)
-    main.Position = UDim2.new(.5, -260, .5, -180)
+    main.Size = UDim2.new(0, 460, 0, 300)             -- dulu 520 x 340
+    main.Position = UDim2.new(.5, -230, .5, -150)
     main.BackgroundColor3 = theme.bg
     main.BorderSizePixel = 0
 
@@ -41,18 +43,24 @@ function library:CreateWindow(title)
     stroke.Thickness = 1
     stroke.Color = theme.stroke
 
+    local cornerMain = Instance.new("UICorner", main)
+    cornerMain.CornerRadius = UDim.new(0, 6)
+
     -- draggable overlay toggle (bulat kecil di samping)
     local overlayBtn = Instance.new("TextButton")
     overlayBtn.Parent = gui
-    overlayBtn.Size = UDim2.new(0, 32, 0, 32)
-    overlayBtn.Position = UDim2.new(0, 12, 0.5, -16)
+    overlayBtn.Size = UDim2.new(0, 30, 0, 30)
+    overlayBtn.Position = UDim2.new(0, 12, 0.5, -15)
     overlayBtn.Text = "≡"
     overlayBtn.Font = Enum.Font.GothamBold
-    overlayBtn.TextSize = 18
+    overlayBtn.TextSize = 16
     overlayBtn.TextColor3 = theme.text
     overlayBtn.BackgroundColor3 = theme.card
     overlayBtn.BorderSizePixel = 0
     overlayBtn.Visible = false
+
+    local ovCorner = Instance.new("UICorner", overlayBtn)
+    ovCorner.CornerRadius = UDim.new(1, 0)
 
     do -- drag overlay
         local dragging, start, offset
@@ -89,9 +97,11 @@ function library:CreateWindow(title)
     -- title bar
     local top = Instance.new("Frame")
     top.Parent = main
-    top.Size = UDim2.new(1,0,0,32)
+    top.Size = UDim2.new(1,0,0,30)                 -- sedikit lebih tipis
     top.BackgroundColor3 = theme.card
     top.BorderSizePixel = 0
+    local topCorner = Instance.new("UICorner", top)
+    topCorner.CornerRadius = UDim.new(0, 6)
 
     local tlabel = Instance.new("TextLabel")
     tlabel.Parent = top
@@ -101,19 +111,19 @@ function library:CreateWindow(title)
     tlabel.Text = tostring(title)
     tlabel.TextXAlignment = Enum.TextXAlignment.Left
     tlabel.Font = Enum.Font.GothamMedium
-    tlabel.TextSize = 16
+    tlabel.TextSize = 15
     tlabel.TextColor3 = theme.text
 
     -- minimize button
     local mini = Instance.new("TextButton")
     mini.Parent = top
-    mini.Size = UDim2.new(0,24,1,0)
-    mini.Position = UDim2.new(1,-64,0,0)
+    mini.Size = UDim2.new(0,22,1,0)
+    mini.Position = UDim2.new(1,-62,0,0)
     mini.Text = "-"
-    mini.TextColor3 = Color3.fromRGB(200,200,200)
+    mini.TextColor3 = Color3.fromRGB(210,210,210)
     mini.BackgroundTransparency = 1
     mini.Font = Enum.Font.GothamBold
-    mini.TextSize = 18
+    mini.TextSize = 16
 
     mini.MouseButton1Click:Connect(function()
         main.Visible = false
@@ -123,10 +133,10 @@ function library:CreateWindow(title)
     -- close button
     local close = Instance.new("TextButton")
     close.Parent = top
-    close.Size = UDim2.new(0,40,1,0)
-    close.Position = UDim2.new(1,-40,0,0)
+    close.Size = UDim2.new(0,36,1,0)
+    close.Position = UDim2.new(1,-36,0,0)
     close.Text = "X"
-    close.TextColor3 = Color3.fromRGB(255,70,70)
+    close.TextColor3 = Color3.fromRGB(255,80,80)
     close.BackgroundTransparency = 1
     close.Font = Enum.Font.GothamBold
     close.TextSize = 16
@@ -170,11 +180,13 @@ function library:CreateWindow(title)
     ------------------------------------------
     local sidebar = Instance.new("Frame")
     sidebar.Parent = main
-    sidebar.Size = UDim2.new(0,160,1,-32)
-    sidebar.Position = UDim2.new(0,0,0,32)
+    sidebar.Size = UDim2.new(0,150,1,-30)      -- sedikit lebih kecil
+    sidebar.Position = UDim2.new(0,0,0,30)
     sidebar.BackgroundColor3 = theme.card
     sidebar.BorderSizePixel = 0
-    
+    local sideCorner = Instance.new("UICorner", sidebar)
+    sideCorner.CornerRadius = UDim.new(0, 6)
+
     local slist = Instance.new("UIListLayout", sidebar)
     slist.SortOrder = Enum.SortOrder.LayoutOrder
     slist.Padding = UDim.new(0,6)
@@ -185,8 +197,8 @@ function library:CreateWindow(title)
     ------------------------------------------
     local holder = Instance.new("Frame")
     holder.Parent = main
-    holder.Size = UDim2.new(1,-160,1,-32)
-    holder.Position = UDim2.new(0,160,0,32)
+    holder.Size = UDim2.new(1,-150,1,-30)
+    holder.Position = UDim2.new(0,150,0,30)
     holder.BackgroundTransparency = 1
 
     ---------------------------------------------------------------------
@@ -197,13 +209,16 @@ function library:CreateWindow(title)
     function win:CreateTab(name)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1,-12,0,32)
+        tabBtn.Size = UDim2.new(1,-12,0,28)
         tabBtn.BackgroundColor3 = theme.bg
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.Font = Enum.Font.Gotham
-        tabBtn.TextSize = 14
+        tabBtn.TextSize = 13
         tabBtn.TextColor3 = theme.text
+
+        local tabCorner = Instance.new("UICorner", tabBtn)
+        tabCorner.CornerRadius = UDim.new(0, 4)
 
         local tabStroke = Instance.new("UIStroke", tabBtn)
         tabStroke.Thickness = 1
@@ -213,18 +228,19 @@ function library:CreateWindow(title)
         page.Parent = holder
         page.Size = UDim2.new(1,0,1,0)
         page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 4
+        page.ScrollBarThickness = 3
         page.Visible = false
         page.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
         local plist = Instance.new("UIListLayout", page)
         plist.SortOrder = Enum.SortOrder.LayoutOrder
-        plist.Padding = UDim.new(0,8)
+        plist.Padding = UDim.new(0,6)
         local pad = Instance.new("UIPadding", page)
-        pad.PaddingTop = UDim.new(0,8)
-        pad.PaddingLeft = UDim.new(0,8)
-        pad.PaddingRight = UDim.new(0,8)
+        pad.PaddingTop = UDim.new(0,6)
+        pad.PaddingLeft = UDim.new(0,6)
+        pad.PaddingRight = UDim.new(0,6)
 
+        -- select tab
         tabBtn.MouseButton1Click:Connect(function()
             for _,pg in ipairs(holder:GetChildren()) do
                 if pg:IsA("ScrollingFrame") then pg.Visible=false end
@@ -256,7 +272,7 @@ function library:CreateWindow(title)
             lbl.BackgroundTransparency = 1
             lbl.Text = text
             lbl.Font = Enum.Font.GothamBold
-            lbl.TextSize = 14
+            lbl.TextSize = 13
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
         end
@@ -269,9 +285,11 @@ function library:CreateWindow(title)
             
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,28)
+            fr.Size = UDim2.new(1,-4,0,26)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
@@ -282,20 +300,24 @@ function library:CreateWindow(title)
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
+            lbl.TextSize = 12
 
             local btn = Instance.new("Frame")
             btn.Parent = fr
-            btn.Size = UDim2.new(0,22,0,22)
-            btn.Position = UDim2.new(1,-28,0.5,-11)
+            btn.Size = UDim2.new(0,20,0,20)
+            btn.Position = UDim2.new(1,-26,0.5,-10)
             btn.BackgroundColor3 = theme.bg
             btn.BorderSizePixel = 0
+            local btnCorner = Instance.new("UICorner", btn)
+            btnCorner.CornerRadius = UDim.new(0,4)
+
             local tick = Instance.new("TextLabel", btn)
             tick.Size = UDim2.new(1,0,1,0)
             tick.BackgroundTransparency = 1
             tick.Font = Enum.Font.GothamBold
             tick.Text = ""
             tick.TextColor3 = theme.accent
+            tick.TextSize = 14
 
             local click = Instance.new("TextButton")
             click.Parent = fr
@@ -304,12 +326,10 @@ function library:CreateWindow(title)
             click.Text = ""
 
             local state = false
-
             local function apply()
                 tick.Text = state and "✓" or ""
                 callback(state)
             end
-
             click.MouseButton1Click:Connect(function()
                 state = not state
                 apply()
@@ -334,31 +354,37 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,38)
+            fr.Size = UDim2.new(1,-4,0,34)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
             lbl.Text = text
-            lbl.Size = UDim2.new(1,-8,0,18)
+            lbl.Size = UDim2.new(1,-8,0,16)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.TextColor3 = theme.text
             lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
+            lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
 
             local bar = Instance.new("Frame", fr)
-            bar.Size = UDim2.new(1,-16,0,6)
-            bar.Position = UDim2.new(0,8,0,24)
+            bar.Size = UDim2.new(1,-16,0,5)
+            bar.Position = UDim2.new(0,8,0,20)
             bar.BackgroundColor3 = theme.bg
             bar.BorderSizePixel = 0
+            local barCorner = Instance.new("UICorner", bar)
+            barCorner.CornerRadius = UDim.new(0,4)
 
             local fill = Instance.new("Frame", bar)
             fill.Size = UDim2.new(0,0,1,0)
             fill.BackgroundColor3 = theme.accent
             fill.BorderSizePixel = 0
+            local fillCorner = Instance.new("UICorner", fill)
+            fillCorner.CornerRadius = UDim.new(0,4)
 
             local dragging = false
             local value = default
@@ -396,7 +422,6 @@ function library:CreateWindow(title)
                 end
             end)
 
-            -- set default
             setFromPct((default-min)/(max-min))
 
             return {
@@ -415,9 +440,11 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,32)
+            fr.Size = UDim2.new(1,-4,0,30)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             local box = Instance.new("TextBox")
             box.Parent = fr
@@ -428,7 +455,7 @@ function library:CreateWindow(title)
             box.BackgroundColor3 = theme.bg
             box.BorderSizePixel = 0
             box.Font = Enum.Font.Gotham
-            box.TextSize = 13
+            box.TextSize = 12
             box.TextColor3 = theme.text
 
             box.FocusLost:Connect(function()
@@ -450,19 +477,21 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("TextButton")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,30)
+            fr.Size = UDim2.new(1,-4,0,28)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
             fr.Text = text
             fr.Font = Enum.Font.GothamSemibold
             fr.TextSize = 13
             fr.TextColor3 = theme.text
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             fr.MouseButton1Click:Connect(callback)
         end
 
         ---------------------
-        -- Dropdown (Single Select)  **FIXED**
+        -- Dropdown (Single Select)
         ---------------------
         function api:Dropdown(text, list, callback)
             callback = callback or function() end
@@ -471,26 +500,28 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,32)
+            fr.Size = UDim2.new(1,-4,0,30)
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
-            lbl.Size = UDim2.new(1,-30,0,32)
+            lbl.Size = UDim2.new(1,-30,0,30)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
             lbl.Font = Enum.Font.Gotham
             lbl.TextColor3 = theme.text
-            lbl.TextSize = 13
+            lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Text = text
 
             local arrow = Instance.new("TextLabel")
             arrow.Parent = fr
-            arrow.Size = UDim2.new(0,20,0,32)
-            arrow.Position = UDim2.new(1,-20,0,0)
+            arrow.Size = UDim2.new(0,18,0,30)
+            arrow.Position = UDim2.new(1,-18,0,0)
             arrow.BackgroundTransparency = 1
             arrow.Text = "v"
             arrow.Font = Enum.Font.GothamBold
@@ -498,12 +529,14 @@ function library:CreateWindow(title)
 
             local holder = Instance.new("Frame")
             holder.Parent = fr
-            holder.Position = UDim2.new(0,0,0,32)
+            holder.Position = UDim2.new(0,0,0,30)
             holder.Size = UDim2.new(1,0,0,0)
             holder.BackgroundColor3 = theme.bg
             holder.BorderSizePixel = 0
             holder.Visible = false
             holder.AutomaticSize = Enum.AutomaticSize.Y
+            local hCorner = Instance.new("UICorner", holder)
+            hCorner.CornerRadius = UDim.new(0,4)
 
             local hlist = Instance.new("UIListLayout", holder)
             hlist.Padding = UDim.new(0,2)
@@ -511,7 +544,7 @@ function library:CreateWindow(title)
             local open = false
             local headBtn = Instance.new("TextButton")
             headBtn.Parent = fr
-            headBtn.Size = UDim2.new(1,0,0,32)
+            headBtn.Size = UDim2.new(1,0,0,30)
             headBtn.BackgroundTransparency = 1
             headBtn.Text = ""
 
@@ -522,13 +555,15 @@ function library:CreateWindow(title)
                 for _,opt in ipairs(opts) do
                     local b = Instance.new("TextButton")
                     b.Parent = holder
-                    b.Size = UDim2.new(1,0,0,26)
+                    b.Size = UDim2.new(1,0,0,24)
                     b.BackgroundColor3 = theme.card
                     b.BorderSizePixel = 0
                     b.Text = opt
                     b.Font = Enum.Font.Gotham
-                    b.TextSize = 13
+                    b.TextSize = 12
                     b.TextColor3 = theme.text
+                    local bc = Instance.new("UICorner", b)
+                    bc.CornerRadius = UDim.new(0,4)
 
                     b.MouseButton1Click:Connect(function()
                         selected = opt
@@ -559,7 +594,7 @@ function library:CreateWindow(title)
         end
 
         ---------------------
-        -- Multi Dropdown  **FIXED**
+        -- Multi Dropdown
         ---------------------
         function api:MultiDropdown(text, list, callback)
             callback = callback or function() end
@@ -569,10 +604,12 @@ function library:CreateWindow(title)
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,36)
+            fr.Size = UDim2.new(1,-4,0,32)
             fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
@@ -581,13 +618,13 @@ function library:CreateWindow(title)
             lbl.BackgroundTransparency = 1
             lbl.TextColor3 = theme.text
             lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
+            lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Text = text.." : None"
 
             local arrow = Instance.new("TextLabel", fr)
-            arrow.Size = UDim2.new(0,20,0,32)
-            arrow.Position = UDim2.new(1,-20,0,0)
+            arrow.Size = UDim2.new(0,18,0,32)
+            arrow.Position = UDim2.new(1,-18,0,0)
             arrow.Font = Enum.Font.GothamBold
             arrow.TextColor3 = theme.accent
             arrow.Text = "v"
@@ -600,6 +637,8 @@ function library:CreateWindow(title)
             holder.Visible = false
             holder.BorderSizePixel = 0
             holder.AutomaticSize = Enum.AutomaticSize.Y
+            local hCorner = Instance.new("UICorner", holder)
+            hCorner.CornerRadius = UDim.new(0,4)
             local hlist = Instance.new("UIListLayout", holder)
             hlist.Padding = UDim.new(0,2)
 
@@ -640,8 +679,10 @@ function library:CreateWindow(title)
                     b.BorderSizePixel = 0
                     b.Text = opt
                     b.Font = Enum.Font.Gotham
-                    b.TextSize = 13
+                    b.TextSize = 12
                     b.TextColor3 = theme.text
+                    local bc = Instance.new("UICorner", b)
+                    bc.CornerRadius = UDim.new(0,4)
 
                     b.MouseButton1Click:Connect(function()
                         selected[opt] = not selected[opt]
@@ -676,6 +717,7 @@ function library:CreateWindow(title)
 
     return win
 end
+
 
 ----------------------------------------------------------------
 -- BUAT WINDOW
@@ -954,25 +996,26 @@ local TabTP = win:CreateTab("Teleport")
 TabTP:Label("Teleport to Island")
 
 local islands = {
-    ["Weather Machine"] = Vector3.new(-1471,-3,1929),
-    ["Esoteric Depths"] = Vector3.new(3157,-1303,1439),
-    ["Tropical Grove"] = Vector3.new(-2038,3,3650),
-    ["Stingray Shores"] = Vector3.new(-32,4,2773),
-    ["Kohana Volcano"] = Vector3.new(-519,24,189),
-    ["Coral Reefs"] = Vector3.new(-3095,1,2177),
-    ["Crater Island"] = Vector3.new(968,1,4854),
-    ["Kohana"] = Vector3.new(-658,3,719),
-    ["Winter Fest"] = Vector3.new(1611,4,3280),
-    ["Esoteric Island"] = Vector3.new(1987,4,1400),
-    ["Treasure Room"] = Vector3.new(-3600,-267,-1558),
-    ["Lost Shore"] = Vector3.new(-3663,38,-989),
-    ["Sisyphus"] = Vector3.new(-3792,-135,-986),
-    ["Crystal Cavern"] = Vector3.new(-2026,-440,7428),
-    ["Halloween"] = Vector3.new(2127,78,3334),
-    ["Ancient Underground Cave"] = Vector3.new(2102,-91,-709),
-    ["Ancient Inside Temple"] = Vector3.new(1506,-22,-641),
-    ["Ancient Jungle"] = Vector3.new(1268,78,-183),
-    ["Fisherman Island"] = Vector3.new(-3,17,2840),
+    ["Fisherman Island"] = Vector3.new(128.62, 3.53, 2783.18),
+    ["Kohana"] = Vector3.new(-663.904236, 3.04580712, 718.796875),
+    ["Kohana Volcano"] = Vector3.new(-572.879456, 22.4521465, 148.355331),
+    ["Lost Isle"] = Vector3.new(-3618.15698, 240.836655, -1317.45801), 
+    ["Sisyphus Statue"] = Vector3.new(-3727.16, -135.07, -1014.40),
+    ["Treasure Room"] = Vector3.new(-3606.34985, -266.57373, -1580.97339),    
+    ["Esoteric Depths"] = Vector3.new(3248.37109, -1301.53027, 1403.82727),    
+    ["Coral Reefs"] = Vector3.new(-3114.78198, 1.32066584, 2237.52295), 
+    ["Crater Island"] = Vector3.new(987.96, 3.30, 5148.49), 
+    ["Tropical Grove"] = Vector3.new(-2095.34106, 197.199997, 3718.08008), 
+    ["Weather Machine"] = Vector3.new(-1488.51196, 83.1732635, 1876.30298),
+    ["Underground Cellar"] = Vector3.new(2135.89, -91.20, -698.50),     
+    ["Ancient Jungle"] = Vector3.new(1483.11, 11.14, -300.08), 
+    ["Sacred Temple"] = Vector3.new(1506.53, -22.13, -640.17), 
+    ["Ancient Ruin"] = Vector3.new(6040.64, -578.44, 4715.02), 
+    ["Crystalline Passage"] = Vector3.new(6049.71, -538.90, 4385.69), 
+    ["Arrow Artifact"] = Vector3.new(881.40, 6.34, -346.27),     
+    ["Crescent Artifact"] = Vector3.new(1404.67, 5.08, 120.55),     
+    ["Diamond Artifact"] = Vector3.new(1841.52, 2.76, -300.38),  
+    ["Hourglass Diamond Artifact"] = Vector3.new(1466.40, 3.19, -846.62),  
 }
 
 local islandList = {}
