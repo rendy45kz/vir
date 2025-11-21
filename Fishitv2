@@ -1077,7 +1077,7 @@ do
     for _, item in ipairs(ItemsPath:GetChildren()) do
         if item:IsA("ModuleScript") then
             local ok, data = pcall(require, item)
-            if ok and data and data.Data and data.Data.Type == "Bait" then
+            if ok and data and data.Data and data.Data.Type == "Baits" then
                 local baitId   = data.Data.Id
                 local baitName = data.Data.Name or item.Name
                 local price    = data.Data.Price or data.Price
