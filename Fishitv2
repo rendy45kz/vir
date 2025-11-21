@@ -1565,34 +1565,29 @@ Players.PlayerRemoving:Connect(function()
     ddPlayer:SetOptions(playerList())
 end)
 
+
 ----------------------------------------------------------------
--- PART X - MASS TRADE (V1 Save Mode + V2 Inventory) – Compact UI
+-- MASS TRADE V2 (Inventory Based – Fish / Enchant Stones)
+-- Hanya pakai TabFarm & UI Compact (Dropdown / Slider / Button)
 ----------------------------------------------------------------
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players           = game:GetService("Players")
 local LocalPlayer       = Players.LocalPlayer
 
--- net (pakai path yang sama dengan fitur lain)
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
+-- pakai net yang sudah ada di script utama
+-- asumsi: local net = ... sudah didefinisikan di atas
+local InitiateTrade = net:WaitForChild("RF/InitiateTrade")
 
-local net = netIndex:WaitForChild("net")
+-- Replion (data pemain)
+local Replion = _G.Replion
 
--- Remotes trade
-local InitiateTrade       = net:WaitForChild("RF/InitiateTrade")
-local RFAwaitTradeResponse = net:WaitForChild("RF/AwaitTradeResponse") -- optional, belum dipakai tapi disiapkan
-
--- Modules inventory
+-- Module untuk nama ikan (kalau tersedia)
 local ItemUtility       = _G.ItemUtility       or (ReplicatedStorage:FindFirstChild("Shared")  and require(ReplicatedStorage.Shared.ItemUtility))
 local ItemStringUtility = _G.ItemStringUtility or (ReplicatedStorage:FindFirstChild("Modules") and require(ReplicatedStorage.Modules.ItemStringUtility))
 
--- Replion (data player)
-local Replion = _G.Replion
-
 ----------------------------------------------------------------
--- SAFE NOTIFY WRAPPER
+-- SAFE NOTIFY (fallback print bila tidak ada)
 ----------------------------------------------------------------
 local function SafeNotifySuccess(title, msg)
     if _G.NotifySuccess then
@@ -1615,37 +1610,25 @@ local function SafeNotifyError(title, msg)
 end
 
 ----------------------------------------------------------------
--- TRADE STATE
+-- STATE V2
 ----------------------------------------------------------------
-local tradeState = { 
-    mode               = "V1",          -- "V1" (save mode) / "V2" (inventory based)
-    selectedPlayerName = nil, 
-    selectedPlayerId   = nil, 
-    tradeAmount        = 1, 
+local TradeV2 = {
+    selectedPlayerName = nil,
+    selectedPlayerId   = nil,
 
-    autoTradeV2        = false,         -- optional flag
+    selectedLabel      = nil,     -- label di dropdown ("Shark (12x)")
+    selectedKey        = nil,     -- nama item murni ("Shark")
 
-    -- filter unfavorited only (V2)
-    filterUnfavorited  = false,
-    
-    -- V1: save-mode
-    saveTempMode       = false,
-    TempTradeList      = {},            -- { {UUID, Category}, ... }
-    onTrade            = false,         -- kirim saat equip
+    amount             = 1,       -- jumlah per kirim
+    filterUnfavorited  = false,   -- kalau true → hanya item yg tidak difavorit
+
+    inventoryCache     = {},      -- [key] = { uuid1, uuid2, ... }
+    labelToKey         = {},      -- ["Shark (12x)"] = "Shark"
+    labelsList         = {},      -- list label untuk dropdown
 }
 
--- Cache inventory (V2)
-local inventoryCache            = {}    -- [dynamicName] = {UUID1, UUID2, ...}
-local fullInventoryDropdownList = {}    -- {"Shark (12x)", ...}
-local dropdownItemNameMap       = {}    -- ["Shark (12x)"] = "Shark"
-
--- UI object refs
-local TabTrade        = win:CreateTab("Trade")
-local ddTradePlayer   = nil
-local ddTradeItemV2   = nil
-
 ----------------------------------------------------------------
--- UTIL: LIST PLAYER
+-- UTIL PLAYER LIST
 ----------------------------------------------------------------
 local function getPlayerListForTrade()
     local list = {}
@@ -1659,298 +1642,202 @@ local function getPlayerListForTrade()
 end
 
 ----------------------------------------------------------------
--- REFRESH INVENTORY (V2)
+-- REFRESH INVENTORY V2
 ----------------------------------------------------------------
-local function refreshInventory()
+local function RefreshInventoryV2()
     if not Replion or not Replion.Client then
-        warn("[Trade] Replion belum tersedia, tidak bisa refresh inventory V2")
-        return
-    end
-    if not ItemUtility or not ItemStringUtility then
-        warn("[Trade] ItemUtility / ItemStringUtility belum tersedia")
+        SafeNotifyError("Trade", "Replion belum tersedia (cek _G.Replion).")
         return
     end
 
     local DataReplion = Replion.Client:WaitReplion("Data")
     if not DataReplion then
-        warn("[Trade] DataReplion nil")
+        SafeNotifyError("Trade", "DataReplion nil.")
         return
     end
 
     local inventoryItems = DataReplion:Get({ "Inventory", "Items" })
-    if not inventoryItems then return end
+    if not inventoryItems then
+        SafeNotifyError("Trade", "Inventory kosong / tidak terbaca.")
+        return
+    end
 
-    inventoryCache            = {}
-    fullInventoryDropdownList = {}
-    dropdownItemNameMap       = {}
+    TradeV2.inventoryCache = {}
+    TradeV2.labelToKey     = {}
+    TradeV2.labelsList     = {}
+    TradeV2.selectedLabel  = nil
+    TradeV2.selectedKey    = nil
 
-    local groupedItems = {}   -- [dynamicName] = count
+    -- group by nama (Fish / Enchant Stones)
+    local grouped = {}  -- [nameKey] = count
 
     for _, itemData in ipairs(inventoryItems) do
-        local baseItemData = ItemUtility:GetItemData(itemData.Id)
-        if baseItemData and baseItemData.Data then
-            local t = baseItemData.Data.Type
-            -- hanya Fish + Enchant Stones
-            if t == "Fish" or t == "Enchant Stones" then
-                -- filter unfavorited: jika filter aktif dan item difavorit → skip
-                if not (tradeState.filterUnfavorited and itemData.Favorited) then
-                    local dynamicName = ItemStringUtility.GetItemName(itemData, baseItemData)
-                    if dynamicName then
-                        if not groupedItems[dynamicName] then
-                            groupedItems[dynamicName] = 0
-                            inventoryCache[dynamicName] = {}
-                        end
-                        groupedItems[dynamicName] += 1
-                        table.insert(inventoryCache[dynamicName], itemData.UUID)
+        -- itemData.Id, itemData.UUID, itemData.Favorited, dll
+        local nameKey = nil
+
+        -- kalau module ada, pakai nama asli item
+        if ItemUtility and ItemStringUtility then
+            local baseItemData = ItemUtility:GetItemData(itemData.Id)
+            if baseItemData and baseItemData.Data then
+                local t = baseItemData.Data.Type
+                -- hanya fish + enchant stones
+                if t == "Fish" or t == "Enchant Stones" then
+                    -- filter unfavorited: kalau aktif dan item difavorit → skip
+                    if not (TradeV2.filterUnfavorited and itemData.Favorited) then
+                        nameKey = ItemStringUtility.GetItemName(itemData, baseItemData)
                     end
                 end
             end
+        else
+            -- fallback: kalau module tidak ada, baca semua item berdasarkan Id saja
+            -- (kalau mau strict fish only, bisa kamu tambah manual)
+            if not (TradeV2.filterUnfavorited and itemData.Favorited) then
+                nameKey = "Item#" .. tostring(itemData.Id)
+            end
+        end
+
+        if nameKey then
+            grouped[nameKey] = (grouped[nameKey] or 0) + 1
+            TradeV2.inventoryCache[nameKey] = TradeV2.inventoryCache[nameKey] or {}
+            table.insert(TradeV2.inventoryCache[nameKey], itemData.UUID)
         end
     end
 
-    for name, count in pairs(groupedItems) do
-        local label = string.format("%s (%dx)", name, count)
-        table.insert(fullInventoryDropdownList, label)
-        dropdownItemNameMap[label] = name
+    for nameKey, count in pairs(grouped) do
+        local label = string.format("%s (%dx)", nameKey, count)
+        table.insert(TradeV2.labelsList, label)
+        TradeV2.labelToKey[label] = nameKey
     end
-    table.sort(fullInventoryDropdownList)
+    table.sort(TradeV2.labelsList)
 
     -- update dropdown item
-    if ddTradeItemV2 and ddTradeItemV2.SetOptions then
-        if #fullInventoryDropdownList == 0 then
-            ddTradeItemV2:SetOptions({ "Inventory Kosong / Tidak cocok filter" })
-            ddTradeItemV2:Set("Inventory Kosong / Tidak cocok filter")
+    if TradeV2.ddItem and TradeV2.ddItem.SetOptions then
+        if #TradeV2.labelsList == 0 then
+            TradeV2.ddItem:SetOptions({ "Inventory kosong / tidak cocok filter" })
+            TradeV2.ddItem:Set("Inventory kosong / tidak cocok filter")
+            TradeV2.selectedLabel = nil
+            TradeV2.selectedKey   = nil
         else
-            ddTradeItemV2:SetOptions(fullInventoryDropdownList)
-            ddTradeItemV2:Set(fullInventoryDropdownList[1])
+            TradeV2.ddItem:SetOptions(TradeV2.labelsList)
+            TradeV2.ddItem:Set(TradeV2.labelsList[1])
+            TradeV2.selectedLabel = TradeV2.labelsList[1]
+            TradeV2.selectedKey   = TradeV2.labelToKey[TradeV2.selectedLabel]
         end
     end
 
     -- update dropdown player
-    if ddTradePlayer and ddTradePlayer.SetOptions then
-        ddTradePlayer:SetOptions(getPlayerListForTrade())
+    if TradeV2.ddPlayer and TradeV2.ddPlayer.SetOptions then
+        TradeV2.ddPlayer:SetOptions(getPlayerListForTrade())
     end
+
+    SafeNotifySuccess("Trade", "Inventory berhasil di-refresh.")
 end
 
 ----------------------------------------------------------------
--- HOOKING REEquipItem (V1 Save Mode)
-----------------------------------------------------------------
-do
-    if getrawmetatable and setreadonly and newcclosure and getnamecallmethod then
-        local mt = getrawmetatable(game)
-        local oldNamecall = mt.__namecall
-        setreadonly(mt, false)
-
-        _G.REEquipItem = _G.REEquipItem or ReplicatedStorage
-            :WaitForChild("Packages")
-            :WaitForChild("_Index")
-            :WaitForChild("sleitnick_net@0.2.0")
-            :WaitForChild("net")
-            :WaitForChild("RE/EquipItem")
-
-        mt.__namecall = newcclosure(function(self, ...)
-            local args   = { ... }
-            local method = getnamecallmethod()
-
-            if method == "FireServer" and self == _G.REEquipItem then
-                local uuid, categoryName = args[1], args[2]
-
-                -- V1 Save Mode: simpan item ke TempTradeList saat equip
-                if tradeState.mode == "V1" and tradeState.saveTempMode then
-                    if uuid and categoryName then
-                        table.insert(tradeState.TempTradeList, {
-                            UUID     = uuid,
-                            Category = categoryName
-                        })
-                        SafeNotifySuccess("Save Mode", "Item saved: " .. tostring(uuid) .. " (" .. tostring(categoryName) .. ")")
-                    else
-                        SafeNotifyError("Save Mode", "Invalid data received.")
-                    end
-                    return nil
-                end
-
-                -- V1 onTrade: setiap equip, langsung kirim 1 item ke target
-                if tradeState.mode == "V1" and tradeState.onTrade then
-                    if uuid and tradeState.selectedPlayerId then
-                        local ok, err = pcall(function()
-                            return InitiateTrade:InvokeServer(tradeState.selectedPlayerId, uuid)
-                        end)
-                        if ok then
-                            SafeNotifySuccess("Trade Sent", "Sent item to " .. (tradeState.selectedPlayerName or tradeState.selectedPlayerId))
-                        else
-                            SafeNotifyError("Trade Error", "Failed: " .. tostring(err))
-                        end
-                    else
-                        SafeNotifyError("Trade Error", "Invalid target or item.")
-                    end
-                    return nil
-                end
-            end
-
-            return oldNamecall(self, ...)
-        end)
-
-        setreadonly(mt, true)
-    else
-        warn("[Trade] Exploit tidak support __namecall hook, V1 Save Mode dinonaktifkan.")
-    end
-end
-
-----------------------------------------------------------------
--- UI : TRADE TAB
+-- UI – MASS TRADE V2 DALAM TAB FARM
 ----------------------------------------------------------------
 
-TabTrade:Label("Mass Trade – Mode V1 (Save by Equip)")
+local FarmTab = TabFarm or win:CreateTab("Farm") -- jaga-jaga kalau variabel beda
+local farmUI  = FarmTab
+
+farmUI:Label("Mass Trade V2 – Inventory Fish/Stone")
 
 -- Dropdown pilih player
-ddTradePlayer = TabTrade:Dropdown("Target Player", getPlayerListForTrade(), function(nm)
-    tradeState.selectedPlayerName = nm
+TradeV2.ddPlayer = farmUI:Dropdown("Target Player", getPlayerListForTrade(), function(nm)
+    TradeV2.selectedPlayerName = nm
     local p = Players:FindFirstChild(nm)
-    tradeState.selectedPlayerId = p and p.UserId or nil
+    TradeV2.selectedPlayerId   = p and p.UserId or nil
 end)
 
--- toggle: aktifkan Save Mode (saat equip item → masuk list)
-TabTrade:Toggle("Save Items (V1)", function(state)
-    tradeState.mode         = "V1"
-    tradeState.saveTempMode = state
-    if state then
-        SafeNotifySuccess("Save Mode", "Equip item untuk menambah ke list trade.")
+-- Toggle filter unfavorited
+farmUI:Toggle("Hanya Unfavorited (tidak ada ⭐)", function(state)
+    TradeV2.filterUnfavorited = state and true or false
+    RefreshInventoryV2()
+end)
+
+-- Dropdown item dari inventory
+TradeV2.ddItem = farmUI:Dropdown("Pilih Item (Fish / Enchant)", { "Klik Refresh Inventory" }, function(label)
+    local key = TradeV2.labelToKey[label]
+    if key then
+        TradeV2.selectedLabel = label
+        TradeV2.selectedKey   = key
     end
 end)
 
--- tombol clear list
-TabTrade:Button("Clear Saved List", function()
-    tradeState.TempTradeList = {}
-    SafeNotifySuccess("Save Mode", "Temp trade list dibersihkan.")
+-- Slider jumlah kirim per batch
+farmUI:Slider("Jumlah per Kirim", 1, 100, 1, function(v)
+    TradeV2.amount = v
 end)
 
--- tombol kirim semua item di TempTradeList ke target player
-TabTrade:Button("Send Saved Items (V1)", function()
-    if not tradeState.selectedPlayerId then
-        SafeNotifyError("Trade Error", "Pilih target player dulu.")
-        return
-    end
-    if #tradeState.TempTradeList == 0 then
-        SafeNotifyError("Trade Error", "Temp trade list kosong.")
-        return
-    end
-
-    local targetId   = tradeState.selectedPlayerId
-    local targetName = tradeState.selectedPlayerName or tostring(targetId)
-
-    task.spawn(function()
-        for _, entry in ipairs(tradeState.TempTradeList) do
-            local uuid = entry.UUID
-            if uuid then
-                pcall(function()
-                    InitiateTrade:InvokeServer(targetId, uuid)
-                end)
-                task.wait(0.15) -- sedikit delay biar aman
-            end
-        end
-        SafeNotifySuccess("Trade V1", "Selesai kirim ke " .. targetName .. " (" .. tostring(#tradeState.TempTradeList) .. " item).")
-    end)
+-- Tombol refresh inventory
+farmUI:Button("Refresh Inventory", function()
+    RefreshInventoryV2()
 end)
 
-----------------------------------------------------------------
-TabTrade:Label("Mass Trade – Mode V2 (Inventory)")
-
--- toggle filter unfavorited
-TabTrade:Toggle("Filter Unfavorited Only", function(state)
-    tradeState.filterUnfavorited = state
-    refreshInventory()
-end)
-
--- dropdown inventory (list fish/enchant + jumlah)
-ddTradeItemV2 = TabTrade:Dropdown("Select Item (Fish / Stone)", {"Klik Refresh Inventory"}, function(lbl)
-    if dropdownItemNameMap[lbl] then
-        tradeState.mode = "V2"
-        -- hanya update mode, nama bisa diambil nanti dari dropdownItemNameMap
-    end
-end)
-
--- slider jumlah kirim per batch
-TabTrade:Slider("Amount per Batch", 1, 100, 1, function(v)
-    tradeState.tradeAmount = v
-end)
-
--- tombol refresh inventory
-TabTrade:Button("Refresh Inventory", function()
-    refreshInventory()
-end)
-
--- tombol kirim batch V2
-TabTrade:Button("Send Batch (V2)", function()
-    if not tradeState.selectedPlayerId then
+-- Tombol kirim batch
+farmUI:Button("Kirim Batch", function()
+    if not TradeV2.selectedPlayerId then
         SafeNotifyError("Trade Error", "Pilih target player dulu.")
         return
     end
 
-    -- ambil label terakhir yang di-set di dropdown item (fallback pakai Get list[1])
-    local chosenLabel = nil
-    -- kita cari label yang kira-kira terakhir dipakai, simple: kalau cuma 1, pakai itu
-    if #fullInventoryDropdownList == 1 then
-        chosenLabel = fullInventoryDropdownList[1]
-    else
-        -- tidak ada state internal label di UI ini, jadi pakai pertama saja
-        chosenLabel = fullInventoryDropdownList[1]
-    end
-
-    if not chosenLabel or not dropdownItemNameMap[chosenLabel] then
-        SafeNotifyError("Trade Error", "Tidak ada item yang valid dipilih / inventory kosong.")
+    if not TradeV2.selectedKey then
+        SafeNotifyError("Trade Error", "Pilih item dari inventory dulu.")
         return
     end
 
-    local itemName   = dropdownItemNameMap[chosenLabel]
-    local uuids      = inventoryCache[itemName] or {}
-    local sendAmount = math.min(tradeState.tradeAmount or 1, #uuids)
+    local ids = TradeV2.inventoryCache[TradeV2.selectedKey] or {}
+    if #ids == 0 then
+        SafeNotifyError("Trade Error", "UUID item untuk '" .. tostring(TradeV2.selectedKey) .. "' tidak ditemukan.")
+        return
+    end
 
+    local sendAmount = math.min(TradeV2.amount or 1, #ids)
     if sendAmount <= 0 then
-        SafeNotifyError("Trade Error", "Tidak ada UUID untuk item: " .. tostring(itemName))
+        SafeNotifyError("Trade Error", "Jumlah yang mau dikirim = 0.")
         return
     end
 
-    local targetId   = tradeState.selectedPlayerId
-    local targetName = tradeState.selectedPlayerName or tostring(targetId)
+    local targetId   = TradeV2.selectedPlayerId
+    local targetName = TradeV2.selectedPlayerName or tostring(targetId)
+    local itemName   = TradeV2.selectedKey
 
     task.spawn(function()
         for i = 1, sendAmount do
-            local uuid = uuids[i]
+            local uuid = ids[i]
             if uuid then
                 pcall(function()
+                    -- format dari script kamu sebelumnya: InitiateTrade:InvokeServer(targetId, uuid)
                     InitiateTrade:InvokeServer(targetId, uuid)
                 end)
                 task.wait(0.15)
             end
         end
+
         SafeNotifySuccess("Trade V2", string.format("Kirim %d x %s ke %s", sendAmount, itemName, targetName))
-        -- setelah trade, boleh refresh inventory lagi
-        refreshInventory()
+        -- setelah kirim, refresh lagi supaya jumlah update
+        RefreshInventoryV2()
     end)
 end)
 
--- auto refresh awal
-task.delay(1.5, function()
-    -- sync player dropdown
-    if ddTradePlayer and ddTradePlayer.SetOptions then
-        ddTradePlayer:SetOptions(getPlayerListForTrade())
-    end
-    refreshInventory()
+-- auto refresh awal sedikit delay
+task.delay(2, function()
+    RefreshInventoryV2()
 end)
 
--- update player list kalau ada yang join / leave
+-- update player list kalau ada yg join/leave
 Players.PlayerAdded:Connect(function()
-    if ddTradePlayer and ddTradePlayer.SetOptions then
-        ddTradePlayer:SetOptions(getPlayerListForTrade())
+    if TradeV2.ddPlayer and TradeV2.ddPlayer.SetOptions then
+        TradeV2.ddPlayer:SetOptions(getPlayerListForTrade())
     end
 end)
 Players.PlayerRemoving:Connect(function()
-    if ddTradePlayer and ddTradePlayer.SetOptions then
-        ddTradePlayer:SetOptions(getPlayerListForTrade())
+    if TradeV2.ddPlayer and TradeV2.ddPlayer.SetOptions then
+        TradeV2.ddPlayer:SetOptions(getPlayerListForTrade())
     end
 end)
 
-
+    
 ------------------------------------------------------------
 -- MISC TAB
 ------------------------------------------------------------
