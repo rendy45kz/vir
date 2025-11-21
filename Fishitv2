@@ -1050,34 +1050,36 @@ else
 end
 
 ----------------------------------------------------------------
--- TAB SHOP – BUY BAIT
+-- TAB SHOP – BUY BAIT (VULN)
 ----------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- kalau netFolder BELUM ada, uncomment baris di bawah:
--- local netFolder = ReplicatedStorage:WaitForChild("Packages")
---     :WaitForChild("_Index")
---     :WaitForChild("sleitnick_net@0.2.0")
---     :WaitForChild("net")
+-- net remotes (path sama seperti script lain)
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
 
--- Remote beli bait (kamu buat di server)
+-- GANTI nama remote ini kalau di game beda (cek hasil spy / scan)
 local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
 
--- folder items
-local ItemsPath = ReplicatedStorage:WaitForChild("Items")
+-- folder baits (dari screenshot: ReplicatedStorage.Baits)
+local BaitsFolder = ReplicatedStorage:WaitForChild("Baits")
 
--- pakai TabShop yang sudah ada dari rod shop
-TabShop:Label("Bait Shop")
+-- kalau sudah ada TabShop sebelumnya (rod shop), pakai yang lama
+local TabShop = TabShop or win:CreateTab("Shop")
 
--- build list bait (Data.Type == "Bait")
-local baitOptions = {}   -- label untuk dropdown
+TabShop:Label("Bait Shop (Vuln)")
+
+-- build list bait dari ReplicatedStorage.Baits (ModuleScript)
+local baitOptions = {}   -- label di dropdown
 local baitIdMap   = {}   -- [displayName] = id
 
 do
-    for _, item in ipairs(ItemsPath:GetChildren()) do
+    for _, item in ipairs(BaitsFolder:GetChildren()) do
         if item:IsA("ModuleScript") then
             local ok, data = pcall(require, item)
-            if ok and data and data.Data and data.Data.Type == "Baits" then
+            if ok and data and data.Data then
                 local baitId   = data.Data.Id
                 local baitName = data.Data.Name or item.Name
                 local price    = data.Data.Price or data.Price
@@ -1089,36 +1091,35 @@ do
                     end
 
                     table.insert(baitOptions, label)
-                    -- map pakai nama bersih tanpa " | Price"
+                    -- map pakai nama bersih (tanpa info price)
                     baitIdMap[baitName] = baitId
                 end
             end
         end
     end
 
-    table.sort(baitOptions, function(a,b)
+    table.sort(baitOptions, function(a, b)
         return a:lower() < b:lower()
     end)
 end
 
--- kalau tidak ada bait, kasih info
 if #baitOptions == 0 then
-    TabShop:Label("Tidak ada bait (Data.Type == \"Bait\") di ReplicatedStorage.Items")
+    TabShop:Label("Tidak ada bait ModuleScript di ReplicatedStorage.Baits")
 else
     -- dropdown pakai UI compact kamu
-    TabShop:Dropdown("Buy Bait", baitOptions, function(option)
+    TabShop:Dropdown("Buy Bait (Limited / Old)", baitOptions, function(option)
         if not option or option == "" then return end
 
-        -- ambil nama bait tanpa bagian " | Price: xxx"
+        -- ambil nama bait tanpa bagian " | Price: ..."
         local pureName = option:split(" |")[1]
         local baitId   = baitIdMap[pureName]
 
         if not baitId then
-            warn("[BaitShop] BaitId tidak ditemukan untuk:", tostring(pureName))
+            warn("[BaitShop] baitId tidak ditemukan untuk:", tostring(pureName))
             return
         end
 
-        -- invoke ke server (server yang urus harga / saldo)
+        -- invoke server (vuln: bisa beli bait yang sudah tidak ada di shop)
         local ok, err = pcall(function()
             RF_PurchaseBait:InvokeServer(baitId)
         end)
@@ -1130,8 +1131,6 @@ else
         end
     end)
 end
-
-
 
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
