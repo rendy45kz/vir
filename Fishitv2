@@ -1518,7 +1518,7 @@ end)
 ----------------------------------------------------------------
 TabShop:Label("Auto Weather (Multi Select)")
 
-farmUI:Toggle("Enable Auto Weather", function(v)
+TabShop:Toggle("Enable Auto Weather", function(v)
     Farm.AutoWeatherEnabled = v
     if v then
         for name,flag in pairs(Farm.AutoWeatherList) do
@@ -1528,7 +1528,7 @@ farmUI:Toggle("Enable Auto Weather", function(v)
 end)
 
 local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
-local ddWeather = farmUI:MultiDropdown("Weather List", weatherList, function(opt,state)
+local ddWeather = TabShop:MultiDropdown("Weather List", weatherList, function(opt,state)
     Farm.AutoWeatherList[opt] = state
     if state and Farm.AutoWeatherEnabled then
         StartWeatherLoop(opt)
