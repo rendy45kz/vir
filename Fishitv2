@@ -1049,6 +1049,187 @@ else
     end)
 end
 
+----------------------------------------------------------------
+-- TAB SHOP – BAITS SHOP (COIN / ROBUX + OPTIONAL GIFT)
+----------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players           = game:GetService("Players")
+local LocalPlayer       = Players.LocalPlayer
+
+-- net remotes (samakan path dengan script lain yang pakai sleitnick_net)
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+-- ⚠️ NAMA REMOTE HARUS KAMU SESUAIKAN DENGAN SERVER-MU
+-- Misal di server kamu buat RemoteFunction "RF/PurchaseBait"
+local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
+
+-- Folder Items (tempat definisi bait)
+local ItemsFolder = ReplicatedStorage:WaitForChild("Items")
+
+-- Kalau sudah punya TabShop sebelum ini, pakai yang lama:
+-- local TabShop = TabShop or win:CreateTab("Shop")
+local TabShop = win:CreateTab("Shop")
+
+TabShop:Label("Bait Shop")
+
+----------------------------------------------------------------
+-- BUILD BAIT LIST DARI ITEMS (Type == 'Bait')
+----------------------------------------------------------------
+local baitDisplayList = {}   -- list string yang muncul di dropdown
+local baitDefs        = {}   -- [displayLabel] = {id,name,coinPrice,robuxPrice}
+
+do
+    for _,mod in ipairs(ItemsFolder:GetChildren()) do
+        if mod:IsA("ModuleScript") then
+            local ok, data = pcall(require, mod)
+            if ok and data and data.Data and data.Data.Type == "Bait" then
+                local id   = data.Data.Id   or mod.Name
+                local name = data.Data.Name or mod.Name
+
+                -- Sesuaikan nama field harga dengan struktur aslinya
+                local cPrice = tonumber(
+                    data.Data.CoinPrice or
+                    data.Data.PriceGold or
+                    data.Data.Price or
+                    0
+                ) or 0
+
+                local rPrice = tonumber(
+                    data.Data.RobuxPrice or
+                    data.Data.PriceRobux or
+                    0
+                ) or 0
+
+                -- Label cantik untuk di dropdown
+                local parts = { name }
+                if cPrice > 0 then
+                    table.insert(parts, ("Coin: %s"):format(cPrice))
+                end
+                if rPrice > 0 then
+                    table.insert(parts, ("R$: %s"):format(rPrice))
+                end
+
+                local label = table.concat(parts, " | ")
+
+                table.insert(baitDisplayList, label)
+                baitDefs[label] = {
+                    id         = id,
+                    name       = name,
+                    coinPrice  = cPrice,
+                    robuxPrice = rPrice,
+                }
+            end
+        end
+    end
+
+    table.sort(baitDisplayList, function(a,b)
+        return a:lower() < b:lower()
+    end)
+end
+
+if #baitDisplayList == 0 then
+    TabShop:Label("Tidak ditemukan bait (Data.Type == 'Bait')")
+    -- langsung selesai, ga perlu UI lain
+    return
+end
+
+----------------------------------------------------------------
+-- STATE PILIHAN USER
+----------------------------------------------------------------
+local currentBaitLabel = nil
+local currentPayType   = "Coin"   -- "Coin" / "Robux"
+local currentAmount    = 1
+local currentGiftName  = ""       -- kosong = diri sendiri
+
+----------------------------------------------------------------
+-- UI: PILIH BAIT
+----------------------------------------------------------------
+TabShop:Label("Pilih Bait")
+
+TabShop:Dropdown("Bait List", baitDisplayList, function(opt)
+    currentBaitLabel = opt
+    local def = baitDefs[opt]
+    if def then
+        print("[BaitShop] Selected:", def.name, "Id:", def.id, "Coin:", def.coinPrice, "Robux:", def.robuxPrice)
+    end
+end)
+
+----------------------------------------------------------------
+-- UI: JUMLAH (STACK)
+----------------------------------------------------------------
+TabShop:Label("Jumlah (Stack / Count)")
+TabShop:Box("Input jumlah bait (contoh: 1, 10, 50)", function(txt)
+    local n = tonumber(txt)
+    if n and n > 0 then
+        currentAmount = math.floor(n)
+    else
+        currentAmount = 1
+    end
+end)
+
+----------------------------------------------------------------
+-- UI: CARA BAYAR
+----------------------------------------------------------------
+TabShop:Label("Cara Bayar")
+TabShop:Dropdown("Pay With", {"Coin", "Robux"}, function(opt)
+    currentPayType = opt
+end)
+
+----------------------------------------------------------------
+-- UI: GIFT KE PLAYER (OPSIONAL)
+----------------------------------------------------------------
+TabShop:Label("Gift (Opsional)")
+TabShop:Box("Nama player (kosong = diri sendiri)", function(txt)
+    currentGiftName = txt or ""
+end)
+
+----------------------------------------------------------------
+-- BUTTON BUY
+----------------------------------------------------------------
+TabShop:Button("Buy Selected Bait", function()
+    if not currentBaitLabel then
+        warn("[BaitShop] Belum ada bait yang dipilih.")
+        return
+    end
+
+    local def = baitDefs[currentBaitLabel]
+    if not def then
+        warn("[BaitShop] Def bait tidak ditemukan untuk label:", currentBaitLabel)
+        return
+    end
+
+    local amount = tonumber(currentAmount) or 1
+    if amount <= 0 then amount = 1 end
+
+    -- Tentukan penerima: kalau giftName kosong atau tidak ditemukan, pakai diri sendiri
+    local targetPlayer = LocalPlayer
+    if currentGiftName ~= "" then
+        local pl = Players:FindFirstChild(currentGiftName)
+        if pl then
+            targetPlayer = pl
+        else
+            warn("[BaitShop] Player gift tidak ditemukan, beli untuk diri sendiri.")
+        end
+    end
+
+    -- Kirim ke server (STRUCTURE PARAM HARUS DISAMAKAN DENGAN IMPLEMENTASI SERVER-MU)
+    -- Contoh: :InvokeServer(baitId, amount, payType, targetPlayer)
+    local ok, res = pcall(function()
+        return RF_PurchaseBait:InvokeServer(def.id, amount, currentPayType, targetPlayer)
+    end)
+
+    if ok then
+        print(("[BaitShop] Request beli bait '%s' (x%d) dengan %s untuk %s | Result: %s")
+            :format(def.name, amount, currentPayType, targetPlayer.Name, tostring(res)))
+    else
+        warn("[BaitShop] Invoke RF_PurchaseBait gagal:", res)
+    end
+end)
+
+
 
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
