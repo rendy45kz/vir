@@ -1132,6 +1132,186 @@ else
     end)
 end
 
+----------------------------------------------------------------
+-- TAB SHOP – ALIEN MERCHANT (TRAVELING MERCHANT)
+----------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Folder net (sama seperti bagian shop lain)
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+-- ==== Remote beli dari Alien Merchant (GANTI NAMA JIKA PERLU) ====
+-- Coba beberapa nama yang umum dipakai, ambil yang pertama ketemu
+local RF_PurchaseAlienItem =
+    netFolder:FindFirstChild("RF/PurchaseAlienMerchantItem")
+    or netFolder:FindFirstChild("RF/PurchaseTravelingMerchantItem")
+    or netFolder:FindFirstChild("RF/PurchaseMerchantItem")
+
+-- ==== Modul data Alien Merchant ====
+local alienConfigModule
+local alienNPCFolder = ReplicatedStorage:FindFirstChild("NPC")
+if alienNPCFolder then
+    alienConfigModule = alienNPCFolder:FindFirstChild("Alien Merchant")
+end
+
+local alienConfig
+if alienConfigModule and alienConfigModule:IsA("ModuleScript") then
+    local ok, data = pcall(require, alienConfigModule)
+    if ok then
+        alienConfig = data
+    else
+        warn("[AlienShop] Gagal require Alien Merchant module:", data)
+    end
+end
+
+-- Helper untuk ambil tabel offers dari berbagai kemungkinan field
+local function getOffersFromConfig(cfg)
+    if not cfg then return nil end
+
+    -- beberapa kemungkinan nama field
+    local candidates = {
+        "Offers", "Stock", "Items", "Shop", "ShopItems", "Inventory"
+    }
+
+    for _, field in ipairs(candidates) do
+        local v = cfg[field]
+        if typeof(v) == "table" then
+            return v
+        end
+    end
+
+    -- kalau langsung table (bukan dibungkus field)
+    if typeof(cfg) == "table" then
+        return cfg
+    end
+
+    return nil
+end
+
+-- Konversi tabel offers → list string buat dropdown + map opsi → data
+local function buildAlienOptions()
+    local offers = getOffersFromConfig(alienConfig)
+    local labels  = {}
+    local mapping = {}  -- [label] = {Id=..., Name=..., Coins=..., Robux=...}
+
+    if not offers then
+        return labels, mapping
+    end
+
+    -- offers bisa array atau dictionary
+    for key, offer in pairs(offers) do
+        if typeof(offer) == "table" then
+            local id    = offer.Id or offer.ItemId or offer.RodId or offer.BaitId or offer.FishId or key
+            local name  = offer.Name or offer.DisplayName or tostring(id)
+
+            -- cari harga coin & robux dari beberapa kemungkinan field
+            local coins = offer.Coins or offer.CoinPrice or offer.PriceCoins
+            local robux = offer.Robux or offer.RobuxPrice or offer.PriceRobux
+
+            -- kadang price berupa table {Coins=..., Robux=...}
+            if typeof(offer.Price) == "table" then
+                coins = coins or offer.Price.Coins or offer.Price.Gold
+                robux = robux or offer.Price.Robux or offer.Price.Gems
+            elseif typeof(offer.Price) == "number" and coins == nil and robux == nil then
+                -- Kalau hanya 1 angka, asumsi sebagai coins
+                coins = offer.Price
+            end
+
+            local priceStrParts = {}
+            if coins then table.insert(priceStrParts, ("Coins: %s"):format(tostring(coins))) end
+            if robux then table.insert(priceStrParts, ("Robux: %s"):format(tostring(robux))) end
+            local priceStr = (#priceStrParts > 0) and (" | " .. table.concat(priceStrParts, " / ")) or ""
+
+            local label = ("%s%s"):format(tostring(name), priceStr)
+            table.insert(labels, label)
+
+            mapping[label] = {
+                Id    = id,
+                Name  = name,
+                Coins = coins,
+                Robux = robux,
+            }
+        end
+    end
+
+    table.sort(labels, function(a,b) return a:lower() < b:lower() end)
+    return labels, mapping
+end
+
+-- Pastikan TabShop sudah ada, kalau belum bikin
+local TabShop = TabShop or win:CreateTab("Shop")
+
+TabShop:Label("Alien Merchant (Traveling Shop)")
+
+if not alienConfigModule then
+    TabShop:Label("Alien Merchant module tidak ditemukan di ReplicatedStorage.NPC")
+elseif not RF_PurchaseAlienItem then
+    TabShop:Label("Remote beli Alien Merchant tidak ditemukan di netFolder (cek nama RF/...)")
+else
+    local currentOptions, optionMap = buildAlienOptions()
+    if #currentOptions == 0 then
+        TabShop:Label("Alien Merchant: belum ada item / tabel offers kosong.")
+    else
+        local selectedLabel = nil
+
+        -- Dropdown pilih item
+        local ddAlien = TabShop:Dropdown("Current Stock", currentOptions, function(opt)
+            selectedLabel = opt
+        end)
+
+        -- tombol refresh stock (misal merchant sudah refresh / server update)
+        TabShop:Button("Refresh Alien Stock", function()
+            -- reload module (kalau module berubah, pcall require lagi)
+            if alienConfigModule then
+                local ok, data = pcall(require, alienConfigModule)
+                if ok then
+                    alienConfig = data
+                else
+                    warn("[AlienShop] Gagal require ulang:", data)
+                end
+            end
+
+            currentOptions, optionMap = buildAlienOptions()
+            if ddAlien and ddAlien.SetOptions then
+                ddAlien:SetOptions(currentOptions)
+            end
+            if #currentOptions > 0 and ddAlien and ddAlien.Set then
+                ddAlien:Set(currentOptions[1])
+                selectedLabel = currentOptions[1]
+            end
+        end)
+
+        -- Button beli (normal, sesuai harga di config – tidak old/vuln)
+        TabShop:Button("Buy Selected Item", function()
+            if not selectedLabel then
+                warn("[AlienShop] Tidak ada item yang dipilih.")
+                return
+            end
+
+            local info = optionMap[selectedLabel]
+            if not info or not info.Id then
+                warn("[AlienShop] Data item tidak lengkap untuk:", tostring(selectedLabel))
+                return
+            end
+
+            local ok, err = pcall(function()
+                -- biasanya cukup kirim id / info.Id, kalau perlu bisa tambah argumen lain
+                RF_PurchaseAlienItem:InvokeServer(info.Id)
+            end)
+
+            if ok then
+                print(string.format("[AlienShop] Berhasil beli '%s' (Id: %s)", tostring(info.Name), tostring(info.Id)))
+            else
+                warn("[AlienShop] Gagal beli item:", err)
+            end
+        end)
+    end
+end
+
+
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
