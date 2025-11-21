@@ -1133,15 +1133,15 @@ else
 end
 
 ----------------------------------------------------------------
--- TAB SHOP – ALIEN MERCHANT (Auto read market data)
+-- TAB SHOP – TRAVELING MERCHANT (Alien Merchant sekarang)
+-- Menampilkan item yang sedang dijual + harga (Coins / Robux)
 ----------------------------------------------------------------
 local ReplicatedStorage   = game:GetService("ReplicatedStorage")
 local Players             = game:GetService("Players")
-local MarketplaceService  = game:GetService("MarketplaceService")
 
 local LocalPlayer = Players.LocalPlayer
 
--- net remotes (sama seperti script lain)
+-- net sleitnick
 local netFolder = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
@@ -1149,165 +1149,166 @@ local netFolder = ReplicatedStorage:WaitForChild("Packages")
 
 local RF_PurchaseMarketItem = netFolder:WaitForChild("RF/PurchaseMarketItem")
 
---------------------------------------------------
--- Cari tabel market dari upvalue GetMarketDataFromId
--- (butuh executor yang support getgc/debug.getupvalue)
---------------------------------------------------
-local MarketTable
+-- gunakan TabShop yang sudah ada, atau buat baru
+local TabShop = TabShop or win:CreateTab("Shop")
+
+TabShop:Label("Traveling Merchant (Alien Merchant)")
+
+----------------------------------------------------------------
+-- Cari merchantItems & GetMarketDataFromId dari script asli game
+-- butuh executor yang support: getgc, debug.getupvalue, debug.getinfo
+----------------------------------------------------------------
+local merchantItems   -- tabel seperti: {["Item 1"] = 5, ["Item 2"] = 4, ["Item 3"] = 3}
+local GetMarketDataFromId
 
 pcall(function()
-    for _, fn in ipairs(getgc(true)) do
-        if typeof(fn) == "function" then
-            local info = debug.getinfo(fn)
-            if info and info.name == "GetMarketDataFromId" then
-                local upv = debug.getupvalue(fn, 1)
-                if type(upv) == "table" then
-                    MarketTable = upv
-                    break
+    for _, obj in ipairs(getgc(true)) do
+        if typeof(obj) == "function" then
+            local info = debug.getinfo(obj)
+
+            -- fungsi market data
+            if not GetMarketDataFromId and info and info.name == "GetMarketDataFromId" then
+                GetMarketDataFromId = obj
+            end
+
+            -- fungsi InitiatePurchase: ada upvalue merchantItems (Item 1/2/3)
+            if info and info.name == "InitiatePurchase" then
+                local i = 1
+                while true do
+                    local upName, upVal = debug.getupvalue(obj, i)
+                    if not upName then break end
+                    if type(upVal) == "table"
+                        and upVal["Item 1"]
+                        and upVal["Item 2"]
+                        and upVal["Item 3"] then
+                        merchantItems = upVal
+                        break
+                    end
+                    i += 1
                 end
             end
+        end
+        if merchantItems and GetMarketDataFromId then
+            break
         end
     end
 end)
 
---------------------------------------------------
--- Build AlienMarketItems dari MarketTable
--- Struktur berdasarkan dump yang kamu kirim:
---  Fishing Rods: { "Fishing Rods", boolLimited, "Coins", id, price, name, ... }
---  Totems      : { "Totems", "Coins", id, price, name, ... }
---  Crate/Robux : { "Crate", boolLimited, id, "Robux", name, ... }
---------------------------------------------------
-local AlienMarketItems = {}
+----------------------------------------------------------------
+-- Build list untuk dropdown + map info (nama, kategori, harga)
+----------------------------------------------------------------
+local displayList = {}
+local itemInfoMap = {}  -- [label] = {Id, Name, Category, Currency, Price}
 
-if MarketTable then
-    for _, row in pairs(MarketTable) do
-        if type(row) == "table" then
-            local category = row[1]
-            if category == "Fishing Rods" then
-                local currency = row[3]
-                local id       = row[4]
-                local price    = row[5]
-                local name     = row[6]
-                table.insert(AlienMarketItems, {
-                    Id       = id,
-                    Name     = name,
-                    Category = category,
-                    Currency = currency,
-                    Price    = price,
-                })
-            elseif category == "Totems" then
-                local currency = row[2]
-                local id       = row[3]
-                local price    = row[4]
-                local name     = row[5]
-                table.insert(AlienMarketItems, {
-                    Id       = id,
-                    Name     = name,
-                    Category = category,
-                    Currency = currency,
-                    Price    = price,
-                })
-            elseif category == "Crate" then
-                -- Mystery Crate (Robux). Di dump tidak ada harga Robux, cuma type-nya.
-                local id       = row[3]
-                local currency = row[4]  -- "Robux"
-                local name     = row[5]
-                table.insert(AlienMarketItems, {
-                    Id       = id,
-                    Name     = name,
-                    Category = category,
-                    Currency = currency,
-                    Price    = nil, -- tidak ada data price di upvalue
-                })
-            end
+if merchantItems and GetMarketDataFromId then
+    for key, id in pairs(merchantItems) do
+        -- key biasanya "Item 1", "Item 2", "Item 3"
+        local info
+        local ok, res = pcall(GetMarketDataFromId, id)
+        if ok and type(res) == "table" then
+            info = res
         end
+
+        local name, category, currency, price
+
+        if info then
+            category = info[1]
+
+            if category == "Fishing Rods" then
+                -- { "Fishing Rods", boolLimited, "Coins", id, price, name, ... }
+                currency = info[3]
+                price    = info[5]
+                name     = info[6]
+            elseif category == "Totems" then
+                -- { "Totems", "Coins", id, price, name, ... }
+                currency = info[2]
+                id       = info[3]
+                price    = info[4]
+                name     = info[5]
+            elseif category == "Crate" then
+                -- { "Crate", boolLimited, id, "Robux", name, ... }
+                id       = info[3]
+                currency = info[4]          -- "Robux"
+                name     = info[5] or "Crate"
+                price    = nil              -- tidak ada di upvalue
+            else
+                -- fallback kalau format beda
+                name     = tostring(info[6] or info[5] or key)
+                category = tostring(category or "Unknown")
+                currency = tostring(info[3] or "Coins")
+                price    = tonumber(info[5]) or 0
+            end
+        else
+            -- kalau gagal ambil info, pakai data minimal
+            name     = "Item "..tostring(id)
+            category = "Unknown"
+            currency = "Coins"
+            price    = 0
+        end
+
+        local label
+        if currency == "Coins" and price and price > 0 then
+            label = string.format("%s [%s] | %s: %s", name, category, currency, tostring(price))
+        elseif currency == "Robux" then
+            label = string.format("%s [%s] | Robux item", name, category)
+        else
+            label = string.format("%s [%s]", name, category)
+        end
+
+        table.insert(displayList, label)
+        itemInfoMap[label] = {
+            Id       = id,
+            Name     = name,
+            Category = category,
+            Currency = currency,
+            Price    = price,
+        }
     end
+
+    table.sort(displayList, function(a,b) return a:lower() < b:lower() end)
 end
 
---------------------------------------------------
--- Build label dropdown + map
---------------------------------------------------
-local alienLabels = {}
-local alienMap    = {}
-
-for _, item in ipairs(AlienMarketItems) do
-    local priceText = ""
-    if item.Currency == "Coins" and item.Price then
-        priceText = string.format(" | %s: %s", item.Currency, tostring(item.Price))
-    elseif item.Currency == "Robux" then
-        priceText = " | Robux item"
-    end
-
-    local label = string.format("%s [%s]%s", item.Name, item.Category, priceText)
-    table.insert(alienLabels, label)
-    alienMap[label] = item
-end
-
-table.sort(alienLabels, function(a, b) return a:lower() < b:lower() end)
-
---------------------------------------------------
--- UI – masuk ke Tab Shop di compact UI
---------------------------------------------------
-local TabShop = TabShop or win:CreateTab("Shop")
-
-TabShop:Label("Alien Merchant (Traveling Shop)")
-
-if not MarketTable or #alienLabels == 0 then
-    TabShop:Label("Gagal baca Alien Market (GetMarketDataFromId).")
+----------------------------------------------------------------
+-- UI – Dropdown + tombol BUY
+----------------------------------------------------------------
+if #displayList == 0 then
+    TabShop:Label("Alien Merchant belum terdeteksi (merchantItems / GetMarketDataFromId nil).")
 else
-    local selectedLabel = alienLabels[1]
-    local selectedItem  = alienMap[selectedLabel]
+    local currentLabel = displayList[1]
+    local currentItem  = itemInfoMap[currentLabel]
 
-    local ddAlien = TabShop:Dropdown("Alien Market Items", alienLabels, function(opt)
-        selectedLabel = opt
-        selectedItem  = alienMap[opt]
+    local ddAlien = TabShop:Dropdown("Traveling Merchant Items", displayList, function(opt)
+        currentLabel = opt
+        currentItem  = itemInfoMap[opt]
     end)
 
     if ddAlien and ddAlien.Set then
-        ddAlien:Set(selectedLabel)
+        ddAlien:Set(currentLabel)
     end
 
-    -- BUY COINS (InvokeServer id; server yang cek saldo)
-    TabShop:Button("Buy (Coins)", function()
-        if not selectedItem then return end
-        if selectedItem.Currency ~= "Coins" then
-            warn("[AlienShop] Item ini bukan item Coins.")
-            return
-        end
+    -- Beli item (server-side yang urus cek saldo / robux)
+    TabShop:Button("Buy Selected Item", function()
+        if not currentItem then return end
 
         local ok, err = pcall(function()
-            RF_PurchaseMarketItem:InvokeServer(selectedItem.Id)
+            RF_PurchaseMarketItem:InvokeServer(currentItem.Id)
         end)
 
         if ok then
             print(string.format(
-                "[AlienShop] Request beli '%s' (Id=%s, Price=%s Coins)",
-                selectedItem.Name,
-                tostring(selectedItem.Id),
-                tostring(selectedItem.Price)
+                "[AlienMerchant] Purchase request: %s (Id=%s, %s %s)",
+                tostring(currentItem.Name),
+                tostring(currentItem.Id),
+                tostring(currentItem.Currency),
+                tostring(currentItem.Price or "")
             ))
         else
-            warn("[AlienShop] Gagal invoke:", err)
+            warn("[AlienMerchant] Purchase failed:", err)
         end
-    end)
-
-    -- OPTIONAL: tombol info untuk item Robux (tanpa auto prompt)
-    TabShop:Button("Info Item Robux", function()
-        if not selectedItem then return end
-        if selectedItem.Currency ~= "Robux" then
-            warn("[AlienShop] Item yang dipilih bukan Robux.")
-            return
-        end
-        print(string.format(
-            "[AlienShop] Robux item: %s (Id=%s, Category=%s)",
-            selectedItem.Name,
-            tostring(selectedItem.Id),
-            tostring(selectedItem.Category)
-        ))
     end)
 end
 
-        
+
 -- sleitnick/net
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
