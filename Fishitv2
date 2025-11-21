@@ -1336,7 +1336,7 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
 end)
 
 ----------------------------------------------------------------
-farmUI:Label("Auto Weather (Multi Select)")
+TabShop:Label("Auto Weather (Multi Select)")
 
 farmUI:Toggle("Enable Auto Weather", function(v)
     Farm.AutoWeatherEnabled = v
