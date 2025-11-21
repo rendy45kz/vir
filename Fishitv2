@@ -1049,6 +1049,87 @@ else
     end)
 end
 
+----------------------------------------------------------------
+-- TAB SHOP – BUY BAIT
+----------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- kalau netFolder BELUM ada, uncomment baris di bawah:
+-- local netFolder = ReplicatedStorage:WaitForChild("Packages")
+--     :WaitForChild("_Index")
+--     :WaitForChild("sleitnick_net@0.2.0")
+--     :WaitForChild("net")
+
+-- Remote beli bait (kamu buat di server)
+local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
+
+-- folder items
+local ItemsPath = ReplicatedStorage:WaitForChild("Items")
+
+-- pakai TabShop yang sudah ada dari rod shop
+TabShop:Label("Bait Shop")
+
+-- build list bait (Data.Type == "Bait")
+local baitOptions = {}   -- label untuk dropdown
+local baitIdMap   = {}   -- [displayName] = id
+
+do
+    for _, item in ipairs(ItemsPath:GetChildren()) do
+        if item:IsA("ModuleScript") then
+            local ok, data = pcall(require, item)
+            if ok and data and data.Data and data.Data.Type == "Bait" then
+                local baitId   = data.Data.Id
+                local baitName = data.Data.Name or item.Name
+                local price    = data.Data.Price or data.Price
+
+                if baitId and baitName then
+                    local label = baitName
+                    if price then
+                        label = string.format("%s | Price: %s", baitName, tostring(price))
+                    end
+
+                    table.insert(baitOptions, label)
+                    -- map pakai nama bersih tanpa " | Price"
+                    baitIdMap[baitName] = baitId
+                end
+            end
+        end
+    end
+
+    table.sort(baitOptions, function(a,b)
+        return a:lower() < b:lower()
+    end)
+end
+
+-- kalau tidak ada bait, kasih info
+if #baitOptions == 0 then
+    TabShop:Label("Tidak ada bait (Data.Type == \"Bait\") di ReplicatedStorage.Items")
+else
+    -- dropdown pakai UI compact kamu
+    TabShop:Dropdown("Buy Bait", baitOptions, function(option)
+        if not option or option == "" then return end
+
+        -- ambil nama bait tanpa bagian " | Price: xxx"
+        local pureName = option:split(" |")[1]
+        local baitId   = baitIdMap[pureName]
+
+        if not baitId then
+            warn("[BaitShop] BaitId tidak ditemukan untuk:", tostring(pureName))
+            return
+        end
+
+        -- invoke ke server (server yang urus harga / saldo)
+        local ok, err = pcall(function()
+            RF_PurchaseBait:InvokeServer(baitId)
+        end)
+
+        if ok then
+            print("[BaitShop] Berhasil beli bait:", pureName, " | Id:", baitId)
+        else
+            warn("[BaitShop] Gagal beli bait:", pureName, "Error:", err)
+        end
+    end)
+end
 
 
 
