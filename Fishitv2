@@ -1356,7 +1356,7 @@ end
 -- UI : MASS TRADE DI TAB FARM
 ----------------------------------------------------------------
 
-farmUI:Label("Mass Trade – Mode V1 (Save by Equip)")
+TabShop:Label("Mass Trade – Mode V1 (Save by Equip)")
 
 -- Dropdown pilih player
 ddTradePlayer = farmUI:Dropdown("Target Player", getPlayerListForTrade(), function(nm)
@@ -1366,7 +1366,7 @@ ddTradePlayer = farmUI:Dropdown("Target Player", getPlayerListForTrade(), functi
 end)
 
 -- toggle: aktifkan Save Mode (saat equip item → masuk list)
-farmUI:Toggle("Save Items (V1)", function(state)
+TabShop:Toggle("Save Items (V1)", function(state)
     tradeState.mode         = "V1"
     tradeState.saveTempMode = state
     if state then
@@ -1375,13 +1375,13 @@ farmUI:Toggle("Save Items (V1)", function(state)
 end)
 
 -- tombol clear list
-farmUI:Button("Clear Saved List", function()
+TabShop:Button("Clear Saved List", function()
     tradeState.TempTradeList = {}
     SafeNotifySuccess("Save Mode", "Temp trade list dibersihkan.")
 end)
 
 -- tombol kirim semua item di TempTradeList ke target player
-farmUI:Button("Send Saved Items (V1)", function()
+TabShop:Button("Send Saved Items (V1)", function()
     if not tradeState.selectedPlayerId then
         SafeNotifyError("Trade Error", "Pilih target player dulu.")
         return
@@ -1409,10 +1409,10 @@ farmUI:Button("Send Saved Items (V1)", function()
 end)
 
 ----------------------------------------------------------------
-farmUI:Label("Mass Trade – Mode V2 (Inventory Based)")
+TabShop:Label("Mass Trade – Mode V2 (Inventory Based)")
 
 -- toggle filter unfavorited
-farmUI:Toggle("Filter Unfavorited Only", function(state)
+TabShop:Toggle("Filter Unfavorited Only", function(state)
     tradeState.filterUnfavorited = state
     refreshInventory()
 end)
@@ -1426,17 +1426,17 @@ ddTradeItemV2 = farmUI:Dropdown("Select Item (Fish / Stone)", {"Klik Refresh Inv
 end)
 
 -- slider jumlah kirim per batch
-farmUI:Slider("Amount per Batch", 1, 100, 1, function(v)
+TabShop:Slider("Amount per Batch", 1, 100, 1, function(v)
     tradeState.tradeAmount = v
 end)
 
 -- tombol refresh inventory
-farmUI:Button("Refresh Inventory", function()
+TabShop:Button("Refresh Inventory", function()
     refreshInventory()
 end)
 
 -- tombol kirim batch V2
-farmUI:Button("Send Batch (V2)", function()
+TabShop:Button("Send Batch (V2)", function()
     if not tradeState.selectedPlayerId then
         SafeNotifyError("Trade Error", "Pilih target player dulu.")
         return
