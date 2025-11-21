@@ -1355,8 +1355,9 @@ end
 ----------------------------------------------------------------
 -- UI : MASS TRADE DI TAB FARM
 ----------------------------------------------------------------
-
-TabShop:Label("Mass Trade – Mode V1 (Save by Equip)")
+local TabFarm  = win:CreateTab("Farm")
+local farmUI = TabFarm
+farmUI:Label("Mass Trade – Mode V1 (Save by Equip)")
 
 -- Dropdown pilih player
 ddTradePlayer = farmUI:Dropdown("Target Player", getPlayerListForTrade(), function(nm)
@@ -1366,7 +1367,7 @@ ddTradePlayer = farmUI:Dropdown("Target Player", getPlayerListForTrade(), functi
 end)
 
 -- toggle: aktifkan Save Mode (saat equip item → masuk list)
-TabShop:Toggle("Save Items (V1)", function(state)
+farmUI:Toggle("Save Items (V1)", function(state)
     tradeState.mode         = "V1"
     tradeState.saveTempMode = state
     if state then
@@ -1375,13 +1376,13 @@ TabShop:Toggle("Save Items (V1)", function(state)
 end)
 
 -- tombol clear list
-TabShop:Button("Clear Saved List", function()
+farmUI:Button("Clear Saved List", function()
     tradeState.TempTradeList = {}
     SafeNotifySuccess("Save Mode", "Temp trade list dibersihkan.")
 end)
 
 -- tombol kirim semua item di TempTradeList ke target player
-TabShop:Button("Send Saved Items (V1)", function()
+farmUI:Button("Send Saved Items (V1)", function()
     if not tradeState.selectedPlayerId then
         SafeNotifyError("Trade Error", "Pilih target player dulu.")
         return
@@ -1409,10 +1410,10 @@ TabShop:Button("Send Saved Items (V1)", function()
 end)
 
 ----------------------------------------------------------------
-TabShop:Label("Mass Trade – Mode V2 (Inventory Based)")
+farmUI:Label("Mass Trade – Mode V2 (Inventory Based)")
 
 -- toggle filter unfavorited
-TabShop:Toggle("Filter Unfavorited Only", function(state)
+farmUI:Toggle("Filter Unfavorited Only", function(state)
     tradeState.filterUnfavorited = state
     refreshInventory()
 end)
@@ -1426,17 +1427,17 @@ ddTradeItemV2 = farmUI:Dropdown("Select Item (Fish / Stone)", {"Klik Refresh Inv
 end)
 
 -- slider jumlah kirim per batch
-TabShop:Slider("Amount per Batch", 1, 100, 1, function(v)
+farmUI:Slider("Amount per Batch", 1, 100, 1, function(v)
     tradeState.tradeAmount = v
 end)
 
 -- tombol refresh inventory
-TabShop:Button("Refresh Inventory", function()
+farmUI:Button("Refresh Inventory", function()
     refreshInventory()
 end)
 
 -- tombol kirim batch V2
-TabShop:Button("Send Batch (V2)", function()
+farmUI:Button("Send Batch (V2)", function()
     if not tradeState.selectedPlayerId then
         SafeNotifyError("Trade Error", "Pilih target player dulu.")
         return
@@ -1520,7 +1521,7 @@ local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
 ----------------------------------------------------------------
 -- TAB FARM (MAIN)
 ----------------------------------------------------------------
-local TabFarm  = win:CreateTab("Farm")
+
 
 ----------------------------------------------------------------
 -- STATE FARM
@@ -1670,7 +1671,7 @@ end
 ----------------------------------------------------------------
 -- UI – FARM MENU
 ----------------------------------------------------------------
-local farmUI = TabFarm
+
 
 farmUI:Label("Auto Favorite")
 
