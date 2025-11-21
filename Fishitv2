@@ -1581,6 +1581,406 @@ Players.PlayerRemoving:Connect(function()
     ddPlayer:SetOptions(playerList())
 end)
 
+
+
+
+----------------------------------------------------------------
+-- AUTO TRADE (Versi V2, tanpa _G, cocok dengan UI Compact AegisHub)
+----------------------------------------------------------------
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players           = game:GetService("Players")
+local LocalPlayer       = Players.LocalPlayer
+
+-- Items master data
+local ItemData          = require(ReplicatedStorage:WaitForChild("Items"))
+
+-- Shared utilities (samakan path dengan game kamu)
+local SharedFolder      = ReplicatedStorage:WaitForChild("Shared")
+local ItemUtility       = require(SharedFolder:WaitForChild("ItemUtility"))
+local TierUtility       = require(SharedFolder:WaitForChild("TierUtility"))
+local Constants         = require(SharedFolder:WaitForChild("Constants"))
+
+-- Tier Data (untuk dropdown Min Rarity)
+local TierData          = require(ReplicatedStorage:WaitForChild("Tiers"))
+
+-- Replion (Inventory Data)
+local Packages          = ReplicatedStorage:WaitForChild("Packages")
+local Replion           = require(Packages:WaitForChild("Replion"))
+local DataReplion       = Replion.Client:WaitReplion("Data")
+
+-- sleitnick/net (pakai 'net' yang sudah kamu pakai di script lain)
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+local net                = netIndex:WaitForChild("net")
+
+local RF_InitiateTrade       = net:WaitForChild("RF/InitiateTrade")
+local RF_AwaitTradeResponse  = net:WaitForChild("RF/AwaitTradeResponse")
+
+----------------------------------------------------------------
+-- SIMPLE NOTIFY (tanpa _G)
+----------------------------------------------------------------
+local function NotifyInfo(title, msg)
+    print(("[INFO] %s | %s"):format(tostring(title), tostring(msg)))
+end
+
+local function NotifyError(title, msg)
+    warn(("[ERROR] %s | %s"):format(tostring(title), tostring(msg)))
+end
+
+----------------------------------------------------------------
+-- STATE AUTO TRADE
+----------------------------------------------------------------
+local TradeAuto = {
+    TradeItems        = {},    -- list item tradable (master)
+    GiveItemNamesSet  = {},    -- [Name] = true
+    MinRarityTier     = nil,   -- number (TierIndex)
+    DontGiveFavorite  = false,
+    AutoGiveEnabled   = false,
+    AutoAcceptTrades  = false,
+    TargetUserId      = nil,
+    TargetPlayerName  = nil,
+    GiveDelay         = 4,     -- detik antar trade (default 4)
+    AutoGiveLoopRunning = false,
+}
+
+----------------------------------------------------------------
+-- 1) BUILD LIST ITEMS TRADABLE (dari Items)
+----------------------------------------------------------------
+local function BuildTradeItems()
+    local listItems = {}
+
+    for _, itemInfo in pairs(ItemData or {}) do
+        local data = itemInfo.Data
+        if not data then
+            continue
+        end
+
+        local itemType = data.Type or "Unknown"
+        -- hanya Type yang tradable
+        if not table.find(Constants.TradableItemTypes, itemType) then
+            continue
+        end
+
+        -- skip item paid tradable type (berbayar, tiket dsb)
+        if table.find(Constants.PaidTradableItemTypes, itemType) then
+            continue
+        end
+
+        local tierIndex  = data.Tier or 100
+        local tierDetail = TierUtility:GetTier(tierIndex)
+
+        table.insert(listItems, {
+            Id          = data.Id,
+            Name        = data.Name or "Unknown",
+            Type        = itemType,
+            Description = data.Description or "No Description",
+            Rarity      = tierDetail and tierDetail.Name or "Unknown",
+            RarityIndex = tierIndex,
+        })
+    end
+
+    table.sort(listItems, function(a,b)
+        if a.RarityIndex == b.RarityIndex then
+            return a.Name < b.Name
+        else
+            return a.RarityIndex < b.RarityIndex
+        end
+    end)
+
+    TradeAuto.TradeItems = listItems
+end
+
+-- helper: find itemData by Id
+local function FindTradeItemById(itemId)
+    for _, info in ipairs(TradeAuto.TradeItems) do
+        if info.Id == itemId then
+            return info
+        end
+    end
+    return nil
+end
+
+----------------------------------------------------------------
+-- 2) AMBIL INVENTORY PLAYER (Fish + tradable item)
+----------------------------------------------------------------
+local function GetInventoryItems()
+    local out = {}
+
+    local inventory = DataReplion:GetExpect({ "Inventory" })
+    local items     = inventory and inventory.Items or {}
+
+    for _, item in pairs(items) do
+        if not item.Id then
+            warn("TradeAuto: item tanpa Id, skip")
+            continue
+        end
+        if not item.UUID then
+            warn("TradeAuto: UUID nil untuk Id:", item.Id)
+            continue
+        end
+
+        local base = FindTradeItemById(item.Id)
+        if not base then
+            -- item tidak ada di daftar tradable
+            continue
+        end
+
+        table.insert(out, {
+            UUID        = item.UUID,
+            Id          = item.Id,
+            Name        = base.Name or "Unknown",
+            Type        = base.Type or "Unknown",
+            Description = base.Description or "No Description",
+            Rarity      = base.Rarity or "Unknown",
+            RarityIndex = base.RarityIndex or 100,
+            Favorited   = item.Favorited or false,
+            Metadata    = item.Metadata or {},
+        })
+    end
+
+    return out
+end
+
+----------------------------------------------------------------
+-- 3) FILTER INVENTORY JADI LIST YANG AKAN DIKIRIM
+----------------------------------------------------------------
+local function BuildItemsToGive()
+    local inventoryItems = GetInventoryItems()
+    local itemsToGive    = {}
+
+    local selectedNames  = TradeAuto.GiveItemNamesSet
+    local minRarity      = TradeAuto.MinRarityTier
+    local dontFav        = TradeAuto.DontGiveFavorite
+
+    print(string.format("[AutoTrade] Inventory tradable: %d items", #inventoryItems))
+
+    for _, itemDetail in ipairs(inventoryItems) do
+        if dontFav and itemDetail.Favorited then
+            -- jangan kasih item yang favorit
+            goto continue
+        end
+
+        -- kalau namanya dipilih di MultiDropdown -> prioritas
+        if selectedNames[itemDetail.Name] then
+            table.insert(itemsToGive, itemDetail)
+            goto continue
+        end
+
+        -- kalau bukan Fish, skip untuk filter by rarity
+        if itemDetail.Type ~= "Fish" then
+            goto continue
+        end
+
+        -- minimal rarity (TierIndex) → yang tierIndex >= minRarity
+        if minRarity and itemDetail.RarityIndex and itemDetail.RarityIndex >= minRarity then
+            table.insert(itemsToGive, itemDetail)
+            goto continue
+        end
+
+        ::continue::
+    end
+
+    print(string.format("[AutoTrade] Total items to give: %d", #itemsToGive))
+    return itemsToGive
+end
+
+----------------------------------------------------------------
+-- 4) LOOP AUTO GIVE
+----------------------------------------------------------------
+local function StartAutoGiveLoop()
+    if TradeAuto.AutoGiveLoopRunning then return end
+    TradeAuto.AutoGiveLoopRunning = true
+
+    task.spawn(function()
+        while TradeAuto.AutoGiveEnabled do
+            if not TradeAuto.TargetUserId then
+                NotifyError("Auto Trade", "Target player belum dipilih.")
+                break
+            end
+
+            local itemsToGive = BuildItemsToGive()
+            if #itemsToGive == 0 then
+                NotifyInfo("Auto Trade", "Tidak ada item yang cocok untuk diberikan.")
+                break
+            end
+
+            local idx = 1
+            while TradeAuto.AutoGiveEnabled and idx <= #itemsToGive do
+                local itm = itemsToGive[idx]
+                idx += 1
+
+                if not itm or not itm.UUID then
+                    warn("[AutoTrade] UUID kosong, skip")
+                    goto continue
+                end
+
+                local ok, res = pcall(function()
+                    return RF_InitiateTrade:InvokeServer(TradeAuto.TargetUserId, itm.UUID)
+                end)
+
+                if ok then
+                    print(string.format(
+                        "[AutoTrade] Berhasil kirim %s (UUID=%s) ke %s",
+                        tostring(itm.Name),
+                        tostring(itm.UUID),
+                        tostring(TradeAuto.TargetPlayerName or TradeAuto.TargetUserId)
+                    ))
+                else
+                    warn("[AutoTrade] Gagal kirim item:", tostring(itm.UUID), "err:", res)
+                end
+
+                ::continue::
+                task.wait(TradeAuto.GiveDelay or 4)
+            end
+
+            -- setelah satu batch selesai, break.
+            break
+        end
+
+        TradeAuto.AutoGiveLoopRunning = false
+        TradeAuto.AutoGiveEnabled = false
+        NotifyInfo("Auto Trade", "Auto Give selesai / berhenti.")
+    end)
+end
+
+----------------------------------------------------------------
+-- 5) AUTO ACCEPT INCOMING TRADES
+----------------------------------------------------------------
+RF_AwaitTradeResponse.OnClientInvoke = function(itemType, itemData, sender)
+    if not TradeAuto.AutoAcceptTrades then
+        print("[AutoTrade] Auto accept OFF -> reject trade dari:", tostring(sender))
+        return false
+    end
+
+    print(string.format(
+        "[AutoTrade] Auto accept trade: Type=%s | Data=%s | Sender=%s",
+        tostring(itemType),
+        tostring(itemData),
+        tostring(sender)
+    ))
+
+    task.wait(0.5)
+    return true
+end
+
+----------------------------------------------------------------
+-- 6) UI – MASUKKAN KE TAB FARM (pakai UI compact kamu)
+----------------------------------------------------------------
+
+-- pastikan di atas sudah ada: local TabFarm = win:CreateTab("Farm")
+local TradeTab = TabFarm
+TradeTab:Label("Auto Trade (Give Items)")
+
+-- Dropdown Player
+local function getPlayerListForTrade()
+    local list = {}
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer then
+            table.insert(list, pl.Name)
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+local ddPlayer = TradeTab:Dropdown("Give To Player", getPlayerListForTrade(), function(opt)
+    local pl = Players:FindFirstChild(opt)
+    if pl then
+        TradeAuto.TargetPlayerName = pl.Name
+        TradeAuto.TargetUserId     = pl.UserId
+        NotifyInfo("Auto Trade", "Target set ke: "..pl.Name)
+    else
+        TradeAuto.TargetPlayerName = nil
+        TradeAuto.TargetUserId     = nil
+    end
+end)
+
+-- Update dropdown player saat join/leave
+Players.PlayerAdded:Connect(function()
+    if ddPlayer and ddPlayer.SetOptions then
+        ddPlayer:SetOptions(getPlayerListForTrade())
+    end
+end)
+Players.PlayerRemoving:Connect(function()
+    if ddPlayer and ddPlayer.SetOptions then
+        ddPlayer:SetOptions(getPlayerListForTrade())
+    end
+end)
+
+-- Build TradeItems sekali di awal dan buat dropdown item
+BuildTradeItems()
+
+local itemOptionLabels = {}
+local itemNameByLabel  = {}
+for _, itemDetail in ipairs(TradeAuto.TradeItems) do
+    local label = string.format("[%s] %s [Type: %s]", itemDetail.Rarity, itemDetail.Name, itemDetail.Type)
+    table.insert(itemOptionLabels, label)
+    itemNameByLabel[label] = itemDetail.Name
+end
+
+table.sort(itemOptionLabels, function(a,b) return a:lower() < b:lower() end)
+
+-- Multi Dropdown Item
+TradeTab:Label("Select Item(s) to Give (optional)")
+local ddItems = TradeTab:MultiDropdown("Items to Give", itemOptionLabels, function(label, state)
+    local name = itemNameByLabel[label]
+    if not name then return end
+    if state then
+        TradeAuto.GiveItemNamesSet[name] = true
+    else
+        TradeAuto.GiveItemNamesSet[name] = nil
+    end
+end)
+
+-- Dropdown Min Rarity
+TradeTab:Label("Or Minimum Rarity (Fish)")
+local rarityLabels   = {}
+local tierByLabel    = {}
+
+for _, tierDetail in pairs(TierData) do
+    local label = tierDetail.Name
+    table.insert(rarityLabels, label)
+    tierByLabel[label] = tierDetail.Tier
+end
+
+table.sort(rarityLabels, function(a,b) return a:lower() < b:lower() end)
+
+local ddRarity = TradeTab:Dropdown("Minimum Rarity to Give", rarityLabels, function(label)
+    TradeAuto.MinRarityTier = tierByLabel[label]
+    if TradeAuto.MinRarityTier then
+        NotifyInfo("Auto Trade", "Min rarity di-set: "..label)
+    end
+end)
+
+-- Toggle: jangan kirim item favorit
+TradeTab:Toggle("Don't Give Favorite Items", function(state)
+    TradeAuto.DontGiveFavorite = state and true or false
+end)
+
+-- Slider delay antar trade
+TradeTab:Slider("Delay Antar Trade (detik)", 1, 10, 4, function(v)
+    TradeAuto.GiveDelay = v
+end)
+
+-- Toggle Auto Give
+TradeTab:Toggle("Auto Give Items", function(state)
+    TradeAuto.AutoGiveEnabled = state and true or false
+    if state then
+        StartAutoGiveLoop()
+    end
+end)
+
+-- Toggle Auto Accept
+TradeTab:Toggle("Auto Accept Incoming Trades", function(state)
+    TradeAuto.AutoAcceptTrades = state and true or false
+end)
+
+
+
+
+
 ------------------------------------------------------------
 -- MISC TAB
 ------------------------------------------------------------
