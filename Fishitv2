@@ -1664,15 +1664,17 @@ end
 -- KONFIGURASI / STATE AUTO ENCHANT (mirip module PC)
 ------------------------------------------------------------
 local EnchantConfig = {
-    TargetEnchant1 = {},   -- [name] = true (multi)
-    TargetEnchant2 = nil,  -- string / single
-    AutoEnchant1   = false,
-    AutoEnchant2   = false,
+    AutoEnchant1 = false,
+    AutoEnchant2 = false,
+    Delay1 = 2,  -- detik antar enchant slot 1
+    Delay2 = 2,  -- detik antar enchant slot 2
+    TargetEnchant1 = {}, -- isinya [namaEnchant] = true
+    TargetEnchant2 = "", -- single string
 }
+local Enchant = {}
+local loop1Running = false
+local loop2Running = false
 
-local Enchant        = {}
-local loop1Running   = false
-local loop2Running   = false
 
 local ENCHANT_ALTAR_CFRAME = CFrame.new(
     3234.55444, -1302.85486, 1400.52197,
@@ -1873,7 +1875,14 @@ end
 -- TELEPORT KE ALTAR + EQUIP BATU & AKTIFKAN (fungsi umum)
 ------------------------------------------------------------
 local function doEnchantCast()
+    -- kalau dua-duanya OFF, langsung nggak usah jalan
+    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+        return
+    end
+
     local char = ensureCharacter()
+    if not char then return end
+
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
@@ -1881,14 +1890,29 @@ local function doEnchantCast()
     local flatCur  = Vector3.new(curPos.X, 0, curPos.Z)
     local flatAltr = Vector3.new(ENCHANT_ALTAR_CFRAME.X, 0, ENCHANT_ALTAR_CFRAME.Z)
 
+    -- TELEPORT KE ALTAR JIKA JAUH
     if (flatCur - flatAltr).Magnitude > 5 then
         hrp.CFrame = ENCHANT_ALTAR_CFRAME + Vector3.new(0, 5, 0)
-        task.wait(1)
+
+        -- dulu: task.wait(1)
+        -- sekarang: wait pendek + cek toggle biar bisa batal
+        local t = 0
+        local maxDelay = 0.8
+        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
+            task.wait(0.1)
+            t += 0.1
+        end
+        -- kalau di tengah² user matiin toggle → stop di sini
+        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+            return
+        end
     end
 
+    -- CARI ENCHANT STONE DI HOTBAR
     local hotBarIndex = nil
     if DataReplion and PlayerStatsUtility and ItemUtility then
         local equipped = DataReplion:Get("EquippedItems") or {}
+
         for k, v in pairs(equipped) do
             local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
                 return it.UUID == v
@@ -1904,28 +1928,51 @@ local function doEnchantCast()
             end
         end
 
+        -- kalau belum ada yang ke-equip, equip 1 batu enchant dulu
         if not hotBarIndex then
-            local equipped = DataReplion:Get("EquippedItems") or {}
-            if #equipped > 0 then
-                Enchant:EquipEnchantStone(equipped[#equipped])
-                hotBarIndex = #equipped
+            local equippedList = DataReplion:Get("EquippedItems") or {}
+            if #equippedList > 0 then
+                Enchant:EquipEnchantStone(equippedList[#equippedList])
+                hotBarIndex = #equippedList
             end
         end
     end
 
-    if not hotBarIndex then hotBarIndex = 2 end
+    if not hotBarIndex then
+        hotBarIndex = 2 -- fallback
+    end
+
+    -- EQUIP STONE
+    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+        return
+    end
 
     pcall(function()
         RE_EquipHotbar:FireServer(hotBarIndex)
     end)
-    task.wait(0.15)
+
+    -- tunggu pendek tapi bisa dibatalkan
+    do
+        local t = 0
+        local maxDelay = 0.2
+        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
+            task.wait(0.05)
+            t += 0.05
+        end
+        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+            return
+        end
+    end
+
+    -- AKTIVASI ALTAR
     pcall(function()
         RE_ActivateEnchant:FireServer()
     end)
 end
 
+
 ------------------------------------------------------------
--- START AUTO ENCHANT SLOT 1
+-- START AUTO ENCHANT SLOT 1 (SATU KALI PROSES)
 ------------------------------------------------------------
 function Enchant:StartAutoEnchant1()
     if not EnchantConfig.AutoEnchant1 then return end
@@ -1950,12 +1997,13 @@ function Enchant:StartAutoEnchant1()
         return
     end
 
+    -- di sini dia bener2 coba enchant sekali
     doEnchantCast()
     print("[AutoEnchant] Proses enchant SLOT 1 dijalankan → target:", table.concat(targetNames, ", "))
 end
 
 ------------------------------------------------------------
--- START AUTO ENCHANT SLOT 2
+-- START AUTO ENCHANT SLOT 2 (SATU KALI PROSES)
 ------------------------------------------------------------
 function Enchant:StartAutoEnchant2()
     if not EnchantConfig.AutoEnchant2 then return end
@@ -1986,36 +2034,57 @@ end
 local function AutoEnchantLoop1()
     if loop1Running then return end
     loop1Running = true
+    print("[AutoEnchant] Loop1 START")
 
     while EnchantConfig.AutoEnchant1 do
-        AutoEnchantRodSlot1()
-        task.wait(2)
+        -- satu kali attempt enchant slot 1
+        local ok, err = pcall(function()
+            Enchant:StartAutoEnchant1()
+        end)
+        if not ok then
+            warn("[AutoEnchant] Error slot1:", err)
+        end
+
+        -- delay yang bisa “diputus” saat toggle off
+        local total = EnchantConfig.Delay1 or 2
+        local t = 0
+        while t < total and EnchantConfig.AutoEnchant1 do
+            task.wait(0.1)
+            t += 0.1
+        end
     end
-    EnchantConfig.AutoEnchant1 = false
+
     loop1Running = false
+    print("[AutoEnchant] Loop1 STOP")
 end
 
 ------------------------------------------------------------
 -- LOOP AUTO ENCHANT 2
 ------------------------------------------------------------
 local function AutoEnchantLoop2()
-    -- kalau sudah jalan, jangan bikin loop baru lagi
     if loop2Running then return end
     loop2Running = true
+    print("[AutoEnchant] Loop2 START")
 
     while EnchantConfig.AutoEnchant2 do
-        -- panggil fungsi enchant rod slot 2 kamu di sini:
-        -- misal: AutoEnchantRodSlot2()
+        local ok, err = pcall(function()
+            Enchant:StartAutoEnchant2()
+        end)
+        if not ok then
+            warn("[AutoEnchant] Error slot2:", err)
+        end
 
-        AutoEnchantRodSlot2()
-
-        -- delay biar nggak spam server, bebas mau diubah
-        task.wait(2)
+        local total = EnchantConfig.Delay2 or 2
+        local t = 0
+        while t < total and EnchantConfig.AutoEnchant2 do
+            task.wait(0.1)
+            t += 0.1
+        end
     end
-    EnchantConfig.AutoEnchant2 = false
-    loop2Running = false
-end
 
+    loop2Running = false
+    print("[AutoEnchant] Loop2 STOP")
+end
 
 
 ----------------------------------------------------------------
@@ -2117,8 +2186,6 @@ farmUI:Toggle("Auto Enchant Slot 1", function(state)
     EnchantConfig.AutoEnchant1 = state
     if state then
         task.spawn(AutoEnchantLoop1)
-    else 
-     EnchantConfig.AutoEnchant1 = false
     end
 end)
 
@@ -2134,8 +2201,6 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     EnchantConfig.AutoEnchant2 = state
     if state then
         task.spawn(AutoEnchantLoop2)
-    else     
-    EnchantConfig.AutoEnchant2 = false
     end
 end)
 
