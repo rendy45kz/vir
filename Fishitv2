@@ -2060,6 +2060,8 @@ farmUI:Toggle("Auto Enchant Slot 1", function(state)
     EnchantConfig.AutoEnchant1 = state
     if state then
         task.spawn(AutoEnchantLoop1)
+    else 
+     EnchantConfig.AutoEnchant1 = false
     end
 end)
 
@@ -2075,6 +2077,8 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     EnchantConfig.AutoEnchant2 = state
     if state then
         task.spawn(AutoEnchantLoop2)
+    else     
+    EnchantConfig.AutoEnchant2 = false
     end
 end)
 
