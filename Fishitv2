@@ -1984,7 +1984,7 @@ end
 -- LOOP AUTO ENCHANT 1
 ------------------------------------------------------------
 local function AutoEnchantLoop1()
-    if EnchantLoop1Running then return end
+    if loop1Running then return end
     loop1Running = true
 
     while EnchantConfig.AutoEnchant1 do
@@ -2083,7 +2083,7 @@ farmUI:Label("Auto Enchant")
 -- UI TAB "Enchant" (struktur sama seperti PC, tapi pakai UI kamu)
 ------------------------------------------------------------
 
-farmUI:Label(function() local r = Enchant:GetCurrentRodDetails() return string.format( "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s", r.Name or "N/A", r.Enchant1 or "None", r.Enchant2 or "None" ) end)
+farmUI:LiveLabel(function() local r = Enchant:GetCurrentRodDetails() return string.format( "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s", r.Name or "N/A", r.Enchant1 or "None", r.Enchant2 or "None" ) end)
 
 farmUI:LiveLabel(function()
     -- ganti Enchant_GetCurrentRodDetails() dengan fungsi kamu sendiri
