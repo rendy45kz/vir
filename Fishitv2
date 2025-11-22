@@ -1087,6 +1087,11 @@ end
 ----------------------------------------------------------------
 -- TAB TRADE – AUTO GIVE ITEMS (V2, UI mirip ThanHub)
 ----------------------------------------------------------------
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players          = game:GetService("Players")
