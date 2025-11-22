@@ -1574,12 +1574,6 @@ end
 -- AUTO ENCHANT FUNCTION
 ----------------------------------------------------------------
 
-
-
-------------------------------------------------------------
--- AUTO ENCHANT (port struktur PC, cocok UI AegisHub)
-------------------------------------------------------------
-
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace         = game:GetService("Workspace")
@@ -1986,11 +1980,6 @@ local function AutoEnchantLoop2()
     loop2Running = false
 end
 
--- expose ke global kalau nanti mau dipakai modul lain
-_G.AegisEnchant       = Enchant
-_G.AegisEnchantConfig = EnchantConfig
-
-
 
 ----------------------------------------------------------------
 -- UI – FARM MENU
@@ -2057,8 +2046,6 @@ farmUI:Label("Auto Enchant")
 -- UI TAB "Enchant" (struktur sama seperti PC, tapi pakai UI kamu)
 ------------------------------------------------------------
 
--- label dinamis (auto-refresh) pakai fungsi, berkat api:Label yang sudah di-upgrade
-
 farmUI:Label(function()
     local r = Enchant:GetCurrentRodDetails()
     return string.format(
@@ -2099,6 +2086,10 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
         task.spawn(AutoEnchantLoop2)
     end
 end)
+
+-- expose ke global kalau nanti mau dipakai modul lain
+_G.AegisEnchant       = Enchant
+_G.AegisEnchantConfig = EnchantConfig
 
 ----------------------------------------------------------------
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
