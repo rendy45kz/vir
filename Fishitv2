@@ -1065,6 +1065,149 @@ else
     end)
 end
 
+------------------------------------------------------------
+-- TAB TRADE (BARU)
+------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Import Replion data
+local Replion = require(ReplicatedStorage.Packages.Replion)
+local DataReplion = Replion.Client:WaitReplion("Data")
+
+-- net remotes
+local netFolder = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+local RF_InitiateTrade = netFolder:WaitForChild("RF/InitiateTrade")
+
+------------------------------------------------------------
+-- Fungsi Baca Inventory
+------------------------------------------------------------
+local function readInventory()
+    local list = {}
+    local data = DataReplion:Get({ "Inventory", "Items" })
+    if not data then return list end
+
+    for _, item in ipairs(data) do
+        local base = item.Id or nil
+        local uuid = item.UUID or nil
+        if base and uuid then
+            local name = tostring(base)
+            table.insert(list, {
+                Label = name .. " | UUID: " .. uuid,
+                Name = name,
+                UUID = uuid
+            })
+        end
+    end
+    return list
+end
+
+------------------------------------------------------------
+-- Fungsi Baca Player List
+------------------------------------------------------------
+local function getPlayers()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then 
+            table.insert(list, p.Name)
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+------------------------------------------------------------
+-- BUAT TAB
+------------------------------------------------------------
+local TabTrade = win:CreateTab("Trade")
+
+TabTrade:Label("AUTO TRADE SYSTEM")
+
+------------------------------------------------------------
+-- STATE
+------------------------------------------------------------
+local TradeState = {
+    TargetPlayer = nil,
+    SelectedItem = nil
+}
+
+------------------------------------------------------------
+-- DROPDOWN PLAYER
+------------------------------------------------------------
+local ddPlayer = TabTrade:Dropdown("Select Target Player", getPlayers(), function(name)
+    TradeState.TargetPlayer = name
+end)
+
+------------------------------------------------------------
+-- DROPDOWN ITEM
+------------------------------------------------------------
+local inventoryList = readInventory()
+local itemDisplayList = {}
+
+for _, v in ipairs(inventoryList) do
+    table.insert(itemDisplayList, v.Label)
+end
+
+local ddItem = TabTrade:Dropdown("Select Item To Trade", itemDisplayList, function(label)
+    for _, data in ipairs(inventoryList) do
+        if data.Label == label then
+            TradeState.SelectedItem = data
+            break
+        end
+    end
+end)
+
+------------------------------------------------------------
+-- REFRESH BUTTONS
+------------------------------------------------------------
+TabTrade:Button("Refresh Player List", function()
+    ddPlayer:SetOptions(getPlayers())
+end)
+
+TabTrade:Button("Refresh Inventory", function()
+    inventoryList = readInventory()
+    local newList = {}
+    for _,data in ipairs(inventoryList) do
+        table.insert(newList, data.Label)
+    end
+    ddItem:SetOptions(newList)
+end)
+
+------------------------------------------------------------
+-- EXECUTE TRADE
+------------------------------------------------------------
+TabTrade:Button("Send Trade Request", function()
+    if not TradeState.TargetPlayer then
+        warn("[Trade] No target player selected")
+        return
+    end
+    if not TradeState.SelectedItem then
+        warn("[Trade] No item selected")
+        return
+    end
+
+    local target = Players:FindFirstChild(TradeState.TargetPlayer)
+    if not target then
+        warn("[Trade] Target player no longer exists")
+        return
+    end
+
+    local ok, err = pcall(function()
+        RF_InitiateTrade:InvokeServer(
+            target.UserId,
+            TradeState.SelectedItem.UUID
+        )
+    end)
+
+    if ok then
+        print("[Trade] Successfully sent item:", TradeState.SelectedItem.UUID)
+    else
+        warn("[Trade] Failed:", err)
+    end
+end)
+
+
 
 ----------------------------------------------------------------
 -- TAB SHOP – BUY BAIT (VULN)
