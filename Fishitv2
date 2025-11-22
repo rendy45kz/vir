@@ -1586,7 +1586,8 @@ end)
 ----------------------------------------------------------------
 -- AUTO TRADE V2 – Aman & cocok dengan UI Compact AegisHub
 ----------------------------------------------------------------
-
+task.spawn(function()
+    local ok, err = pcall(function()
         --------------------------------------------------------
         -- SETUP DASAR
         --------------------------------------------------------
@@ -1594,12 +1595,7 @@ end)
         local Players           = game:GetService("Players")
         local LocalPlayer       = Players.LocalPlayer
 
-        -- Pastikan TabFarm dan net sudah ada (dibuat di script utama)
-        if not TabFarm or not net then
-            warn("[AutoTrade] TabFarm / net belum ada, AutoTrade dilewati.")
-            return
-        end
-
+        
         -- Replion untuk baca Inventory
         local Packages = ReplicatedStorage:WaitForChild("Packages")
         local okRep, ReplionLib = pcall(function()
@@ -1862,7 +1858,8 @@ end)
         --------------------------------------------------------
         -- UI – MASUK TAB FARM / MAIN
         --------------------------------------------------------
-        local TradeTab = TabFarm
+        local TradeTab = win:CreateTab("Trade")
+        -- local TradeTab = TabFarm
         TradeTab:Label("Auto Trade (Give Items)")
 
         -- Dropdown: pilih player
@@ -1986,7 +1983,7 @@ end)
     if not ok then
         warn("[AutoTrade] Init error, UI utama tetap jalan. Detail:", err)
     end
-
+end)
 
 
 
