@@ -734,16 +734,17 @@ local Players          = game:GetService("Players")
 local LocalPlayer      = Players.LocalPlayer
 
 -- ====== REMOTES FISHING (sleitnick_net) ====== --
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
 
-local RF_ChargeFishingRod      = netFolder:WaitForChild("RF/ChargeFishingRod")
-local RF_RequestMinigame       = netFolder:WaitForChild("RF/RequestFishingMinigameStarted")
-local RE_FishingCompleted      = netFolder:WaitForChild("RE/FishingCompleted")
-local RF_CancelFishingInputs   = netFolder:FindFirstChild("RF/CancelFishingInputs")
-local RE_EquipToolFromHotbar   = netFolder:WaitForChild("RE/EquipToolFromHotbar")
+local net = netIndex:WaitForChild("net")
+
+local RF_ChargeFishingRod      = net:WaitForChild("RF/ChargeFishingRod")
+local RF_RequestMinigame       = net:WaitForChild("RF/RequestFishingMinigameStarted")
+local RE_FishingCompleted      = net:WaitForChild("RE/FishingCompleted")
+local RF_CancelFishingInputs   = net:FindFirstChild("RF/CancelFishingInputs")
+local RE_EquipToolFromHotbar   = net:WaitForChild("RE/EquipToolFromHotbar")
 
 ----------------------------------------------------------------
 -- CONFIG & STATE
