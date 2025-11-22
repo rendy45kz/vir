@@ -1991,7 +1991,7 @@ local function AutoEnchantLoop1()
         AutoEnchantRodSlot1()
         task.wait(2)
     end
-
+    EnchantConfig.AutoEnchant1 = false
     loop1Running = false
 end
 
@@ -2012,7 +2012,7 @@ local function AutoEnchantLoop2()
         -- delay biar nggak spam server, bebas mau diubah
         task.wait(2)
     end
-
+    EnchantConfig.AutoEnchant2 = false
     loop2Running = false
 end
 
@@ -2118,7 +2118,7 @@ farmUI:Toggle("Auto Enchant Slot 1", function(state)
     if state then
         task.spawn(AutoEnchantLoop1)
     else 
-     
+     EnchantConfig.AutoEnchant1 = false
     end
 end)
 
@@ -2135,7 +2135,7 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     if state then
         task.spawn(AutoEnchantLoop2)
     else     
-    
+    EnchantConfig.AutoEnchant2 = false
     end
 end)
 
