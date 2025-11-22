@@ -1985,7 +1985,7 @@ end
 ------------------------------------------------------------
 local function AutoEnchantLoop1()
     if EnchantLoop1Running then return end
-    EnchantLoop1Running = true
+    loop1Running = true
 
     while EnchantConfig.AutoEnchant1 do
         AutoEnchantRodSlot1()
@@ -2000,8 +2000,8 @@ end
 ------------------------------------------------------------
 local function AutoEnchantLoop2()
     -- kalau sudah jalan, jangan bikin loop baru lagi
-    if EnchantLoop2Running then return end
-    EnchantLoop2Running = true
+    if loop2Running then return end
+    loop2Running = true
 
     while EnchantConfig.AutoEnchant2 do
         -- panggil fungsi enchant rod slot 2 kamu di sini:
