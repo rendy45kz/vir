@@ -1948,17 +1948,14 @@ end
 -- LOOP AUTO ENCHANT 1
 ------------------------------------------------------------
 local function AutoEnchantLoop1()
-    if loop1Running then return end
-    loop1Running = true
+    if EnchantLoop1Running then return end
+    EnchantLoop1Running = true
+
     while EnchantConfig.AutoEnchant1 do
-        local ok, err = pcall(function()
-            Enchant:StartAutoEnchant1()
-        end)
-        if not ok then
-            warn("[AutoEnchant] loop1 error:", err)
-        end
-        task.wait(2.5)
+        AutoEnchantRodSlot1()
+        task.wait(2)
     end
+
     loop1Running = false
 end
 
@@ -1966,19 +1963,23 @@ end
 -- LOOP AUTO ENCHANT 2
 ------------------------------------------------------------
 local function AutoEnchantLoop2()
-    if loop2Running then return end
-    loop2Running = true
+    -- kalau sudah jalan, jangan bikin loop baru lagi
+    if EnchantLoop2Running then return end
+    EnchantLoop2Running = true
+
     while EnchantConfig.AutoEnchant2 do
-        local ok, err = pcall(function()
-            Enchant:StartAutoEnchant2()
-        end)
-        if not ok then
-            warn("[AutoEnchant] loop2 error:", err)
-        end
-        task.wait(2.5)
+        -- panggil fungsi enchant rod slot 2 kamu di sini:
+        -- misal: AutoEnchantRodSlot2()
+
+        AutoEnchantRodSlot2()
+
+        -- delay biar nggak spam server, bebas mau diubah
+        task.wait(2)
     end
+
     loop2Running = false
 end
+
 
 
 ----------------------------------------------------------------
@@ -2061,7 +2062,7 @@ farmUI:Toggle("Auto Enchant Slot 1", function(state)
     if state then
         task.spawn(AutoEnchantLoop1)
     else 
-     EnchantConfig.AutoEnchant1 = false
+     
     end
 end)
 
@@ -2078,7 +2079,7 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     if state then
         task.spawn(AutoEnchantLoop2)
     else     
-    EnchantConfig.AutoEnchant2 = false
+    
     end
 end)
 
