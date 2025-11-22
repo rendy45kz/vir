@@ -1065,6 +1065,89 @@ else
     end)
 end
 
+----------------------------------------------------------------
+-- TAB SHOP – BUY BAIT (VULN)
+----------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- net remotes (path sama seperti script lain)
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+-- GANTI nama remote ini kalau di game beda (cek hasil spy / scan)
+local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
+
+-- folder baits (dari screenshot: ReplicatedStorage.Baits)
+local BaitsFolder = ReplicatedStorage:WaitForChild("Baits")
+
+-- kalau sudah ada TabShop sebelumnya (rod shop), pakai yang lama
+local TabShop = TabShop or win:CreateTab("Shop")
+
+TabShop:Label("Bait Shop")
+
+-- build list bait dari ReplicatedStorage.Baits (ModuleScript)
+local baitOptions = {}   -- label di dropdown
+local baitIdMap   = {}   -- [displayName] = id
+
+do
+    for _, item in ipairs(BaitsFolder:GetChildren()) do
+        if item:IsA("ModuleScript") then
+            local ok, data = pcall(require, item)
+            if ok and data and data.Data then
+                local baitId   = data.Data.Id
+                local baitName = data.Data.Name or item.Name
+                local price    = data.Data.Price or data.Price
+
+                if baitId and baitName then
+                    local label = baitName
+                    if price then
+                        label = string.format("%s | Price: %s", baitName, tostring(price))
+                    end
+
+                    table.insert(baitOptions, label)
+                    -- map pakai nama bersih (tanpa info price)
+                    baitIdMap[baitName] = baitId
+                end
+            end
+        end
+    end
+
+    table.sort(baitOptions, function(a, b)
+        return a:lower() < b:lower()
+    end)
+end
+
+if #baitOptions == 0 then
+    TabShop:Label("Tidak ada bait ModuleScript di ReplicatedStorage.Baits")
+else
+    -- dropdown pakai UI compact kamu
+    TabShop:Dropdown("Buy Baits", baitOptions, function(option)
+        if not option or option == "" then return end
+
+        -- ambil nama bait tanpa bagian " | Price: ..."
+        local pureName = option:split(" |")[1]
+        local baitId   = baitIdMap[pureName]
+
+        if not baitId then
+            warn("[BaitShop] baitId tidak ditemukan untuk:", tostring(pureName))
+            return
+        end
+
+        -- invoke server (vuln: bisa beli bait yang sudah tidak ada di shop)
+        local ok, err = pcall(function()
+            RF_PurchaseBait:InvokeServer(baitId)
+        end)
+
+        if ok then
+            print("[BaitShop] Berhasil beli bait:", pureName, " | Id:", baitId)
+        else
+            warn("[BaitShop] Gagal beli bait:", pureName, "Error:", err)
+        end
+    end)
+end
+
 ------------------------------------------------------------
 -- TAB TRADE (BARU)
 ------------------------------------------------------------
@@ -1206,91 +1289,6 @@ TabTrade:Button("Send Trade Request", function()
         warn("[Trade] Failed:", err)
     end
 end)
-
-
-
-----------------------------------------------------------------
--- TAB SHOP – BUY BAIT (VULN)
-----------------------------------------------------------------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- net remotes (path sama seperti script lain)
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
-
--- GANTI nama remote ini kalau di game beda (cek hasil spy / scan)
-local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
-
--- folder baits (dari screenshot: ReplicatedStorage.Baits)
-local BaitsFolder = ReplicatedStorage:WaitForChild("Baits")
-
--- kalau sudah ada TabShop sebelumnya (rod shop), pakai yang lama
-local TabShop = TabShop or win:CreateTab("Shop")
-
-TabShop:Label("Bait Shop")
-
--- build list bait dari ReplicatedStorage.Baits (ModuleScript)
-local baitOptions = {}   -- label di dropdown
-local baitIdMap   = {}   -- [displayName] = id
-
-do
-    for _, item in ipairs(BaitsFolder:GetChildren()) do
-        if item:IsA("ModuleScript") then
-            local ok, data = pcall(require, item)
-            if ok and data and data.Data then
-                local baitId   = data.Data.Id
-                local baitName = data.Data.Name or item.Name
-                local price    = data.Data.Price or data.Price
-
-                if baitId and baitName then
-                    local label = baitName
-                    if price then
-                        label = string.format("%s | Price: %s", baitName, tostring(price))
-                    end
-
-                    table.insert(baitOptions, label)
-                    -- map pakai nama bersih (tanpa info price)
-                    baitIdMap[baitName] = baitId
-                end
-            end
-        end
-    end
-
-    table.sort(baitOptions, function(a, b)
-        return a:lower() < b:lower()
-    end)
-end
-
-if #baitOptions == 0 then
-    TabShop:Label("Tidak ada bait ModuleScript di ReplicatedStorage.Baits")
-else
-    -- dropdown pakai UI compact kamu
-    TabShop:Dropdown("Buy Baits", baitOptions, function(option)
-        if not option or option == "" then return end
-
-        -- ambil nama bait tanpa bagian " | Price: ..."
-        local pureName = option:split(" |")[1]
-        local baitId   = baitIdMap[pureName]
-
-        if not baitId then
-            warn("[BaitShop] baitId tidak ditemukan untuk:", tostring(pureName))
-            return
-        end
-
-        -- invoke server (vuln: bisa beli bait yang sudah tidak ada di shop)
-        local ok, err = pcall(function()
-            RF_PurchaseBait:InvokeServer(baitId)
-        end)
-
-        if ok then
-            print("[BaitShop] Berhasil beli bait:", pureName, " | Id:", baitId)
-        else
-            warn("[BaitShop] Gagal beli bait:", pureName, "Error:", err)
-        end
-    end)
-end
 
 
 -- sleitnick/net
