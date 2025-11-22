@@ -726,192 +726,229 @@ local win = library:CreateWindow("AegisHub - Fish It")
 
 
 ----------------------------------------------------------------
--- TAB AUTO – AUTO FISHING (INSTANT)
+-- AUTO FISHING – CONVERT DARI MODULE PC, DISESUAIKAN UNTUK MOBILE
 ----------------------------------------------------------------
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace        = game:GetService("Workspace")
 local Players          = game:GetService("Players")
 local LocalPlayer      = Players.LocalPlayer
 
--- konfigurasi
+-- ====== REMOTES FISHING (sleitnick_net) ====== --
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+local RF_ChargeFishingRod      = netFolder:WaitForChild("RF/ChargeFishingRod")
+local RF_RequestMinigame       = netFolder:WaitForChild("RF/RequestFishingMinigameStarted")
+local RE_FishingCompleted      = netFolder:WaitForChild("RE/FishingCompleted")
+local RF_CancelFishingInputs   = netFolder:FindFirstChild("RF/CancelFishingInputs")
+local RE_EquipToolFromHotbar   = netFolder:WaitForChild("RE/EquipToolFromHotbar")
+
+----------------------------------------------------------------
+-- CONFIG & STATE
+----------------------------------------------------------------
 local AutoFish = {
-    Enabled = false,
-    Delay   = 0.7, -- default, bisa diubah dari textbox
+    Enabled          = false,
+    Method           = "Instant",   -- "Instant" / "Fast"
+    DelayBetweenCast = 1.7,        -- dipakai untuk mode Instant
+    AutoPerfectCast  = true,
+
+    _Running         = false,
 }
 
--- notifikasi sederhana (kalau mau sambung ke Rayfield tinggal ganti di sini)
-local function Notify(title, msg)
-    print(("[AegisHub][%s] %s"):format(title, msg))
+-- Cast power ala module asli (AutoPerfectCast -> power mendekati 1)
+local function CalculateCastPower()
+    local minCastPower = AutoFish.AutoPerfectCast and 0.95 or 0.5
+    local castPower = math.random() * (0.9999 - minCastPower) + minCastPower
+    return castPower
 end
 
-------------------------------------------------------------
--- Helper: ambil remote net
-------------------------------------------------------------
-local function GetNetRemote(name)
-    local ok, netFolder = pcall(function()
-        return ReplicatedStorage:WaitForChild("Packages")
-            :WaitForChild("_Index")
-            :WaitForChild("sleitnick_net@0.2.0")
-            :WaitForChild("net")
-    end)
-    if not ok or not netFolder then return nil end
-    return netFolder:FindFirstChild(name)
+-- Persis fungsi GetElapsedFromPower dari module
+local function GetElapsedFromPower(seedTime, castPower)
+    local frequency = Random.new(seedTime):NextInteger(4, 10)
+
+    castPower = math.clamp(castPower, 0, 1)
+
+    if castPower == 1 then
+        return math.pi / frequency
+    elseif castPower == 0 then
+        return 0
+    end
+
+    local theta = math.asin(1 - 2 * castPower)
+    local elapsed = (theta - math.pi / 2) / frequency
+
+    if elapsed < 0 then
+        elapsed = elapsed + (2 * math.pi) / frequency
+    end
+
+    return elapsed
 end
 
--- remotes penting
-local RE_EquipToolFromHotbar  = GetNetRemote("RE/EquipToolFromHotbar")
-local RF_ChargeFishingRod     = GetNetRemote("RF/ChargeFishingRod")
-local RF_RequestMinigame      = GetNetRemote("RF/RequestFishingMinigameStarted")
-local RE_FishingCompleted     = GetNetRemote("RE/FishingCompleted")
+-- Raycast sederhana ke depan kaki player, ambil Y air
+local function GetWaterRay()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
 
-local function RebindRemotes()
+    local forwardPos = hrp.Position + hrp.CFrame.LookVector * 12
+    local origin     = forwardPos + Vector3.new(0, 5, 0)
+    local direction  = Vector3.new(0, -120, 0)
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char}
+    params.IgnoreWater = false
+
+    local result = Workspace:Raycast(origin, direction, params)
+    return result
+end
+
+-- Pastikan rod slot 1 ter-equip
+local function EnsureRodEquipped()
     pcall(function()
-        RE_EquipToolFromHotbar  = GetNetRemote("RE/EquipToolFromHotbar")  or RE_EquipToolFromHotbar
-        RF_ChargeFishingRod     = GetNetRemote("RF/ChargeFishingRod")     or RF_ChargeFishingRod
-        RF_RequestMinigame      = GetNetRemote("RF/RequestFishingMinigameStarted") or RF_RequestMinigame
-        RE_FishingCompleted     = GetNetRemote("RE/FishingCompleted")     or RE_FishingCompleted
+        RE_EquipToolFromHotbar:FireServer(1)
     end)
 end
 
--- rebind tiap respawn
-LocalPlayer.CharacterAdded:Connect(function()
-    task.delay(1, RebindRemotes)
-end)
+----------------------------------------------------------------
+-- 1 CYCLE FAST FISHING
+----------------------------------------------------------------
+local function DoFastCycle()
+    EnsureRodEquipped()
 
-------------------------------------------------------------
--- Helper: waktu server (kalau ada) untuk ChargeRod
-------------------------------------------------------------
-local function GetServerNow()
-    if workspace and workspace.GetServerTimeNow then
-        local ok, res = pcall(function()
-            return workspace:GetServerTimeNow()
-        end)
-        if ok and res then return res end
+    local ray = GetWaterRay()
+    if not ray or not ray.Position then
+        warn("[AutoFish] Raycast gagal, tidak menemukan air.")
+        return
     end
-    return tick()
+
+    local serverNow = Workspace:GetServerTimeNow and Workspace:GetServerTimeNow() or tick()
+    local power     = CalculateCastPower()
+    local offset    = GetElapsedFromPower(serverNow, power)
+
+    -- charge rod dengan waktu dikoreksi supaya bar berhenti di power yg kita mau
+    pcall(function()
+        RF_ChargeFishingRod:InvokeServer(serverNow - offset)
+    end)
+
+    task.wait(0.1)
+
+    -- start minigame (Y air, power, currentTime)
+    local startTime = Workspace:GetServerTimeNow and Workspace:GetServerTimeNow() or tick()
+    pcall(function()
+        RF_RequestMinigame:InvokeServer(ray.Position.Y, power, startTime)
+    end)
+
+    -- tunggu sebentar, lalu langsung claim hasil
+    task.wait(0.35)
+    pcall(function()
+        RE_FishingCompleted:FireServer()
+    end)
 end
 
-------------------------------------------------------------
--- AUTO FISH LOOP (selalu “perfect” posisi minigame)
-------------------------------------------------------------
-local AutoFishLoopRunning = false
+----------------------------------------------------------------
+-- 1 CYCLE INSTANT FISHING (lebih agresif, pakai delay custom)
+----------------------------------------------------------------
+local function DoInstantCycle()
+    EnsureRodEquipped()
 
-local function AutoFishingLoop()
-    if AutoFishLoopRunning then return end
-    AutoFishLoopRunning = true
+    local ray = GetWaterRay()
+    if not ray or not ray.Position then
+        warn("[AutoFish] Raycast gagal, tidak menemukan air.")
+        return
+    end
 
-    while AutoFish.Enabled do
-        local okCycle, errMsg = pcall(function()
-            -- pastikan remotes ada
-            if not (RE_EquipToolFromHotbar and RF_ChargeFishingRod and RF_RequestMinigame and RE_FishingCompleted) then
-                RebindRemotes()
-                Notify("Auto Fishing", "Remote belum siap, mencoba rebind...")
-                task.wait(2)
-                return
-            end
-
-            -- pastikan character + HRP
-            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-            if not hrp then
-                task.wait(1)
-                return
-            end
-
-            ------------------------------------------------
-            -- 1. Equip rod di hotbar slot 1 (ubah jika beda)
-            ------------------------------------------------
-            pcall(function()
-                RE_EquipToolFromHotbar:FireServer(1)
-            end)
-            task.wait(0.15)
-
-            ------------------------------------------------
-            -- 2. Charge rod (pakai waktu server)
-            ------------------------------------------------
-            local now = GetServerNow()
-            pcall(function()
-                if RF_ChargeFishingRod.InvokeServer then
-                    RF_ChargeFishingRod:InvokeServer(now)
-                else
-                    RF_ChargeFishingRod:FireServer(now)
-                end
-            end)
-            task.wait(0.15)
-
-            ------------------------------------------------
-            -- 3. Start minigame di koordinat “perfect”
-            --    ambil contoh dari sigma spy yg kamu kirim
-            ------------------------------------------------
-            local perfectX = -0.5718746185302734
-            local perfectY =  0.9851953866475573
-
-            pcall(function()
-                if RF_RequestMinigame.InvokeServer then
-                    RF_RequestMinigame:InvokeServer(perfectX, perfectY, GetServerNow())
-                else
-                    RF_RequestMinigame:FireServer(perfectX, perfectY, GetServerNow())
-                end
-            end)
-
-            -- tunggu sesuai delay user
-            task.wait((AutoFish.Delay or 0.7))
-
-            ------------------------------------------------
-            -- 4. Selesaikan fishing
-            ------------------------------------------------
-            pcall(function()
-                RE_FishingCompleted:FireServer()
-            end)
-
-            task.wait(0.1)
+    -- cancel input minigame lama jika remote ada
+    if RF_CancelFishingInputs then
+        pcall(function()
+            RF_CancelFishingInputs:InvokeServer()
         end)
+    end
 
-        if not okCycle then
-            warn("[AutoFish] error cycle:", errMsg)
-            task.wait(1)
+    local serverNow = Workspace:GetServerTimeNow and Workspace:GetServerTimeNow() or tick()
+    local power     = CalculateCastPower()
+
+    -- charge rod (di sini tidak pakai offset rumit, cukup power tinggi)
+    pcall(function()
+        RF_ChargeFishingRod:InvokeServer(serverNow)
+    end)
+
+    task.wait(0.05)
+
+    local startTime = Workspace:GetServerTimeNow and Workspace:GetServerTimeNow() or tick()
+    pcall(function()
+        RF_RequestMinigame:InvokeServer(ray.Position.Y, power, startTime)
+    end)
+
+    -- tunggu sesuai delay user, lalu selesaiin minigame
+    task.wait(math.max(AutoFish.DelayBetweenCast, 0.1))
+
+    pcall(function()
+        RE_FishingCompleted:FireServer()
+    end)
+end
+
+----------------------------------------------------------------
+-- MAIN LOOP
+----------------------------------------------------------------
+local function AutoFishLoop()
+    if AutoFish._Running then return end
+    AutoFish._Running = true
+
+    task.spawn(function()
+        while AutoFish.Enabled do
+            local ok, err = pcall(function()
+                if AutoFish.Method == "Fast" then
+                    DoFastCycle()
+                else
+                    DoInstantCycle()
+                end
+            end)
+            if not ok then
+                warn("[AutoFish] Error cycle:", err)
+            end
+
+            -- jeda kecil antar cycle supaya server tidak terlalu disiksa
+            task.wait(0.15)
         end
-    end
-
-    AutoFishLoopRunning = false
+        AutoFish._Running = false
+    end)
 end
 
-local function StartAutoFish()
-    if AutoFish.Enabled then return end
-    AutoFish.Enabled = true
-    Notify("Auto Fishing", "Auto fishing ON")
-    task.spawn(AutoFishingLoop)
-end
-
-local function StopAutoFish()
-    if not AutoFish.Enabled then return end
-    AutoFish.Enabled = false
-    Notify("Auto Fishing", "Auto fishing OFF")
-end
-
-------------------------------------------------------------
--- TAB AUTO (UI sesuai library kamu)
-------------------------------------------------------------
+----------------------------------------------------------------
+-- UI TAB: AUTO
+----------------------------------------------------------------
 local TabAuto = win:CreateTab("Auto")
 
-TabAuto:Label("Auto Fishing (Instant)")
+TabAuto:Label("Auto Fishing (Instant / Fast)")
 
-local autoToggle
-autoToggle = TabAuto:Toggle("Enable Auto Fishing (Instant)", function(state)
-    if state then
-        StartAutoFish()
-    else
-        StopAutoFish()
-    end
+-- Dropdown method
+TabAuto:Dropdown("Auto Fishing Method", {"Instant","Fast"}, function(opt)
+    AutoFish.Method = opt
 end)
 
-TabAuto:Box("Custom delay (seconds)", function(text)
-    local n = tonumber(text)
+-- Toggle perfect cast
+TabAuto:Toggle("Auto Perfect Cast", function(v)
+    AutoFish.AutoPerfectCast = v and true or false
+end)
+
+-- Input delay
+TabAuto:Box("Custom delay (seconds, Instant mode)", function(txt)
+    local n = tonumber(txt)
     if n and n > 0 then
-        AutoFish.Delay = n
-        Notify("Auto Fishing", "Delay di-set ke "..tostring(n).." detik")
+        AutoFish.DelayBetweenCast = n
     end
 end)
 
+-- Toggle utama
+TabAuto:Toggle("Enable Auto Fishing", function(v)
+    AutoFish.Enabled = v and true or false
+    if v then
+        AutoFishLoop()
+    end
+end)
 
 
 
