@@ -957,36 +957,6 @@ local TabAuto = win:CreateTab("Auto")
 
 TabAuto:Label("Auto Fishing (Instant / Fast)")
 
--- Delay between casts (AutoInstantCatchDelay)
-TabAuto:Box("Delay between casts ⛵ (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.1, 20)
-        FishingConfig.AutoInstantCatchDelay = n
-        print("[AutoFishing] AutoInstantCatchDelay =", n)
-    end
-end)
-
--- Delay per click power (dipakai mode Fast sebagai delay mini)
-TabAuto:Box("Delay per click power ⚡ (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.1, 1.0)
-        FishingConfig.AutoInstantCatchDelayPerClickPower = n
-        print("[AutoFishing] AutoInstantCatchDelayPerClickPower =", n)
-    end
-end)
-
--- Fishing Method to Use ("Fast" / "Instant")
-TabAuto:Dropdown("Fishing Method to Use 🎣", {"Fast","Instant"}, function(opt)
-    if opt == "Fast" or opt == "Instant" then
-        FishingConfig.AutoFishingMethod = opt
-        print("[AutoFishing] Method =", opt)
-    end
-end)
-
-TabAuto:Label(" ")
-
 -- Toggle Auto Fishing
 TabAuto:Toggle("Auto Fishing 🎣", function(value)
     if value then
@@ -996,14 +966,33 @@ TabAuto:Toggle("Auto Fishing 🎣", function(value)
     end
 end)
 
--- (Opsional) kalau mau akses dari script lain:
-_G.AegisFishing = Fishing
-_G.AegisFishingConfig = FishingConfig
+-- Fishing Method to Use ("Fast" / "Instant")
+TabAuto:Dropdown("Fishing Method to Use", {"Fast","Instant"}, function(opt)
+    if opt == "Fast" or opt == "Instant" then
+        FishingConfig.AutoFishingMethod = opt
+        print("[AutoFishing] Method =", opt)
+    end
+end)
 
+-- Delay between casts (AutoInstantCatchDelay)
+TabAuto:Box("Reel Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 0.1, 20)
+        FishingConfig.AutoInstantCatchDelay = n
+        print("[AutoFishing] AutoInstantCatchDelay =", n)
+    end
+end)
 
-
-
-
+-- Delay per click power (dipakai mode Fast sebagai delay mini)
+TabAuto:Box("Custom Complate Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 0.1, 1.0)
+        FishingConfig.AutoInstantCatchDelayPerClickPower = n
+        print("[AutoFishing] AutoInstantCatchDelayPerClickPower =", n)
+    end
+end)
 
 ----------------------------------------------------------------
 -- TAB SHOP – BUY OLD ROD (VULN)
