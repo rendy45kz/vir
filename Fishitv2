@@ -2084,7 +2084,11 @@ farmUI:Label("Auto Enchant")
 ------------------------------------------------------------
 
 farmUI:LiveLabel(function()
-    local r = GetCurrentRodDetails()
+    -- ganti Enchant_GetCurrentRodDetails() dengan fungsi kamu sendiri
+    local r = Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails() 
+              or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
+              or nil
+
     if not r then
         return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
     end
@@ -2095,7 +2099,8 @@ farmUI:LiveLabel(function()
         r.Enchant1 or "None",
         r.Enchant2 or "None"
     )
-end)
+end, 0.5) -- 0.5 = update setiap 0.5 detik
+
 
 
 -- daftar enchant dari Enchants
