@@ -787,7 +787,7 @@ local function CalculateCastPower()
     local minCastPower = 0.5
     if FishingConfig.AutoPerfectCast then
         -- dipaksa sangat dekat ke perfect
-        minCastPower = 0.995
+        minCastPower = 0.999
     end
     local castPower = minCastPower + math.random() * (0.9999 - minCastPower)
     return math.clamp(castPower, 0, 0.9999)
@@ -843,7 +843,7 @@ local function AutoFishingLoop()
             pcall(function()
                 RE_EquipToolFromHotbar:FireServer(1)
             end)
-            task.wait(0.15)
+            task.wait(0.5)
 
             local method = FishingConfig.AutoFishingMethod
 
@@ -861,7 +861,7 @@ local function AutoFishingLoop()
                     RF_ChargeFishingRod:InvokeServer(chargeTime)
                 end)
 
-                task.wait(0.12)
+                task.wait(0.1)
 
                 -- Y kira-kira sedikit di bawah kaki
                 local yPos = hrp.Position.Y - 10
