@@ -1986,7 +1986,7 @@ end)
     if not ok then
         warn("[AutoTrade] Init error, UI utama tetap jalan. Detail:", err)
     end
-end)
+
 
 
 
