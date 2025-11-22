@@ -1582,7 +1582,7 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 
-
+local TabTrade = win:CreateTab("Trade")
 ----------------------------------------------------------------
 -- AUTO TRADE V2 – Aman & cocok dengan UI Compact AegisHub
 ----------------------------------------------------------------
@@ -1858,8 +1858,8 @@ task.spawn(function()
         --------------------------------------------------------
         -- UI – MASUK TAB FARM / MAIN
         --------------------------------------------------------
-        local TradeTab = win:CreateTab("Trade")
-        -- local TradeTab = TabFarm
+        
+        local TradeTab = TabTrade
         TradeTab:Label("Auto Trade (Give Items)")
 
         -- Dropdown: pilih player
