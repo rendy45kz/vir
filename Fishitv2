@@ -2046,16 +2046,7 @@ farmUI:Label("Auto Enchant")
 -- UI TAB "Enchant" (struktur sama seperti PC, tapi pakai UI kamu)
 ------------------------------------------------------------
 
-farmUI:Label(function()
-    local r = Enchant:GetCurrentRodDetails()
-    return string.format(
-        "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
-        r.Name or "N/A",
-        r.Enchant1 or "None",
-        r.Enchant2 or "None"
-    )
-end)
-farmUI:Label("")
+
 
 -- daftar enchant dari Enchants
 local enchantNames = Enchant:GetListEnchant()
