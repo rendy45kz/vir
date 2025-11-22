@@ -1574,8 +1574,10 @@ end
 -- AUTO ENCHANT FUNCTION
 ----------------------------------------------------------------
 
+
+
 ------------------------------------------------------------
--- AUTO ENCHANT (port dari auto/enchant.lua ke UI AegisHub)
+-- AUTO ENCHANT (port struktur PC, cocok UI AegisHub)
 ------------------------------------------------------------
 
 local Players           = game:GetService("Players")
@@ -1591,28 +1593,29 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
-local RE_EquipHotbar        = net:WaitForChild("RE/EquipToolFromHotbar")
-local RE_ActivateEnchant    = net:WaitForChild("RE/ActivateEnchantingAltar")
-local RE_EquipItem          = net:FindFirstChild("RE/EquipItem")
-local RE_UnequipItem        = net:FindFirstChild("RE/UnequipItem")
+local RE_EquipHotbar     = net:WaitForChild("RE/EquipToolFromHotbar")
+local RE_ActivateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
+local RE_EquipItem       = net:FindFirstChild("RE/EquipItem")
+local RE_UnequipItem     = net:FindFirstChild("RE/UnequipItem")
 
 ------------------------------------------------------------
--- IMPORT MODULES (Replion, ItemUtility, TierUtility, Enchants)
+-- IMPORT MODULES (Replion, PlayerStatsUtility, ItemUtility,
+--                 TierUtility, Enchants)
 ------------------------------------------------------------
 local Replion, DataReplion
 local PlayerStatsUtility, ItemUtility, TierUtility
 local EnchantDefs
 
 do
-    local ok, mod = pcall(function()
+    local okR, modR = pcall(function()
         return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Replion"))
     end)
-    if ok and mod then
-        Replion = mod
-        local ok2, rep = pcall(function()
+    if okR and modR then
+        Replion = modR
+        local okD, rep = pcall(function()
             return Replion.Client:WaitReplion("Data")
         end)
-        if ok2 then DataReplion = rep end
+        if okD then DataReplion = rep end
     end
 
     local shared = ReplicatedStorage:FindFirstChild("Shared")
@@ -1628,17 +1631,18 @@ do
 end
 
 ------------------------------------------------------------
--- KONFIGURASI / STATE AUTO ENCHANT
+-- KONFIGURASI / STATE AUTO ENCHANT (mirip module PC)
 ------------------------------------------------------------
 local EnchantConfig = {
-    TargetEnchant1 = {},   -- [name] = true
-    TargetEnchant2 = nil,  -- string
+    TargetEnchant1 = {},   -- [name] = true (multi)
+    TargetEnchant2 = nil,  -- string / single
     AutoEnchant1   = false,
     AutoEnchant2   = false,
 }
 
-local Enchant = {}
-local loop1Running = false
+local Enchant        = {}
+local loop1Running   = false
+local loop2Running   = false
 
 local ENCHANT_ALTAR_CFRAME = CFrame.new(
     3234.55444, -1302.85486, 1400.52197,
@@ -1697,7 +1701,6 @@ function Enchant:EquipEnchantStone(unequipUUID)
 
     local first = stones[1]
 
-    -- coba unequip item lama
     if RE_UnequipItem and unequipUUID then
         pcall(function()
             RE_UnequipItem:FireServer(unequipUUID)
@@ -1705,7 +1708,6 @@ function Enchant:EquipEnchantStone(unequipUUID)
         task.wait(0.15)
     end
 
-    -- equip enchant stone (asumsi signature: (uuid, "EnchantStones"))
     if RE_EquipItem then
         pcall(function()
             RE_EquipItem:FireServer(first.UUID, first.Type or "EnchantStones")
@@ -1737,7 +1739,6 @@ function Enchant:GetCurrentRodDetails()
 
     local equippedItem = DataReplion:Get("EquippedItems")
     if not (equippedItem and equippedItem[1]) then
-        warn("[AutoEnchant] Tidak ada item di slot 1 (EquippedItems).")
         return {
             Name = "None", Enchant1 = "None", Enchant2 = "None"
         }
@@ -1749,7 +1750,6 @@ function Enchant:GetCurrentRodDetails()
     end)
 
     if not inventoryItem then
-        warn("[AutoEnchant] Item slot 1 tidak ditemukan di inventory.")
         return {
             Name = "None", Enchant1 = "None", Enchant2 = "None"
         }
@@ -1840,12 +1840,66 @@ function Enchant:GetListEnchant()
 end
 
 ------------------------------------------------------------
--- START AUTO ENCHANT SLOT 1 (mirip StartAutoEnchant1 module)
+-- TELEPORT KE ALTAR + EQUIP BATU & AKTIFKAN (fungsi umum)
+------------------------------------------------------------
+local function doEnchantCast()
+    local char = ensureCharacter()
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local curPos   = hrp.Position
+    local flatCur  = Vector3.new(curPos.X, 0, curPos.Z)
+    local flatAltr = Vector3.new(ENCHANT_ALTAR_CFRAME.X, 0, ENCHANT_ALTAR_CFRAME.Z)
+
+    if (flatCur - flatAltr).Magnitude > 5 then
+        hrp.CFrame = ENCHANT_ALTAR_CFRAME + Vector3.new(0, 5, 0)
+        task.wait(1)
+    end
+
+    local hotBarIndex = nil
+    if DataReplion and PlayerStatsUtility and ItemUtility then
+        local equipped = DataReplion:Get("EquippedItems") or {}
+        for k, v in pairs(equipped) do
+            local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
+                return it.UUID == v
+            end)
+            if invItem then
+                local okI, itemData = pcall(function()
+                    return ItemUtility:GetItemData(invItem.Id)
+                end)
+                if okI and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+                    hotBarIndex = k
+                    break
+                end
+            end
+        end
+
+        if not hotBarIndex then
+            local equipped = DataReplion:Get("EquippedItems") or {}
+            if #equipped > 0 then
+                Enchant:EquipEnchantStone(equipped[#equipped])
+                hotBarIndex = #equipped
+            end
+        end
+    end
+
+    if not hotBarIndex then hotBarIndex = 2 end
+
+    pcall(function()
+        RE_EquipHotbar:FireServer(hotBarIndex)
+    end)
+    task.wait(0.15)
+    pcall(function()
+        RE_ActivateEnchant:FireServer()
+    end)
+end
+
+------------------------------------------------------------
+-- START AUTO ENCHANT SLOT 1
 ------------------------------------------------------------
 function Enchant:StartAutoEnchant1()
     if not EnchantConfig.AutoEnchant1 then return end
 
-    -- kumpulkan target enchant (nama)
     local targetNames = {}
     for name, state in pairs(EnchantConfig.TargetEnchant1) do
         if state then table.insert(targetNames, name) end
@@ -1861,71 +1915,43 @@ function Enchant:StartAutoEnchant1()
         return
     end
 
-    -- jika enchant1 sudah salah satu dari target -> tidak perlu enchant lagi
     if table.find(targetNames, currentRod.Enchant1) then
         print("[AutoEnchant] Enchant1 sudah salah satu target:", currentRod.Enchant1)
         return
     end
 
-    -- teleport ke altar (pakai CFrame)
-    local char = ensureCharacter()
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local curPos = hrp.Position
-    local flatCur = Vector3.new(curPos.X, 0, curPos.Z)
-    local flatAltar = Vector3.new(ENCHANT_ALTAR_CFRAME.X, 0, ENCHANT_ALTAR_CFRAME.Z)
-
-    if (flatCur - flatAltar).Magnitude > 5 then
-        hrp.CFrame = ENCHANT_ALTAR_CFRAME + Vector3.new(0, 5, 0)
-        task.wait(1)
-    end
-
-    -- cari slot hotbar yang berisi enchant stone
-    local hotBarIndex = nil
-    if DataReplion and PlayerStatsUtility and ItemUtility then
-        local equipped = DataReplion:Get("EquippedItems") or {}
-        for k, v in pairs(equipped) do
-            local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
-                return it.UUID == v
-            end)
-            if invItem then
-                local okItem, itemData = pcall(function()
-                    return ItemUtility:GetItemData(invItem.Id)
-                end)
-                if okItem and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-                    hotBarIndex = k
-                    break
-                end
-            end
-        end
-
-        if not hotBarIndex and #equipped > 0 then
-            -- equip enchant stone ke slot terakhir
-            self:EquipEnchantStone(equipped[#equipped])
-            hotBarIndex = #equipped
-        end
-    end
-
-    if not hotBarIndex then
-        -- fallback: pakai slot 2 kalau tidak ketemu apapun
-        hotBarIndex = 2
-    end
-
-    -- equip tool di slot enchant stone lalu aktifkan altar
-    pcall(function()
-        RE_EquipHotbar:FireServer(hotBarIndex)
-    end)
-    task.wait(0.15)
-    pcall(function()
-        RE_ActivateEnchant:FireServer()
-    end)
-
-    print("[AutoEnchant] Proses enchant 1 dijalankan. Target:", table.concat(targetNames, ", "))
+    doEnchantCast()
+    print("[AutoEnchant] Proses enchant SLOT 1 dijalankan → target:", table.concat(targetNames, ", "))
 end
 
 ------------------------------------------------------------
--- LOOP AUTO ENCHANT1
+-- START AUTO ENCHANT SLOT 2
+------------------------------------------------------------
+function Enchant:StartAutoEnchant2()
+    if not EnchantConfig.AutoEnchant2 then return end
+    local target2 = EnchantConfig.TargetEnchant2
+    if not target2 or target2 == "" then
+        warn("[AutoEnchant] TargetEnchant2 belum dipilih.")
+        return
+    end
+
+    local currentRod = self:GetCurrentRodDetails()
+    if not currentRod or not currentRod.Name then
+        warn("[AutoEnchant] Tidak ada fishing rod equipped.")
+        return
+    end
+
+    if currentRod.Enchant2 == target2 then
+        print("[AutoEnchant] Enchant2 sudah sesuai target:", target2)
+        return
+    end
+
+    doEnchantCast()
+    print("[AutoEnchant] Proses enchant SLOT 2 dijalankan → target:", target2)
+end
+
+------------------------------------------------------------
+-- LOOP AUTO ENCHANT 1
 ------------------------------------------------------------
 local function AutoEnchantLoop1()
     if loop1Running then return end
@@ -1941,6 +1967,28 @@ local function AutoEnchantLoop1()
     end
     loop1Running = false
 end
+
+------------------------------------------------------------
+-- LOOP AUTO ENCHANT 2
+------------------------------------------------------------
+local function AutoEnchantLoop2()
+    if loop2Running then return end
+    loop2Running = true
+    while EnchantConfig.AutoEnchant2 do
+        local ok, err = pcall(function()
+            Enchant:StartAutoEnchant2()
+        end)
+        if not ok then
+            warn("[AutoEnchant] loop2 error:", err)
+        end
+        task.wait(2.5)
+    end
+    loop2Running = false
+end
+
+-- expose ke global kalau nanti mau dipakai modul lain
+_G.AegisEnchant       = Enchant
+_G.AegisEnchantConfig = EnchantConfig
 
 
 
@@ -2005,24 +2053,27 @@ end)
 ----------------------------------------------------------------
 farmUI:Label("Auto Enchant")
 
-
-
 ------------------------------------------------------------
--- UI TAB "Enchant" (struktur mirip EnchantSection module)
+-- UI TAB "Enchant" (struktur sama seperti PC, tapi pakai UI kamu)
 ------------------------------------------------------------
 
+-- label dinamis (auto-refresh) pakai fungsi, berkat api:Label yang sudah di-upgrade
 
--- Info rod (sekali saat buka)
-local rodInfo = Enchant:GetCurrentRodDetails() or {}
-farmUI:Label("Current Rod: " .. (rodInfo.Name or "N/A"))
-farmUI:Label("Enchant 1: " .. (rodInfo.Enchant1 or "None"))
-farmUI:Label("Enchant 2: " .. (rodInfo.Enchant2 or "None"))
-farmUI:Label(" ")
+farmUI:Label(function()
+    local r = Enchant:GetCurrentRodDetails()
+    return string.format(
+        "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
+        r.Name or "N/A",
+        r.Enchant1 or "None",
+        r.Enchant2 or "None"
+    )
+end)
+farmUI:Label("")
 
--- ambil list enchant
+-- daftar enchant dari Enchants
 local enchantNames = Enchant:GetListEnchant()
 
-farmUI:Label("Enchant 1 (Slot Pertama)")
+farmUI:Label("Enchant 1 (Target Bisa Banyak)")
 farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
     EnchantConfig.TargetEnchant1[name] = state and true or false
 end)
@@ -2034,23 +2085,20 @@ farmUI:Toggle("Auto Enchant Slot 1", function(state)
     end
 end)
 
-farmUI:Label(" ")
-farmUI:Label("Enchant 2 (opsional / manual)")
+farmUI:Label("")
+farmUI:Label("Enchant 2 (Target Single)")
 
 farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
     EnchantConfig.TargetEnchant2 = name
     print("[AutoEnchant] TargetEnchant2 =", name)
 end)
 
-farmUI:Toggle("Auto Enchant Slot 2 (placeholder)", function(state)
+farmUI:Toggle("Auto Enchant Slot 2", function(state)
     EnchantConfig.AutoEnchant2 = state
-    -- TODO: bisa ditambah logic slot 2 kalau mau, sekarang hanya disimpan di config
+    if state then
+        task.spawn(AutoEnchantLoop2)
+    end
 end)
-
--- expose kalau mau dipakai script lain
-_G.AegisEnchant      = Enchant
-_G.AegisEnchantConfig = EnchantConfig
-
 
 ----------------------------------------------------------------
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
