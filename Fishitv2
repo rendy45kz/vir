@@ -1196,276 +1196,299 @@ else
     end)
 end
 
+------------------------------------------------------------
+-- TAB TRADE – SIMPLE AUTO GIVE + AUTO ACCEPT (+ QUANTITY)
+------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players           = game:GetService("Players")
+local LocalPlayer       = Players.LocalPlayer
 
-
-
-----------------------------------------------------------------
--- TAB TRADE – AUTO GIVE ITEMS (V2, UI mirip ThanHub)
-----------------------------------------------------------------
+-- sleitnick/net (sama seperti part lain)
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players          = game:GetService("Players")
-local LocalPlayer      = Players.LocalPlayer
+-- REMOTES TRADE
+local RF_InitiateTrade      = net:WaitForChild("RF/InitiateTrade")
+local RF_AwaitTradeResponse = net:WaitForChild("RF/AwaitTradeResponse")
 
--- pakai folder net yang sama dengan Farm / Shop
-local RF_InitiateTrade        = net:WaitForChild("RF/InitiateTrade")
-local RF_AwaitTradeResponse   = net:WaitForChild("RF/AwaitTradeResponse")
+-- MODULE DATA
+local Replion      = require(ReplicatedStorage.Packages.Replion)
+local ItemUtility  = require(ReplicatedStorage.Shared.ItemUtility)
+local TierUtility  = require(ReplicatedStorage.Shared.TierUtility)
+local Constants    = require(ReplicatedStorage.Shared.Constants)
 
--- coba ambil Replion + Utility dari ReplicatedStorage (fallback _G kalau ada)
-local Replion = rawget(_G, "Replion")
-if not Replion then
-    pcall(function()
-        Replion = require(ReplicatedStorage.Packages.Replion)
-    end)
-end
+local ItemsModule  = require(ReplicatedStorage:WaitForChild("Items"))
+local DataReplion  = Replion.Client:WaitReplion("Data")
 
-local ItemUtility, ItemStringUtility
-pcall(function()
-    ItemUtility      = require(ReplicatedStorage.Shared.ItemUtility)
-    ItemStringUtility = require(ReplicatedStorage.Modules.ItemStringUtility)
-end)
-
--- STATE TRADE
-local Trade = {
-    AutoGive       = false,
-    AutoAccept     = false,
-    SkipFavorited  = true,
-    TargetPlayer   = nil,   -- string nama target
-    Thread         = nil,
+------------------------------------------------------------
+-- CONFIG TRADE
+------------------------------------------------------------
+local TradeConfig = {
+    AutoGive         = false,
+    AutoAccept       = false,
+    TargetUserId     = nil,
+    SelectedNames    = {},  -- [itemName] = true
+    MinRarityIndex   = nil, -- angka tier, nil = off
+    DontGiveFavorite = true,
+    SendLimit        = 0,   -- 0 = kirim semua yang lolos filter
 }
 
--- CACHE INVENTORY  (key = label tampilan)
-local inventoryDisplayList = {}           -- { "Candy Butterfly (Qty : 1)", ... }
-local inventoryDataByLabel = {}           -- [label] = { name = "Candy Butterfly", uuids = {..}, selected = bool }
-
--- dropdown handle (dari UI library kamu)
-local DD_Player   = nil
-local DD_Items    = nil
-
 ------------------------------------------------------------
--- Helper: Player List
+-- BUILD LIST ITEM TRADABLE
 ------------------------------------------------------------
-local function getPlayerList()
-    local list = {}
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
-    end
-    table.sort(list)
-    return list
-end
+local TradeItems = {}
 
-------------------------------------------------------------
--- Helper: Refresh Player Dropdown
-------------------------------------------------------------
-local function refreshPlayerDropdown()
-    if not DD_Player or not DD_Player.SetOptions then return end
-    DD_Player:SetOptions(getPlayerList())
-end
+do
+    for _, itemInfo in pairs(ItemsModule or {}) do
+        local data = itemInfo.Data
+        if data then
+            local itemType = data.Type or "Unknown"
+            if table.find(Constants.TradableItemTypes, itemType)
+            and not table.find(Constants.PaidTradableItemTypes, itemType) then
 
-Players.PlayerAdded:Connect(refreshPlayerDropdown)
-Players.PlayerRemoving:Connect(refreshPlayerDropdown)
+                local tierIndex  = data.Tier or 100
+                local tierDetail = TierUtility:GetTier(tierIndex)
 
-------------------------------------------------------------
--- REFRESH INVENTORY (Fish + Enchant Stones, grouped)
-------------------------------------------------------------
-local function refreshInventoryForTrade()
-    table.clear(inventoryDisplayList)
-    table.clear(inventoryDataByLabel)
-
-    if not (Replion and ItemUtility and ItemStringUtility) then
-        warn("[Trade] Replion / ItemUtility / ItemStringUtility tidak ditemukan")
-        return
-    end
-
-    local dataReplion = Replion.Client:WaitReplion("Data")
-    if not dataReplion then
-        warn("[Trade] DataReplion nil")
-        return
-    end
-
-    local items = dataReplion:Get({ "Inventory", "Items" }) or {}
-    if not items then return end
-
-    -- group per nama dinamis
-    local grouped = {}     -- [name] = { count = n, uuids = { .. } }
-
-    for _, inv in ipairs(items) do
-        local base = ItemUtility:GetItemData(inv.Id)
-        if base and base.Data then
-            local typ = base.Data.Type
-
-            -- hanya Fish & Enchant Stones seperti script asli
-            if typ == "Fish" or typ == "Enchant Stones" then
-                -- opsi: skip favorit
-                if not (Trade.SkipFavorited and inv.Favorited) then
-                    local dynName = ItemStringUtility.GetItemName(inv, base)
-
-                    if not grouped[dynName] then
-                        grouped[dynName] = { count = 0, uuids = {} }
-                    end
-                    grouped[dynName].count = grouped[dynName].count + 1
-                    table.insert(grouped[dynName].uuids, inv.UUID)
-                end
+                table.insert(TradeItems, {
+                    Id          = data.Id,
+                    Name        = data.Name or "Unknown",
+                    Type        = itemType,
+                    Description = data.Description or "No Description",
+                    Rarity      = tierDetail and tierDetail.Name or "Unknown",
+                    RarityIndex = tierIndex,
+                })
             end
         end
     end
 
-    -- jadikan label seperti ThanHub: "Name (Qty : X)"
-    for name, data in pairs(grouped) do
-        local label = string.format("%s (Qty : %d)", name, data.count)
-        table.insert(inventoryDisplayList, label)
-        inventoryDataByLabel[label] = {
-            name     = name,
-            uuids    = data.uuids,
-            selected = false,
-        }
-    end
-
-    table.sort(inventoryDisplayList)
-
-    if DD_Items and DD_Items.SetOptions then
-        DD_Items:SetOptions(inventoryDisplayList)
-    end
-end
-
-------------------------------------------------------------
--- AUTO GIVE LOOP
-------------------------------------------------------------
-local function startAutoGiveLoop()
-    if Trade.Thread or not Trade.AutoGive then return end
-
-    Trade.Thread = task.spawn(function()
-        while Trade.AutoGive do
-            -- butuh player + minimal 1 item ter-select
-            if not Trade.TargetPlayer then
-                task.wait(1)
-                continue
-            end
-
-            local targetPlayer = Players:FindFirstChild(Trade.TargetPlayer)
-            if not targetPlayer then
-                task.wait(1)
-                continue
-            end
-
-            -- cari label yang selected dan masih punya uuid
-            local chosenLabel, chosenData
-            for label, data in pairs(inventoryDataByLabel) do
-                if data.selected and data.uuids and #data.uuids > 0 then
-                    chosenLabel = label
-                    chosenData  = data
-                    break
-                end
-            end
-
-            if not chosenLabel then
-                -- tidak ada item yang dipilih / habis
-                task.wait(1.5)
-                continue
-            end
-
-            local uuid = table.remove(chosenData.uuids) -- ambil 1
-            if not uuid then
-                task.wait(0.5)
-                continue
-            end
-
-            local ok, res = pcall(function()
-                return RF_InitiateTrade:InvokeServer(targetPlayer.UserId, uuid)
-            end)
-
-            if ok then
-                print("[Trade] Sent", chosenData.name, "→", targetPlayer.Name, "| UUID:", uuid)
-            else
-                warn("[Trade] Gagal trade:", chosenData.name, "err:", res)
-            end
-
-            -- kecilkan qty di label (visual saja)
-            local newCount = math.max(0, (#chosenData.uuids))
-            -- (biarkan teks label di dropdown tetap, nanti beres saat refresh backpack)
-
-            task.wait(4) -- delay antar trade, jangan spam server
+    table.sort(TradeItems, function(a,b)
+        if a.RarityIndex == b.RarityIndex then
+            return a.Name < b.Name
+        else
+            return a.RarityIndex < b.RarityIndex
         end
-
-        Trade.Thread = nil
     end)
 end
 
 ------------------------------------------------------------
--- AUTO ACCEPT TRADE (opsional)
+-- HELPER: LIST PLAYER
+------------------------------------------------------------
+local function getPlayerNames()
+    local t = {}
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(t, p.Name)
+        end
+    end
+    table.sort(t)
+    return t
+end
+
+------------------------------------------------------------
+-- HELPER: SCAN INVENTORY TRADABLE
+------------------------------------------------------------
+local function getInventoryTradables()
+    local out = {}
+
+    local inv   = DataReplion:Get({ "Inventory" })
+    local items = inv and inv.Items or {}
+    if not items then return out end
+
+    for _,it in ipairs(items) do
+        if it.Id and it.UUID then
+            local ok, base = pcall(function()
+                return ItemUtility:GetItemData(it.Id)
+            end)
+            if ok and base and base.Data then
+                local itemType = base.Data.Type or "Unknown"
+                if table.find(Constants.TradableItemTypes, itemType)
+                and not table.find(Constants.PaidTradableItemTypes, itemType) then
+                    local tierIndex = base.Data.Tier or 100
+                    table.insert(out, {
+                        UUID        = it.UUID,
+                        Name        = base.Data.Name or "Unknown",
+                        RarityIndex = tierIndex,
+                        Favorited   = it.Favorited and true or false,
+                    })
+                end
+            end
+        end
+    end
+
+    return out
+end
+
+------------------------------------------------------------
+-- LOOP AUTO GIVE (PAKAI QUANTITY)
+------------------------------------------------------------
+local tradeLoopRunning = false
+
+local function AutoGiveLoop()
+    if tradeLoopRunning then return end
+    tradeLoopRunning = true
+
+    while TradeConfig.AutoGive do
+        local targetId = TradeConfig.TargetUserId
+        if targetId then
+            local inventory = getInventoryTradables()
+            local sendList  = {}
+
+            -- filter mana yang mau dikirim
+            for _,it in ipairs(inventory) do
+                if TradeConfig.DontGiveFavorite and it.Favorited then
+                    -- skip favorit
+                else
+                    local passName = false
+                    if next(TradeConfig.SelectedNames) ~= nil then
+                        for nm,_ in pairs(TradeConfig.SelectedNames) do
+                            if it.Name == nm then
+                                passName = true
+                                break
+                            end
+                        end
+                    else
+                        passName = true
+                    end
+
+                    local passRarity = true
+                    if TradeConfig.MinRarityIndex then
+                        passRarity = it.RarityIndex >= TradeConfig.MinRarityIndex
+                    end
+
+                    if passName and passRarity then
+                        table.insert(sendList, it)
+                    end
+                end
+            end
+
+            -- kirim satu-satu, hormati SendLimit (quantity)
+            local sent = 0
+            for _,it in ipairs(sendList) do
+                if not TradeConfig.AutoGive then break end
+                if TradeConfig.SendLimit and TradeConfig.SendLimit > 0 and sent >= TradeConfig.SendLimit then
+                    break
+                end
+
+                local ok, res = pcall(function()
+                    return RF_InitiateTrade:InvokeServer(targetId, it.UUID)
+                end)
+                if ok then
+                    sent += 1
+                    print("[AutoTrade] Sent", it.Name, "to", targetId)
+                else
+                    warn("[AutoTrade] Failed trade:", res)
+                end
+                task.wait(4) -- delay anti spam
+            end
+        end
+
+        task.wait(1)
+    end
+
+    tradeLoopRunning = false
+end
+
+------------------------------------------------------------
+-- AUTO ACCEPT INCOMING TRADE
 ------------------------------------------------------------
 RF_AwaitTradeResponse.OnClientInvoke = function(itemType, itemData, sender)
-    if Trade.AutoAccept then
-        print("[Trade] Auto accept trade dari:", tostring(sender))
+    if TradeConfig.AutoAccept then
+        print("[AutoTrade] Auto accept trade dari:", tostring(sender))
         return true
     end
     return false
 end
 
 ------------------------------------------------------------
--- UI: TAB TRADE
+-- UI TAB TRADE (LIBRARY KAMU)
 ------------------------------------------------------------
 local TabTrade = win:CreateTab("Trade")
 
-TabTrade:Label("Trade Status: gunakan Auto Give untuk mass trade.")
-TabTrade:Label("Select Fish from Backpack (unfavorited only jika opsi aktif).")
+TabTrade:Label("Target Player")
 
--- Toggle: Skip Favorited
-TabTrade:Toggle("Skip Favorited (jangan kirim yang di-favorite)", function(state)
-    Trade.SkipFavorited = state
-    refreshInventoryForTrade()
-end):Set(true) -- default ON
-
--- Dropdown item (Multi, mirip gambar 2: daftar nama + Qty)
-DD_Items = TabTrade:MultiDropdown("Backpack Items", {}, function(label, state)
-    local data = inventoryDataByLabel[label]
-    if data then
-        data.selected = state and true or false
+TabTrade:Dropdown("Player", getPlayerNames(), function(name)
+    local pl = Players:FindFirstChild(name)
+    if pl then
+        TradeConfig.TargetUserId = pl.UserId
+        print("[Trade] Target player set:", name, "(", pl.UserId, ")")
+    else
+        TradeConfig.TargetUserId = nil
+        warn("[Trade] Player tidak ditemukan:", name)
     end
 end)
 
--- Tombol refresh backpack
-TabTrade:Button("Refresh Backpack", function()
-    refreshInventoryForTrade()
-end)
+-- Build list nama item untuk MultiDropdown
+local displayList   = {}
+local displayToName = {}
 
--- Dropdown pilih player
-DD_Player = TabTrade:Dropdown("Select Target Player", getPlayerList(), function(name)
-    Trade.TargetPlayer = name
-    print("[Trade] Target player set ke:", tostring(name))
-end)
+for _,info in ipairs(TradeItems) do
+    local label = string.format("[%s] %s (%s)", info.Rarity, info.Name, info.Type)
+    table.insert(displayList, label)
+    displayToName[label] = info.Name
+end
 
--- Toggle Auto Give
-TabTrade:Toggle("Auto Give Selected Items", function(state)
-    Trade.AutoGive = state
-    if state then
-        startAutoGiveLoop()
+table.sort(displayList)
+
+TabTrade:Label("Pilih item yang mau dikirim")
+
+TabTrade:MultiDropdown("Items To Give", displayList, function(label, state)
+    local realName = displayToName[label]
+    if realName then
+        if state then
+            TradeConfig.SelectedNames[realName] = true
+        else
+            TradeConfig.SelectedNames[realName] = nil
+        end
+        print("[Trade] Select item:", realName, "=", state and "ON" or "OFF")
     end
 end)
 
--- Toggle Auto Accept incoming trades
-TabTrade:Toggle("Auto Accept Incoming Trades", function(state)
-    Trade.AutoAccept = state
+TabTrade:Label("Min Rarity Tier (0 = off)")
+TabTrade:Slider("Min Tier", 0, 20, 0, function(v)
+    if v <= 0 then
+        TradeConfig.MinRarityIndex = nil
+        print("[Trade] MinRarity OFF")
+    else
+        TradeConfig.MinRarityIndex = v
+        print("[Trade] MinRarityIndex =", v)
+    end
 end)
 
--- inisialisasi awal
-task.defer(function()
-    refreshPlayerDropdown()
-    refreshInventoryForTrade()
+TabTrade:Toggle("Don't Give Favorites", function(v)
+    TradeConfig.DontGiveFavorite = v and true or false
+end)
+
+-- ✅ INPUT QUANTITY DI SINI
+TabTrade:Label("Quantity To Send (0 = all)")
+
+TabTrade:Box("contoh: 10 (0 = all)", function(txt)
+    local n = tonumber(txt)
+
+    if not n or n < 0 then
+        -- Jika input kosong / bukan angka / minus → dianggap 0 (kirim semua)
+        TradeConfig.SendLimit = 0
+    else
+        TradeConfig.SendLimit = math.floor(n)
+    end
+
+    print("[Trade] SendLimit =", TradeConfig.SendLimit)
 end)
 
 
+TabTrade:Toggle("Auto Give Items", function(v)
+    TradeConfig.AutoGive = v and true or false
+    if v then
+        task.spawn(AutoGiveLoop)
+    end
+end)
 
+TabTrade:Toggle("Auto Accept Incoming Trades", function(v)
+    TradeConfig.AutoAccept = v and true or false
+end)
 
-
-    
 
 
 -- sleitnick/net
