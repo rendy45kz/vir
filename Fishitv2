@@ -1222,19 +1222,6 @@ local TradeState = {
     NameToId     = {},    -- [Name] = UserId
 }
 
-local TradeLogs = {}      -- untuk debug
-
-local function LogTradeEvent(...)
-    local msg = table.concat(
-        table.create(select("#", ...), function(i) return tostring(select(i, ...)) end),
-        " "
-    )
-    print("[TradeLog]", msg)
-    table.insert(TradeLogs, os.date("%X") .. " | " .. msg)
-    if #TradeLogs > 100 then
-        table.remove(TradeLogs, 1)
-    end
-end
 
 ------------------------------------------------------------
 -- BANGUN LIST PLAYER (Nama → UserId)
@@ -1251,7 +1238,7 @@ local function BuildPlayerNameList()
     end
 
     table.sort(list)
-    LogTradeEvent("Rebuild player list:", table.concat(list, ", "))
+   -- LogTradeEvent("Rebuild player list:", table.concat(list, ", "))
     return list
 end
 
@@ -1272,7 +1259,7 @@ end
 local function BuildInventoryGroups()
     local groups = {}      -- [displayName] = { Name = ..., UUIDs = { ... } }
     if not DataReplion then
-        LogTradeEvent("DataReplion NIL, tidak bisa baca inventory")
+      --  LogTradeEvent("DataReplion NIL, tidak bisa baca inventory")
         return groups
     end
 
@@ -1305,7 +1292,7 @@ local playerDropdown = TabTrade:Dropdown("Target Player", BuildPlayerNameList(),
     TradeState.TargetName   = name
     TradeState.TargetUserId = TradeState.NameToId[name]
 
-    LogTradeEvent("Select target:", name, "UserId =", TradeState.TargetUserId)
+  --  LogTradeEvent("Select target:", name, "UserId =", TradeState.TargetUserId)
 end)
 
 -- AUTO REFRESH LIST PLAYER TIAP 5 DETIK
@@ -1334,7 +1321,7 @@ local itemDropdown = TabTrade:Dropdown("Select Item (by name)", itemOptions, fun
     -- label contoh: "Candy Butterfly (Qty: 3)"
     local pureName = label:match("^(.-)%s%(") or label
     selectedItemName = pureName
-    LogTradeEvent("Select item:", pureName)
+  --  LogTradeEvent("Select item:", pureName)
 end)
 
 -- INPUT JUMLAH (NumberBox versi sederhana pakai TextBox)
@@ -1345,7 +1332,7 @@ TabTrade:Box("Quantity to send", function(txt)
     else
         TradeState.Quantity = math.floor(n)
     end
-    LogTradeEvent("Set quantity:", TradeState.Quantity)
+   -- LogTradeEvent("Set quantity:", TradeState.Quantity)
 end)
 
 ------------------------------------------------------------
@@ -1353,7 +1340,7 @@ end)
 ------------------------------------------------------------
 TabTrade:Toggle("Auto Accept Incoming Trades", function(state)
     TradeState.AutoAccept = state
-    LogTradeEvent("AutoAccept set to:", state)
+  --  LogTradeEvent("AutoAccept set to:", state)
 end)
 
 -- Bind RemoteFunction untuk auto-accept (kalau ada)
@@ -1373,7 +1360,7 @@ if RF_AwaitTradeResponse then
         return true
     end
 else
-    LogTradeEvent("RF/AwaitTradeResponse tidak ditemukan di net folder")
+  --  LogTradeEvent("RF/AwaitTradeResponse tidak ditemukan di net folder")
 end
 
 ------------------------------------------------------------
@@ -1385,14 +1372,14 @@ TabTrade:Button("Send Trade", function()
         return
     end
     if not selectedItemName then
-        LogTradeEvent("Gagal SendTrade: Item belum dipilih")
+      --  LogTradeEvent("Gagal SendTrade: Item belum dipilih")
         return
     end
 
     inventoryGroups = BuildInventoryGroups()
     local grp = inventoryGroups[selectedItemName]
     if not grp or #grp.UUIDs == 0 then
-        LogTradeEvent("Gagal SendTrade: Tidak ada item", selectedItemName, "di inventory")
+     --   LogTradeEvent("Gagal SendTrade: Tidak ada item", selectedItemName, "di inventory")
         return
     end
 
@@ -1411,26 +1398,14 @@ TabTrade:Button("Send Trade", function()
         end)
 
         if ok then
-            LogTradeEvent("  Trade OK → uuid=", uuid, "res=", tostring(res))
+           -- LogTradeEvent("  Trade OK → uuid=", uuid, "res=", tostring(res))
         else
-            LogTradeEvent("  Trade FAIL → uuid=", uuid, "err=", tostring(res))
+          --  LogTradeEvent("  Trade FAIL → uuid=", uuid, "err=", tostring(res))
         end
 
         task.wait(0.3) -- kecilin kalau mau lebih cepat
     end
 end)
-
-------------------------------------------------------------
--- LIHAT LOG (OPTIONAL)
-------------------------------------------------------------
-TabTrade:Button("Print Trade Logs", function()
-    print("========== TRADE LOG DUMP ==========")
-    for i, line in ipairs(TradeLogs) do
-        print(i, line)
-    end
-    print("====================================")
-end)
-
 
 
 -- sleitnick/net
