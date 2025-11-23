@@ -1203,13 +1203,14 @@ local Players      = game:GetService("Players")
 local LocalPlayer  = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
 
-local RF_InitiateTrade       = netFolder:WaitForChild("RF/InitiateTrade")
-local RF_AwaitTradeResponse  = netFolder:FindFirstChild("RF/AwaitTradeResponse")
+local net = netIndex:WaitForChild("net")
+
+local RF_InitiateTrade       = net:WaitForChild("RF/InitiateTrade")
+local RF_AwaitTradeResponse  = net:FindFirstChild("RF/AwaitTradeResponse")
 
 -- STATE
 local TradeState = {
