@@ -1197,271 +1197,237 @@ else
 end
 
 ------------------------------------------------------------
--- ===========  TRADE TAB (SIMPLE V2)  =====================
+-- TRADE TAB (pakai UserId tapi tampilan nama saja)
 ------------------------------------------------------------
+local Players      = game:GetService("Players")
+local LocalPlayer  = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- pastikan service & net sudah ada di atas:
- local ReplicatedStorage = game:GetService("ReplicatedStorage")
- local Players           = game:GetService("Players")
- local LocalPlayer       = Players.LocalPlayer
-
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
-local net = netIndex:WaitForChild("net")
+    :WaitForChild("net")
 
--- Replion + utility item (dipakai juga di Enchant, aman kalau require 2x)
-local Replion       = require(ReplicatedStorage.Packages:WaitForChild("Replion"))
-local ItemUtility   = require(ReplicatedStorage.Shared:WaitForChild("ItemUtility"))
+local RF_InitiateTrade       = netFolder:WaitForChild("RF/InitiateTrade")
+local RF_AwaitTradeResponse  = netFolder:FindFirstChild("RF/AwaitTradeResponse")
 
-local DataReplion   = Replion.Client:WaitReplion("Data")
+-- STATE
+local TradeState = {
+    TargetName   = nil,   -- nama yang kelihatan di UI
+    TargetUserId = nil,   -- yang dikirim ke server
+    Quantity     = 1,
+    AutoAccept   = false,
 
--- Remotes trade
-local RF_InitiateTrade       = net:WaitForChild("RF/InitiateTrade")
-local RF_AwaitTradeResponse  = net:FindFirstChild("RF/AwaitTradeResponse") -- bisa nil di beberapa versi
-
-------------------------------------------------------------
--- CONFIG / STATE TRADE
-------------------------------------------------------------
-local TradeConfig = {
-    SelectedPlayerName   = nil,
-    SelectedPlayerUserId = nil,
-
-    SelectedItemLabel    = nil,   -- label dropdown "Nama (xN)"
-    SendLimit            = 0,     -- 0 = kirim semua yg ada
-    AutoAcceptIncoming   = false,
+    NameToId     = {},    -- [Name] = UserId
 }
 
--- mapping label -> group {name, count, uuids = {...}}
-local TradeInventoryGroups = {}
-local TradeItemLabels      = {}
+local TradeLogs = {}      -- untuk debug
+
+local function LogTradeEvent(...)
+    local msg = table.concat(
+        table.create(select("#", ...), function(i) return tostring(select(i, ...)) end),
+        " "
+    )
+    print("[TradeLog]", msg)
+    table.insert(TradeLogs, os.date("%X") .. " | " .. msg)
+    if #TradeLogs > 100 then
+        table.remove(TradeLogs, 1)
+    end
+end
 
 ------------------------------------------------------------
--- HELPER: LIST PLAYER
+-- BANGUN LIST PLAYER (Nama → UserId)
 ------------------------------------------------------------
-local function buildPlayerList()
+local function BuildPlayerNameList()
+    TradeState.NameToId = {}
     local list = {}
-    for _,pl in ipairs(Players:GetPlayers()) do
+
+    for _, pl in ipairs(Players:GetPlayers()) do
         if pl ~= LocalPlayer then
             table.insert(list, pl.Name)
+            TradeState.NameToId[pl.Name] = pl.UserId
         end
     end
+
     table.sort(list)
+    LogTradeEvent("Rebuild player list:", table.concat(list, ", "))
     return list
 end
 
 ------------------------------------------------------------
--- HELPER: BUILD INVENTORY GROUPS (NAMA + JUMLAH + UUID)
+-- BACA INVENTORY & GROUP PER NAMA ITEM
+-- (supaya trade bisa pilih item + qty)
 ------------------------------------------------------------
-local function refreshTradeInventory()
-    TradeInventoryGroups = {}
-    TradeItemLabels      = {}
+local DataReplion
+local okDR, ReplionMod = pcall(function()
+    return ReplicatedStorage.Packages.Replion
+end)
 
-    if not DataReplion then return end
+if okDR and ReplionMod then
+    local Replion = require(ReplionMod)
+    DataReplion = Replion.Client:WaitReplion("Data")
+end
 
-    local invRoot = nil
-    local okInv, errInv = pcall(function()
-        -- mengikuti struktur script PC: Inventory.Items
-        return DataReplion:GetExpect({ "Inventory" })
-    end)
-    if okInv then
-        invRoot = errInv
-    else
-        warn("[Trade] DataReplion:GetExpect('Inventory') gagal:", errInv)
-        return
+local function BuildInventoryGroups()
+    local groups = {}      -- [displayName] = { Name = ..., UUIDs = { ... } }
+    if not DataReplion then
+        LogTradeEvent("DataReplion NIL, tidak bisa baca inventory")
+        return groups
     end
 
-    local items = invRoot and invRoot.Items or invRoot and invRoot["Items"] or {}
-    if not items then
-        warn("[Trade] Inventory.Items tidak ditemukan")
-        return
-    end
+    local inv = DataReplion:Get({ "Inventory", "Items" }) or {}
+    for _, item in ipairs(inv) do
+        if item.Id and item.UUID then
+            local name = tostring(item.Id)
+            -- kalau kamu punya ItemUtility:GetItemData, bisa diganti jadi nama asli
+            -- name = ItemUtility:GetItemData(item.Id).Data.Name or name
 
-    for _, it in ipairs(items) do
-        local id   = it.Id
-        local uuid = it.UUID
-        if not id or not uuid then
-            -- skip item tanpa Id / UUID
-        else
-            local okData, data = pcall(function()
-                return ItemUtility:GetItemData(id)
-            end)
-            if okData and data and data.Data then
-                local t = data.Data.Type
-                -- batasi ke item yang masuk akal buat trade
-                if t == "Fish" or t == "Enchant Stones" or t == "Totems" then
-                    local name = data.Data.Name or ("Item "..tostring(id))
-                    local grp = TradeInventoryGroups[name]
-                    if not grp then
-                        grp = { name = name, count = 0, uuids = {} }
-                        TradeInventoryGroups[name] = grp
-                    end
-                    grp.count += 1
-                    table.insert(grp.uuids, uuid)
-                end
+            if not groups[name] then
+                groups[name] = { Name = name, UUIDs = {} }
             end
+            table.insert(groups[name].UUIDs, item.UUID)
         end
     end
 
-    for name, grp in pairs(TradeInventoryGroups) do
-        local label = string.format("%s (%dx)", name, grp.count)
-        table.insert(TradeItemLabels, label)
-        -- simpan juga by label untuk lookup nanti
-        grp.label = label
-    end
-
-    table.sort(TradeItemLabels, function(a,b) return a:lower() < b:lower() end)
+    return groups
 end
 
--- helper dapat group dari label dropdown
-local function getGroupByLabel(label)
-    if not label then return nil end
-    -- cara cepat: karena grp.label = label
-    for _, grp in pairs(TradeInventoryGroups) do
-        if grp.label == label then
-            return grp
+------------------------------------------------------------
+-- UI TAB TRADE
+------------------------------------------------------------
+local TabTrade = win:CreateTab("Trade")
+
+TabTrade:Label("Mass Trade / Gift (userId based)")
+
+-- PLAYER DROPDOWN (TAMPIL NAMA, SIMPAN USERID)
+local playerDropdown = TabTrade:Dropdown("Target Player", BuildPlayerNameList(), function(name)
+    TradeState.TargetName   = name
+    TradeState.TargetUserId = TradeState.NameToId[name]
+
+    LogTradeEvent("Select target:", name, "UserId =", TradeState.TargetUserId)
+end)
+
+-- AUTO REFRESH LIST PLAYER TIAP 5 DETIK
+task.spawn(function()
+    while true do
+        task.wait(5)
+        if playerDropdown and playerDropdown.SetOptions then
+            playerDropdown:SetOptions(BuildPlayerNameList())
         end
     end
-    return nil
-end
+end)
 
 ------------------------------------------------------------
--- AUTO ACCEPT INCOMING TRADE (REMOTE OnClientInvoke)
+-- ITEM DROPDOWN + QUANTITY INPUT
 ------------------------------------------------------------
+local inventoryGroups = BuildInventoryGroups()
+local itemOptions = {}
+for displayName, info in pairs(inventoryGroups) do
+    table.insert(itemOptions, string.format("%s (Qty: %d)", displayName, #info.UUIDs))
+end
+table.sort(itemOptions)
+
+local selectedItemName = nil
+
+local itemDropdown = TabTrade:Dropdown("Select Item (by name)", itemOptions, function(label)
+    -- label contoh: "Candy Butterfly (Qty: 3)"
+    local pureName = label:match("^(.-)%s%(") or label
+    selectedItemName = pureName
+    LogTradeEvent("Select item:", pureName)
+end)
+
+-- INPUT JUMLAH (NumberBox versi sederhana pakai TextBox)
+TabTrade:Box("Quantity to send", function(txt)
+    local n = tonumber(txt)
+    if not n or n < 1 then
+        TradeState.Quantity = 1
+    else
+        TradeState.Quantity = math.floor(n)
+    end
+    LogTradeEvent("Set quantity:", TradeState.Quantity)
+end)
+
+------------------------------------------------------------
+-- AUTO ACCEPT TOGGLE
+------------------------------------------------------------
+TabTrade:Toggle("Auto Accept Incoming Trades", function(state)
+    TradeState.AutoAccept = state
+    LogTradeEvent("AutoAccept set to:", state)
+end)
+
+-- Bind RemoteFunction untuk auto-accept (kalau ada)
 if RF_AwaitTradeResponse then
     RF_AwaitTradeResponse.OnClientInvoke = function(itemType, itemData, sender)
-        -- dipanggil saat server tanya: "mau terima trade ini?"
-        if not TradeConfig.AutoAcceptIncoming then
-            -- return nil → biarkan UI asli game yang muncul (kalau ada)
-            print("[Trade] Incoming trade dari", sender and sender.Name or "???", " → AutoAccept OFF")
-            return nil
+        LogTradeEvent(
+            "OnClientInvoke AwaitTradeResponse | AutoAccept=" .. tostring(TradeState.AutoAccept),
+            "itemType=", tostring(itemType),
+            "sender=", tostring(sender and sender.Name or sender)
+        )
+
+        if not TradeState.AutoAccept then
+            return false
         end
 
-        print("[Trade] Auto-accept trade dari", sender and sender.Name or "???",
-              "| itemType:", tostring(itemType))
-        -- true = accept
+        -- di sini kalau mau filter bisa ditambah
         return true
     end
 else
-    warn("[Trade] RF/AwaitTradeResponse tidak ditemukan, AutoAccept tidak bisa.")
+    LogTradeEvent("RF/AwaitTradeResponse tidak ditemukan di net folder")
 end
 
 ------------------------------------------------------------
--- TAB TRADE (UI KAMU)
+-- KIRIM TRADE BUTTON
 ------------------------------------------------------------
-local TabTrade = win:CreateTab("Trade")
-TabTrade:Label("AUTO TRADE INVENTORY")
-
-------------------------------------------------------------
--- PLAYER TARGET
-------------------------------------------------------------
-TabTrade:Label("Target Player")
-
-local ddTradePlayer = TabTrade:Dropdown("Select Player", buildPlayerList(), function(name)
-    TradeConfig.SelectedPlayerName = name
-    local pl = Players:FindFirstChild(name)
-    if pl then
-        TradeConfig.SelectedPlayerUserId = pl.UserId
-        print("[Trade] Target player set →", name, pl.UserId)
-    else
-        TradeConfig.SelectedPlayerUserId = nil
-        warn("[Trade] Player tidak ditemukan:", name)
-    end
-end)
-
-------------------------------------------------------------
--- ITEM YANG DIKIRIM
-------------------------------------------------------------
-TabTrade:Label("Item To Send (Fish / Enchant / Totem)")
-
--- build pertama kali
-refreshTradeInventory()
-
-local ddTradeItem = TabTrade:Dropdown("Select Item", (#TradeItemLabels > 0 and TradeItemLabels) or {"(inventory kosong)"}, function(label)
-    TradeConfig.SelectedItemLabel = label
-    print("[Trade] Selected item label =", label)
-end)
-
--- tombol refresh inventory / dropdown item
-TabTrade:Button("Refresh Inventory List", function()
-    refreshTradeInventory()
-    if ddTradeItem and ddTradeItem.SetOptions then
-        ddTradeItem:SetOptions((#TradeItemLabels > 0 and TradeItemLabels) or {"(inventory kosong)"})
-    end
-    print("[Trade] Inventory dropdown di-refresh, total opsi:", #TradeItemLabels)
-end)
-
-------------------------------------------------------------
--- INPUT JUMLAH YANG DIKIRIM
-------------------------------------------------------------
-TabTrade:Label("Quantity To Send (0 = all)")
-
-TabTrade:Box("contoh: 10 (0 = all)", function(txt)
-    local n = tonumber(txt)
-    if not n or n < 0 then
-        TradeConfig.SendLimit = 0      -- 0 = kirim semua
-    else
-        TradeConfig.SendLimit = math.floor(n)
-    end
-    print("[Trade] SendLimit =", TradeConfig.SendLimit)
-end)
-
-------------------------------------------------------------
--- TOGGLE AUTO ACCEPT
-------------------------------------------------------------
-TabTrade:Toggle("Auto Accept Incoming Trades", function(state)
-    TradeConfig.AutoAcceptIncoming = state
-    print("[Trade] AutoAcceptIncoming =", state)
-end)
-
-------------------------------------------------------------
--- KIRIM TRADE SEKARANG
-------------------------------------------------------------
-TabTrade:Button("Send Trade Now", function()
-    if not TradeConfig.SelectedPlayerUserId then
-        warn("[Trade] Belum pilih target player.")
+TabTrade:Button("Send Trade", function()
+    if not TradeState.TargetUserId then
+        LogTradeEvent("Gagal SendTrade: TargetUserId NIL")
         return
     end
-    if not TradeConfig.SelectedItemLabel then
-        warn("[Trade] Belum pilih item yang mau dikirim.")
+    if not selectedItemName then
+        LogTradeEvent("Gagal SendTrade: Item belum dipilih")
         return
     end
 
-    local grp = getGroupByLabel(TradeConfig.SelectedItemLabel)
-    if not grp or not grp.uuids or #grp.uuids == 0 then
-        warn("[Trade] Group/UUID item tidak ditemukan untuk label:", TradeConfig.SelectedItemLabel)
+    inventoryGroups = BuildInventoryGroups()
+    local grp = inventoryGroups[selectedItemName]
+    if not grp or #grp.UUIDs == 0 then
+        LogTradeEvent("Gagal SendTrade: Tidak ada item", selectedItemName, "di inventory")
         return
     end
 
-    local maxSend = #grp.uuids
-    local limit = TradeConfig.SendLimit or 0
-    if limit > 0 and limit < maxSend then
-        maxSend = limit
-    end
-
-    print(string.format("[Trade] Mulai kirim %d item '%s' ke %s (UserId=%d)",
-        maxSend, grp.name,
-        tostring(TradeConfig.SelectedPlayerName),
-        TradeConfig.SelectedPlayerUserId
+    local qty = math.min(TradeState.Quantity, #grp.UUIDs)
+    LogTradeEvent(string.format(
+        "SendTrade → Target=%s (UserId=%d), Item=%s, Qty=%d",
+        TradeState.TargetName or "?", TradeState.TargetUserId, selectedItemName, qty
     ))
 
-    for i = 1, maxSend do
-        local uuid = grp.uuids[i]
+    for i = 1, qty do
+        local uuid = grp.UUIDs[i]
         if not uuid then break end
 
         local ok, res = pcall(function()
-            -- PENTING: server butuh USERID (number), BUKAN nama / player instance
-            return RF_InitiateTrade:InvokeServer(TradeConfig.SelectedPlayerUserId, uuid)
+            return RF_InitiateTrade:InvokeServer(TradeState.TargetUserId, uuid)
         end)
 
         if ok then
-            print("[Trade] Request kirim UUID:", uuid, "→ success, server reply:", res)
+            LogTradeEvent("  Trade OK → uuid=", uuid, "res=", tostring(res))
         else
-            warn("[Trade] Gagal kirim UUID:", uuid, "error:", res)
+            LogTradeEvent("  Trade FAIL → uuid=", uuid, "err=", tostring(res))
         end
 
-        task.wait(0.4) -- delay kecil biar nggak spam server
+        task.wait(0.3) -- kecilin kalau mau lebih cepat
     end
+end)
+
+------------------------------------------------------------
+-- LIHAT LOG (OPTIONAL)
+------------------------------------------------------------
+TabTrade:Button("Print Trade Logs", function()
+    print("========== TRADE LOG DUMP ==========")
+    for i, line in ipairs(TradeLogs) do
+        print(i, line)
+    end
+    print("====================================")
 end)
 
 
