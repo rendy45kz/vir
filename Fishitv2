@@ -2018,8 +2018,8 @@ local Players        = game:GetService("Players")
 local LocalPlayer    = Players.LocalPlayer
 
 -- label live posisi & nama island
-local coordLabel = TabTP:Label("Pos: 0, 0, 0")
-local islandLiveLabel = TabTP:Label("Island: Unknown")
+local coordLabel = TabTP:LiveLabel("Pos: 0, 0, 0")
+local islandLiveLabel = TabTP:LiveLabel("Island: Unknown")
 
 -- update setiap frame
 RunService.RenderStepped:Connect(function()
