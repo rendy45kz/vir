@@ -265,6 +265,9 @@ function library:CreateWindow(title)
         ---------------------
         -- Label
         ---------------------
+                ---------------------
+        -- Label  (sekarang return instance)
+        ---------------------
         function api:Label(text)
             local lbl = Instance.new("TextLabel")
             lbl.Parent = page
@@ -272,9 +275,51 @@ function library:CreateWindow(title)
             lbl.BackgroundTransparency = 1
             lbl.Text = text
             lbl.Font = Enum.Font.GothamBold
-            lbl.TextSize = 13
+            lbl.TextSize = 14
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            -- boleh diabaikan kalau nggak dipakai
+            return lbl
+        end
+
+        ---------------------
+        -- TextBox
+        ---------------------
+        function api:Box(placeholder, callback)
+            callback = callback or function() end
+
+            local fr = Instance.new("Frame")
+            fr.Parent = page
+            fr.Size = UDim2.new(1,-4,0,32)
+            fr.BackgroundColor3 = theme.card
+            fr.BorderSizePixel = 0
+
+            local box = Instance.new("TextBox")
+            box.Parent = fr
+            box.PlaceholderText = placeholder
+            box.Text = ""
+            box.Size = UDim2.new(1,-12,1,-6)
+            box.Position = UDim2.new(0,6,0,3)
+            box.BackgroundColor3 = theme.bg
+            box.BorderSizePixel = 0
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 13
+            box.TextColor3 = theme.text
+
+            box.FocusLost:Connect(function()
+                callback(box.Text)
+            end)
+
+            return {
+                Set = function(_,v)
+                    box.Text = v
+                end,
+                Get = function()
+                    return box.Text
+                end,
+                Object = box
+            }
         end
 
         ---------------------
@@ -2172,6 +2217,159 @@ end
 local TabTP = win:CreateTab("Teleport")
 
 TabTP:Label("Teleport to Island")
+
+------------------------------------------------------------
+-- LIVE COORDINATE + SAVE ISLAND
+------------------------------------------------------------
+local RunService     = game:GetService("RunService")
+local HttpService    = game:GetService("HttpService")
+local Players        = game:GetService("Players")
+local LocalPlayer    = Players.LocalPlayer
+
+-- label live posisi & nama island
+local coordLabel = TabTP:Label("Pos: 0, 0, 0")
+local islandLiveLabel = TabTP:Label("Island: Unknown")
+
+-- update setiap frame
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not coordLabel or not coordLabel.Parent then return end
+
+    local p = hrp.Position
+    coordLabel.Text = string.format("Pos: %.1f, %.1f, %.1f", p.X, p.Y, p.Z)
+
+    -- coba ambil nama island dari GUI lokasi (kalau ada)
+    local islandName = "Unknown"
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local ok, guiLoc = pcall(function()
+            return pg.Events.Frame.Location.Label
+        end)
+        if ok and guiLoc and guiLoc.Text ~= "" then
+            islandName = guiLoc.Text
+        end
+    end
+    islandLiveLabel.Text = "Island: "..islandName
+end)
+
+------------------------------------------------------------
+-- SAVE / LOAD ISLAND COORDS
+------------------------------------------------------------
+local SavedIslands = {}   -- [name] = Vector3
+local SAVE_FILE    = "AegisHub_FishIt_Islands.json"
+
+local function encodeVec(v) return {x = v.X, y = v.Y, z = v.Z} end
+local function decodeVec(t) return Vector3.new(t.x, t.y, t.z) end
+
+local function LoadIslands()
+    if not readfile then return end
+    local ok, data = pcall(readfile, SAVE_FILE)
+    if not ok or not data then return end
+
+    local ok2, decoded = pcall(function()
+        return HttpService:JSONDecode(data)
+    end)
+    if not ok2 or type(decoded) ~= "table" then return end
+
+    for name, vec in pairs(decoded) do
+        if vec.x and vec.y and vec.z then
+            SavedIslands[name] = decodeVec(vec)
+        end
+    end
+end
+
+local function SaveIslands()
+    if not writefile then return end
+    local serial = {}
+    for name, v in pairs(SavedIslands) do
+        serial[name] = encodeVec(v)
+    end
+    local ok, json = pcall(function()
+        return HttpService:JSONEncode(serial)
+    end)
+    if not ok then return end
+    pcall(writefile, SAVE_FILE, json)
+end
+
+LoadIslands()
+
+------------------------------------------------------------
+-- UI: INPUT NAMA, SAVE, LIST, TELEPORT
+------------------------------------------------------------
+local currentIslandName = ""
+local lastSelectedIsland = nil
+local islandDropdown
+
+-- input nama island
+local nameBox = TabTP:Box("Nama island (kosong = pakai nama lokasi GUI)", function(text)
+    currentIslandName = text or ""
+end)
+
+-- tombol save posisi sekarang
+TabTP:Button("Save current position as Island", function()
+    local char = LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local name = currentIslandName
+
+    -- kalau kosong, pakai nama dari GUI lokasi / fallback ke koordinat
+    if name == "" then
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local islandName = nil
+        if pg then
+            local ok, guiLoc = pcall(function()
+                return pg.Events.Frame.Location.Label
+            end)
+            if ok and guiLoc and guiLoc.Text ~= "" then
+                islandName = guiLoc.Text
+            end
+        end
+        name = islandName or string.format("Island (%.0f, %.0f, %.0f)", hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+    end
+
+    SavedIslands[name] = hrp.Position
+    SaveIslands()
+    if islandDropdown and islandDropdown.SetOptions then
+        -- refresh list
+        local list = {}
+        for k in pairs(SavedIslands) do table.insert(list, k) end
+        table.sort(list)
+        islandDropdown:SetOptions(list)
+    end
+end)
+
+-- helper buat build list dropdown
+local function buildIslandList()
+    local t = {}
+    for name in pairs(SavedIslands) do
+        table.insert(t, name)
+    end
+    table.sort(t)
+    return t
+end
+
+-- dropdown island tersimpan
+islandDropdown = TabTP:Dropdown("Saved Islands", buildIslandList(), function(opt)
+    lastSelectedIsland = opt
+    local pos = SavedIslands[opt]
+    if pos then
+        tpTo(pos)
+    end
+end)
+
+-- tombol hapus island yang dipilih
+TabTP:Button("Delete Selected Island", function()
+    if not lastSelectedIsland then return end
+    SavedIslands[lastSelectedIsland] = nil
+    SaveIslands()
+    lastSelectedIsland = nil
+    if islandDropdown and islandDropdown.SetOptions then
+        islandDropdown:SetOptions(buildIslandList())
+    end
+end)
+
 
 local islands = {
     ["Fisherman Island"] = Vector3.new(128.62, 3.53, 2783.18),
