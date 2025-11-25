@@ -2186,6 +2186,9 @@ local islands = {
     ["Crescent Artifact"] = Vector3.new(1404.67, 5.08, 120.55),     
     ["Diamond Artifact"] = Vector3.new(1841.52, 2.76, -300.38),  
     ["Hourglass Diamond Artifact"] = Vector3.new(1466.40, 3.19, -846.62),  
+    ["Classic Island"] = Vector3.new(1246.1,13.7,2852.7),     
+    ["Iron Cavern"] = Vector3.new(-8795.1,-580.0,91.6),  
+    ["Iron Cafe"] = Vector3.new(-8641.5,-542.8,161.3), 
 }
 
 local islandList = {}
