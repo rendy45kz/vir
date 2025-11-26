@@ -2486,9 +2486,8 @@ Players.PlayerRemoving:Connect(function()
     ddPlayer:SetOptions(playerList())
 end)
 
-
 ------------------------------------------------------------
--- TAB OBSERVERS
+-- TAB OBSERVERS (FIXED LIVE LABELS)
 ------------------------------------------------------------
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -2497,7 +2496,7 @@ local RunService        = game:GetService("RunService")
 
 local LocalPlayer       = Players.LocalPlayer
 
--- net khusus observer (boleh duplikat, aman)
+-- net untuk fish observer
 local netIndex_obs = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
@@ -2505,32 +2504,28 @@ local netIndex_obs = ReplicatedStorage:WaitForChild("Packages")
 local net_obs = netIndex_obs:WaitForChild("net")
 local RE_ObtainedNewFish_Obs = net_obs:WaitForChild("RE/ObtainedNewFishNotification")
 
---========================
--- CONFIG & STATE
---========================
-local ObsConfig = {
-    SpectateEnabled = false,
-    SpectateTarget  = nil,
-}
-
-local SpectateConn  = nil
-local SpectateLabel = nil
-
-local SessionStats = {
-    Count     = 0,
-    MaxWeight = 0,
-    MaxName   = "None",
-    LastName  = "None",
-    LastWeight = 0,
-}
-
-local LastFishLabel    = nil
-local BestFishLabel    = nil
-local TotalFishLabel   = nil
-
 ------------------------------------------------------------
--- UTILS
+-- HELPER: SAFE SET LIVELABEL TEXT
 ------------------------------------------------------------
+local function setLiveText(lbl, txt)
+    if not lbl then return end
+
+    local t = typeof(lbl)
+    if t == "Instance" then
+        if lbl:IsA("TextLabel") or lbl:IsA("TextButton") then
+            lbl.Text = txt
+        end
+    elseif t == "table" then
+        if typeof(lbl.Set) == "function" then
+            lbl:Set(txt)
+        elseif typeof(lbl.Update) == "function" then
+            lbl:Update(txt)
+        elseif typeof(lbl.SetText) == "function" then
+            lbl:SetText(txt)
+        end
+    end
+end
+
 local function getPlayerNames()
     local list = {}
     for _,p in ipairs(Players:GetPlayers()) do
@@ -2550,22 +2545,46 @@ local function getCharacterRoot(plr)
 end
 
 ------------------------------------------------------------
--- OBSERVER TAB UI
+-- STATE
+------------------------------------------------------------
+local ObsConfig = {
+    SpectateEnabled = false,
+    SpectateTarget  = nil,
+}
+
+local SpectateConn      = nil
+local SpectateLabel     = nil
+
+local SessionStats = {
+    Count      = 0,
+    MaxWeight  = 0,
+    MaxName    = "None",
+    LastName   = "None",
+    LastWeight = 0,
+}
+
+local TotalFishLabel = nil
+local BestFishLabel  = nil
+local LastFishLabel  = nil
+
+------------------------------------------------------------
+-- TAB & UI
 ------------------------------------------------------------
 local TabObs = win:CreateTab("Observers")
 
-TabObs:Label("Player Observer")
-
--- Live label info spectate
+--------------------------------------------------
+-- SPECTATE PLAYER (ALL LIVE LABEL)
+--------------------------------------------------
 SpectateLabel = TabObs:LiveLabel("Spectate: OFF")
 
--- Dropdown pilih target player
 local ddSpectate = TabObs:Dropdown("Target Player", getPlayerNames(), function(name)
     ObsConfig.SpectateTarget = name
     print("[Observers] Spectate target set to:", name)
+    if SpectateLabel then
+        setLiveText(SpectateLabel, "Spectate: "..tostring(name).." (ready)")
+    end
 end)
 
--- Tombol refresh list player
 TabObs:Button("Refresh Player List", function()
     local list = getPlayerNames()
     if ddSpectate and ddSpectate.SetOptions then
@@ -2574,13 +2593,11 @@ TabObs:Button("Refresh Player List", function()
     print("[Observers] Player list refreshed.")
 end)
 
--- Toggle spectate
 TabObs:Toggle("Enable Spectate Player", function(state)
     ObsConfig.SpectateEnabled = state
     print("[Observers] SpectateEnabled =", state)
 
     if not state then
-        -- reset kamera ke local player
         local cam = Workspace.CurrentCamera
         local char = LocalPlayer.Character
         if cam and char then
@@ -2589,15 +2606,15 @@ TabObs:Toggle("Enable Spectate Player", function(state)
                 cam.CameraSubject = hum
             end
         end
-        if SpectateLabel then
-            SpectateLabel.Text = "Spectate: OFF"
-        end
+        setLiveText(SpectateLabel, "Spectate: OFF")
     end
 end)
 
-------------------------------------------------------------
--- SPECTATE LOOP (RenderStepped)
-------------------------------------------------------------
+-- loop kamera
+if SpectateConn then
+    SpectateConn:Disconnect()
+end
+
 SpectateConn = RunService.RenderStepped:Connect(function()
     if not ObsConfig.SpectateEnabled then return end
     if not ObsConfig.SpectateTarget or ObsConfig.SpectateTarget == "" then return end
@@ -2613,52 +2630,46 @@ SpectateConn = RunService.RenderStepped:Connect(function()
     local myChar, myHrp = getCharacterRoot(LocalPlayer)
 
     if not (tChar and tHum and tHrp and myHrp) then
-        if SpectateLabel then
-            SpectateLabel.Text = "Spectate: "..tostring(ObsConfig.SpectateTarget).." (no char)"
-        end
+        setLiveText(SpectateLabel, "Spectate: "..tostring(ObsConfig.SpectateTarget).." (no char)")
         return
     end
 
-    -- set camera subject & posisi di belakang sedikit
     cam.CameraSubject = tHum
     local targetPos = tHrp.Position
-    local camPos = targetPos + Vector3.new(0, 10, -15)
-    cam.CFrame = CFrame.new(camPos, targetPos)
+    local camPos    = targetPos + Vector3.new(0, 10, -15)
+    cam.CFrame      = CFrame.new(camPos, targetPos)
 
     local dist = (targetPos - myHrp.Position).Magnitude
-    if SpectateLabel then
-        SpectateLabel.Text = string.format(
-            "Spectate: %s | Dist: %.1f",
-            ObsConfig.SpectateTarget,
-            dist
-        )
-    end
+    setLiveText(SpectateLabel, string.format(
+        "Spectate: %s | Dist: %.1f",
+        ObsConfig.SpectateTarget,
+        dist
+    ))
 end)
 
-------------------------------------------------------------
--- SESSION FISH OBSERVER
-------------------------------------------------------------
-TabObs:Label("Session Fish Observer")
-
+--------------------------------------------------
+-- SESSION FISH OBSERVER (TOTAL / BEST / LAST)
+--------------------------------------------------
 TotalFishLabel = TabObs:LiveLabel("Total Fish: 0")
-BestFishLabel  = TabObs:LiveLabel("Best: None (0.0)")
-LastFishLabel  = TabObs:LiveLabel("Last: None (0.0)")
+BestFishLabel  = TabObs:LiveLabel("Best: None (0.00)")
+LastFishLabel  = TabObs:LiveLabel("Last: None (0.00)")
 
--- Hook remote ketika dapat ikan
+-- handler remote ikan baru
 RE_ObtainedNewFish_Obs.OnClientEvent:Connect(function(itemId, _, info)
     SessionStats.Count += 1
 
-    -- coba ambil nama dan berat dari info
     local fishName = "Id "..tostring(itemId)
     local weight   = 0
 
     if info then
+        -- coba ambil nama
         if info.DisplayName then
             fishName = info.DisplayName
         elseif info.InventoryItem and info.InventoryItem.Name then
             fishName = info.InventoryItem.Name
         end
 
+        -- coba ambil berat
         local meta = info.InventoryItem and info.InventoryItem.Metadata
         if meta and meta.Weight then
             weight = tonumber(meta.Weight) or 0
@@ -2675,23 +2686,9 @@ RE_ObtainedNewFish_Obs.OnClientEvent:Connect(function(itemId, _, info)
         SessionStats.MaxName   = fishName
     end
 
-    if TotalFishLabel then
-        TotalFishLabel.Text = string.format("Total Fish: %d", SessionStats.Count)
-    end
-    if BestFishLabel then
-        BestFishLabel.Text = string.format(
-            "Best: %s (%.2f)",
-            SessionStats.MaxName,
-            SessionStats.MaxWeight
-        )
-    end
-    if LastFishLabel then
-        LastFishLabel.Text = string.format(
-            "Last: %s (%.2f)",
-            SessionStats.LastName,
-            SessionStats.LastWeight
-        )
-    end
+    setLiveText(TotalFishLabel, string.format("Total Fish: %d", SessionStats.Count))
+    setLiveText(BestFishLabel,  string.format("Best: %s (%.2f)", SessionStats.MaxName, SessionStats.MaxWeight))
+    setLiveText(LastFishLabel,  string.format("Last: %s (%.2f)", SessionStats.LastName, SessionStats.LastWeight))
 
     print(string.format(
         "[Observers] Fish #%d → %s (%.2f)",
@@ -2701,9 +2698,7 @@ RE_ObtainedNewFish_Obs.OnClientEvent:Connect(function(itemId, _, info)
     ))
 end)
 
-------------------------------------------------------------
--- OPTIONAL: RESET SESSION BUTTON
-------------------------------------------------------------
+-- tombol reset statistik
 TabObs:Button("Reset Session Stats", function()
     SessionStats.Count      = 0
     SessionStats.MaxWeight  = 0
@@ -2711,14 +2706,14 @@ TabObs:Button("Reset Session Stats", function()
     SessionStats.LastName   = "None"
     SessionStats.LastWeight = 0
 
-    if TotalFishLabel then TotalFishLabel.Text = "Total Fish: 0" end
-    if BestFishLabel then  BestFishLabel.Text  = "Best: None (0.0)" end
-    if LastFishLabel then  LastFishLabel.Text  = "Last: None (0.0)" end
+    setLiveText(TotalFishLabel, "Total Fish: 0")
+    setLiveText(BestFishLabel,  "Best: None (0.00)")
+    setLiveText(LastFishLabel,  "Last: None (0.00)")
 
     print("[Observers] Session stats reset.")
 end)
 
-                
+
 
 ------------------------------------------------------------
 -- MISC TAB
