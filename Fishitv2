@@ -805,56 +805,38 @@ end
 ----------------------------------------------------------------
 local win = library:CreateWindow("AegisHub - Fish It")
 
---== SERVICES & REMOTES ==--
-local Players           = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
+ --== SERVICES & REMOTES ==--
+local Players          = game:GetService("Players")
+local ReplicatedStorage= game:GetService("ReplicatedStorage")
+local Workspace        = game:GetService("Workspace")
 
-local LocalPlayer       = Players.LocalPlayer
+local LocalPlayer      = Players.LocalPlayer
 
--- net folder (sama seperti script lain di hub kamu)
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
 
--- remotes utama untuk mancing
+-- remotes utama mancing
 local RE_EquipToolFromHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
 local RF_ChargeFishingRod         = net:WaitForChild("RF/ChargeFishingRod")
 local RF_RequestFishingMinigame   = net:WaitForChild("RF/RequestFishingMinigameStarted")
 local RE_FishingCompleted         = net:WaitForChild("RE/FishingCompleted")
-local RE_ObtainedNewFishNotification = net:WaitForChild("RE/ObtainedNewFishNotification")
+local RE_ObtainedNewFishNotify    = net:WaitForChild("RE/ObtainedNewFishNotification")
 
 ------------------------------------------------------------
--- CONFIG
-------------------------------------------------------------
--- FAST:
---   - ReelDelayFast                = REEL DELAY (input)
---   - ComplateDelay                = COMPLATE DELAY (input)
---   - Delay complete = offset 1/3 (clamp 0.10–0.20)
--- INSTANT:
---   - HANYA pakai ComplateDelay
--- BLATANT:
---   - Abaikan rumus → delay 0.01–0.02
+-- CONFIG BLATANT
 ------------------------------------------------------------
 local FishingConfig = {
-    AutoFishing        = false,
-    AutoFishingMethod  = "Instant", -- "Fast" / "Instant"
-    ReelDelayFast      = 0.30,      -- REEL DELAY
-    ComplateDelay      = 0.80,      -- COMPLATE DELAY
-    AutoPerfectCast    = true,
-    BlatantMode        = false,
+    AutoFishing     = false,  -- on/off
+    CastDelay       = 0.05,   -- delay setelah dapat ikan sebelum lempar lagi (spam delay)
+    CompleteDelay   = 0.25,   -- delay dari StartMinigame -> FishingCompleted
 }
 
 local Fishing = {}
-
--- state chain casting
-local State = {
-    Casting      = false,  -- sedang lakukan satu cast
-    PendingChain = false,  -- flag kalau fish-caught datang saat masih casting
-    LastCastTime = 0,
-}
+local autoLoopRunning = false
+local castActive      = false   -- sedang ada 1 cast aktif
 
 local function GetServerTime()
     if Workspace.GetServerTimeNow then
@@ -866,36 +848,6 @@ local function GetServerTime()
     return tick()
 end
 
-------------------------------------------------------------
--- CAST POWER & UTIL
-------------------------------------------------------------
-local function CalculateCastPower()
-    local minCastPower = 0.5
-    if FishingConfig.AutoPerfectCast then
-        minCastPower = 0.999
-    end
-    local castPower = minCastPower + math.random() * (0.9999 - minCastPower)
-    return math.clamp(castPower, 0, 0.9999)
-end
-
-local function GetElapsedFromPower(seedTime, castPower)
-    castPower = math.clamp(castPower or 0, 0, 1)
-    local frequency = Random.new(seedTime):NextInteger(4, 10)
-
-    if castPower == 1 then
-        return math.pi / frequency
-    elseif castPower == 0 then
-        return 0
-    end
-
-    local theta = math.asin(1 - 2 * castPower)
-    local elapsed = (theta - math.pi / 2) / frequency
-    if elapsed < 0 then
-        elapsed = elapsed + (2 * math.pi) / frequency
-    end
-    return elapsed
-end
-
 local function ensureCharacter()
     local char = LocalPlayer.Character
     if not char or not char.Parent then
@@ -905,230 +857,149 @@ local function ensureCharacter()
 end
 
 ------------------------------------------------------------
--- SINGLE CAST (SATU SIKLUS MANCIING)
+-- SATU CAST (BLATANT)
 ------------------------------------------------------------
-local function DoSingleCast()
-    -- stop kalau auto fishing sudah off
+local function DoOneCast()
     if not FishingConfig.AutoFishing then return end
-    if State.Casting then
-        -- lagi proses, jangan double
-        return
-    end
-
-    State.Casting = true
-    State.LastCastTime = tick()
+    if castActive then return end
+    castActive = true
 
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then
-        warn("[AutoFishing] HRP not found")
-        State.Casting = false
+        castActive = false
         return
     end
 
-    -- equip rod slot 1
+    -- equip rod slot 1 (kalau kosong ya game yang nolak)
     pcall(function()
         RE_EquipToolFromHotbar:FireServer(1)
     end)
+    task.wait(0.03)
 
-    if FishingConfig.BlatantMode then
-        task.wait(0.10)
-    else
-        task.wait(0.35)
-    end
+    -- castPower random, TIDAK perfect (0.40–0.85)
+    local castPower = math.random(40, 85) / 100
 
-    local now       = GetServerTime()
-    local castPower = CalculateCastPower()
-    local yPos      = hrp.Position.Y - 10
-
-    local method    = FishingConfig.AutoFishingMethod
-    local delayComplete
-
-    if method == "Fast" then
-        ------------------------------------------------
-        -- FAST MODE: charge dengan offset + rumus 1/3
-        ------------------------------------------------
-        local elapsed   = GetElapsedFromPower(now, castPower)
-        local chargeT   = now - elapsed
-
-        pcall(function()
-            RF_ChargeFishingRod:InvokeServer(chargeT)
-        end)
-
-        if not FishingConfig.BlatantMode then
-            task.wait(0.05)
-        end
-
-        local okStart, res = pcall(function()
-            if typeof(RF_RequestFishingMinigame.InvokeServer) == "function" then
-                return RF_RequestFishingMinigame:InvokeServer(yPos, castPower, GetServerTime())
-            else
-                RF_RequestFishingMinigame:FireServer(yPos, castPower, GetServerTime())
-                return true
-            end
-        end)
-
-        if not okStart then
-            warn("[AutoFishing Fast] StartMini failed:", res)
-        end
-
-        if FishingConfig.BlatantMode then
-            delayComplete = 0.01 + math.random() * 0.01
-        else
-            -- RUMUS 1/3: offset = |(reel*3)-complate|
-            local reel   = FishingConfig.ReelDelayFast or 0.30
-            local compl  = FishingConfig.ComplateDelay or 0.80
-            local expect = reel * 3
-            local offset = math.abs(expect - compl)
-            delayComplete = math.clamp(offset, 0.10, 0.20)
-
-            print(string.format(
-                "[FastCalc] reel=%.2f comp=%.2f expect=%.2f offset=%.3f => delay=%.3f",
-                reel, compl, expect, offset, delayComplete
-            ))
-        end
-    else
-        ------------------------------------------------
-        -- INSTANT MODE: cuma pakai ComplateDelay
-        ------------------------------------------------
-        pcall(function()
-            RF_ChargeFishingRod:InvokeServer(now)
-        end)
-
-        if not FishingConfig.BlatantMode then
-            task.wait(0.08)
-        end
-
-        local okStart, res = pcall(function()
-            if typeof(RF_RequestFishingMinigame.InvokeServer) == "function" then
-                return RF_RequestFishingMinigame:InvokeServer(yPos, castPower, GetServerTime())
-            else
-                RF_RequestFishingMinigame:FireServer(yPos, castPower, GetServerTime())
-                return true
-            end
-        end)
-        if not okStart then
-            warn("[AutoFishing Instant] StartMini failed:", res)
-        end
-
-        if FishingConfig.BlatantMode then
-            delayComplete = 0.01 + math.random() * 0.01
-        else
-            local compl = FishingConfig.ComplateDelay or 0.80
-            delayComplete = math.max(compl, 0.05)
-            print(string.format(
-                "[InstantCalc] complate=%.3f => delay=%.3f",
-                compl, delayComplete
-            ))
-        end
-    end
-
-    -- tunggu sebelum kirim FishingCompleted
-    task.wait(delayComplete)
-
+    -- charge (pakai now langsung, ga pake rumus perfect)
+    local now = GetServerTime()
     pcall(function()
-        RE_FishingCompleted:FireServer()
+        RF_ChargeFishingRod:InvokeServer(now)
     end)
 
-    -- selesai 1 cast; fish-caught event akan chain cast berikutnya
-    State.Casting = false
+    task.wait(0.02)
 
-    -- kalau saat casting ada PendingChain = true, langsung cast lagi
-    if FishingConfig.AutoFishing and State.PendingChain then
-        State.PendingChain = false
-        task.spawn(DoSingleCast)
-    end
-end
+    -- start minigame
+    local yPos = hrp.Position.Y - 10
+    local okStart, res = pcall(function()
+        if typeof(RF_RequestFishingMinigame.InvokeServer) == "function" then
+            return RF_RequestFishingMinigame:InvokeServer(yPos, castPower, GetServerTime())
+        else
+            RF_RequestFishingMinigame:FireServer(yPos, castPower, GetServerTime())
+            return true
+        end
+    end)
 
-------------------------------------------------------------
--- EVENT FISH CAUGHT → CHAIN CAST
-------------------------------------------------------------
-RE_ObtainedNewFishNotification.OnClientEvent:Connect(function(...)
-    if not FishingConfig.AutoFishing then return end
-
-    print("[AutoFishing] Fish caught event received")
-
-    -- kalau lagi cast, tandai bahwa setelah selesai, langsung cast lagi
-    if State.Casting then
-        State.PendingChain = true
+    if not okStart then
+        warn("[BlatantFishing] StartMini failed:", res)
+        castActive = false
         return
     end
 
-    -- kalau tidak sedang casting, langsung cast baru
-    task.spawn(DoSingleCast)
+    -- sangat cepat, tunggu CompleteDelay lalu paksa selesai
+    local completeDelay = math.max(FishingConfig.CompleteDelay or 0.05, 0.02)
+    task.delay(completeDelay, function()
+        if not FishingConfig.AutoFishing then return end
+        pcall(function()
+            RE_FishingCompleted:FireServer()
+        end)
+    end)
+end
+
+------------------------------------------------------------
+-- TRIGGER ULANG DARI EVENT DAPAT IKAN
+------------------------------------------------------------
+RE_ObtainedNewFishNotify.OnClientEvent:Connect(function(...)
+    -- ikan sudah benar-benar masuk backpack
+    castActive = false
+
+    if not FishingConfig.AutoFishing then return end
+
+    local d = math.max(FishingConfig.CastDelay or 0, 0)
+    task.delay(d, function()
+        DoOneCast()
+    end)
 end)
 
 ------------------------------------------------------------
--- API
+-- LOOP BACKUP (kalau event kagak kepanggil, tetap lanjut)
+------------------------------------------------------------
+local function AutoFishingLoop()
+    if autoLoopRunning then return end
+    autoLoopRunning = true
+    print("[BlatantFishing] loop start")
+
+    while FishingConfig.AutoFishing do
+        -- kalau belum ada cast aktif (misal event miss), paksa lempar lagi
+        if not castActive then
+            DoOneCast()
+        end
+        task.wait(0.3) -- loop ringan, spam utama dari event
+    end
+
+    autoLoopRunning = false
+    castActive = false
+    print("[BlatantFishing] loop end")
+end
+
+------------------------------------------------------------
+-- API START / STOP
 ------------------------------------------------------------
 function Fishing:StartAutoFishing()
     if FishingConfig.AutoFishing then return end
     FishingConfig.AutoFishing = true
-    State.PendingChain = false
-    print("[AutoFishing] START, method =", FishingConfig.AutoFishingMethod)
-    -- mulai chain pertama
-    task.spawn(DoSingleCast)
+    task.spawn(AutoFishingLoop)
 end
 
 function Fishing:StopAutoFishing()
     FishingConfig.AutoFishing = false
-    State.PendingChain = false
-    print("[AutoFishing] STOP")
 end
 
 ------------------------------------------------------------
--- UI TAB AUTO (pakai UI AegisHub kamu)
+-- UI AEGISHUB – TAB AUTO (BLATANT MODE)
 ------------------------------------------------------------
 local TabAuto = win:CreateTab("Auto")
 
-TabAuto:Label("Auto Fishing (Fast / Instant + FishCaught)")
+TabAuto:Label("Auto Fishing (Blatant)")
 
--- Toggle Auto Fishing
-TabAuto:Toggle("Auto Fishing 🎣", function(value)
-    if value then
+-- Toggle utama
+TabAuto:Toggle("Blatant Auto Fishing 🎣", function(state)
+    if state then
         Fishing:StartAutoFishing()
     else
         Fishing:StopAutoFishing()
     end
 end)
 
--- Blatant (super cepat)
-TabAuto:Toggle("Blatant Speed (very fast)", function(v)
-    FishingConfig.BlatantMode = v and true or false
-    print("[AutoFishing] BlatantMode =", FishingConfig.BlatantMode)
-end)
-
--- Method
-TabAuto:Dropdown("Fishing Method to Use", {"Fast","Instant"}, function(opt)
-    if opt == "Fast" or opt == "Instant" then
-        FishingConfig.AutoFishingMethod = opt
-        print("[AutoFishing] Method =", opt)
-    end
-end)
-
--- REEL DELAY (Fast)
-TabAuto:Box("Reel Delay Fast (seconds)", function(txt)
+-- Complete Delay (dari start mini -> FishingCompleted)
+TabAuto:Box("Complete Delay (seconds)", function(txt)
     local n = tonumber(txt)
     if n then
-        n = math.clamp(n, 0.01, 5)
-        FishingConfig.ReelDelayFast = n
-        print("[AutoFishing] ReelDelayFast =", n)
+        -- boleh sangat kecil, tapi tetap kasih batas biar ga 0
+        n = math.clamp(n, 0.01, 2)
+        FishingConfig.CompleteDelay = n
+        print("[BlatantFishing] CompleteDelay =", n)
     end
 end)
 
--- COMPLATE DELAY (Fast & Instant)
-TabAuto:Box("Complate Delay (seconds)", function(txt)
+-- Cast Delay / Spam Delay (jeda setelah dapat ikan sebelum lempar lagi)
+TabAuto:Box("Cast Delay / Spam (seconds)", function(txt)
     local n = tonumber(txt)
     if n then
-        n = math.clamp(n, 0.01, 5)
-        FishingConfig.ComplateDelay = n
-        print("[AutoFishing] ComplateDelay =", n)
+        n = math.clamp(n, 0, 1)
+        FishingConfig.CastDelay = n
+        print("[BlatantFishing] CastDelay =", n)
     end
 end)
-
--- simpan global kalau mau dipanggil dari tempat lain
-_G.AegisFishing = Fishing
-            
 
 
 ----------------------------------------------------------------
