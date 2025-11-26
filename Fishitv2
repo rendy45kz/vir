@@ -1915,24 +1915,24 @@ _G.AegisEnchantConfig = EnchantConfig
 ------------------------------------------------------------
 -- TAB EVENT – PILIH EVENT + AUTO TELEPORT
 ------------------------------------------------------------
-local Players          = game:GetService("Players")
+local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace        = game:GetService("Workspace")
+local Workspace         = game:GetService("Workspace")
 
-local LocalPlayer      = Players.LocalPlayer
-local EventsFolder     = ReplicatedStorage:WaitForChild("Events", 5)
+local LocalPlayer       = Players.LocalPlayer
+local EventsFolder      = ReplicatedStorage:FindFirstChild("Events")
 
 local EventConfig = {
-    AutoEvent       = false,
-    SelectedEvent   = nil,
+    AutoEvent     = false,
+    SelectedEvent = nil,
 }
 
-local originalCFrame      = nil
-local isAtEvent           = false
-local eventLoopRunning    = false
+local originalCFrame    = nil
+local isAtEvent         = false
+local eventLoopRunning  = false
 
 ------------------------------------------------------------
--- TELEPORT HELPER (pakai tpTo kalau ada)
+-- TELEPORT HELPER (pakai tpTo kalau sudah kamu buat)
 ------------------------------------------------------------
 local function safeTpTo(cfOrPos)
     if typeof(tpTo) == "function" then
@@ -1966,19 +1966,20 @@ local function isEventActive(ev)
     end
 
     for _,v in ipairs(ev:GetChildren()) do
-        if v:IsA("BoolValue") and (v.Name == "Active" or v.Name == "IsActive" or v.Name == "Enabled") then
+        if v:IsA("BoolValue")
+           and (v.Name == "Active" or v.Name == "IsActive" or v.Name == "Enabled") then
             return v.Value == true
         end
     end
 
-    -- kalau tidak ada apa-apa, anggap aktif
-    return true
+    -- kalau nggak ada info, anggap off (lebih aman)
+    return false
 end
 
 local function getEventTeleportCFrame(ev)
     if not ev then return nil end
 
-    -- di dalam folder Events
+    -- cari referensi posisi di dalam folder Events
     for _,v in ipairs(ev:GetDescendants()) do
         if v:IsA("CFrameValue") then
             return v.Value
@@ -1992,7 +1993,7 @@ local function getEventTeleportCFrame(ev)
         end
     end
 
-    -- cari di Workspace nama mirip event
+    -- fallback: cari part di workspace dengan nama mirip event
     local lname = ev.Name:lower()
     local best, dist
     local char = LocalPlayer.Character
@@ -2008,8 +2009,8 @@ local function getEventTeleportCFrame(ev)
                     part = inst
                 else
                     part = inst:FindFirstChild("HumanoidRootPart")
-                         or inst.PrimaryPart
-                         or inst:FindFirstChildWhichIsA("BasePart")
+                        or inst.PrimaryPart
+                        or inst:FindFirstChildWhichIsA("BasePart")
                 end
                 if part then
                     local d = (part.Position - origin).Magnitude
@@ -2042,67 +2043,57 @@ end
 ------------------------------------------------------------
 -- LOOP AUTO EVENT
 ------------------------------------------------------------
-local function EventAutoLoop(statusLabel)
+local function EventAutoLoop()
     if eventLoopRunning then return end
     eventLoopRunning = true
+    print("[AegisHub Event] loop start")
 
     while EventConfig.AutoEvent do
         local evName = EventConfig.SelectedEvent
 
-        if not evName or evName == "" then
-            if statusLabel and statusLabel.Parent then
-                statusLabel.Text = "Event: none selected"
-            end
-            task.wait(1)
-            goto continue
-        end
+        if evName and EventsFolder then
+            local ev = EventsFolder:FindFirstChild(evName)
+            local active = ev and isEventActive(ev)
 
-        local ev = EventsFolder and EventsFolder:FindFirstChild(evName) or nil
-        local active = ev and isEventActive(ev) or false
+            if active then
+                if not isAtEvent then
+                    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        originalCFrame = hrp.CFrame
+                    end
 
-        if statusLabel and statusLabel.Parent then
-            statusLabel.Text = string.format("Event: %s (%s)", evName, active and "ACTIVE" or "OFF")
-        end
-
-        if active then
-            -- kalau belum teleport ke event, simpan posisi & tp
-            if not isAtEvent then
-                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    originalCFrame = hrp.CFrame
+                    local cf = getEventTeleportCFrame(ev)
+                    if cf then
+                        safeTpTo(cf)
+                        isAtEvent = true
+                        print("[AegisHub Event] Teleport ke event:", evName)
+                    else
+                        warn("[AegisHub Event] Posisi event tidak ditemukan:", evName)
+                    end
                 end
-
-                local cf = getEventTeleportCFrame(ev)
-                if cf then
-                    safeTpTo(cf)
-                    isAtEvent = true
-                    print("[AegisHub Event] Teleport ke event:", evName)
-                else
-                    warn("[AegisHub Event] Tidak menemukan posisi event:", evName)
+            else
+                if isAtEvent and originalCFrame then
+                    safeTpTo(originalCFrame)
+                    print("[AegisHub Event] Event selesai, balik ke posisi semula.")
                 end
+                isAtEvent = false
             end
-        else
-            -- event selesai → balik ke posisi awal kalau lagi di event
-            if isAtEvent and originalCFrame then
-                safeTpTo(originalCFrame)
-                print("[AegisHub Event] Event selesai, balik ke posisi semula.")
-            end
-            isAtEvent = false
         end
 
         task.wait(1.5)
-        ::continue::
     end
 
-    -- toggle dimatikan → kalau masih di event, balikin
+    -- toggle dimatikan → kembalikan posisi kalau masih di event
     if isAtEvent and originalCFrame then
         safeTpTo(originalCFrame)
         print("[AegisHub Event] AutoEvent OFF, balik ke posisi semula.")
     end
+
     isAtEvent        = false
     originalCFrame   = nil
     eventLoopRunning = false
+    print("[AegisHub Event] loop end")
 end
 
 ------------------------------------------------------------
@@ -2110,36 +2101,29 @@ end
 ------------------------------------------------------------
 local TabEvent = win:CreateTab("Event")
 
-local statusLabel = TabEvent:LiveLabel("Event: none selected")
+TabEvent:Label("Auto Teleport Event")
 
--- Dropdown pilih event
 local eventNames = getEventNames()
 local ddEvent = TabEvent:Dropdown("Select Event", eventNames, function(opt)
     EventConfig.SelectedEvent = opt
     print("[AegisHub Event] SelectedEvent =", tostring(opt))
 end)
 
--- Tombol refresh list event (opsional tapi berguna)
 TabEvent:Button("Refresh Event List", function()
     local list = getEventNames()
     if ddEvent and ddEvent.SetOptions then
         ddEvent:SetOptions(list)
     end
-    print("[AegisHub Event] List event di-refresh.")
+    print("[AegisHub Event] Event list refreshed.")
 end)
 
--- Toggle Auto Teleport
 TabEvent:Toggle("Auto Teleport Selected Event", function(state)
     EventConfig.AutoEvent = state
     print("[AegisHub Event] AutoEvent =", state)
     if state then
-        task.spawn(function()
-            EventAutoLoop(statusLabel)
-        end)
+        task.spawn(EventAutoLoop)
     end
 end)
-
-
 
 
 ----------------------------------------------------------------
