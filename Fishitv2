@@ -1913,191 +1913,233 @@ _G.AegisEnchantConfig = EnchantConfig
 
 
 ------------------------------------------------------------
--- EVENT TAB – AUTO TELEPORT EVENT
+-- TAB EVENT – PILIH EVENT + AUTO TELEPORT
 ------------------------------------------------------------
-local RunService   = game:GetService("RunService")
-local Workspace    = game:GetService("Workspace")
-local Players      = game:GetService("Players")
-local LocalPlayer  = Players.LocalPlayer
+local Players          = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace        = game:GetService("Workspace")
 
--- kalau kamu sudah punya tpTo, pakai itu, kalau tidak buat fallback sederhana
-local function safeTpTo(pos)
+local LocalPlayer      = Players.LocalPlayer
+local EventsFolder     = ReplicatedStorage:WaitForChild("Events", 5)
+
+local EventConfig = {
+    AutoEvent       = false,
+    SelectedEvent   = nil,
+}
+
+local originalCFrame      = nil
+local isAtEvent           = false
+local eventLoopRunning    = false
+
+------------------------------------------------------------
+-- TELEPORT HELPER (pakai tpTo kalau ada)
+------------------------------------------------------------
+local function safeTpTo(cfOrPos)
     if typeof(tpTo) == "function" then
-        tpTo(pos)
+        tpTo(cfOrPos)
         return
     end
 
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        if typeof(pos) == "CFrame" then
-            hrp.CFrame = pos + Vector3.new(0, 5, 0)
-        else
-            hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
-        end
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    if typeof(cfOrPos) == "CFrame" then
+        hrp.CFrame = cfOrPos + Vector3.new(0, 5, 0)
+    elseif typeof(cfOrPos) == "Vector3" then
+        hrp.CFrame = CFrame.new(cfOrPos + Vector3.new(0, 5, 0))
     end
 end
 
-local EventConfig = {
-    AutoEvent = false,
-}
-
-local lastTeleportForEvent = {}   -- [eventName] = os.clock()
-local EVENT_COOLDOWN = 30         -- detik, biar nggak spam tp ke event yg sama
-
 ------------------------------------------------------------
--- AMBIL LIST NAMA EVENT DARI GUI
+-- CEK ACTIVE & POSISI EVENT
 ------------------------------------------------------------
-local function getGuiEventNames()
-    local namesSet = {}
+local function isEventActive(ev)
+    if not ev then return false end
 
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if not pg then return {} end
+    local activeAttr = ev:GetAttribute("Active")
+                    or ev:GetAttribute("IsActive")
+                    or ev:GetAttribute("Enabled")
 
-    -- coba cari berbagai kemungkinan container event
-    local containers = {}
+    if type(activeAttr) == "boolean" then
+        return activeAttr
+    end
 
-    for _, child in ipairs(pg:GetChildren()) do
-        if child.Name:lower():find("event") then
-            table.insert(containers, child)
+    for _,v in ipairs(ev:GetChildren()) do
+        if v:IsA("BoolValue") and (v.Name == "Active" or v.Name == "IsActive" or v.Name == "Enabled") then
+            return v.Value == true
         end
     end
 
-    -- kalau tidak nemu child langsung, coba cari di dalam PlayerGui
-    if #containers == 0 then
-        for _, d in ipairs(pg:GetDescendants()) do
-            if d:IsA("Frame") or d:IsA("ScrollingFrame") then
-                if d.Name:lower():find("event") then
-                    table.insert(containers, d)
-                end
+    -- kalau tidak ada apa-apa, anggap aktif
+    return true
+end
+
+local function getEventTeleportCFrame(ev)
+    if not ev then return nil end
+
+    -- di dalam folder Events
+    for _,v in ipairs(ev:GetDescendants()) do
+        if v:IsA("CFrameValue") then
+            return v.Value
+        elseif v:IsA("Vector3Value") then
+            return CFrame.new(v.Value)
+        elseif v:IsA("ObjectValue") and v.Name:lower():find("teleport") then
+            local ref = v.Value
+            if ref and ref:IsA("BasePart") then
+                return ref.CFrame
             end
         end
     end
 
-    -- jika tetap 0, yaudah kosong
-    if #containers == 0 then
-        return {}
-    end
-
-    -- kumpulkan semua text label yang kelihatannya nama event
-    for _, root in ipairs(containers) do
-        for _, inst in ipairs(root:GetDescendants()) do
-            if inst:IsA("TextLabel") and typeof(inst.Text) == "string" then
-                local txt = inst.Text
-                if txt and txt ~= "" and txt:match("%a") then
-                    -- buang timer di belakang / di dalam ()
-                    txt = txt:gsub("%s*%b()", "")
-                    txt = txt:gsub("%s%d+:%d+%s*$", "")
-                    txt = txt:gsub("^%s+", ""):gsub("%s+$","")
-                    if txt ~= "" and #txt <= 40 then
-                        namesSet[txt] = true
-                    end
-                end
-            end
-        end
-    end
-
-    local list = {}
-    for n in pairs(namesSet) do
-        table.insert(list, n)
-    end
-    table.sort(list)
-    return list
-end
-
-------------------------------------------------------------
--- CARI POSISI EVENT DI WORKSPACE BERDASARKAN NAMA
-------------------------------------------------------------
-local function findEventCFrameByName(eventName)
-    if not eventName or eventName == "" then return nil end
-
+    -- cari di Workspace nama mirip event
+    local lname = ev.Name:lower()
+    local best, dist
     local char = LocalPlayer.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     local origin = hrp and hrp.Position or Vector3.new()
 
-    local lname = string.lower(eventName)
-    local bestPart, bestDist
-
-    for _, inst in ipairs(Workspace:GetDescendants()) do
-        if inst:IsA("Model") or inst:IsA("BasePart") then
-            local iname = string.lower(inst.Name or "")
+    for _,inst in ipairs(Workspace:GetDescendants()) do
+        if inst:IsA("BasePart") or inst:IsA("Model") then
+            local iname = (inst.Name or ""):lower()
             if iname:find(lname, 1, true) then
                 local part
                 if inst:IsA("BasePart") then
                     part = inst
                 else
                     part = inst:FindFirstChild("HumanoidRootPart")
-                        or inst.PrimaryPart
-                        or inst:FindFirstChildWhichIsA("BasePart")
+                         or inst.PrimaryPart
+                         or inst:FindFirstChildWhichIsA("BasePart")
                 end
-
                 if part then
                     local d = (part.Position - origin).Magnitude
-                    if not bestDist or d < bestDist then
-                        bestDist = d
-                        bestPart = part
+                    if not dist or d < dist then
+                        dist = d
+                        best = part
                     end
                 end
             end
         end
     end
 
-    return bestPart and bestPart.CFrame or nil
+    return best and best.CFrame or nil
 end
 
 ------------------------------------------------------------
--- LOOP AUTO EVENT TELEPORT
+-- BUILD LIST EVENT DARI ReplicatedStorage.Events
 ------------------------------------------------------------
-local function AutoEventLoop(statusLabel)
-    while EventConfig.AutoEvent do
-        local events = getGuiEventNames()
+local function getEventNames()
+    local list = {}
+    if not EventsFolder then return list end
 
-        -- update tulisan status
-        if statusLabel and statusLabel.Parent then
-            if #events == 0 then
-                statusLabel.Text = "Events: none"
-            else
-                statusLabel.Text = "Events: " .. table.concat(events, ", ")
+    for _,ev in ipairs(EventsFolder:GetChildren()) do
+        table.insert(list, ev.Name)
+    end
+    table.sort(list)
+    return list
+end
+
+------------------------------------------------------------
+-- LOOP AUTO EVENT
+------------------------------------------------------------
+local function EventAutoLoop(statusLabel)
+    if eventLoopRunning then return end
+    eventLoopRunning = true
+
+    while EventConfig.AutoEvent do
+        local evName = EventConfig.SelectedEvent
+
+        if not evName or evName == "" then
+            if statusLabel and statusLabel.Parent then
+                statusLabel.Text = "Event: none selected"
             end
+            task.wait(1)
+            goto continue
         end
 
-        local now = os.clock()
+        local ev = EventsFolder and EventsFolder:FindFirstChild(evName) or nil
+        local active = ev and isEventActive(ev) or false
 
-        for _, evName in ipairs(events) do
-            local last = lastTeleportForEvent[evName] or 0
-            if now - last >= EVENT_COOLDOWN then
-                local cf = findEventCFrameByName(evName)
+        if statusLabel and statusLabel.Parent then
+            statusLabel.Text = string.format("Event: %s (%s)", evName, active and "ACTIVE" or "OFF")
+        end
+
+        if active then
+            -- kalau belum teleport ke event, simpan posisi & tp
+            if not isAtEvent then
+                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    originalCFrame = hrp.CFrame
+                end
+
+                local cf = getEventTeleportCFrame(ev)
                 if cf then
-                    print("[AegisHub Event] Teleport to event:", evName)
-                    lastTeleportForEvent[evName] = now
                     safeTpTo(cf)
-                    break -- satu event dulu tiap loop
+                    isAtEvent = true
+                    print("[AegisHub Event] Teleport ke event:", evName)
                 else
-                    print("[AegisHub Event] Workspace posisi event tidak ditemukan:", evName)
+                    warn("[AegisHub Event] Tidak menemukan posisi event:", evName)
                 end
             end
+        else
+            -- event selesai → balik ke posisi awal kalau lagi di event
+            if isAtEvent and originalCFrame then
+                safeTpTo(originalCFrame)
+                print("[AegisHub Event] Event selesai, balik ke posisi semula.")
+            end
+            isAtEvent = false
         end
 
-        task.wait(2) -- jeda scan, jangan terlalu spam
+        task.wait(1.5)
+        ::continue::
     end
+
+    -- toggle dimatikan → kalau masih di event, balikin
+    if isAtEvent and originalCFrame then
+        safeTpTo(originalCFrame)
+        print("[AegisHub Event] AutoEvent OFF, balik ke posisi semula.")
+    end
+    isAtEvent        = false
+    originalCFrame   = nil
+    eventLoopRunning = false
 end
 
 ------------------------------------------------------------
--- TAB EVENT UI
+-- UI TAB EVENT (Dropdown + Toggle + Refresh)
 ------------------------------------------------------------
 local TabEvent = win:CreateTab("Event")
 
-local liveLabel = TabEvent:LiveLabel("Events: scanning...")
+local statusLabel = TabEvent:LiveLabel("Event: none selected")
 
-TabEvent:Toggle("Auto Teleport Events", function(state)
+-- Dropdown pilih event
+local eventNames = getEventNames()
+local ddEvent = TabEvent:Dropdown("Select Event", eventNames, function(opt)
+    EventConfig.SelectedEvent = opt
+    print("[AegisHub Event] SelectedEvent =", tostring(opt))
+end)
+
+-- Tombol refresh list event (opsional tapi berguna)
+TabEvent:Button("Refresh Event List", function()
+    local list = getEventNames()
+    if ddEvent and ddEvent.SetOptions then
+        ddEvent:SetOptions(list)
+    end
+    print("[AegisHub Event] List event di-refresh.")
+end)
+
+-- Toggle Auto Teleport
+TabEvent:Toggle("Auto Teleport Selected Event", function(state)
     EventConfig.AutoEvent = state
     print("[AegisHub Event] AutoEvent =", state)
     if state then
         task.spawn(function()
-            AutoEventLoop(liveLabel)
+            EventAutoLoop(statusLabel)
         end)
     end
 end)
+
+
 
 
 ----------------------------------------------------------------
