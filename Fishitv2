@@ -2040,6 +2040,195 @@ end)
 _G.AegisEnchant       = Enchant
 _G.AegisEnchantConfig = EnchantConfig
 
+
+------------------------------------------------------------
+-- EVENT TAB – AUTO TELEPORT EVENT
+------------------------------------------------------------
+local RunService   = game:GetService("RunService")
+local Workspace    = game:GetService("Workspace")
+local Players      = game:GetService("Players")
+local LocalPlayer  = Players.LocalPlayer
+
+-- kalau kamu sudah punya tpTo, pakai itu, kalau tidak buat fallback sederhana
+local function safeTpTo(pos)
+    if typeof(tpTo) == "function" then
+        tpTo(pos)
+        return
+    end
+
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        if typeof(pos) == "CFrame" then
+            hrp.CFrame = pos + Vector3.new(0, 5, 0)
+        else
+            hrp.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+        end
+    end
+end
+
+local EventConfig = {
+    AutoEvent = false,
+}
+
+local lastTeleportForEvent = {}   -- [eventName] = os.clock()
+local EVENT_COOLDOWN = 30         -- detik, biar nggak spam tp ke event yg sama
+
+------------------------------------------------------------
+-- AMBIL LIST NAMA EVENT DARI GUI
+------------------------------------------------------------
+local function getGuiEventNames()
+    local namesSet = {}
+
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return {} end
+
+    -- coba cari berbagai kemungkinan container event
+    local containers = {}
+
+    for _, child in ipairs(pg:GetChildren()) do
+        if child.Name:lower():find("event") then
+            table.insert(containers, child)
+        end
+    end
+
+    -- kalau tidak nemu child langsung, coba cari di dalam PlayerGui
+    if #containers == 0 then
+        for _, d in ipairs(pg:GetDescendants()) do
+            if d:IsA("Frame") or d:IsA("ScrollingFrame") then
+                if d.Name:lower():find("event") then
+                    table.insert(containers, d)
+                end
+            end
+        end
+    end
+
+    -- jika tetap 0, yaudah kosong
+    if #containers == 0 then
+        return {}
+    end
+
+    -- kumpulkan semua text label yang kelihatannya nama event
+    for _, root in ipairs(containers) do
+        for _, inst in ipairs(root:GetDescendants()) do
+            if inst:IsA("TextLabel") and typeof(inst.Text) == "string" then
+                local txt = inst.Text
+                if txt and txt ~= "" and txt:match("%a") then
+                    -- buang timer di belakang / di dalam ()
+                    txt = txt:gsub("%s*%b()", "")
+                    txt = txt:gsub("%s%d+:%d+%s*$", "")
+                    txt = txt:gsub("^%s+", ""):gsub("%s+$","")
+                    if txt ~= "" and #txt <= 40 then
+                        namesSet[txt] = true
+                    end
+                end
+            end
+        end
+    end
+
+    local list = {}
+    for n in pairs(namesSet) do
+        table.insert(list, n)
+    end
+    table.sort(list)
+    return list
+end
+
+------------------------------------------------------------
+-- CARI POSISI EVENT DI WORKSPACE BERDASARKAN NAMA
+------------------------------------------------------------
+local function findEventCFrameByName(eventName)
+    if not eventName or eventName == "" then return nil end
+
+    local char = LocalPlayer.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    local origin = hrp and hrp.Position or Vector3.new()
+
+    local lname = string.lower(eventName)
+    local bestPart, bestDist
+
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        if inst:IsA("Model") or inst:IsA("BasePart") then
+            local iname = string.lower(inst.Name or "")
+            if iname:find(lname, 1, true) then
+                local part
+                if inst:IsA("BasePart") then
+                    part = inst
+                else
+                    part = inst:FindFirstChild("HumanoidRootPart")
+                        or inst.PrimaryPart
+                        or inst:FindFirstChildWhichIsA("BasePart")
+                end
+
+                if part then
+                    local d = (part.Position - origin).Magnitude
+                    if not bestDist or d < bestDist then
+                        bestDist = d
+                        bestPart = part
+                    end
+                end
+            end
+        end
+    end
+
+    return bestPart and bestPart.CFrame or nil
+end
+
+------------------------------------------------------------
+-- LOOP AUTO EVENT TELEPORT
+------------------------------------------------------------
+local function AutoEventLoop(statusLabel)
+    while EventConfig.AutoEvent do
+        local events = getGuiEventNames()
+
+        -- update tulisan status
+        if statusLabel and statusLabel.Parent then
+            if #events == 0 then
+                statusLabel.Text = "Events: none"
+            else
+                statusLabel.Text = "Events: " .. table.concat(events, ", ")
+            end
+        end
+
+        local now = os.clock()
+
+        for _, evName in ipairs(events) do
+            local last = lastTeleportForEvent[evName] or 0
+            if now - last >= EVENT_COOLDOWN then
+                local cf = findEventCFrameByName(evName)
+                if cf then
+                    print("[AegisHub Event] Teleport to event:", evName)
+                    lastTeleportForEvent[evName] = now
+                    safeTpTo(cf)
+                    break -- satu event dulu tiap loop
+                else
+                    print("[AegisHub Event] Workspace posisi event tidak ditemukan:", evName)
+                end
+            end
+        end
+
+        task.wait(2) -- jeda scan, jangan terlalu spam
+    end
+end
+
+------------------------------------------------------------
+-- TAB EVENT UI
+------------------------------------------------------------
+local TabEvent = win:CreateTab("Event")
+
+local liveLabel = TabEvent:LiveLabel("Events: scanning...")
+
+TabEvent:Toggle("Auto Teleport Events", function(state)
+    EventConfig.AutoEvent = state
+    print("[AegisHub Event] AutoEvent =", state)
+    if state then
+        task.spawn(function()
+            AutoEventLoop(liveLabel)
+        end)
+    end
+end)
+
+
 ----------------------------------------------------------------
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
 ----------------------------------------------------------------
