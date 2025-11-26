@@ -1911,9 +1911,10 @@ end)
 _G.AegisEnchant       = Enchant
 _G.AegisEnchantConfig = EnchantConfig
 
+----------------------------------------------------------------
 
 ------------------------------------------------------------
--- TAB EVENT – PILIH EVENT + AUTO TELEPORT
+-- TAB EVENT – AUTO TELEPORT EVENT (SCAN WORKSPACE)
 ------------------------------------------------------------
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -1932,14 +1933,9 @@ local isAtEvent         = false
 local eventLoopRunning  = false
 
 ------------------------------------------------------------
--- TELEPORT HELPER (pakai tpTo kalau sudah kamu buat)
+-- TELEPORT HELPER (pakai tpTo kalau sudah ada)
 ------------------------------------------------------------
 local function safeTpTo(cfOrPos)
-    if typeof(tpTo) == "function" then
-        tpTo(cfOrPos)
-        return
-    end
-
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
@@ -1952,9 +1948,9 @@ local function safeTpTo(cfOrPos)
 end
 
 ------------------------------------------------------------
--- CEK ACTIVE & POSISI EVENT
+-- CEK ACTIVE DARI ReplicatedStorage.Events (kalau ada)
 ------------------------------------------------------------
-local function isEventActive(ev)
+local function isEventActiveInRep(ev)
     if not ev then return false end
 
     local activeAttr = ev:GetAttribute("Active")
@@ -1972,58 +1968,59 @@ local function isEventActive(ev)
         end
     end
 
-    -- kalau nggak ada info, anggap off (lebih aman)
     return false
 end
 
-local function getEventTeleportCFrame(ev)
-    if not ev then return nil end
+------------------------------------------------------------
+-- CARI POSISI EVENT DI WORKSPACE DARI NAMA EVENT
+------------------------------------------------------------
+local function findEventCFrameByName(eventName)
+    if not eventName or eventName == "" then return nil end
 
-    -- cari referensi posisi di dalam folder Events
-    for _,v in ipairs(ev:GetDescendants()) do
-        if v:IsA("CFrameValue") then
-            return v.Value
-        elseif v:IsA("Vector3Value") then
-            return CFrame.new(v.Value)
-        elseif v:IsA("ObjectValue") and v.Name:lower():find("teleport") then
-            local ref = v.Value
-            if ref and ref:IsA("BasePart") then
-                return ref.CFrame
-            end
-        end
-    end
-
-    -- fallback: cari part di workspace dengan nama mirip event
-    local lname = ev.Name:lower()
-    local best, dist
+    local lname = string.lower(eventName)
     local char = LocalPlayer.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     local origin = hrp and hrp.Position or Vector3.new()
 
-    for _,inst in ipairs(Workspace:GetDescendants()) do
-        if inst:IsA("BasePart") or inst:IsA("Model") then
-            local iname = (inst.Name or ""):lower()
+    local bestPart, bestDist
+
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        if inst:IsA("BasePart") then
+            local iname = string.lower(inst.Name or "")
+            -- cocok nama event di mana saja (Contains)
             if iname:find(lname, 1, true) then
-                local part
-                if inst:IsA("BasePart") then
-                    part = inst
-                else
-                    part = inst:FindFirstChild("HumanoidRootPart")
-                        or inst.PrimaryPart
-                        or inst:FindFirstChildWhichIsA("BasePart")
+                local d = (inst.Position - origin).Magnitude
+                if not bestDist or d < bestDist then
+                    bestDist = d
+                    bestPart = inst
                 end
-                if part then
-                    local d = (part.Position - origin).Magnitude
-                    if not dist or d < dist then
-                        dist = d
-                        best = part
+            end
+        elseif inst:IsA("Model") then
+            local iname = string.lower(inst.Name or "")
+            if iname:find(lname, 1, true) then
+                local p = inst:FindFirstChild("HumanoidRootPart")
+                    or inst.PrimaryPart
+                    or inst:FindFirstChildWhichIsA("BasePart")
+                if p then
+                    local d = (p.Position - origin).Magnitude
+                    if not bestDist or d < bestDist then
+                        bestDist = d
+                        bestPart = p
                     end
                 end
             end
         end
     end
 
-    return best and best.CFrame or nil
+    if bestPart then
+        print(string.format("[Event] Found workspace target for '%s' at %s (dist=%.1f)",
+            eventName, tostring(bestPart.Position), bestDist or 0))
+        return bestPart.CFrame
+    else
+        print("[Event] No workspace match for event:", eventName)
+    end
+
+    return nil
 end
 
 ------------------------------------------------------------
@@ -2031,7 +2028,10 @@ end
 ------------------------------------------------------------
 local function getEventNames()
     local list = {}
-    if not EventsFolder then return list end
+    if not EventsFolder then
+        warn("[Event] ReplicatedStorage.Events tidak ditemukan")
+        return list
+    end
 
     for _,ev in ipairs(EventsFolder:GetChildren()) do
         table.insert(list, ev.Name)
@@ -2051,11 +2051,21 @@ local function EventAutoLoop()
     while EventConfig.AutoEvent do
         local evName = EventConfig.SelectedEvent
 
-        if evName and EventsFolder then
-            local ev = EventsFolder:FindFirstChild(evName)
-            local active = ev and isEventActive(ev)
+        if evName and evName ~= "" then
+            local evDef = EventsFolder and EventsFolder:FindFirstChild(evName) or nil
+            local activeRep = evDef and isEventActiveInRep(evDef) or false
 
-            if active then
+            -- cari posisi event di workspace
+            local cf = findEventCFrameByName(evName)
+
+            local active = activeRep or (cf ~= nil)
+
+            print(string.format(
+                "[Event] Check '%s' | activeRep=%s | foundPos=%s",
+                evName, tostring(activeRep), tostring(cf ~= nil)
+            ))
+
+            if active and cf then
                 if not isAtEvent then
                     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
                     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -2063,19 +2073,14 @@ local function EventAutoLoop()
                         originalCFrame = hrp.CFrame
                     end
 
-                    local cf = getEventTeleportCFrame(ev)
-                    if cf then
-                        safeTpTo(cf)
-                        isAtEvent = true
-                        print("[AegisHub Event] Teleport ke event:", evName)
-                    else
-                        warn("[AegisHub Event] Posisi event tidak ditemukan:", evName)
-                    end
+                    safeTpTo(cf)
+                    isAtEvent = true
+                    print("[Event] Teleport to event:", evName)
                 end
             else
                 if isAtEvent and originalCFrame then
                     safeTpTo(originalCFrame)
-                    print("[AegisHub Event] Event selesai, balik ke posisi semula.")
+                    print("[Event] Event ended / not found, return to original.")
                 end
                 isAtEvent = false
             end
@@ -2084,10 +2089,10 @@ local function EventAutoLoop()
         task.wait(1.5)
     end
 
-    -- toggle dimatikan → kembalikan posisi kalau masih di event
+    -- toggle OFF → balikin posisi
     if isAtEvent and originalCFrame then
         safeTpTo(originalCFrame)
-        print("[AegisHub Event] AutoEvent OFF, balik ke posisi semula.")
+        print("[Event] AutoEvent OFF, return to original pos.")
     end
 
     isAtEvent        = false
@@ -2124,6 +2129,8 @@ TabEvent:Toggle("Auto Teleport Selected Event", function(state)
         task.spawn(EventAutoLoop)
     end
 end)
+
+
 
 
 ----------------------------------------------------------------
