@@ -863,11 +863,11 @@ local function castRod()
     pcall(function()
         -- equip slot 1
         Events.equip:FireServer(1)
-        task.wait(0.05)
+        task.wait(0.03)
 
         -- charge & start minigame (data fix dari test.lua)
         Events.charge:InvokeServer(1755848498.4834)
-        task.wait(0.05)
+        task.wait(0.03)
         Events.minigame:InvokeServer(1.2854545116425, 1)
 
         print("[Fishing] Cast")
@@ -895,7 +895,7 @@ local function ultraFishingLoop()
             -- 3 cast paralel (sama seperti raw, tapi kita tetap jaga sedikit delay)
             pcall(function()
                 Events.equip:FireServer(1)
-                task.wait(0.01)
+                task.wait(0.03)
 
                 -- Cast 1
                 task.spawn(function()
@@ -906,21 +906,21 @@ local function ultraFishingLoop()
             end)
 
             -- FISH DELAY x5 (1/5 dari FishDelay)
-            task.wait(math.max(Config.FishDelay * 0.5, 0.02))
+            task.wait(math.max(Config.FishDelay * 0.3, 0.05))
 
             -- SPAM REEL 5x (dari 8x → 5x)
             for i = 1, 5 do
                 reelIn()
-                task.wait(0.05)
+                task.wait(0.03)
             end
 
             -- CATCH DELAY x5 (1/5 dari CatchDelay)
-            task.wait(math.max(Config.CatchDelay * 0.5, 0.02))
+            task.wait(math.max(Config.CatchDelay * 0.3, 0.03))
 
             isFishing = false
             print("[ULTRA x5] cycle selesai")
         else
-            task.wait(0.05)
+            task.wait(0.03)
         end
     end
 end
@@ -936,27 +936,27 @@ local function blatantFishingLoop()
             -- 2 cast cepat (mirip raw, tapi tuned ke x5)
             pcall(function()
                 Events.equip:FireServer(1)
-                task.wait(0.02)
+                task.wait(0.03)
 
                 -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
+                    task.wait(0.03)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
 
             -- FISH DELAY x5
-            task.wait(math.max(Config.FishDelay * 0.2, 0.02))
+            task.wait(math.max(Config.FishDelay * 0.3, 0.03))
 
             -- REEL 5x (sama kayak raw blatant, tapi tetap 5)
             for i = 1, 5 do
                 reelIn()
-                task.wait(0.2)
+                task.wait(0.3)
             end
 
             -- CATCH DELAY x5
-            task.wait(math.max(Config.CatchDelay * 0.2, 0.02))
+            task.wait(math.max(Config.CatchDelay * 0.3, 0.03))
 
             isFishing = false
             print("[BLATANT x5] cycle selesai")
