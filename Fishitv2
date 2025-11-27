@@ -902,25 +902,7 @@ local function ultraFishingLoop()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.02)
-
-                -- Cast 2
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.02)
-
-                -- Cast 3
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
+                end)                
             end)
 
             -- FISH DELAY x5 (1/5 dari FishDelay)
@@ -954,18 +936,9 @@ local function blatantFishingLoop()
             -- 2 cast cepat (mirip raw, tapi tuned ke x5)
             pcall(function()
                 Events.equip:FireServer(1)
-                task.wait(0.01)
+                task.wait(0.02)
 
                 -- Cast 1
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.03)
-
-                -- Cast 2
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
@@ -979,7 +952,7 @@ local function blatantFishingLoop()
             -- REEL 5x (sama kayak raw blatant, tapi tetap 5)
             for i = 1, 5 do
                 reelIn()
-                task.wait(0.01)
+                task.wait(0.2)
             end
 
             -- CATCH DELAY x5
