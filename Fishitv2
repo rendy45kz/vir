@@ -884,7 +884,6 @@ end
 -- ULTRA / BLATANT / NORMAL LOOPS (DISAMAKAN KE X5)
 ----------------------------------------------------------------
 
--- ULTRA MODE: SPAM 3 CAST + REEL 5x (delay 1/5)
 local function ultraFishingLoop()
     while fishingActive and Config.UltraMode do
         if not Config.AutoFish then break end
@@ -895,32 +894,34 @@ local function ultraFishingLoop()
             -- 3 cast paralel (sama seperti raw, tapi kita tetap jaga sedikit delay)
             pcall(function()
                 Events.equip:FireServer(1)
-                task.wait(0.03)
+                task.wait(0.01)
 
                 -- Cast 1
                 task.spawn(function()
                     Events.charge:InvokeServer(1755848498.4834)
                     task.wait(0.01)
                     Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)                
+                end)
+
+                task.wait(0.02)                
             end)
 
             -- FISH DELAY x5 (1/5 dari FishDelay)
-            task.wait(math.max(Config.FishDelay * 0.3, 0.05))
+            task.wait(math.max(Config.FishDelay * 0.2, 0.02))
 
             -- SPAM REEL 5x (dari 8x → 5x)
             for i = 1, 5 do
                 reelIn()
-                task.wait(0.03)
+                task.wait(0.005)
             end
 
             -- CATCH DELAY x5 (1/5 dari CatchDelay)
-            task.wait(math.max(Config.CatchDelay * 0.3, 0.03))
+            task.wait(math.max(Config.CatchDelay * 0.2, 0.02))
 
             isFishing = false
             print("[ULTRA x5] cycle selesai")
         else
-            task.wait(0.03)
+            task.wait(0.005)
         end
     end
 end
