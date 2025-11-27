@@ -898,7 +898,7 @@ local function AutoFishLoop()
             local hrp  = char and char:FindFirstChild("HumanoidRootPart")
             if not hrp then
                 warn("[AutoFish] HRP not found")
-                task.wait(0.5)
+                task.wait(0.05)
                 return
             end
 
@@ -917,10 +917,10 @@ local function AutoFishLoop()
             ------------------------------------------------
             -- SPAM CAST (x5 / sesuai AutoFishConfig.CastCount)
             ------------------------------------------------
-            for i = 1, AutoFishConfig.CastCount do
+            for i = 1, 5 do
                 doSingleCast()
                 -- jeda sangat kecil antar cast
-                task.wait(0.02)
+                task.wait(0.002)
             end
 
             ------------------------------------------------
@@ -928,12 +928,12 @@ local function AutoFishLoop()
             -- → jeda sebelum spam FishingCompleted
             ------------------------------------------------
             local catchDelay = math.max(AutoFishConfig.CatchDelay or 0.05, 0.01)
-            task.wait(catchDelay)
+            task.wait(catchDelay * 0.05)
 
             ------------------------------------------------
             -- SPAM COMPLETE (FishingCompleted)
             ------------------------------------------------
-            for i = 1, AutoFishConfig.CompleteSpam do
+            for i = 1, 5 do
                 pcall(function()
                     RE_FishingCompleted:FireServer()
                 end)
@@ -944,12 +944,12 @@ local function AutoFishLoop()
             -- FISH DELAY – sebelum restart loop
             ------------------------------------------------
             local fishDelay = math.max(AutoFishConfig.FishDelay or 0.05, 0.01)
-            task.wait(fishDelay)
+            task.wait(fishDelay*0.05)
         end)
 
         if not okCycle then
             warn("[AutoFish] cycle error:", err)
-            task.wait(0.5)
+            task.wait(0.05)
         end
     end
 
