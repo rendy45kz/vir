@@ -807,16 +807,16 @@ local win = library:CreateWindow("AegisHub - Fish It")
 
 
 ----------------------------------------------------------------
--- AUTO FISH V4.1 - ULTRA SPEED (AegisHub UI Version)
--- Ganti Auto Fishing lama dengan blok ini
+-- AUTO FISH V5 – SIMPLE X5 SPAM (AegisHub UI)
+-- Ganti semua Auto Fishing lama dengan blok ini
 ----------------------------------------------------------------
 
 --== SERVICES & NET ==--
-local Players         = game:GetService("Players")
+local Players          = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace       = game:GetService("Workspace")
+local Workspace        = game:GetService("Workspace")
 
-local LocalPlayer     = Players.LocalPlayer
+local LocalPlayer      = Players.LocalPlayer
 
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
@@ -824,33 +824,30 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
--- remotes utama (sama nama dengan raw Pastebin)
-local Events = {
-    fishing  = net:WaitForChild("RE/FishingCompleted"),
-    sell     = net:WaitForChild("RF/SellAllItems"),
-    charge   = net:WaitForChild("RF/ChargeFishingRod"),
-    minigame = net:WaitForChild("RF/RequestFishingMinigameStarted"),
-    cancel   = net:WaitForChild("RF/CancelFishingInputs"),
-    equip    = net:WaitForChild("RE/EquipToolFromHotbar"),
-    unequip  = net:WaitForChild("RE/UnequipToolFromHotbar"),
-}
+-- Remotes (nama sama seperti script2 kamu sebelumnya)
+local RE_EquipToolFromHotbar    = net:WaitForChild("RE/EquipToolFromHotbar")
+local RE_UnequipToolFromHotbar  = net:WaitForChild("RE/UnequipToolFromHotbar")
+local RF_ChargeFishingRod       = net:WaitForChild("RF/ChargeFishingRod")
+local RF_RequestFishingMinigame = net:WaitForChild("RF/RequestFishingMinigameStarted")
+local RF_CancelFishingInputs    = net:WaitForChild("RF/CancelFishingInputs")
+local RE_FishingCompleted       = net:WaitForChild("RE/FishingCompleted")
 
 ------------------------------------------------------------
--- KONFIGURASI AUTO FISH (simple, tanpa file config)
+-- CONFIG – kamu atur dari UI untuk tiap rod
 ------------------------------------------------------------
-local FishConfig = {
-    AutoFish    = false,
-    BlatantMode = true,   -- default: Blatant
-    UltraMode   = false,  -- kalau true → Ultra akan ON dan Blatant ikut ON
-    AutoCatch   = false,
+local AutoFishConfig = {
+    Enabled     = false,
 
-    FishDelay   = 0.9,    -- delay tunggu "ikan makan"
-    CatchDelay  = 0.2,    -- delay sesudah spam reel
+    -- ini kamu sesuaikan per rod:
+    FishDelay   = 0.25,  -- delay sebelum loop diulang (sebelum cast baru)
+    CatchDelay  = 0.10,  -- delay sebelum complete (sesaat setelah spam cast)
+
+    CastCount   = 5,     -- spam cast berapa kali per siklus (x5)
+    CompleteSpam = 3,    -- spam FishingCompleted berapa kali
 }
 
-local Fishing = {}
-local isFishing     = false
-local fishingActive = false
+local AutoFish    = {}
+local loopRunning = false
 
 local function GetServerTime()
     if Workspace.GetServerTimeNow then
@@ -871,284 +868,169 @@ local function ensureCharacter()
 end
 
 ------------------------------------------------------------
--- FUNGSI DASAR (diambil dari raw)
+-- 1x CAST (pakai pattern dari sigma spy, tapi time dinamis)
 ------------------------------------------------------------
+local PERFECT_Y   = -0.5718746185302734
+local PERFECT_PWR = 0.9851953866475573
 
--- single cast versi raw (pakai timestamp & param yang sama)
-local function castRod()
+local function doSingleCast()
+    local tNow = GetServerTime()
     pcall(function()
-        Events.equip:FireServer(1)
+        -- charge + start minigame instant
+        RF_ChargeFishingRod:InvokeServer(tNow)
         task.wait(0.01)
-        -- param di bawah ini diambil dari test.lua / raw
-        Events.charge:InvokeServer(1755848498.4834)
-        task.wait(0.01)
-        Events.minigame:InvokeServer(1.2854545116425, 1)
-        print("[Fishing] Cast")
-    end)
-end
-
-local function reelIn()
-    pcall(function()
-        Events.fishing:FireServer()
+        RF_RequestFishingMinigame:InvokeServer(PERFECT_Y, PERFECT_PWR, tNow)
     end)
 end
 
 ------------------------------------------------------------
--- ULTRA MODE (8x speed) – diambil dari raw, disesuaikan sedikit
+-- LOOP UTAMA – X5 SPAM
 ------------------------------------------------------------
-local function ultraFishingLoop()
-    while fishingActive and FishConfig.UltraMode do
-        if not isFishing then
-            isFishing = true
+local function AutoFishLoop()
+    if loopRunning then return end
+    loopRunning = true
+    print("[AutoFish] Loop started")
 
-            -- Equip sekali
-            pcall(function()
-                Events.equip:FireServer(1)
-                task.wait(0.01)
-
-                -- Cast 1
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.03)
-
-                -- Cast 2
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.03)
-
-                -- Cast 3
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-            end)
-
-            -- FishDelay diperkecil 3x (67% lebih cepat)
-            task.wait(math.max(FishConfig.FishDelay * 0.33, 0.01))
-
-            -- spam reel 8x
-            for i = 1, 8 do
-                pcall(function()
-                    Events.fishing:FireServer()
-                end)
-                task.wait(0.005)
+    while AutoFishConfig.Enabled do
+        local okCycle, err = pcall(function()
+            -- pastikan character & HRP ada
+            local char = ensureCharacter()
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            if not hrp then
+                warn("[AutoFish] HRP not found")
+                task.wait(0.5)
+                return
             end
 
-            -- CatchDelay 70% lebih cepat
-            task.wait(math.max(FishConfig.CatchDelay * 0.3, 0.01))
-
-            isFishing = false
-            print("[ULTRA] ⚡⚡⚡ ULTRA FAST cycle")
-        else
-            task.wait(0.005)
-        end
-    end
-end
-
-------------------------------------------------------------
--- BLATANT MODE (3x speed) – dari raw
-------------------------------------------------------------
-local function blatantFishingLoop()
-    while fishingActive and FishConfig.BlatantMode and not FishConfig.UltraMode do
-        if not isFishing then
-            isFishing = true
-
-            -- 2 cast cepat paralel
+            -- cancel state lama biar bisa recast lagi
             pcall(function()
-                Events.equip:FireServer(1)
-                task.wait(0.01)
-
-                -- Cast 1
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.05)
-
-                -- Cast 2
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
+                RF_CancelFishingInputs:InvokeServer()
             end)
 
-            -- tunggu sesuai FishDelay (ini yang bisa kamu atur manual)
-            task.wait(math.max(FishConfig.FishDelay, 0.01))
+            -- equip rod slot 1 (kamu bisa ganti slot kalau perlu)
+            pcall(function()
+                RE_EquipToolFromHotbar:FireServer(1)
+            end)
 
-            -- spam reel 5x
-            for i = 1, 5 do
-                pcall(function()
-                    Events.fishing:FireServer()
-                end)
-                task.wait(0.01)
+            task.wait(0.05)
+
+            ------------------------------------------------
+            -- SPAM CAST (x5 / sesuai AutoFishConfig.CastCount)
+            ------------------------------------------------
+            for i = 1, AutoFishConfig.CastCount do
+                doSingleCast()
+                -- jeda sangat kecil antar cast
+                task.wait(0.02)
             end
 
-            -- cooldown 50% lebih cepat
-            task.wait(math.max(FishConfig.CatchDelay * 0.5, 0.01))
+            ------------------------------------------------
+            -- CATCH DELAY (Complete Delay)
+            -- → jeda sebelum spam FishingCompleted
+            ------------------------------------------------
+            local catchDelay = math.max(AutoFishConfig.CatchDelay or 0.05, 0.01)
+            task.wait(catchDelay)
 
-            isFishing = false
-            print("[Blatant] ⚡ Fast cycle")
-        else
-            task.wait(0.01)
+            ------------------------------------------------
+            -- SPAM COMPLETE (FishingCompleted)
+            ------------------------------------------------
+            for i = 1, AutoFishConfig.CompleteSpam do
+                pcall(function()
+                    RE_FishingCompleted:FireServer()
+                end)
+                task.wait(0.02)
+            end
+
+            ------------------------------------------------
+            -- FISH DELAY – sebelum restart loop
+            ------------------------------------------------
+            local fishDelay = math.max(AutoFishConfig.FishDelay or 0.05, 0.01)
+            task.wait(fishDelay)
+        end)
+
+        if not okCycle then
+            warn("[AutoFish] cycle error:", err)
+            task.wait(0.5)
         end
     end
-end
 
-------------------------------------------------------------
--- NORMAL MODE (satu cast, satu reel)
-------------------------------------------------------------
-local function normalFishingLoop()
-    while fishingActive and not FishConfig.BlatantMode and not FishConfig.UltraMode do
-        if not isFishing then
-            isFishing = true
-            castRod()
-            task.wait(math.max(FishConfig.FishDelay, 0.05))
-            reelIn()
-            task.wait(math.max(FishConfig.CatchDelay, 0.05))
-            isFishing = false
-        else
-            task.wait(0.1)
-        end
-    end
-end
-
-------------------------------------------------------------
--- AUTO CATCH (opsional, extra spam)
-------------------------------------------------------------
-task.spawn(function()
-    while true do
-        if FishConfig.AutoCatch and not isFishing then
-            pcall(function()
-                Events.fishing:FireServer()
-            end)
-        end
-        task.wait(math.max(FishConfig.CatchDelay, 0.05))
-    end
-end)
-
-------------------------------------------------------------
--- CONTROLLER LOOP
-------------------------------------------------------------
-local function mainFishingLoop()
-    while fishingActive do
-        if FishConfig.UltraMode then
-            ultraFishingLoop()
-        elseif FishConfig.BlatantMode then
-            blatantFishingLoop()
-        else
-            normalFishingLoop()
-        end
-        task.wait(0.02)
-    end
+    -- stop
+    pcall(function()
+        RE_UnequipToolFromHotbar:FireServer()
+    end)
+    loopRunning = false
+    print("[AutoFish] Loop stopped")
 end
 
 ------------------------------------------------------------
 -- API START / STOP
 ------------------------------------------------------------
-function Fishing:Start()
-    if fishingActive then return end
-    fishingActive = true
-    FishConfig.AutoFish = true
-
-    -- equip rod sekali di awal
-    pcall(function()
-        Events.equip:FireServer(1)
-    end)
-
-    print("[AutoFish] Started (Mode:",
-        FishConfig.UltraMode and "ULTRA" or
-        (FishConfig.BlatantMode and "BLATANT" or "NORMAL"),
-        ")"
-    )
-    task.spawn(mainFishingLoop)
+function AutoFish:Start()
+    if AutoFishConfig.Enabled then return end
+    AutoFishConfig.Enabled = true
+    task.spawn(AutoFishLoop)
 end
 
-function Fishing:Stop()
-    FishConfig.AutoFish = false
-    fishingActive = false
-    isFishing = false
-
-    -- optional: unequip
-    pcall(function()
-        Events.unequip:FireServer()
-    end)
-
-    print("[AutoFish] Stopped")
+function AutoFish:Stop()
+    AutoFishConfig.Enabled = false
 end
 
 ------------------------------------------------------------
--- TAB AUTO – UI AegisHub
+-- TAB AUTO – UI AegisHub (pakai library kamu)
+-- Tempel di bawah setelah 'win' sudah ada
 ------------------------------------------------------------
 local TabAuto = win:CreateTab("Auto")
 
-TabAuto:Label("Auto Fish V4.1 – Ultra Speed")
+TabAuto:Label("Auto Fish – X5 Spam")
 
--- Toggle utama Auto Fish
-TabAuto:Toggle("Auto Fish 🎣", function(state)
+-- Toggle utama
+TabAuto:Toggle("Enable Auto Fish 🎣", function(state)
     if state then
-        Fishing:Start()
+        AutoFish:Start()
     else
-        Fishing:Stop()
+        AutoFish:Stop()
     end
 end)
 
--- Mode Blatant (3x)
-TabAuto:Toggle("Blatant Mode ⚡ (3x speed)", function(state)
-    FishConfig.BlatantMode = state and true or false
-    -- kalau Blatant dimatikan, Ultra juga ikut mati
-    if not state then
-        FishConfig.UltraMode = false
-    end
-    print("[AutoFish] Blatant Mode =", FishConfig.BlatantMode)
-end)
-
--- Mode Ultra (8x)
-TabAuto:Toggle("Ultra Mode ⚡⚡⚡ (8x, HIGH RISK)", function(state)
-    FishConfig.UltraMode = state and true or false
-    if state then
-        -- Ultra butuh Blatant aktif juga, sama seperti raw
-        FishConfig.BlatantMode = true
-    end
-    print("[AutoFish] Ultra Mode =", FishConfig.UltraMode)
-end)
-
--- Extra AutoCatch
-TabAuto:Toggle("Extra Auto Catch (Spam Reel)", function(state)
-    FishConfig.AutoCatch = state and true or false
-    print("[AutoFish] AutoCatch =", FishConfig.AutoCatch)
-end)
-
--- Fish Delay (waktu tunggu "ikan makan")
-TabAuto:Box("Fish Delay (detik)", function(txt)
+-- Fish Delay (before restarting loop)
+TabAuto:Box("Fish Delay (before next cast)", function(txt)
     local n = tonumber(txt)
     if n then
-        n = math.clamp(n, 0.05, 10)
-        FishConfig.FishDelay = n
+        n = math.clamp(n, 0.01, 5)
+        AutoFishConfig.FishDelay = n
         print("[AutoFish] FishDelay =", n)
     end
 end)
 
--- Catch Delay (cooldown sesudah reel spam)
-TabAuto:Box("Catch Delay (detik)", function(txt)
+-- Catch Delay (Complete Delay)
+TabAuto:Box("Catch Delay (before complete)", function(txt)
     local n = tonumber(txt)
     if n then
-        n = math.clamp(n, 0.05, 10)
-        FishConfig.CatchDelay = n
+        n = math.clamp(n, 0.01, 5)
+        AutoFishConfig.CatchDelay = n
         print("[AutoFish] CatchDelay =", n)
     end
 end)
+
+-- CastCount (berapa kali lempar / spam cast per siklus)
+TabAuto:Box("Cast Count (default 5x)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 1, 10)  -- 1–10 biar nggak gila banget
+        AutoFishConfig.CastCount = n
+        print("[AutoFish] CastCount =", n)
+    end
+end)
+
+-- CompleteSpam (berapa kali spam FishingCompleted)
+TabAuto:Box("Complete Spam Count", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 1, 10)
+        AutoFishConfig.CompleteSpam = n
+        print("[AutoFish] CompleteSpam =", n)
+    end
+end)
+
 
 
 ----------------------------------------------------------------
