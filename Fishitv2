@@ -867,7 +867,7 @@ local function castRod()
 
         -- charge & start minigame (data fix dari test.lua)
         Events.charge:InvokeServer(1755848498.4834)
-        task.wait(0.02)
+        task.wait(0.05)
         Events.minigame:InvokeServer(1.2854545116425, 1)
 
         print("[Fishing] Cast")
@@ -906,21 +906,21 @@ local function ultraFishingLoop()
             end)
 
             -- FISH DELAY x5 (1/5 dari FishDelay)
-            task.wait(math.max(Config.FishDelay * 0.2, 0.02))
+            task.wait(math.max(Config.FishDelay * 0.5, 0.02))
 
             -- SPAM REEL 5x (dari 8x → 5x)
             for i = 1, 5 do
                 reelIn()
-                task.wait(0.005)
+                task.wait(0.05)
             end
 
             -- CATCH DELAY x5 (1/5 dari CatchDelay)
-            task.wait(math.max(Config.CatchDelay * 0.2, 0.02))
+            task.wait(math.max(Config.CatchDelay * 0.5, 0.02))
 
             isFishing = false
             print("[ULTRA x5] cycle selesai")
         else
-            task.wait(0.005)
+            task.wait(0.05)
         end
     end
 end
