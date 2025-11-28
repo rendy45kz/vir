@@ -1253,6 +1253,96 @@ local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
 ----------------------------------------------------------------
 local TabFarm  = win:CreateTab("Farm")
 
+------------------------------------------------------------
+-- ⛏ FARM – AUTO RESPAWN SETELAH 500 FISH
+------------------------------------------------------------
+local FARM_FISH_LIMIT = 500
+
+local farmRespawnState = {
+    enabled    = false,
+    sessionCnt = 0,
+    savedCFrame = nil,
+}
+
+-- remote notifikasi ikan baru (path sama seperti di spy)
+local RE_ObtainedNewFishNotification = net:WaitForChild("RE/ObtainedNewFishNotification")
+
+------------------------------------------------------------
+-- TAB FARM (kalau sudah ada, jangan buat ulang, cukup pakai)
+------------------------------------------------------------
+
+-- live label jumlah ikan per session
+TabFarm:LiveLabel(function()
+    return string.format("Session Fish: %d / %d", farmRespawnState.sessionCnt, FARM_FISH_LIMIT)
+end, 0.3)
+
+-- toggle utama
+TabFarm:Toggle("Auto Respawn setelah 500 Fish", function(state)
+    farmRespawnState.enabled    = state
+    farmRespawnState.sessionCnt = 0
+
+    if state then
+        -- simpan posisi awal untuk balik lagi setelah respawn
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp  = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            farmRespawnState.savedCFrame = hrp.CFrame
+        else
+            farmRespawnState.savedCFrame = nil
+        end
+        print("[Farm] Auto respawn ON, posisi awal tersimpan")
+    else
+        print("[Farm] Auto respawn OFF")
+    end
+end)
+
+------------------------------------------------------------
+-- HOOK SAAT DAPAT IKAN
+------------------------------------------------------------
+RE_ObtainedNewFishNotification.OnClientEvent:Connect(function(...)
+    -- setiap notifikasi ikan baru, tambah 1
+    farmRespawnState.sessionCnt += 1
+
+    -- kalau fitur dimatikan, cukup hitung saja
+    if not farmRespawnState.enabled then
+        return
+    end
+
+    -- kalau belum nyentuh limit, keluar
+    if farmRespawnState.sessionCnt < FARM_FISH_LIMIT then
+        return
+    end
+
+    print(string.format("[Farm] Limit %d fish tercapai, respawn…", FARM_FISH_LIMIT))
+
+    -- reset counter biar mulai session baru
+    farmRespawnState.sessionCnt = 0
+
+    -- RESP AWN
+    task.spawn(function()
+        local char = LocalPlayer.Character
+        local hum  = char and char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+            hum.Health = 0
+        elseif char then
+            char:BreakJoints()
+        end
+
+        -- tunggu karakter baru muncul
+        local newChar = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = newChar:WaitForChild("HumanoidRootPart", 5)
+
+        -- teleport balik ke posisi awal kalau ada
+        if hrp and farmRespawnState.savedCFrame then
+            task.wait(1.2) -- kasih waktu load map
+            hrp.CFrame = farmRespawnState.savedCFrame
+            print("[Farm] Teleport kembali ke posisi awal setelah respawn")
+        end
+    end)
+end)
+
+
 ----------------------------------------------------------------
 -- STATE FARM
 ----------------------------------------------------------------
