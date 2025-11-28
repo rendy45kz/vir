@@ -899,7 +899,7 @@ local function computeFishDelay()
         ratio = 1/2
     end
 
-    local fd = (Config.CatchDelay or 0.8) * ratio + (Config.FishDelayOffset or 0.15)
+    local fd = (Config.CatchDelay or 0.5) * ratio + (Config.FishDelayOffset or 0.15)
     -- clamp biar nggak absurd
     if fd < 0.05 then fd = 0.05 end
     return fd
@@ -913,13 +913,13 @@ local function doOneBlatantCycle()
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     if not hrp then
         warn("[BlatantFish] HRP not found")
-        task.wait(0.5)
+        task.wait(0.05)
         return
     end
 
     local dSmall  = randomDelay()
     local fishDel = computeFishDelay()
-    local catchDel = math.max(Config.CatchDelay or 0.8, 0.05)
+    local catchDel = math.max(Config.CatchDelay or 0.5, 0.05)
 
     ----------------------------------------------------------------
     -- 1) EQUIP ROD SLOT 1
@@ -954,7 +954,7 @@ local function doOneBlatantCycle()
 
     if not okStart then
         warn("[BlatantFish] StartMini failed:", res)
-        task.wait(0.3)
+        task.wait(0.03)
         return
     end
 
@@ -994,7 +994,7 @@ local function mainFishingLoop()
         local ok, err = pcall(doOneBlatantCycle)
         if not ok then
             warn("[BlatantFish] cycle error:", err)
-            task.wait(0.5)
+            task.wait(0.05)
         end
         -- sedikit napas antar cycle
         task.wait(randomDelay())
