@@ -1257,7 +1257,7 @@ local TabFarm  = win:CreateTab("Farm")
 ------------------------------------------------------------
 -- ⛏ FARM – AUTO RESPAWN 500 FISH + TELEPORT BALIK + EQUIP ROD
 ------------------------------------------------------------
-local FARM_FISH_LIMIT = 10
+local FARM_FISH_LIMIT = 10000
 
 local farmRespawnState = {
     enabled    = false,
@@ -1296,6 +1296,8 @@ task.wait(0.2)
 EquipHotbar:FireServer(1)
     end)
 end
+
+
 
 ------------------------------------------------------------
 -- TAB FARM – TOGGLE AUTO RESPAWN
@@ -1359,7 +1361,12 @@ RE_ObtainedNewFishNotification.OnClientEvent:Connect(function(...)
 
             -- equip rod setelah balik
             task.wait(0.5)
-            equipRodAfterRespawn()
+            for i = 1, 2 do
+                pcall(function() 
+                    EquipHotbar:FireServer(1) 
+                end)
+                task.wait(0.1)
+            end
 
             print("[Farm] Respawn + balik posisi + equip rod dijalankan")
         end)
