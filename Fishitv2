@@ -1335,7 +1335,7 @@ RE_ObtainedNewFishNotification.OnClientEvent:Connect(function(...)
 
         -- teleport balik ke posisi awal kalau ada
         if hrp and farmRespawnState.savedCFrame then
-            task.wait(1.2) -- kasih waktu load map
+            task.wait(0.5) -- kasih waktu load map
             hrp.CFrame = farmRespawnState.savedCFrame
             print("[Farm] Teleport kembali ke posisi awal setelah respawn")
         end
