@@ -899,7 +899,7 @@ local function computeFishDelay()
         ratio = 1/2
     end
 
-    local fd = (Config.CatchDelay or 0.5) * ratio + (Config.FishDelayOffset or 0.15)
+    local fd = (Config.CatchDelay or 0.5) * ratio + (Config.FishDelayOffset or 0.05)
     -- clamp biar nggak absurd
     if fd < 0.05 then fd = 0.05 end
     return fd
@@ -940,7 +940,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.chargeRod:InvokeServer(now)
     end)
-    task.wait(dSmall)
+    task.wait(0.03)
 
     -- request minigame
     local okStart, res = pcall(function()
@@ -973,7 +973,7 @@ local function doOneBlatantCycle()
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(subDelay)
+        task.wait(0.05)
     end
 
     ----------------------------------------------------------------
@@ -997,7 +997,7 @@ local function mainFishingLoop()
             task.wait(0.05)
         end
         -- sedikit napas antar cycle
-        task.wait(randomDelay())
+        task.wait(0.03)
     end
 
     loopRunning = false
