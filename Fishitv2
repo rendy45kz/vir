@@ -1257,7 +1257,7 @@ local TabFarm  = win:CreateTab("Farm")
 ------------------------------------------------------------
 -- ⛏ FARM – AUTO RESPAWN 500 FISH + TELEPORT BALIK + EQUIP ROD
 ------------------------------------------------------------
-local FARM_FISH_LIMIT = 10000
+local FARM_FISH_LIMIT = 10
 
 local farmRespawnState = {
     enabled    = false,
