@@ -856,170 +856,129 @@ local Config = {
 local isFishing     = false
 local fishingActive = false
 
+local function randomDelay()
+    local fpsChoices = {60, 90, 120, 240}
+    local fps = fpsChoices[math.random(1, #fpsChoices)]
+    return 1 / fps
+end
+
+local dRandom = randomDelay()
+
 ----------------------------------------------------------------
 -- HELPER: CAST & REEL (PAKAI DATA TEST.YANG WORKING)
 ----------------------------------------------------------------
+
 local function castRod()
     pcall(function()
-        -- equip slot 1
         Events.equip:FireServer(1)
-        task.wait(0.03)
-
-        -- charge & start minigame (data fix dari test.lua)
-        Events.charge:InvokeServer(1755848498.4834)
-        task.wait(0.03)
-        Events.minigame:InvokeServer(1.2854545116425, 1)
-
+        task.wait(dRandom)
+        Events.chargeRod:InvokeServer(workspace:GetServerTimeNow())
+        task.wait(dRandom)
+        Events.startFish:InvokeServer(0, 0.96, workspace:GetServerTimeNow())
         print("[Fishing] Cast")
     end)
 end
-
+ 
 local function reelIn()
-    pcall(function()
-        Events.fishing:FireServer()
-    end)
+    for i = 1, 3 do
+      pcall(function() completeFish:FireServer() end)
+    end
+    print("[Fishing] Reel")
 end
 
 ----------------------------------------------------------------
 -- ULTRA / BLATANT / NORMAL LOOPS (DISAMAKAN KE X5)
 ----------------------------------------------------------------
 
-local function ultraFishingLoop()
-    while fishingActive and Config.UltraMode do
-        if not Config.AutoFish then break end
-
-        if not isFishing then
-            isFishing = true
-
-            -- 3 cast paralel (sama seperti raw, tapi kita tetap jaga sedikit delay)
-            pcall(function()
-                Events.equip:FireServer(1)
-                task.wait(0.01)
-
-                -- Cast 1
-                task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                end)
-
-                task.wait(0.02)                
-            end)
-
-            -- FISH DELAY x5 (1/5 dari FishDelay)
-            task.wait(math.max(Config.FishDelay * 0.2, 0.02))
-
-            -- SPAM REEL 5x (dari 8x → 5x)
-            for i = 1, 5 do
-                reelIn()
-                task.wait(0.005)
-            end
-
-            -- CATCH DELAY x5 (1/5 dari CatchDelay)
-            task.wait(math.max(Config.CatchDelay * 0.2, 0.02))
-
-            isFishing = false
-            print("[ULTRA x5] cycle selesai")
-        else
-            task.wait(0.005)
-        end
-    end
-end
-
--- BLATANT MODE: 2 CAST + REEL 5x (x5)
+-- BLATANT MODE: Your exact implementation
 local function blatantFishingLoop()
-    while fishingActive and Config.BlatantMode and not Config.UltraMode do
-        if not Config.AutoFish then break end
-
+    while fishingActive and Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
-            -- 2 cast cepat (mirip raw, tapi tuned ke x5)
+            
+            local dRandom = randomDelay()
+            -- Step 1: Rapid fire casts (2 parallel casts)
             pcall(function()
                 Events.equip:FireServer(1)
-                task.wait(0.03)
-
+                task.wait(dRandom)
+                
                 -- Cast 1
                 task.spawn(function()
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.03)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                    Events.chargeRod:InvokeServer(workspace:GetServerTimeNow())
+                    task.wait(dRandom)
+                    Events.startFish:InvokeServer(0, 0.96, workspace:GetServerTimeNow())
+                end)
+                
+                task.wait(dRandom)
+                
+                -- Cast 2 (overlapping)
+                task.spawn(function()
+                    Events.chargeRod:InvokeServer(workspace:GetServerTimeNow())
+                    task.wait(dRandom)
+                    Events.startFish:InvokeServer(0, 0.99, workspace:GetServerTimeNow())
                 end)
             end)
-
-            -- FISH DELAY x5
-            task.wait(math.max(Config.FishDelay * 0.3, 0.03))
-
-            -- REEL 5x (sama kayak raw blatant, tapi tetap 5)
-            for i = 1, 5 do
-                reelIn()
-                task.wait(0.3)
+            
+            -- Step 2: jeda tambahan di antara siklus fishing
+            task.wait(Config.dStart)
+            
+            -- Step 3: Spam reel 5x to instant catch
+            for i = 1, 6 do
+                pcall(function() 
+                    Events.completeFish:FireServer() 
+                end)
+                task.wait(dRandom)
             end
-
-            -- CATCH DELAY x5
-            task.wait(math.max(Config.CatchDelay * 0.3, 0.03))
-
+            
+            -- Step 4: Short cooldown (50% faster)
+            task.wait(Config.CatchDelay * 0.5)
+            
             isFishing = false
-            print("[BLATANT x5] cycle selesai")
+            print(\"[Blatant] ⚡ Fast cycle\")
         else
-            task.wait(0.01)
+            task.wait(dRandom)
         end
     end
 end
 
--- NORMAL MODE: 1 cast → tunggu → 1 reel → tunggu
+-- NORMAL MODE: Your exact implementation
 local function normalFishingLoop()
-    while fishingActive and not Config.BlatantMode and not Config.UltraMode do
-        if not Config.AutoFish then break end
-
+    while fishingActive and not Config.BlatantMode do
         if not isFishing then
             isFishing = true
-
+            
             castRod()
             task.wait(Config.FishDelay)
-
             reelIn()
             task.wait(Config.CatchDelay)
-
+            
             isFishing = false
-            print("[NORMAL] cycle selesai")
         else
-            task.wait(0.1)
+            task.wait(dRandom)
         end
     end
 end
 
-----------------------------------------------------------------
--- MAIN FISHING CONTROLLER
-----------------------------------------------------------------
+-- Main fishing controller
 local function fishingLoop()
-    while fishingActive and Config.AutoFish do
-        if Config.UltraMode then
-            ultraFishingLoop()
-        elseif Config.BlatantMode then
+    while fishingActive do
+        if Config.BlatantMode then
             blatantFishingLoop()
         else
             normalFishingLoop()
         end
-        task.wait(0.05)
+        task.wait(dRandom)
     end
-
-    -- stop state
-    isFishing = false
-    print("[AutoFish] Loop stop")
-    pcall(function()
-        Events.unequip:FireServer()
-    end)
 end
 
-----------------------------------------------------------------
--- AUTO CATCH EKSTRA (SPAM FISHING COMPLETED)
-----------------------------------------------------------------
+-- ====================================================================
+--                     AUTO CATCH (SPAM SYSTEM)
+-- ====================================================================
 task.spawn(function()
     while true do
-        if Config.AutoCatch and not isFishing and Config.AutoFish then
-            pcall(function()
-                Events.fishing:FireServer()
+        if Config.AutoCatch and not isFishing then
+            pcall(function() 
+                Events.completeFish:FireServer() 
             end)
         end
         task.wait(Config.CatchDelay)
@@ -1053,14 +1012,6 @@ function Fishing:SetBlatant(state)
     print("[Mode] Blatant =", Config.BlatantMode)
 end
 
-function Fishing:SetUltra(state)
-    Config.UltraMode = state and true or false
-    if state then
-        Config.BlatantMode = true  -- Ultra = Blatant+super
-    end
-    print("[Mode] Ultra =", Config.UltraMode)
-end
-
 function Fishing:SetAutoCatch(state)
     Config.AutoCatch = state and true or false
     print("[AutoCatch] =", Config.AutoCatch)
@@ -1071,8 +1022,7 @@ function Fishing:Start()
     Config.AutoFish   = true
     fishingActive     = true
     print("[AutoFish] START (mode:",
-        Config.UltraMode and "ULTRA x5"
-        or Config.BlatantMode and "BLATANT x5"
+        Config.BlatantMode and "BLATANT x5"
         or "NORMAL", ")")
 
     task.spawn(fishingLoop)
