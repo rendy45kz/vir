@@ -1350,6 +1350,8 @@ RE_ObtainedNewFishNotification.OnClientEvent:Connect(function(...)
             task.wait(0.4)
             pcall(function()
                 RE_EquipToolFromHotbar:FireServer(1)
+                RE_EquipToolFromHotbar:FireServer(1)
+                RE_EquipToolFromHotbar:FireServer(1)
             end)
 
             print("[Farm] Respawn & balik ke posisi awal, rod sudah di-equip")
