@@ -899,7 +899,7 @@ local function computeFishDelay()
         ratio = 1/2
     end
 
-    local fd = (Config.CatchDelay or 0.5) * ratio + (Config.FishDelayOffset or 0.05)
+    local fd = (Config.CatchDelay ) * ratio + (Config.FishDelayOffset)
     -- clamp biar nggak absurd
     if fd < 0.05 then fd = 0.05 end
     return fd
@@ -913,13 +913,13 @@ local function doOneBlatantCycle()
     local hrp  = char:FindFirstChild("HumanoidRootPart")
     if not hrp then
         warn("[BlatantFish] HRP not found")
-        task.wait(0.05)
+        task.wait(0.005)
         return
     end
 
     local dSmall  = randomDelay()
     local fishDel = computeFishDelay()
-    local catchDel = math.max(Config.CatchDelay or 0.5, 0.05)
+    local catchDel = math.max(Config.CatchDelay)
 
     ----------------------------------------------------------------
     -- 1) EQUIP ROD SLOT 1
@@ -966,14 +966,12 @@ local function doOneBlatantCycle()
     ----------------------------------------------------------------
     -- 4) SPAM COMPLETE x5 (masih halus)
     ----------------------------------------------------------------
-    local subDelay = catchDel / 5
-    if subDelay < 0.02 then subDelay = 0.02 end
 
     for i = 1, 5 do
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(0.05)
+        task.wait(0.03)
     end
 
     ----------------------------------------------------------------
@@ -997,7 +995,7 @@ local function mainFishingLoop()
             task.wait(0.05)
         end
         -- sedikit napas antar cycle
-        task.wait(0.03)
+        task.wait(0.05)
     end
 
     loopRunning = false
