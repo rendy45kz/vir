@@ -1291,6 +1291,9 @@ local function equipRodAfterRespawn()
     pcall(function()
         EquipHotbar:FireServer(1)
      task.wait(0.2)
+EquipHotbar:FireServer(1)
+task.wait(0.2)
+EquipHotbar:FireServer(1)
     end)
 end
 
