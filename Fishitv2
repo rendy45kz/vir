@@ -977,7 +977,7 @@ local function doOneBlatantCycle()
     ----------------------------------------------------------------
     -- 5) TUNGGU CATCH DELAY SEBELUM CAST LAGI
     ----------------------------------------------------------------
-    task.wait(catchDel)
+    task.wait(0.05)
 end
 
 ------------------------------------------------------------
@@ -992,10 +992,10 @@ local function mainFishingLoop()
         local ok, err = pcall(doOneBlatantCycle)
         if not ok then
             warn("[BlatantFish] cycle error:", err)
-            task.wait(0.05)
+            task.wait(0.005)
         end
         -- sedikit napas antar cycle
-        task.wait(0.01)
+        task.wait(0.001)
     end
 
     loopRunning = false
@@ -1275,6 +1275,16 @@ local Farm = {
     },
 
     AutoEnchant_LastRun = 0,
+
+    -- COUNTER FISH + AUTORESPAWN
+    FishStats = {
+        Total          = 0,       -- total semua ikan yg sudah ditangkap semenjak execute
+        Session        = 0,       -- hitungan sesi sejak terakhir respawn
+        RespawnEnabled = false,   -- toggle ON/OFF auto respawn
+        RespawnThreshold = 500,   -- batas ikan sebelum respawn (bisa diubah lewat input)
+        OriginCFrame   = nil,     -- posisi awal tempat mancing
+    },
+
 }
 
 ----------------------------------------------------------------
@@ -1303,6 +1313,75 @@ if itemsFolder then
     end
 end
 
+------------------------------------------------------------
+-- DOUBLE EQUIP ROD (dibuat terpisah dari Auto Fishing)
+------------------------------------------------------------
+local function equipRodAfterRespawn()
+    task.spawn(function()
+        -- spam slot 1–3 dua kali putaran (total 6 kali equip)
+        for cycle = 1, 2 do
+            for slot = 1, 3 do
+                pcall(function()
+                    RE_EquipHotbar:FireServer(slot)
+                end)
+                task.wait(0.12)
+            end
+            task.wait(0.15)
+        end
+        print("[Farm] Double-equip rod slot 1–3 selesai")
+    end)
+end
+
+------------------------------------------------------------
+-- RESPawn + TELEPORT KEMBALI KE POSISI ASAL + EQUIP ROD
+------------------------------------------------------------
+local respawnBusy = false
+
+local function RespawnAndReturnToOrigin()
+    if respawnBusy then return end
+    respawnBusy = true
+
+    local origin = Farm.FishStats and Farm.FishStats.OriginCFrame
+    if not origin then
+        warn("[AutoRespawnFish] OriginCFrame belum diset, batal respawn.")
+        respawnBusy = false
+        return
+    end
+
+    local plr = LocalPlayer
+    local char = plr.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    -- bunuh karakter untuk respawn
+    if hum then
+        hum.Health = 0
+    elseif char then
+        char:BreakJoints()
+    end
+
+    -- tunggu karakter baru
+    local newChar = plr.CharacterAdded:Wait()
+    local hrp = newChar:WaitForChild("HumanoidRootPart")
+
+    -- kasih jeda dikit biar load
+    task.wait(0.6)
+
+    -- teleport ke posisi asal + offset atas dikit
+    hrp.CFrame = origin + Vector3.new(0, 5, 0)
+
+    -- langsung equip rod (double equip)
+    equipRodAfterRespawn()
+
+    -- reset counter sesi
+    Farm.FishStats.Session = 0
+    print("[AutoRespawnFish] Respawn & balik ke posisi asal. Session counter reset.")
+
+    task.delay(1, function()
+        respawnBusy = false
+    end)
+end
+
+
 ----------------------------------------------------------------
 -- AUTO FAVORITE + AUTO SELL HANDLER
 ----------------------------------------------------------------
@@ -1313,6 +1392,29 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     if not info or not info.InventoryItem then return end
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
+
+    ------------------------------------------------------------
+    -- COUNTER FISH (SELALU JALAN, MAUPUN TOGGLE ON / OFF)
+    ------------------------------------------------------------
+    if Farm.FishStats then
+        Farm.FishStats.Total   = (Farm.FishStats.Total or 0) + 1
+        Farm.FishStats.Session = (Farm.FishStats.Session or 0) + 1
+
+        -- cek apakah perlu respawn
+        if Farm.FishStats.RespawnEnabled
+            and not respawnBusy
+            and Farm.FishStats.OriginCFrame
+        then
+            local limit = Farm.FishStats.RespawnThreshold or 500
+            if Farm.FishStats.Session >= limit then
+                print(string.format(
+                    "[AutoRespawnFish] Batas %d ikan tercapai (Session=%d). Respawn...",
+                    limit, Farm.FishStats.Session
+                ))
+                RespawnAndReturnToOrigin()
+            end
+        end
+    end
 
     -- AUTO FAVORITE
     if Farm.AutoFavoriteEnabled and itemId then
@@ -1857,6 +1959,55 @@ end
 -- UI – FARM MENU
 ----------------------------------------------------------------
 local farmUI = TabFarm
+
+----------------------------------------------------------------
+-- AUTO RESPAWN BY FISH COUNT (FARM TAB)
+----------------------------------------------------------------
+TabFarm:Label("Auto Respawn / Teleport by Fish Count")
+
+-- live info counter
+TabFarm:LiveLabel(function()
+    local fs = Farm.FishStats or {}
+    local total   = fs.Total   or 0
+    local session = fs.Session or 0
+    local limit   = fs.RespawnThreshold or 500
+    local onoff   = fs.RespawnEnabled and "ON" or "OFF"
+
+    return string.format(
+        "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
+        onoff, session, total, limit
+    )
+end, 0.5)
+
+-- input jumlah ikan sebelum respawn (tidak hardcode)
+TabFarm:Box("Fish count to respawn", function(txt)
+    local n = tonumber(txt)
+    if not n or n <= 0 then return end
+    n = math.floor(n)
+    Farm.FishStats.RespawnThreshold = n
+    print("[AutoRespawnFish] Threshold di-set ke:", n)
+end)
+
+-- toggle ON/OFF respawn
+TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
+    Farm.FishStats.RespawnEnabled = state and true or false
+
+    if state then
+        -- simpan posisi awal sebagai "tempat semula"
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            Farm.FishStats.OriginCFrame = hrp.CFrame
+            Farm.FishStats.Session = 0
+            print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
+        else
+            warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
+        end
+    else
+        print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
+    end
+end)
+
 
 farmUI:Label("Auto Favorite")
 
