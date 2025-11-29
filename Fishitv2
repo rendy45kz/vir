@@ -899,7 +899,7 @@ local function computeFishDelay()
         ratio = 1/2
     end
 
-    local fd = (Config.CatchDelay ) * ratio + (Config.FishDelayOffset)
+    local fd = (Config.CatchDelay ) * ratio * (Config.FishDelayOffset)
     -- clamp biar nggak absurd
     if fd < 0.05 then fd = 0.05 end
     return fd
@@ -927,8 +927,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
-    task.wait(dSmall)
-
+    
     ----------------------------------------------------------------
     -- 2) CHARGE + START MINIGAME
     ----------------------------------------------------------------
@@ -945,19 +944,14 @@ local function doOneBlatantCycle()
     -- request minigame
     local okStart, res = pcall(function()
         if typeof(Events.startMini.InvokeServer) == "function" then
-            return Events.startMini:InvokeServer(yPos, castPower, getServerTime())
+            return Events.startMini:InvokeServer(getServerTime())
         else
-            Events.startMini:FireServer(yPos, castPower, getServerTime())
+            Events.startMini:FireServer(getServerTime())
             return true
         end
     end)
 
-    if not okStart then
-        warn("[BlatantFish] StartMini failed:", res)
-        task.wait(fishDel)
-        return
-    end
-
+    
     ----------------------------------------------------------------
     -- 3) TUNGGU FISH DELAY (BLATANT)
     ----------------------------------------------------------------
@@ -977,7 +971,7 @@ local function doOneBlatantCycle()
     ----------------------------------------------------------------
     -- 5) TUNGGU CATCH DELAY SEBELUM CAST LAGI
     ----------------------------------------------------------------
-    task.wait(0.05)
+    task.wait(catchDel)
 end
 
 ------------------------------------------------------------
