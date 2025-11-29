@@ -1317,15 +1317,8 @@ end
 -- DOUBLE EQUIP ROD (dibuat terpisah dari Auto Fishing)
 ------------------------------------------------------------
 local function equipRodAfterRespawn()
-    task.spawn(function()
-    task.wait(0.12)
-        for i = 1, 4 do -- 4x click slot 1
-            pcall(function()
-                RE_EquipHotbar:FireServer(1)
-            end)
-            task.wait(0.12)
-        end
-        print("[Farm] Double/quad-equip rod slot 1 selesai")
+    pcall(function()
+        Events.equipHotbar:FireServer(1)
     end)
 end
 
