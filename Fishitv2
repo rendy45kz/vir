@@ -1015,7 +1015,7 @@ end
 ------------------------------------------------------------
 -- UI AEGISHUB – TAB AUTO
 ------------------------------------------------------------
-local TabAuto = win:CreateTab("Auto")
+local TabAuto = win:CreateTab("Farm")
 
 TabAuto:Label("Blatant Auto Fishing 🎣")
 
@@ -1249,7 +1249,7 @@ local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
 ----------------------------------------------------------------
 -- TAB FARM (MAIN)
 ----------------------------------------------------------------
-local TabFarm  = win:CreateTab("Farm")
+local TabFarm  = win:CreateTab("Auto")
 
 
 ----------------------------------------------------------------
@@ -2098,14 +2098,14 @@ local mutationList = {
     "Shiny",
 }
 
-farmUI:MultiDropdown("Favorite Mutations (VariantId)", mutationList, function(name, state)
+farmUI:MultiDropdown("Auto kinyis kinyis", mutationList, function(name, state)
     Farm.FavoriteMutations[name] = state
 end)
 
 
 
 ----------------------------------------------------------------
-farmUI:Label("Auto Sell (Sell All)")
+farmUI:Label("Auto Sell")
 
 farmUI:Dropdown("Sell Mode", {
     "Off","10 Fish","20 Fish","30 Fish","50 Fish"
