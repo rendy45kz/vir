@@ -1254,8 +1254,28 @@ local TabFarm  = win:CreateTab("Farm")
 local Farm = {
     AutoFavoriteEnabled = false,
     FavoriteRarity = {
-        COMMON=true, UNCOMMON=false, RARE=false, EPIC=false,
+        COMMON=false, UNCOMMON=false, RARE=false, EPIC=false,
         LEGENDARY=false, MYTHIC=false, SECRET=false,
+    },
+
+    FavoriteMutations = {
+        ["Galaxy"]       = false,
+        ["Fairy Dust"]   = false,
+        ["Gemstone"]     = false,
+        ["1x1x1x1"]      = false,
+        ["Stone"]        = false,
+        ["Gold"]         = false,
+        ["Albino"]       = false,
+        ["Frozen"]       = false,
+        ["Sandy"]        = false,
+        ["Ghost"]        = false,
+        ["Radioactive"]  = false,
+        ["Holographic"]  = false,
+        ["Noob"]         = false,
+        ["Corrupt"]      = false,
+        ["Lightning"]    = false,
+        ["Midnight"]     = false,
+        ["Shiny"]        = false,
     },
 
     AutoSellEnabled  = false,
@@ -1400,15 +1420,73 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
         end
     end
 
-    -- AUTO FAVORITE
+        ------------------------------------------------------------
+    -- AUTO FAVORITE (by Rarity + by Mutation)
+    ------------------------------------------------------------
     if Farm.AutoFavoriteEnabled and itemId then
+        local shouldFavorite = false
+
+        --------------------------------------------------------
+        -- 1) Cek Rarity
+        --------------------------------------------------------
         local rarity = FishIdToRarity[itemId] or "COMMON"
         if Farm.FavoriteRarity[rarity] then
+            shouldFavorite = true
+        end
+
+        --------------------------------------------------------
+        -- 2) Cek Mutation (kalau belum favorite dari rarity)
+        --------------------------------------------------------
+        if not shouldFavorite and Farm.FavoriteMutations then
+            local meta = info.InventoryItem.Metadata
+            local mutationName
+
+            if meta then
+                -- beberapa kemungkinan nama field mutation di game
+                mutationName = meta.MutationName
+                             or meta.Mutation
+                             or meta.MutationType
+
+                -- kalau game pakai array Mutations
+                if (not mutationName) and meta.Mutations then
+                    local m = meta.Mutations[1]
+                    if typeof(m) == "string" then
+                        mutationName = m
+                    elseif type(m) == "table" then
+                        mutationName = m.Name or m.Id or m.Type
+                    end
+                end
+            end
+
+            if mutationName then
+                -- normalisasi: huruf kecil + hilang spasi/underscore
+                local function norm(s)
+                    s = tostring(s or "")
+                    s = string.lower(s)
+                    s = string.gsub(s, "[%s_]+", "")
+                    return s
+                end
+
+                local key = norm(mutationName)
+                for name, enabled in pairs(Farm.FavoriteMutations) do
+                    if enabled and norm(name) == key then
+                        shouldFavorite = true
+                        break
+                    end
+                end
+            end
+        end
+
+        --------------------------------------------------------
+        -- 3) Kalau salah satu cocok → Favorite
+        --------------------------------------------------------
+        if shouldFavorite then
             pcall(function()
                 RE_FavoriteItem:FireServer(uuid)
             end)
         end
     end
+
 
     -- AUTO SELL ALL
     if Farm.AutoSellEnabled then
@@ -1999,11 +2077,38 @@ local tgFav = farmUI:Toggle("Enable Auto Favorite", function(v)
     Farm.AutoFavoriteEnabled = v
 end)
 
+-- RARITY LIST
 local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
 
-local ddFav = farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
+farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
     Farm.FavoriteRarity[r] = state
 end)
+
+-- MUTATION LIST (dari kamu)
+local mutationList = {
+    "Galaxy",
+    "Fairy Dust",
+    "Gemstone",
+    "1x1x1x1",
+    "Stone",
+    "Gold",
+    "Albino",
+    "Frozen",
+    "Sandy",
+    "Ghost",
+    "Radioactive",
+    "Holographic",
+    "Noob",
+    "Corrupt",
+    "Lightning",
+    "Midnight",
+    "Shiny",
+}
+
+farmUI:MultiDropdown("Favorite Mutations", mutationList, function(name, state)
+    Farm.FavoriteMutations[name] = state
+end)
+
 
 ----------------------------------------------------------------
 farmUI:Label("Auto Sell (Sell All)")
