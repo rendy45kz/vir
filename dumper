@@ -1,60 +1,77 @@
-local old = unpack
-local old_append = appendfile 
+-- save original functions
+local old_unpack = unpack
+local old_appendfile = appendfile
 
 local output = "yes.txt"
+local Credits = "Dumped with your unpack hook"
 
+-- safer append wrapper
+local function append_wrapped(filename, content)
+    -- create file with credits once
+    if not isfile(filename) then
+        writefile(filename, Credits .. "\n")
+    end
 
+    -- now append content
+    return old_appendfile(filename, content)
+end
 
-local function appendfile(filename,content)
-    if not isfile(filename) then 
-        writefile(filename,string.format("%s\n %s",Credits,content))
-    end 
+-- pretty format any table
+local function format_table(tab, indent)
+    indent = indent or ""
+    local next_indent = indent .. "  "
 
-    return old_append(filename,content)
-end 
-
-local function format(tab)
-    local result = "{"
+    local result = "{\n"
     for index, value in pairs(tab) do
         if type(value) == "table" then
-            result = result .. format(value)
+            result = result .. string.format(
+                "%s[Index: %s] = %s\n",
+                next_indent,
+                tostring(index),
+                format_table(value, next_indent)
+            )
         else
-            result = result .. string.format("\n'Index: %s' | 'Value: %s', ", tostring(index), tostring(value))
+            result = result .. string.format(
+                "%s[Index: %s] = %s,\n",
+                next_indent,
+                tostring(index),
+                tostring(value)
+            )
         end
     end
-    result = result:sub(1, -3) .. "\n},\n" 
+    result = result .. indent .. "}"
     return result
 end
 
-local function foreach(tab)
-    if type(tab) == "table" then 
-        for index, value in pairs(tab) do 
-            if type(value) == "table" then
-                appendfile(output, format(value) .. "\n")
-            else
-                appendfile(output, string.format("{Index: %s | Value: %s\n", tostring(index), tostring(value)))
-            end
-        end
-    end 
-end 
+-- dump a table (or multiple tables) to file
+local function dump_value(v)
+    if type(v) == "table" then
+        append_wrapped(output, format_table(v) .. "\n\n")
+    else
+        append_wrapped(output, string.format("{ Value = %s }\n", tostring(v)))
+    end
+end
 
+local function dump_results(results)
+    for i = 1, #results do
+        dump_value(results[i])
+    end
+end
+
+-- hook unpack
 function unpack(...)
-    if type(old(...)) == "table" then 
-        foreach(old(...))
-    end 
-    return old(...)
-end 
+    -- call the original once and capture ALL returns
+    local results = { old_unpack(...) }
 
+    -- you can choose how aggressive you want to be:
+    -- here we only inspect the first result (common pattern)
+    if type(results[1]) == "table" then
+        dump_results(results)
+    end
 
+    -- return original unpack results
+    return table.unpack(results)
+end
 
---> Put your obfuscated script here 
---> Using tbo as an example : It will freeze your game for a bit and then create a file named after your output
---> then it will basically just put all the stuff in there, just wait for it to be done
-
---> either loadstring or just the pasted script here 
---> btw dont use tbo its skidded lmao (this is only used for a example)
-
-
-
+-- finally, run the obfuscated / remote script
 loadstring(game:HttpGet("https://raw.githubusercontent.com/MajestySkie/Fish-It/refs/heads/main/Memancing.lua"))()
-
