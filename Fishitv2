@@ -968,6 +968,8 @@ local function Fishingspeed()
        task.wait(spamDel) 
         Events.minigame:InvokeServer(1.2854545116425, 1) 
     end) 
+end)
+
     task.wait(catchDel) 
 
     -- 5) Spam completeFish (ikan naik)
