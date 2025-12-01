@@ -2178,38 +2178,7 @@ local originalCFrame    = nil
 local isAtEvent         = false
 local eventLoopRunning  = false
 
-------------------------------------------------------------
--- FORCE DAY EVENT (tanpa Night)
-------------------------------------------------------------
-local DayControl = {
-    ForceDay = false,
-}
 
-local dayLoopRunning = false
-
-local function startDayLoop()
-    if dayLoopRunning or not ArrayUpdate then return end
-    dayLoopRunning = true
-
-    task.spawn(function()
-        while DayControl.ForceDay and ArrayUpdate do
-            -- dari spy: firesignal(ArrayUpdate.OnClientEvent, "1","i","Events","Night")
-            -- kita paksa jadi "Day"
-            pcall(function()
-                firesignal(ArrayUpdate.OnClientEvent,
-                    "1",
-                    "i",
-                    "Events",
-                    "Day" -- kalau di game ternyata namanya beda (misal "Daytime"),
-                         -- ganti string ini sesuai yang kamu lihat di Sigma Spy
-                )
-            end)
-
-            task.wait(2) -- spam pelan2 biar nggak terlalu brutal
-        end
-        dayLoopRunning = false
-    end)
-end
 
 ------------------------------------------------------------
 -- TELEPORT HELPER (pakai tpTo kalau sudah ada)
@@ -2406,13 +2375,6 @@ TabEvent:Toggle("Auto Teleport Selected Event", function(state)
     print("[AegisHub Event] AutoEvent =", state)
     if state then
         task.spawn(EventAutoLoop)
-    end
-end)
-
-TabEvent:Toggle("Force Spawn Day (no Night)", function(state)
-    DayControl.ForceDay = state
-    if state then
-        startDayLoop()
     end
 end)
 
