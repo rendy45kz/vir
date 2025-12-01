@@ -939,12 +939,10 @@ local function doOneBlatantCycle()
     -- 4) SPAM FISHING COMPLETED (ikan naik)
     ----------------------------------------------------------------
     for i = 1, 5 do
-        pcall(function()
-            Events.startMini:FireServer(getServerTime())
-            task.wait(catchDel)
+        pcall(function()            
             Events.completeFish:FireServer()
         end)
-        task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
+       -- task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
     end
 
     ----------------------------------------------------------------
