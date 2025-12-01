@@ -913,7 +913,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.chargeRod:InvokeServer(now)
     end)
-    task.wait(0.002)
+    task.wait(0.001)
 
     -- start minigame
     local okStart = pcall(function()
@@ -942,12 +942,9 @@ local function doOneBlatantCycle()
         pcall(function()            
             Events.completeFish:FireServer()
         end)
-       -- task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
+       task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
     end
 
-    ----------------------------------------------------------------
-    -- 5) TIDAK ADA DELAY TAMBAHAN → LOOP LANGSUNG ULANG
-    ----------------------------------------------------------------
 end
 
 ------------------------------------------------------------
