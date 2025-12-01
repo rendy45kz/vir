@@ -2767,8 +2767,17 @@ local Misc = {
     NoLighting   = false,
     NoEffects    = false,
     FPSCap       = 120,
+
+    -- fitur baru
+    NoRodVFX     = false, -- hilangin efek rod (splash, trail, dsb)
+    NoFishNotif  = false, -- sembunyiin notifikasi fish caught
+    NoCutscene   = false, -- paksa kamera balik ke mode biasa
+    NoPlayerAnim = false, -- matikan animasi player
 }
 
+-- =========================
+-- HELPER FPS LAMA
+-- =========================
 local function HideAllTextures()
     for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("Decal") or v:IsA("Texture") then
@@ -2787,8 +2796,8 @@ end
 
 local function ApplyNoLighting()
     Lighting.GlobalShadows = false
-    Lighting.FogEnd = 1e10
-    Lighting.Brightness = 1
+    Lighting.FogEnd        = 1e10
+    Lighting.Brightness    = 1
 end
 
 local function RemoveEffects()
@@ -2804,6 +2813,109 @@ local function RemoveEffects()
     end
 end
 
+-- =========================
+-- HELPER BARU – ROD VFX
+-- =========================
+local rodConn
+
+local function applyRodVFXToInstance(obj)
+    if not obj then return end
+    if obj:IsA("ParticleEmitter")
+    or obj:IsA("Beam")
+    or obj:IsA("Trail")
+    or obj:IsA("Smoke")
+    or obj:IsA("Fire")
+    or obj:IsA("Sparkles") then
+
+        local n1 = (obj.Name or ""):lower()
+        local n2 = obj.Parent and (obj.Parent.Name or ""):lower() or ""
+
+        if n1:find("rod") or n1:find("splash") or n1:find("dive")
+        or n2:find("rod") or n2:find("splash") or n2:find("dive") then
+            obj.Enabled = false
+        end
+    end
+end
+
+local function EnableRodOnlyEffects()
+    for _,v in ipairs(game:GetDescendants()) do
+        applyRodVFXToInstance(v)
+    end
+
+    if rodConn then rodConn:Disconnect() rodConn = nil end
+    rodConn = game.DescendantAdded:Connect(function(o)
+        if Misc.NoRodVFX then
+            pcall(applyRodVFXToInstance, o)
+        end
+    end)
+end
+
+local function DisableRodOnlyEffects()
+    if rodConn then
+        rodConn:Disconnect()
+        rodConn = nil
+    end
+end
+
+-- =========================
+-- HELPER BARU – GUI / KAMERA / ANIMASI
+-- =========================
+local function HideFishCaughtGui()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return end
+
+    for _,gui in ipairs(pg:GetDescendants()) do
+        if gui:IsA("Frame") or gui:IsA("TextLabel") or gui:IsA("ImageLabel") then
+            local name = (gui.Name or ""):lower()
+            local text = gui:IsA("TextLabel") and ((gui.Text or ""):lower()) or ""
+
+            if name:find("fish")
+            or name:find("caught")
+            or name:find("newfish")
+            or text:find("new fish")
+            or text:find("fish caught") then
+                gui.Visible = false
+            end
+        end
+    end
+end
+
+local function ForceGameplayCamera()
+    local cam = Workspace.CurrentCamera
+    if not cam then return end
+
+    cam.CameraType = Enum.CameraType.Custom
+
+    local char = LocalPlayer.Character
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        cam.CameraSubject = hum
+    end
+end
+
+local function ApplyPlayerAnimSetting()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum       = char:FindFirstChildOfClass("Humanoid")
+    local animator  = hum and hum:FindFirstChildOfClass("Animator")
+    local animateSc = char:FindFirstChild("Animate")
+
+    if Misc.NoPlayerAnim then
+        if animateSc then animateSc.Disabled = true end
+        if animator then
+            for _,track in ipairs(animator:GetPlayingAnimationTracks()) do
+                track:Stop()
+            end
+        end
+    else
+        if animateSc then animateSc.Disabled = false end
+    end
+end
+
+-- =========================
+-- TOGGLE DI TAB MISC
+-- =========================
 TabMisc:Toggle("Hide Textures", function(v)
     Misc.HideTextures = v
     if v then HideAllTextures() end
@@ -2819,10 +2931,54 @@ TabMisc:Toggle("No Lighting", function(v)
     if v then ApplyNoLighting() end
 end)
 
-TabMisc:Toggle("Disable Effects", function(v)
+TabMisc:Toggle("Disable Effects (All)", function(v)
     Misc.NoEffects = v
     if v then RemoveEffects() end
 end)
+
+TabMisc:Toggle("Disable Rod VFX (Splash/Dive)", function(v)
+    Misc.NoRodVFX = v
+    if v then
+        EnableRodOnlyEffects()
+    else
+        DisableRodOnlyEffects()
+    end
+end)
+
+TabMisc:Toggle("Hide Fish Caught Notification", function(v)
+    Misc.NoFishNotif = v
+    if v then
+        HideFishCaughtGui()
+    end
+end)
+
+TabMisc:Toggle("Skip Cutscene Camera", function(v)
+    Misc.NoCutscene = v
+    if v then
+        ForceGameplayCamera()
+    end
+end)
+
+TabMisc:Toggle("Disable Player Animation", function(v)
+    Misc.NoPlayerAnim = v
+    ApplyPlayerAnimSetting()
+end)
+
+-- loop halus supaya fitur di atas terus dijaga
+RunService.RenderStepped:Connect(function()
+    if Misc.NoFishNotif then
+        HideFishCaughtGui()
+    end
+
+    if Misc.NoCutscene then
+        ForceGameplayCamera()
+    end
+
+    if Misc.NoPlayerAnim then
+        ApplyPlayerAnimSetting()
+    end
+end)
+
 
 ------------------------------------------------------------
 -- FPS CAP
