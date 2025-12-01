@@ -3031,55 +3031,6 @@ local function TampilkanNotifikasiIkan()
     end)
 end
 
-local function ForceGameplayCamera()
-    local cam = Workspace.CurrentCamera
-    if not cam then return end
-
-    cam.CameraType   = Enum.CameraType.Custom
-    cam.CameraSubject = nil
-
-    local char = LocalPlayer.Character
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        cam.CameraSubject = hum
-    end
-
-    -- optional: normalkan FOV kalau cutscene pakai FOV aneh
-    if cam.FieldOfView < 60 or cam.FieldOfView > 80 then
-        cam.FieldOfView = 70
-    end
-end
-
-local function ApplyFishingAnimSetting()
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local hum      = char:FindFirstChildOfClass("Humanoid")
-    local animator = hum and hum:FindFirstChildOfClass("Animator")
-    if not animator then return end
-
-    -- jangan disable script Animate, biar jalan/lari/idle tetap
-    -- kita cuma stop track yang berkaitan dengan fishing/rod
-    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-        local anim = track.Animation
-        local name = (track.Name or ""):lower()
-        local id   = anim and (anim.AnimationId or ""):lower() or ""
-
-        local function isFishingAnim()
-            if name:find("fish") or name:find("rod") or name:find("cast") or name:find("reel") then
-                return true
-            end
-            if id:find("fish") or id:find("rod") or id:find("cast") or id:find("reel") then
-                return true
-            end
-            return false
-        end
-
-        if Misc.NoPlayerAnim and isFishingAnim() then
-            track:Stop()
-        end
-    end
-end
 
 
 -- =========================
@@ -3100,12 +3051,6 @@ TabMisc:Toggle("No Lighting", function(v)
     if v then ApplyNoLighting() end
 end)
 
-TabMisc:Toggle("Disable Fishing Animation", function(v)
-    Misc.NoPlayerAnim = v
-    -- apply sekali, sisanya di-loop RenderStepped
-    ApplyFishingAnimSetting()
-end)
-
 TabMisc:Toggle("Disable Rod VFX", function(v)
     Misc.NoRodVFX = v
     if v then
@@ -3122,33 +3067,6 @@ TabMisc:Toggle("Hide Fish Caught Notification", function(v)
         SembunyikanNotifikasiIkan()
     else
         TampilkanNotifikasiIkan()
-    end
-end)
-
-TabMisc:Toggle("Skip Cutscene Camera", function(v)
-    Misc.NoCutscene = v
-    if v then
-        ForceGameplayCamera()
-    end
-end)
-
-TabMisc:Toggle("Disable Player Animation", function(v)
-    Misc.NoPlayerAnim = v
-    ApplyPlayerAnimSetting()
-end)
-
--- loop halus supaya fitur di atas terus dijaga
-RunService.RenderStepped:Connect(function()
-    if Misc.NoFishNotif then
-        HideFishCaughtGui()
-    end
-
-    if Misc.NoCutscene then
-        ForceGameplayCamera()
-    end
-
-    if Misc.NoPlayerAnim then
-        ApplyFishingAnimSetting()
     end
 end)
 
