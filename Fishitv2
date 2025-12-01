@@ -888,11 +888,11 @@ end
 local function doOneBlatantCycle()
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        warn("[BlatantFish] HRP not found")
-        task.wait(0.01)
-        return
-    end
+    -- if not hrp then
+        -- warn("[BlatantFish] HRP not found")
+        -- task.wait(0.01)
+        -- return
+    -- end
 
     -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
     local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
@@ -903,7 +903,6 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
-
     ----------------------------------------------------------------
     -- 2) CHARGE ROD + START MINIGAME
     ----------------------------------------------------------------
@@ -914,7 +913,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.chargeRod:InvokeServer(now)
     end)
-    task.wait(0.02)
+    task.wait(0.002)
 
     -- start minigame
     local okStart = pcall(function()
@@ -943,7 +942,7 @@ local function doOneBlatantCycle()
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(0.01) -- sangat kecil, biar request-nya gak numpuk bareng
+        task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
     end
 
     ----------------------------------------------------------------
@@ -960,7 +959,7 @@ local function mainFishingLoop()
     
     while Config.AutoFish do
         local ok, err = pcall(doOneBlatantCycle)        
-        task.wait(0.001)
+        --task.wait(0.001)
     end
 
     loopRunning = false
