@@ -2998,43 +2998,38 @@ end
 -- =========================
 -- HELPER BARU – GUI / KAMERA / ANIMASI
 -- =========================
-local function HideFishCaughtGui()
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if not pg then return end
-
-    -- target utama by exact name
-    local notif1 = pg:FindFirstChild("ObtainedNewFishNotification", true)
-    local notif2 = pg:FindFirstChild("FishCought", true) -- kalau di game memang typo
-
-    local function hideGui(gui)
-        if not gui then return end
-        if gui:IsA("ScreenGui") then
-            gui.Enabled = false
-        elseif gui:IsA("Frame") or gui:IsA("TextLabel") or gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
-            gui.Visible = false
+local function SembunyikanNotifikasiIkan()
+    task.spawn(function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local notifPath = ReplicatedStorage:FindFirstChild("Packages")        
+        local NetFolder = notifPath:FindFirstChild("_Index") 
+        local sleitnickNet = NetFolder:FindFirstChild("sleitnick_net@0.2.0")
+        local net = sleitnickNet:FindFirstChild("net")
+        local REObtainedNewFishNotification = net:FindFirstChild("RE/ObtainedNewFishNotification")
+         
+        for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
+            connection:Disable()
         end
-    end
-
-    hideGui(notif1)
-    hideGui(notif2)
-
-    -- backup: sembunyiin semua elemen yang kelihatan kayak notif ikan
-    for _, gui in ipairs(pg:GetDescendants()) do
-        if gui:IsA("Frame") or gui:IsA("TextLabel") or gui:IsA("ImageLabel") then
-            local name = (gui.Name or ""):lower()
-            local text = gui:IsA("TextLabel") and ((gui.Text or ""):lower()) or ""
-
-            if name:find("obtainednewfish")
-            or name:find("fishcought")
-            or name:find("fishcaught")
-            or text:find("new fish")
-            or text:find("fish caught") then
-                gui.Visible = false
-            end
-        end
-    end
+ 
+    end)
 end
 
+local function TampilkanNotifikasiIkan()
+    task.spawn(function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local REObtainedNewFishNotification = ReplicatedStorage
+            .Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+ 
+        if REObtainedNewFishNotification then
+            for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
+                connection:Enable()
+            end
+            
+        else
+            warn("⚠️ Tidak dapat menemukan event notifikasi ikan.")
+        end
+    end)
+end
 
 local function ForceGameplayCamera()
     local cam = Workspace.CurrentCamera
@@ -3124,7 +3119,9 @@ end)
 TabMisc:Toggle("Hide Fish Caught Notification", function(v)
     Misc.NoFishNotif = v
     if v then
-        HideFishCaughtGui()
+        SembunyikanNotifikasiIkan()
+    else
+        TampilkanNotifikasiIkan()
     end
 end)
 
