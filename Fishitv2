@@ -951,54 +951,43 @@ end
 local function Fishingspeed()
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    -- if not hrp then
-        -- warn("[BlatantFish] HRP not found")
-        -- task.wait(0.01)
-        -- return
-    -- end
+    if not hrp then
+        -- optional: kalau nggak ada HRP, skip sekali
+        task.wait(0.01)
+        return
+    end
 
-    -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
-    local spamDel = math.max(tonumber(Config.SpamDelay) or 0.20, 0.02)
+    local spamDel  = math.max(tonumber(Config.SpamDelay)  or 0.03, 0.001)
     local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
 
-    ----------------------------------------------------------------
-    -- 1) EQUIP ROD SLOT 1
-    ----------------------------------------------------------------
+    -- 1) Equip rod slot 1
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
-    ----------------------------------------------------------------
-    -- 2) CHARGE ROD + START MINIGAME
-    ----------------------------------------------------------------
-    local castPower = Config.PerfectCast and 0.99 or getCastPower()
-    local now       = getServerTime()
 
-    -- Step 1: Rapid fire casts (2 parallel casts)
-            pcall(function()                                                
-                task.spawn(function()
-                    Events.chargeRod:InvokeServer(now)
-                    task.wait(0.001)
-                    Events.startMini:InvokeServer(now)
-                end)
-                
-                task.wait(0.001)                                
-            end)    
+    -- 2) Charge rod
+    local now = getServerTime()
+    pcall(function()
+        Events.chargeRod:InvokeServer(now)
+    end)
 
-    ----------------------------------------------------------------
-    -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
-    ----------------------------------------------------------------
     task.wait(spamDel)
 
-    ----------------------------------------------------------------
-    -- 4) SPAM FISHING COMPLETED (ikan naik)
-    ----------------------------------------------------------------
+    -- 3) Start minigame
+    pcall(function()
+        Events.startMini:InvokeServer(getServerTime())
+    end)
+
+    -- 4) Tunggu CATCH DELAY (satu-satunya pengatur kecepatan)
+    task.wait(catchDel)
+
+    -- 5) Spam completeFish (ikan naik)
     for i = 1, 5 do
-        pcall(function()            
+        pcall(function()
             Events.completeFish:FireServer()
         end)
-       task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
+        task.wait(0.001)
     end
-
 end
 
 
@@ -1044,7 +1033,7 @@ end
 
 function Fishing:Start2()
     if Config.BlatantFish then return end
-    Config.BltantFish = true
+    Config.BlatantFish = true
     task.spawn(mainFishingLoop2)
 end
 
