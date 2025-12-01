@@ -960,26 +960,15 @@ local function Fishingspeed()
     local spamDel  = math.max(tonumber(Config.SpamDelay)  or 0.03, 0.001)
     local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
 
-    -- 1) Equip rod slot 1
-    pcall(function()
-        Events.equipHotbar:FireServer(1)
-    end)
-
-    -- 2) Charge rod
-    local now = getServerTime()
-    pcall(function()
-        Events.chargeRod:InvokeServer(now)
-    end)
-
-    task.wait(spamDel)
-
-    -- 3) Start minigame
-    pcall(function()
-        Events.startMini:InvokeServer(getServerTime())
-    end)
-
-    -- 4) Tunggu CATCH DELAY (satu-satunya pengatur kecepatan)
-    task.wait(catchDel)
+    pcall(function() 
+        Events.equip:FireServer(1) 
+           
+     task.spawn(function() 
+        Events.charge:InvokeServer(1755848498.4834) 
+       task.wait(spamDel) 
+        Events.minigame:InvokeServer(1.2854545116425, 1) 
+    end) 
+    task.wait(catchDel) 
 
     -- 5) Spam completeFish (ikan naik)
     for i = 1, 5 do
