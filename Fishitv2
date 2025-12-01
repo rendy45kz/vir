@@ -2922,30 +2922,63 @@ end
 -- =========================
 local rodConn
 
-local function applyRodVFXToInstance(obj)
-    if not obj then return end
-    if obj:IsA("ParticleEmitter")
-    or obj:IsA("Beam")
-    or obj:IsA("Trail")
-    or obj:IsA("Smoke")
-    or obj:IsA("Fire")
-    or obj:IsA("Sparkles") then
+local function isRodVFX(obj: Instance)
+    if not obj then return false end
 
-        local n1 = (obj.Name or ""):lower()
-        local n2 = obj.Parent and (obj.Parent.Name or ""):lower() or ""
+    if not (obj:IsA("ParticleEmitter")
+        or obj:IsA("Beam")
+        or obj:IsA("Trail")
+        or obj:IsA("Smoke")
+        or obj:IsA("Fire")
+        or obj:IsA("Sparkles")) then
+        return false
+    end
 
-        if n1:find("rod") or n1:find("splash") or n1:find("dive")
-        or n2:find("rod") or n2:find("splash") or n2:find("dive") then
-            obj.Enabled = false
+    local function low(s)
+        return string.lower(s or "")
+    end
+
+    local name  = low(obj.Name)
+    local parent = obj.Parent
+    local pname  = parent and low(parent.Name) or ""
+
+    -- cek nama sendiri / parent
+    if name:find("rod") or name:find("fish") or name:find("cast") or name:find("splash") or name:find("dive") then
+        return true
+    end
+    if pname:find("rod") or pname:find("fishing") or pname:find("vfx") then
+        return true
+    end
+
+    -- cek tool / ancestor
+    local current = parent
+    while current do
+        local cname = low(current.Name)
+        if current:IsA("Tool") and cname:find("rod") then
+            return true
         end
+        if cname:find("vfx") and (cname:find("rod") or cname:find("fish")) then
+            return true
+        end
+        current = current.Parent
+    end
+
+    return false
+end
+
+local function applyRodVFXToInstance(obj)
+    if isRodVFX(obj) then
+        obj.Enabled = false
     end
 end
 
 local function EnableRodOnlyEffects()
-    for _,v in ipairs(game:GetDescendants()) do
+    -- matikan semua efek rod yang sudah ada
+    for _, v in ipairs(game:GetDescendants()) do
         applyRodVFXToInstance(v)
     end
 
+    -- monitor efek baru (misal saat mancing mulai)
     if rodConn then rodConn:Disconnect() rodConn = nil end
     rodConn = game.DescendantAdded:Connect(function(o)
         if Misc.NoRodVFX then
@@ -2961,6 +2994,7 @@ local function DisableRodOnlyEffects()
     end
 end
 
+
 -- =========================
 -- HELPER BARU – GUI / KAMERA / ANIMASI
 -- =========================
@@ -2968,14 +3002,31 @@ local function HideFishCaughtGui()
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if not pg then return end
 
-    for _,gui in ipairs(pg:GetDescendants()) do
+    -- target utama by exact name
+    local notif1 = pg:FindFirstChild("ObtainedNewFishNotification", true)
+    local notif2 = pg:FindFirstChild("FishCought", true) -- kalau di game memang typo
+
+    local function hideGui(gui)
+        if not gui then return end
+        if gui:IsA("ScreenGui") then
+            gui.Enabled = false
+        elseif gui:IsA("Frame") or gui:IsA("TextLabel") or gui:IsA("ImageLabel") or gui:IsA("ImageButton") then
+            gui.Visible = false
+        end
+    end
+
+    hideGui(notif1)
+    hideGui(notif2)
+
+    -- backup: sembunyiin semua elemen yang kelihatan kayak notif ikan
+    for _, gui in ipairs(pg:GetDescendants()) do
         if gui:IsA("Frame") or gui:IsA("TextLabel") or gui:IsA("ImageLabel") then
             local name = (gui.Name or ""):lower()
             local text = gui:IsA("TextLabel") and ((gui.Text or ""):lower()) or ""
 
-            if name:find("fish")
-            or name:find("caught")
-            or name:find("newfish")
+            if name:find("obtainednewfish")
+            or name:find("fishcought")
+            or name:find("fishcaught")
             or text:find("new fish")
             or text:find("fish caught") then
                 gui.Visible = false
@@ -2984,38 +3035,57 @@ local function HideFishCaughtGui()
     end
 end
 
+
 local function ForceGameplayCamera()
     local cam = Workspace.CurrentCamera
     if not cam then return end
 
-    cam.CameraType = Enum.CameraType.Custom
+    cam.CameraType   = Enum.CameraType.Custom
+    cam.CameraSubject = nil
 
     local char = LocalPlayer.Character
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
         cam.CameraSubject = hum
     end
+
+    -- optional: normalkan FOV kalau cutscene pakai FOV aneh
+    if cam.FieldOfView < 60 or cam.FieldOfView > 80 then
+        cam.FieldOfView = 70
+    end
 end
 
-local function ApplyPlayerAnimSetting()
+local function ApplyFishingAnimSetting()
     local char = LocalPlayer.Character
     if not char then return end
 
-    local hum       = char:FindFirstChildOfClass("Humanoid")
-    local animator  = hum and hum:FindFirstChildOfClass("Animator")
-    local animateSc = char:FindFirstChild("Animate")
+    local hum      = char:FindFirstChildOfClass("Humanoid")
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
+    if not animator then return end
 
-    if Misc.NoPlayerAnim then
-        if animateSc then animateSc.Disabled = true end
-        if animator then
-            for _,track in ipairs(animator:GetPlayingAnimationTracks()) do
-                track:Stop()
+    -- jangan disable script Animate, biar jalan/lari/idle tetap
+    -- kita cuma stop track yang berkaitan dengan fishing/rod
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+        local anim = track.Animation
+        local name = (track.Name or ""):lower()
+        local id   = anim and (anim.AnimationId or ""):lower() or ""
+
+        local function isFishingAnim()
+            if name:find("fish") or name:find("rod") or name:find("cast") or name:find("reel") then
+                return true
             end
+            if id:find("fish") or id:find("rod") or id:find("cast") or id:find("reel") then
+                return true
+            end
+            return false
         end
-    else
-        if animateSc then animateSc.Disabled = false end
+
+        if Misc.NoPlayerAnim and isFishingAnim() then
+            track:Stop()
+        end
     end
 end
+
 
 -- =========================
 -- TOGGLE DI TAB MISC
@@ -3035,12 +3105,13 @@ TabMisc:Toggle("No Lighting", function(v)
     if v then ApplyNoLighting() end
 end)
 
-TabMisc:Toggle("Disable Effects (All)", function(v)
-    Misc.NoEffects = v
-    if v then RemoveEffects() end
+TabMisc:Toggle("Disable Fishing Animation", function(v)
+    Misc.NoPlayerAnim = v
+    -- apply sekali, sisanya di-loop RenderStepped
+    ApplyFishingAnimSetting()
 end)
 
-TabMisc:Toggle("Disable Rod VFX (Splash/Dive)", function(v)
+TabMisc:Toggle("Disable Rod VFX", function(v)
     Misc.NoRodVFX = v
     if v then
         EnableRodOnlyEffects()
@@ -3048,6 +3119,7 @@ TabMisc:Toggle("Disable Rod VFX (Splash/Dive)", function(v)
         DisableRodOnlyEffects()
     end
 end)
+
 
 TabMisc:Toggle("Hide Fish Caught Notification", function(v)
     Misc.NoFishNotif = v
@@ -3079,7 +3151,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     if Misc.NoPlayerAnim then
-        ApplyPlayerAnimSetting()
+        ApplyFishingAnimSetting()
     end
 end)
 
