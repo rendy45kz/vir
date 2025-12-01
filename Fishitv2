@@ -952,34 +952,78 @@ local function Fishingspeed()
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then
-        -- optional: kalau nggak ada HRP, skip sekali
         task.wait(0.01)
         return
     end
 
-    local spamDel  = math.max(tonumber(Config.SpamDelay)  or 0.03, 0.001)
-    local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
+    -- kalau Config.SpamDelay gak ada, pakai default
+    local spamDel   = math.max(tonumber(Config.SpamDelay)   or 0.01, 0.001)
+    local fishDel   = math.max(tonumber(Config.FishDelay)   or 0.60, 0.02)
+    local catchDel  = math.max(tonumber(Config.CatchDelay)  or 0.80, 0.02)
 
-    pcall(function() 
-        Events.equip:FireServer(1) 
-           
-     task.spawn(function() 
-        Events.charge:InvokeServer(1755848498.4834) 
-       task.wait(spamDel) 
-        Events.minigame:InvokeServer(1.2854545116425, 1) 
-    end) 
-end)
+    -- berapa banyak cast paralel (searah)
+    local castCount = 3      -- mirip script ultra kamu
+    local gapCast   = 0.03   -- jeda antar cast
+    local reelCount = 8      -- berapa kali spam completeFish
 
-    task.wait(catchDel) 
+    ----------------------------------------------------------------
+    -- 1) EQUIP ROD SLOT 1
+    ----------------------------------------------------------------
+    pcall(function()
+        Events.equipHotbar:FireServer(1)
+    end)
 
-    -- 5) Spam completeFish (ikan naik)
+    ----------------------------------------------------------------
+    -- 2) CAST PARAREL: chargeRod + startMini pakai task.spawn
+    ----------------------------------------------------------------
+    pcall(function()
+        for i = 1, castCount do
+            task.spawn(function()
+                -- waktu server sekarang (ganti timestamp tetap di script lama kamu)
+                local t = getServerTime()
+
+                -- CHARGE
+                pcall(function()
+                    Events.chargeRod:InvokeServer(t)
+                end)
+
+                -- jeda kecil biar server sempat proses
+                task.wait(spamDel)
+
+                -- START MINIGAME
+                pcall(function()
+                    if typeof(Events.startMini.InvokeServer) == "function" then
+                        Events.startMini:InvokeServer(getServerTime())
+                    else
+                        Events.startMini:FireServer(getServerTime())
+                    end
+                end)
+            end)
+
+        end
+    end)
+
+    ----------------------------------------------------------------
+    -- 3) FISH DELAY SUPER CEPAT (boleh kamu kaliin ratio kalau mau)
+    ----------------------------------------------------------------
+    task.wait(fishDel * 0.33)  -- sama ide: 67% lebih cepat dari FishDelay
+
+    ----------------------------------------------------------------
+    -- 4) SPAM COMPLETEFISH (REEL)
+    ----------------------------------------------------------------
     for i = 1, 5 do
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(0.001)
+        task.wait(0.005) -- ultra cepat
     end
+
+    ----------------------------------------------------------------
+    -- 5) CATCH DELAY SUPER CEPAT sebelum loop berikutnya
+    ----------------------------------------------------------------
+    task.wait(catchDel * 0.3)
 end
+
 
 
 ------------------------------------------------------------
