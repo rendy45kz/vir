@@ -1023,7 +1023,7 @@ local function mainFishingLoop2()
     loopRunning = true
     
     while Config.BlatantFish do
-        local ok, err = pcall(mainFishingLoop)        
+        local ok, err = pcall(Fishingspeed)        
         --task.wait(0.001)
     end
     loopRunning = false    
