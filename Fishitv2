@@ -845,27 +845,16 @@ local ArrayUpdate = net:FindFirstChild("ArrayUpdate")
 -- CONFIG
 ------------------------------------------------------------
 local Config = {
-    AutoFish        = false,     -- toggle utama
-    FishDelayRatio  = "1/3",     -- "1/4", "1/3", "1/2"
-    FishDelayOffset = 0.15,      -- tambahan offset (detik)
-    CatchDelay      = 0.80,      -- delay sesudah spam complete sebelum loop berikutnya
-    PerfectCast     = false,     -- kalau mau tetap random, biar mirip player
+    AutoFish    = false,   -- toggle utama
+    CatchDelay  = 0.25,    -- SATU-SATUNYA pengatur kecepatan
+    PerfectCast = true,    -- optional
 }
-
 -- internal state
 local loopRunning  = false
 
 ------------------------------------------------------------
 -- HELPER
 ------------------------------------------------------------
-
-
--- delay kecil random biar nggak terlalu robot banget
-local function randomDelay()
-    local fpsChoices = {60, 90, 120, 240}
-    local fps = fpsChoices[math.random(1, #fpsChoices)]
-    return 1 / fps
-end
 
 local function getServerTime()
     local ok, t = pcall(function()
@@ -893,37 +882,20 @@ local function getCastPower()
     end
 end
 
--- rumus FISH DELAY:
--- FishDelay = CatchDelay * rasio + offset
-local function computeFishDelay()
-    local ratio = 1/3
-    if Config.FishDelayRatio == "1/4" then
-        ratio = 1/4
-    elseif Config.FishDelayRatio == "1/2" then
-        ratio = 1/2
-    end
-
-    local fd = (Config.CatchDelay ) * ratio * (Config.FishDelayOffset)
-    -- clamp biar nggak absurd
-    if fd < 0.05 then fd = 0.05 end
-    return fd
-end
-
 ------------------------------------------------------------
 -- SATU SIKLUS BLATANT (x5 SPEED)
 ------------------------------------------------------------
 local function doOneBlatantCycle()
     local char = ensureCharacter()
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then
         warn("[BlatantFish] HRP not found")
-        task.wait(0.005)
+        task.wait(0.01)
         return
     end
 
-    local dSmall  = randomDelay()
-    local fishDel = computeFishDelay()
-    local catchDel = math.max(Config.CatchDelay)
+    -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
+    local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
 
     ----------------------------------------------------------------
     -- 1) EQUIP ROD SLOT 1
@@ -931,22 +903,21 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
-    
-    ----------------------------------------------------------------
-    -- 2) CHARGE + START MINIGAME
-    ----------------------------------------------------------------
-    local castPower = getCastPower()
-    local now       = getServerTime()
-    local yPos      = hrp.Position.Y - 10
 
-    -- charge rod (boleh Invoke / Fire, tapi di game ini pakai Invoke)
+    ----------------------------------------------------------------
+    -- 2) CHARGE ROD + START MINIGAME
+    ----------------------------------------------------------------
+    local castPower = Config.PerfectCast and 0.99 or getCastPower()
+    local now       = getServerTime()
+
+    -- charge
     pcall(function()
         Events.chargeRod:InvokeServer(now)
     end)
-    task.wait(0.03)
+    task.wait(0.02)
 
-    -- request minigame
-    local okStart, res = pcall(function()
+    -- start minigame
+    local okStart = pcall(function()
         if typeof(Events.startMini.InvokeServer) == "function" then
             return Events.startMini:InvokeServer(getServerTime())
         else
@@ -955,27 +926,29 @@ local function doOneBlatantCycle()
         end
     end)
 
-    
-    ----------------------------------------------------------------
-    -- 3) TUNGGU FISH DELAY (BLATANT)
-    ----------------------------------------------------------------
-    task.wait(fishDel)
+    if not okStart then
+        warn("[BlatantFish] gagal start minigame")
+        return
+    end
 
     ----------------------------------------------------------------
-    -- 4) SPAM COMPLETE x5 (masih halus)
+    -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
     ----------------------------------------------------------------
+    task.wait(catchDel)
 
+    ----------------------------------------------------------------
+    -- 4) SPAM FISHING COMPLETED (ikan naik)
+    ----------------------------------------------------------------
     for i = 1, 5 do
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(catchDel)
+        task.wait(0.01) -- sangat kecil, biar request-nya gak numpuk bareng
     end
 
     ----------------------------------------------------------------
-    -- 5) TUNGGU CATCH DELAY SEBELUM CAST LAGI
+    -- 5) TIDAK ADA DELAY TAMBAHAN → LOOP LANGSUNG ULANG
     ----------------------------------------------------------------
-    task.wait(catchDel)
 end
 
 ------------------------------------------------------------
@@ -984,20 +957,14 @@ end
 local function mainFishingLoop()
     if loopRunning then return end
     loopRunning = true
-    print("[BlatantFish] loop started")
-
+    
     while Config.AutoFish do
-        local ok, err = pcall(doOneBlatantCycle)
-        if not ok then
-            warn("[BlatantFish] cycle error:", err)
-            task.wait(0.005)
-        end
-        -- sedikit napas antar cycle
+        local ok, err = pcall(doOneBlatantCycle)        
         task.wait(0.001)
     end
 
     loopRunning = false
-    print("[BlatantFish] loop stopped")
+    
 end
 
 local Fishing = {}
@@ -1017,10 +984,10 @@ end
 ------------------------------------------------------------
 local TabAuto = win:CreateTab("Farm")
 
-TabAuto:Label("Blatant Auto Fishing 🎣")
+TabAuto:Label("Instant Fishing")
 
 -- Toggle utama
-TabAuto:Toggle("Enable Blatant Auto Fishing", function(state)
+TabAuto:Toggle("Enable Auto Fishing", function(state)
     if state then
         Fishing:Start()
     else
@@ -1028,29 +995,11 @@ TabAuto:Toggle("Enable Blatant Auto Fishing", function(state)
     end
 end)
 
--- Rasio FishDelay (1/4, 1/3, 1/2)
-TabAuto:Dropdown("FishDelay Ratio (FishDelay / CatchDelay)", {"1/4","1/3","1/2"}, function(opt)
-    Config.FishDelayRatio = opt
-    print("[BlatantFish] Ratio set:", opt)
-end)
-
--- Offset tambahan (detik)
-TabAuto:Box("FishDelay Offset (0.00 - 0.30)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0, 0.30)
-        Config.FishDelayOffset = n
-        print("[BlatantFish] Offset set:", n)
-    end
-end)
-
--- Catch Delay (delay sesudah complete sebelum cast ulang)
 TabAuto:Box("Catch Delay (seconds)", function(txt)
     local n = tonumber(txt)
     if n then
-        n = math.clamp(n, 0.10, 3.0)
-        Config.CatchDelay = n
-        print("[BlatantFish] CatchDelay set:", n)
+        n = math.clamp(n, 0.02, 3.0)
+        Config.CatchDelay = n        
     end
 end)
 
