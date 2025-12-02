@@ -2178,37 +2178,47 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
 end)
 
 ----------------------------------------------------------------
--- Dropdown Group: Auto Weather
-local weatherGroupOpen = false
+------------------------------------------------------------
+-- COLLAPSE / EXPAND: AUTO WEATHER (MULTI SELECT)
+------------------------------------------------------------
 
--- Header tombol (dropdown opener)
+Farm.AutoWeatherList = Farm.AutoWeatherList or {}
+Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
+
+local weatherGroupOpen = false
+local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
+
+-- Header: tombol untuk collapse / expand
 TabShop:Button("Auto Weather (Multi Select) ▼", function()
     weatherGroupOpen = not weatherGroupOpen
+
+    -- show / hide isi group
+    toggleAutoWeather.Visible = weatherGroupOpen
+    ddWeather.Visible         = weatherGroupOpen
 end)
 
--- Content: isi dropdown
-TabShop:Toggle("    Enable Auto Weather", function(v)
-    if not weatherGroupOpen then return end
-
+-- Isi 1: Toggle Enable
+local toggleAutoWeather = TabShop:Toggle("    Enable Auto Weather", function(v)
     Farm.AutoWeatherEnabled = v
     if v then
-        for name,flag in pairs(Farm.AutoWeatherList) do
-            if flag then StartWeatherLoop(name) end
+        for name, flag in pairs(Farm.AutoWeatherList) do
+            if flag then
+                StartWeatherLoop(name)
+            end
         end
     end
 end)
+toggleAutoWeather.Visible = false  -- awalnya collapsed
 
-local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
-
-TabShop:MultiDropdown("    Weather List", weatherList, function(opt,state)
-    if not weatherGroupOpen then return end
-
+-- Isi 2: MultiDropdown Weather List
+local ddWeather = TabShop:MultiDropdown("    Weather List", weatherList, function(opt, state)
     Farm.AutoWeatherList[opt] = state
+
     if state and Farm.AutoWeatherEnabled then
         StartWeatherLoop(opt)
     end
 end)
-
+ddWeather.Visible = false  -- awalnya collapsed
 
 ----------------------------------------------------------------
 farmUI:Label("Auto Enchant")
