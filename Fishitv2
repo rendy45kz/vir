@@ -2238,7 +2238,7 @@ Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
 
 local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
 
-local weatherGroup = CreateCollapseGroup(TabShop, "Auto Weather (Multi Select)", function(add, group)
+local weatherGroup = CreateCollapseGroup(TabShop, "Auto Buy Weather", function(add, group)
     -- Toggle Enable
     local toggleAuto = add(TabShop:Toggle("Enable Auto Weather", function(v)
         Farm.AutoWeatherEnabled = v
