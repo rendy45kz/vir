@@ -2178,9 +2178,18 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
 end)
 
 ----------------------------------------------------------------
-TabShop:Label("Auto Weather (Multi Select)")
+-- Dropdown Group: Auto Weather
+local weatherGroupOpen = false
 
-TabShop:Toggle("Enable Auto Weather", function(v)
+-- Header tombol (dropdown opener)
+TabShop:Button("Auto Weather (Multi Select) ▼", function()
+    weatherGroupOpen = not weatherGroupOpen
+end)
+
+-- Content: isi dropdown
+TabShop:Toggle("    Enable Auto Weather", function(v)
+    if not weatherGroupOpen then return end
+
     Farm.AutoWeatherEnabled = v
     if v then
         for name,flag in pairs(Farm.AutoWeatherList) do
@@ -2190,12 +2199,16 @@ TabShop:Toggle("Enable Auto Weather", function(v)
 end)
 
 local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
-local ddWeather = TabShop:MultiDropdown("Weather List", weatherList, function(opt,state)
+
+TabShop:MultiDropdown("    Weather List", weatherList, function(opt,state)
+    if not weatherGroupOpen then return end
+
     Farm.AutoWeatherList[opt] = state
     if state and Farm.AutoWeatherEnabled then
         StartWeatherLoop(opt)
     end
 end)
+
 
 ----------------------------------------------------------------
 farmUI:Label("Auto Enchant")
