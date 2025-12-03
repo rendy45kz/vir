@@ -1136,13 +1136,12 @@ local function mainFishingLoop2()
     if loopRunning then return end
     loopRunning = true
     
-    task.spawn(function()
-    while AutoFishing and Config.BlatantMode do
-        Fishingspeed()
+    
+    while Config.BlatantFish do
+       local ok, err = pcall(Fishingspeed) 
         -- kalau masih terlalu cepat / rubberband, tambahin delay kecil di sini
         --task.wait(0.05)
     end
-end)
     loopRunning = false    
 end
 
