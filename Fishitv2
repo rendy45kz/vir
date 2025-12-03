@@ -2565,19 +2565,25 @@ local Players        = game:GetService("Players")
 local LocalPlayer    = Players.LocalPlayer
 
 -- label live posisi & nama island
-local coordLabel = TabTP:LiveLabel("Pos: 0, 0, 0")
-local islandLiveLabel = TabTP:LiveLabel("Island: Unknown")
+local coordText = "Pos: 0, 0, 0"
+local islandText = "Island: Unknown"
 
--- update setiap frame
+local coordLabel = TabTP:LiveLabel(function()
+    return coordText
+end)
+
+local islandLiveLabel = TabTP:LiveLabel(function()
+    return islandText
+end)
+
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp or not coordLabel or not coordLabel.Parent then return end
+    if not hrp then return end
 
     local p = hrp.Position
-    coordLabel.Text = string.format("Pos: %.1f, %.1f, %.1f", p.X, p.Y, p.Z)
+    coordText = string.format("Pos: %.1f, %.1f, %.1f", p.X, p.Y, p.Z)
 
-    -- coba ambil nama island dari GUI lokasi (kalau ada)
     local islandName = "Unknown"
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
@@ -2588,8 +2594,9 @@ RunService.RenderStepped:Connect(function()
             islandName = guiLoc.Text
         end
     end
-    islandLiveLabel.Text = "Island: "..islandName
+    islandText = "Island: "..islandName
 end)
+
 
 ------------------------------------------------------------
 -- SAVE / LOAD ISLAND COORDS
@@ -2869,13 +2876,19 @@ end)
 task.spawn(function()
     while true do
         task.wait(8)
-        local newNPC = scanNPC()
-        ddNPC:SetOptions(newNPC)
+
+        local newNPC = scanNPC_Models()
+        if ddNPC and ddNPC.SetOptions and newNPC then
+            ddNPC:SetOptions(newNPC)
+        end
 
         local newPL = playerList()
-        ddPlayer:SetOptions(newPL)
+        if ddPlayer and ddPlayer.SetOptions and newPL then
+            ddPlayer:SetOptions(newPL)
+        end
     end
 end)
+
 
 Players.PlayerAdded:Connect(function()
     ddPlayer:SetOptions(playerList())
