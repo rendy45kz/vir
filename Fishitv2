@@ -1035,6 +1035,12 @@ local function doOneBlatantCycle()
     end
 end
 
+-- DEFAULT CONFIG (taruh dekat config lain)
+Config.BlatantFast      = Config.BlatantFast      or false
+Config.FastCastCount    = Config.FastCastCount    or 3    -- default 3 cast paralel
+Config.FastCompleteCount= Config.FastCompleteCount or 6   -- default 6x completeFish
+Config.FastLoopDelay    = Config.FastLoopDelay    or 0.05 -- default jeda antar cycle
+
 -- FAST CYCLE BLATANT MODE
 local function Fishingspeed()
     local char = ensureCharacter()
@@ -1049,8 +1055,9 @@ local function Fishingspeed()
     local fishDel   = math.max(tonumber(Config.FishDelay)  or 0.60, 0.02)
     local catchDel  = math.max(tonumber(Config.CatchDelay) or 0.80, 0.02)
 
-    local castCount     = 3    -- berapa banyak cast paralel
-    local completeCount = 6    -- berapa kali spam completeFish
+    -- ambil dari config (bisa di-edit dari UI)
+    local castCount = math.max(1, math.floor(tonumber(Config.FastCastCount) or 3))
+    local completeCount = math.max(1, math.floor(tonumber(Config.FastCompleteCount) or 6))
 
     ----------------------------------------------------------------
     -- 1) EQUIP ROD SLOT 1
@@ -1078,7 +1085,7 @@ local function Fishingspeed()
                 task.wait(spamDel)
 
                 pcall(function()
-                    -- angka kamu sebelumnya
+                    -- angka param boleh kamu ganti sesuai game
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
@@ -1104,6 +1111,26 @@ local function Fishingspeed()
     end
 end
 
+-- LOOP KONTROL
+local blatantFastRunning = false
+
+local function StartBlatantFastLoop()
+    if blatantFastRunning then return end
+    blatantFastRunning = true
+
+    task.spawn(function()
+        while blatantFastRunning and Config.BlatantFast do
+            Fishingspeed()
+            local loopDelay = math.max(tonumber(Config.FastLoopDelay) or 0.05, 0.01)
+            task.wait(loopDelay)
+        end
+        blatantFastRunning = false
+    end)
+end
+
+local function StopBlatantFastLoop()
+    blatantFastRunning = false
+end
 
 
 ------------------------------------------------------------
@@ -1134,28 +1161,6 @@ function Fishing:Stop()
     Config.AutoFish = false
 end
 
--- flag & kontrol loop
-Config.BlatantFast = Config.BlatantFast or false
-local blatantFastRunning = false
-
-local function StartBlatantFastLoop()
-    if blatantFastRunning then return end
-    blatantFastRunning = true
-
-    task.spawn(function()
-        while blatantFastRunning and Config.BlatantFast do
-            Fishingspeed()
-            -- delay kecil antar cycle, bisa kamu ubah
-            task.wait(0.05)
-        end
-        blatantFastRunning = false
-    end)
-end
-
-local function StopBlatantFastLoop()
-    blatantFastRunning = false
-end
-
 
 ------------------------------------------------------------
 -- UI AEGISHUB – TAB AUTO
@@ -1181,6 +1186,11 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
     end
 end)
 
+-- misal:
+-- local TabAuto = win:CreateTab("Auto")
+-- atau pakai alias:
+-- local autoUI = TabAuto
+
 TabAuto:Toggle("Blatant Fast Cycle", function(v)
     Config.BlatantFast = v and true or false
 
@@ -1191,28 +1201,30 @@ TabAuto:Toggle("Blatant Fast Cycle", function(v)
     end
 end)
 
-
-TabAuto:Box("Spam Delay (seconds)", function(txt)
+TabAuto:Box("Fast Cast Count (parallel)", function(txt)
     local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.SpamDelay = n        
-    end
+    if not n then return end
+    n = math.clamp(math.floor(n), 1, 10)     -- batas aman 1–10 cast
+    Config.FastCastCount = n
+    print("[BlatantFast] FastCastCount =", n)
 end)
 
-TabAuto:Box("Catch Delay (seconds)", function(txt)
+TabAuto:Box("Fast Complete Count", function(txt)
     local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
+    if not n then return end
+    n = math.clamp(math.floor(n), 1, 20)     -- batas aman 1–20 completeFish
+    Config.FastCompleteCount = n
+    print("[BlatantFast] FastCompleteCount =", n)
 end)
 
--- Optional: perfect cast on/off
-TabAuto:Toggle("Use Perfect Cast", function(state)
-    Config.PerfectCast = state
-    print("[BlatantFish] PerfectCast:", state)
+TabAuto:Box("Fast Loop Delay (sec)", function(txt)
+    local n = tonumber(txt)
+    if not n then return end
+    n = math.clamp(n, 0.01, 2)               -- minimal 0.01 biar nggak freeze
+    Config.FastLoopDelay = n
+    print("[BlatantFast] FastLoopDelay =", n)
 end)
+
 
 
 
