@@ -1061,19 +1061,13 @@ local function Fishingspeed()
         for i = 1, castCount do
             task.spawn(function()
                 local t = getServerTime()
+                
+                    Events.charge:InvokeServer(1755848498.4834)
+                    task.wait(0.01)
+                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                
 
-                pcall(function()
-                    Events.chargeRod:InvokeServer(1755848498.4834)
-                end)
-
-                task.wait(spamDel * 0.05)  -- ini pakai Spam Delay dari TabAuto
-
-                pcall(function()
-                    if typeof(Events.startMini.InvokeServer) == "function" then
-                        Events.startMini:InvokeServer(1.2854545116425, 1)
-                    
-                    end
-                end)
+                
             end)
 
             task.wait(spamDel * catchDel)
