@@ -1063,17 +1063,14 @@ local function Fishingspeed()
     -- 2) CHARGE + MINIGAME CEPAT (SEAKAN BARENG)
     ----------------------------------------------------------------
     pcall(function()
-        -- waktu server (kalau kamu punya util getServerTime, pakai itu)
         local baseTs = os.clock()
 
         for i = 1, castCount do
             task.spawn(function()
-                -- sedikit offset biar nggak super sama persis
                 local ts = baseTs + (i - 1) * 0.01
 
                 -- CHARGE
                 pcall(function()
-                    -- kalau game kamu butuh timestamp spesifik, ganti ts ini
                     Events.charge:InvokeServer(ts)
                 end)
 
@@ -1081,13 +1078,12 @@ local function Fishingspeed()
                 task.wait(spamDel)
 
                 pcall(function()
-                    -- pakai nilai yang kamu kasih tadi
-                    -- 1.2854545116425 = progress, 1 = (?) misalnya difficulty
+                    -- angka kamu sebelumnya
                     Events.minigame:InvokeServer(1.2854545116425, 1)
                 end)
             end)
 
-            -- jeda antar cast biar gak numpuk banget
+            -- jeda antar cast biar gak numpuk parah
             task.wait(spamDel * 0.5)
         end
     end)
@@ -1095,7 +1091,6 @@ local function Fishingspeed()
     ----------------------------------------------------------------
     -- 3) TUNGGU SAMPAI IKAN "NYANGKUT"
     ----------------------------------------------------------------
-    -- boleh pakai fishDel atau catchDel, pilih yang berasa paling aman
     task.wait(math.min(fishDel, catchDel) * 0.5)
 
     ----------------------------------------------------------------
@@ -1105,15 +1100,10 @@ local function Fishingspeed()
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(0.01) -- sangat kecil, tapi kasih jeda biar request nggak ke-stack
+        task.wait(0.01)
     end
-
-    ----------------------------------------------------------------
-    -- 5) (OPSIONAL) TUNGGU SEDIKIT SEBELUM LOOP BERIKUTNYA
-    ----------------------------------------------------------------
-    -- kalau fungsi ini dipanggil dalam while true loop, kamu bisa kasih:
-    -- task.wait(catchDel * 0.2)
 end
+
 
 
 ------------------------------------------------------------
@@ -1132,20 +1122,6 @@ local function mainFishingLoop()
     
 end
 
-local function mainFishingLoop2()
-    if loopRunning then return end
-    loopRunning = true
-    
-    
-    while Config.BlatantFish do
-       local ok, err = pcall(Fishingspeed) 
-        -- kalau masih terlalu cepat / rubberband, tambahin delay kecil di sini
-        --task.wait(0.05)
-    end
-    loopRunning = false    
-end
-
-
 local Fishing = {}
 
 function Fishing:Start()
@@ -1158,17 +1134,28 @@ function Fishing:Stop()
     Config.AutoFish = false
 end
 
-function Fishing:Start2()
-    if Config.BlatantFish then return end
-    Config.BlatantFish = true
-    task.spawn(mainFishingLoop2)
-    
-    
+-- flag & kontrol loop
+Config.BlatantFast = Config.BlatantFast or false
+local blatantFastRunning = false
+
+local function StartBlatantFastLoop()
+    if blatantFastRunning then return end
+    blatantFastRunning = true
+
+    task.spawn(function()
+        while blatantFastRunning and Config.BlatantFast do
+            Fishingspeed()
+            -- delay kecil antar cycle, bisa kamu ubah
+            task.wait(0.05)
+        end
+        blatantFastRunning = false
+    end)
 end
 
-function Fishing:Stop2()
-    Config.BlatantFish = false
+local function StopBlatantFastLoop()
+    blatantFastRunning = false
 end
+
 
 ------------------------------------------------------------
 -- UI AEGISHUB – TAB AUTO
@@ -1194,13 +1181,16 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
     end
 end)
 
-TabAuto:Toggle("Enable Blatant Mode", function(state)
-    if state then
-        Fishing:Start2()
+TabAuto:Toggle("Blatant Fast Cycle", function(v)
+    Config.BlatantFast = v and true or false
+
+    if v then
+        StartBlatantFastLoop()
     else
-        Fishing:Stop2()
+        StopBlatantFastLoop()
     end
 end)
+
 
 TabAuto:Box("Spam Delay (seconds)", function(txt)
     local n = tonumber(txt)
