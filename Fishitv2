@@ -280,9 +280,9 @@ end
         local tabCorner = Instance.new("UICorner", tabBtn)
         tabCorner.CornerRadius = UDim.new(0, 4)
 
-        local tabStroke = Instance.new("UIStroke", tabBtn)
-        tabStroke.Thickness = 1
-        tabStroke.Color = theme.stroke
+       -- local tabStroke = Instance.new("UIStroke", tabBtn)
+       -- tabStroke.Thickness = 1
+       -- tabStroke.Color = theme.stroke
 
         local page = Instance.new("ScrollingFrame")
         page.Parent = holder
