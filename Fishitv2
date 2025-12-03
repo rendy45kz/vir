@@ -1066,7 +1066,7 @@ local function Fishingspeed()
                     Events.chargeRod:InvokeServer(t)
                 end)
 
-                task.wait(spamDel)  -- ini pakai Spam Delay dari TabAuto
+                task.wait(spamDel * catchDel)  -- ini pakai Spam Delay dari TabAuto
 
                 pcall(function()
                     if typeof(Events.startMini.InvokeServer) == "function" then
@@ -1077,19 +1077,19 @@ local function Fishingspeed()
                 end)
             end)
 
-            task.wait(gapCast)
+            task.wait(spamDel * catchDel)
         end
     end)
 
     -- FishDelay dipercepat (boleh kamu ubah faktor 0.33)
-    task.wait(fishDel * 0.33)
+    task.wait(catchDel)
 pcall(function()
             Events.completeFish:FireServer()
         end)
     
 
     -- CatchDelay dipakai untuk jeda akhir sebelum loop berikut
-    task.wait(catchDel * 0.3)
+    -- task.wait(catchDel * 0.3)
 end
 
 
