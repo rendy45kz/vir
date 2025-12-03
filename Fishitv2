@@ -205,65 +205,6 @@ function library:CreateWindow(title)
     -- TAB CREATOR
     ---------------------------------------------------------------------
     local win = {}
-    ------------------------------------------------------------
--- GENERIC COLLAPSE GROUP COMPONENT
-------------------------------------------------------------
-function api:CreateCollapseGroup(title, buildFn)
-    local group = {}
-    group.IsOpen = false
-    group.Items  = {}
-
-    -- helper: set visibility semua item
-    function group:SetOpen(open)
-        self.IsOpen = open and true or false
-
-        -- update label header (▼ / ▲)
-        local suffix = self.IsOpen and " ▲" or " ▼"
-        if self.Header and self.Header.Set then
-            self.Header:Set(title .. suffix)
-        end
-
-        for _, ctrl in ipairs(self.Items) do
-            if ctrl then
-                local obj = ctrl.Object or ctrl
-                if obj and obj.Visible ~= nil then
-                    obj.Visible = self.IsOpen
-                end
-            end
-        end
-    end
-
-    function group:Toggle()
-        self:SetOpen(not self.IsOpen)
-    end
-
-    -- header button (pakai Button milik tab ini)
-    group.Header = self:Button(title .. " ▼", function()
-        group:Toggle()
-    end)
-
-    -- helper untuk dipakai di buildFn
-    local function add(ctrl)
-        if ctrl then
-            local obj = ctrl.Object or ctrl
-            if obj and obj.Visible ~= nil then
-                obj.Visible = group.IsOpen  -- start collapsed
-            end
-            table.insert(group.Items, ctrl)
-        end
-        return ctrl
-    end
-
-    -- bangun isi group (user-defined)
-    if typeof(buildFn) == "function" then
-        buildFn(add, group)
-    end
-
-    -- awalnya collapse
-    group:SetOpen(false)
-
-    return group
-end
 
 
     function win:CreateTab(name)
@@ -706,6 +647,67 @@ end
 
             return lbl
         end
+
+           ------------------------------------------------------------
+-- GENERIC COLLAPSE GROUP COMPONENT
+------------------------------------------------------------
+function api:CreateCollapseGroup(title, buildFn)
+    local group = {}
+    group.IsOpen = false
+    group.Items  = {}
+
+    -- helper: set visibility semua item
+    function group:SetOpen(open)
+        self.IsOpen = open and true or false
+
+        -- update label header (▼ / ▲)
+        local suffix = self.IsOpen and " ▲" or " ▼"
+        if self.Header and self.Header.Set then
+            self.Header:Set(title .. suffix)
+        end
+
+        for _, ctrl in ipairs(self.Items) do
+            if ctrl then
+                local obj = ctrl.Object or ctrl
+                if obj and obj.Visible ~= nil then
+                    obj.Visible = self.IsOpen
+                end
+            end
+        end
+    end
+
+    function group:Toggle()
+        self:SetOpen(not self.IsOpen)
+    end
+
+    -- header button (pakai Button milik tab ini)
+    group.Header = self:Button(title .. " ▼", function()
+        group:Toggle()
+    end)
+
+    -- helper untuk dipakai di buildFn
+    local function add(ctrl)
+        if ctrl then
+            local obj = ctrl.Object or ctrl
+            if obj and obj.Visible ~= nil then
+                obj.Visible = group.IsOpen  -- start collapsed
+            end
+            table.insert(group.Items, ctrl)
+        end
+        return ctrl
+    end
+
+    -- bangun isi group (user-defined)
+    if typeof(buildFn) == "function" then
+        buildFn(add, group)
+    end
+
+    -- awalnya collapse
+    group:SetOpen(false)
+
+    return group
+end
+
 
         ---------------------
         -- Multi Dropdown
