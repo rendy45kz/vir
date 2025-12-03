@@ -1078,7 +1078,7 @@ local function Fishingspeed()
 
                 -- CHARGE
                 pcall(function()
-                    Events.charge:InvokeServer(ts)
+                    Events.chargeRod:InvokeServer(ts)
                 end)
 
                 -- delay super kecil lalu MINIGAME
@@ -1086,7 +1086,7 @@ local function Fishingspeed()
 
                 pcall(function()
                     -- angka param boleh kamu ganti sesuai game
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                    Events.startMini:InvokeServer(1.2854545116425, 1)
                 end)
             end)
 
