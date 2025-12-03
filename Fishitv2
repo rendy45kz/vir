@@ -1038,50 +1038,52 @@ end
 ----------------------------------------------------------------
 -- CONFIG DEFAULT
 ----------------------------------------------------------------
+----------------------------------------------------------------
+-- CONFIG
+----------------------------------------------------------------
 Config.BlatantFast       = Config.BlatantFast or false
-Config.FastDelay         = Config.FastDelay or 0.01        -- micro delay
-Config.ReelDelay         = Config.ReelDelay or 1.0         -- delay sebelum looping
-Config.CompleteDelay     = Config.CompleteDelay or 0.5     -- delay sebelum completeFish
+Config.FastChargeDelay   = Config.FastChargeDelay or 0.05   -- delay setelah charge
+Config.FastMiniDelay     = Config.FastMiniDelay   or 0.10   -- delay sebelum complete
+Config.FastCycleDelay    = Config.FastCycleDelay  or 0.05   -- delay antar cycle
 
 ----------------------------------------------------------------
--- FAST BLATANT ACTION
+-- FUNGSI FAST BLATANT
 ----------------------------------------------------------------
 local function FastBlatant()
     local ts = tick()
 
-    -- EQUIP ROD SLOT 1
+    ------------------------------------------------------------
+    -- 1) EQUIP ROD
+    ------------------------------------------------------------
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
 
     ------------------------------------------------------------
-    -- 1) CHARGE
+    -- 2) CHARGE
     ------------------------------------------------------------
-    task.spawn(function()
-        pcall(function()
-            Events.chargeRod:InvokeServer(ts)
-        end)
-    end)
-
-    task.wait(Config.FastDelay)
-
-    ------------------------------------------------------------
-    -- 2) MINIGAME
-    ------------------------------------------------------------
-    task.spawn(function()
-        pcall(function()
-            Events.startMini:InvokeServer(ts)
-        end)
+    pcall(function()
+        Events.chargeRod:InvokeServer(ts)
     end)
 
     ------------------------------------------------------------
-    -- 3) COMPLETE DELAY (SEBELUM COMPLETEFISH)
+    -- 3) **DELAY WAJIB** supaya bobber SPAWN
     ------------------------------------------------------------
-    task.wait(math.max(Config.CompleteDelay, 0.01))
+    task.wait(Config.FastChargeDelay)
 
     ------------------------------------------------------------
-    -- 4) COMPLETEFISH
+    -- 4) MINIGAME
     ------------------------------------------------------------
+    pcall(function()
+        -- kalau game-mu butuh args berbeda, masukkan di sini
+        Events.startMini:InvokeServer(ts)
+    end)
+
+    ------------------------------------------------------------
+    -- 5) COMPLETE (tunggu dikit biar minigame kebuka)
+    ------------------------------------------------------------
+    task.wait(Config.FastMiniDelay)
+
     pcall(function()
         Events.completeFish:FireServer()
     end)
@@ -1098,13 +1100,9 @@ local function StartFastLoop()
 
     task.spawn(function()
         while RunningFast and Config.BlatantFast do
-        
             FastBlatant()
-
-            -- REEL DELAY = delay antar siklus
-            task.wait(math.max(Config.ReelDelay, 0.01))
+            task.wait(Config.FastCycleDelay)
         end
-
         RunningFast = false
     end)
 end
@@ -1112,6 +1110,7 @@ end
 local function StopFastLoop()
     RunningFast = false
 end
+
 
 
 
@@ -1169,36 +1168,26 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
 end)
 
 ----------------------------------------------------------------
--- GUI SETUP
+-- GUI
 ----------------------------------------------------------------
-TabAuto:Toggle("⚡ Blatant Fast Cycle", function(v)
+TabAuto:Toggle("⚡ Blatant Fast Mode", function(v)
     Config.BlatantFast = v
-    if v then
-        StartFastLoop()
-    else
-        StopFastLoop()
-    end
+    if v then StartFastLoop() else StopFastLoop() end
 end)
 
-TabAuto:Box("Reel Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        Config.ReelDelay = math.clamp(n, 0.01, 5)
-    end
+TabAuto:Box("Charge Delay", function(v)
+    local n = tonumber(v)
+    if n then Config.FastChargeDelay = math.clamp(n, 0.02, 1) end
 end)
 
-TabAuto:Box("Complete Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        Config.CompleteDelay = math.clamp(n, 0.01, 5)
-    end
+TabAuto:Box("MiniGame Delay", function(v)
+    local n = tonumber(v)
+    if n then Config.FastMiniDelay = math.clamp(n, 0.02, 1) end
 end)
 
-TabAuto:Box("Fast Micro Delay", function(txt)
-    local n = tonumber(txt)
-    if n then
-        Config.FastDelay = math.clamp(n, 0.001, 0.2)
-    end
+TabAuto:Box("Cycle Delay", function(v)
+    local n = tonumber(v)
+    if n then Config.FastCycleDelay = math.clamp(n, 0.02, 1) end
 end)
 
 
