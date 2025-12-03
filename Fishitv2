@@ -3,329 +3,219 @@
 ----------------------------------------------------------------
 if not game:IsLoaded() then game.Loaded:Wait() end
 
-local TweenService     = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui          = game:GetService("CoreGui")
+--==============================================================
+-- SIMPLE UI LIBRARY + COLLAPSE GROUP + RED BORDER
+--==============================================================
 
-local library = {}
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local CoreGui           = game:GetService("CoreGui")
 
--- Tema baru: sedikit lebih terang & kalem
-local theme = {
-    bg     = Color3.fromRGB(14, 16, 24),   -- background utama
-    card   = Color3.fromRGB(24, 26, 36),   -- panel / kartu
-    stroke = Color3.fromRGB(60, 70, 100),  -- garis luar
-    text   = Color3.fromRGB(235, 239, 255),
-    accent = Color3.fromRGB(140, 190, 255), -- biru lembut
-}
+local LocalPlayer       = Players.LocalPlayer
 
-local function tween(obj, dur, props)
-    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+local function getParentGui()
+    local ok, ui = pcall(function()
+        if gethui then
+            return gethui()
+        end
+    end)
+    if ok and ui then
+        return ui
+    end
+    return CoreGui
 end
 
---------------------------------------------------------------------------------
--- MAIN WINDOW
---------------------------------------------------------------------------------
-function library:CreateWindow(title)
+local theme = {
+    bg     = Color3.fromRGB(14, 16, 24),    -- background utama window
+    card   = Color3.fromRGB(24, 26, 36),    -- kartu panel
+    stroke = Color3.fromRGB(220, 40, 40),   -- 🔴 border merah
+    text   = Color3.fromRGB(235, 239, 255),
+    accent = Color3.fromRGB(140, 190, 255), -- aksen biru
+}
+
+local function CreateWindow(title)
+    -- ScreenGui
     local gui = Instance.new("ScreenGui")
-    gui.Name = "AegisHubCompact"
-    gui.Parent = CoreGui
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Name = "FishitUI"
+    gui.ResetOnSpawn = false
+    gui.Parent = getParentGui()
 
-    -- main window (diperkecil)
+    -- Main Window
     local main = Instance.new("Frame")
-
+    main.Name = "Main"
     main.Parent = gui
-    main.Size = UDim2.new(0, 460, 0, 300)             -- dulu 520 x 340
-    main.Position = UDim2.new(.5, -230, .5, -150)
+    main.Size = UDim2.new(0, 600, 0, 380)
+    main.Position = UDim2.new(0.5, -300, 0.5, -190)
     main.BackgroundColor3 = theme.bg
     main.BorderSizePixel = 0
+    local mainCorner = Instance.new("UICorner", main)
+    mainCorner.CornerRadius = UDim.new(0, 8)
 
-    local stroke = Instance.new("UIStroke", main)
-    stroke.Thickness = 1
-    stroke.Color = theme.stroke
+    local mainStroke = Instance.new("UIStroke", main)
+    mainStroke.Color = theme.stroke
+    mainStroke.Thickness = 1
 
-    local cornerMain = Instance.new("UICorner", main)
-    cornerMain.CornerRadius = UDim.new(0, 6)
-
-    -- draggable overlay toggle (bulat kecil di samping)
-    local overlayBtn = Instance.new("TextButton")
-    overlayBtn.Parent = gui
-    overlayBtn.Size = UDim2.new(0, 30, 0, 30)
-    overlayBtn.Position = UDim2.new(0, 12, 0.5, -15)
-    overlayBtn.Text = "≡"
-    overlayBtn.Font = Enum.Font.GothamBold
-    overlayBtn.TextSize = 16
-    overlayBtn.TextColor3 = theme.text
-    overlayBtn.BackgroundColor3 = theme.card
-    overlayBtn.BorderSizePixel = 0
-    overlayBtn.Visible = false
-
-    local ovCorner = Instance.new("UICorner", overlayBtn)
-    ovCorner.CornerRadius = UDim.new(1, 0)
-
-    do -- drag overlay
-        local dragging, start, offset
-        overlayBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-               or i.UserInputType == Enum.UserInputType.Touch then
+    -- Dragging
+    do
+        local dragging, dragStart, startPos
+        main.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
-                start    = i.Position
-                offset   = overlayBtn.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
+                dragStart = input.Position
+                startPos = main.Position
             end
         end)
-        UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-                or i.UserInputType == Enum.UserInputType.Touch) then
-                local d = i.Position - start
-                overlayBtn.Position = UDim2.new(
-                    offset.X.Scale, offset.X.Offset + d.X,
-                    offset.Y.Scale, offset.Y.Offset + d.Y
+        main.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local delta = input.Position - dragStart
+                main.Position = UDim2.new(
+                    startPos.X.Scale,
+                    startPos.X.Offset + delta.X,
+                    startPos.Y.Scale,
+                    startPos.Y.Offset + delta.Y
                 )
             end
         end)
     end
 
-    overlayBtn.MouseButton1Click:Connect(function()
-        main.Visible = true
-        overlayBtn.Visible = false
-    end)
-
-    -- title bar
+    -- Title bar
     local top = Instance.new("Frame")
     top.Parent = main
-    top.Size = UDim2.new(1,0,0,30)                 -- sedikit lebih tipis
+    top.Size = UDim2.new(1,0,0,28)
     top.BackgroundColor3 = theme.card
     top.BorderSizePixel = 0
     local topCorner = Instance.new("UICorner", top)
-    topCorner.CornerRadius = UDim.new(0, 6)
+    topCorner.CornerRadius = UDim.new(0,8)
 
-    local tlabel = Instance.new("TextLabel")
-    tlabel.Parent = top
-    tlabel.Size = UDim2.new(1,-80,1,0)
-    tlabel.Position = UDim2.new(0,10,0,0)
-    tlabel.BackgroundTransparency = 1
-    tlabel.Text = tostring(title)
-    tlabel.TextXAlignment = Enum.TextXAlignment.Left
-    tlabel.Font = Enum.Font.GothamMedium
-    tlabel.TextSize = 15
-    tlabel.TextColor3 = theme.text
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Parent = top
+    titleLbl.Size = UDim2.new(1,-10,1,0)
+    titleLbl.Position = UDim2.new(0,6,0,0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title or "Window"
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 13
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.TextColor3 = theme.text
 
-    -- minimize button
-    local mini = Instance.new("TextButton")
-    mini.Parent = top
-    mini.Size = UDim2.new(0,22,1,0)
-    mini.Position = UDim2.new(1,-62,0,0)
-    mini.Text = "-"
-    mini.TextColor3 = Color3.fromRGB(210,210,210)
-    mini.BackgroundTransparency = 1
-    mini.Font = Enum.Font.GothamBold
-    mini.TextSize = 16
+    -- Tab Buttons Bar
+    local tabBar = Instance.new("Frame")
+    tabBar.Parent = main
+    tabBar.Size = UDim2.new(0,130,1,-28)
+    tabBar.Position = UDim2.new(0,0,0,28)
+    tabBar.BackgroundColor3 = theme.bg
+    tabBar.BorderSizePixel = 0
 
-    mini.MouseButton1Click:Connect(function()
-        main.Visible = false
-        overlayBtn.Visible = true
-    end)
+    local tabList = Instance.new("UIListLayout", tabBar)
+    tabList.Padding = UDim.new(0,4)
+    tabList.FillDirection = Enum.FillDirection.Vertical
+    tabList.HorizontalAlignment = Enum.HorizontalAlignment.Stretch
+    tabList.VerticalAlignment = Enum.VerticalAlignment.Top
 
-    -- close button
-    local close = Instance.new("TextButton")
-    close.Parent = top
-    close.Size = UDim2.new(0,36,1,0)
-    close.Position = UDim2.new(1,-36,0,0)
-    close.Text = "X"
-    close.TextColor3 = Color3.fromRGB(255,80,80)
-    close.BackgroundTransparency = 1
-    close.Font = Enum.Font.GothamBold
-    close.TextSize = 16
+    -- Content Area
+    local pageHolder = Instance.new("Frame")
+    pageHolder.Parent = main
+    pageHolder.Size = UDim2.new(1,-130,1,-28)
+    pageHolder.Position = UDim2.new(0,130,0,28)
+    pageHolder.BackgroundColor3 = theme.bg
+    pageHolder.BorderSizePixel = 0
 
-    close.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
+    -- Tab logic
+    local window = {}
+    window._tabs = {}
+    window._activeTab = nil
 
-    ---------------------------
-    -- DRAGGING THE WINDOW
-    ---------------------------
-    do
-        local dragging, start, offset
-        top.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-               or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                start    = i.Position
-                offset   = main.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-                or i.UserInputType == Enum.UserInputType.Touch) then
-                local d = i.Position - start
-                main.Position = UDim2.new(
-                    offset.X.Scale, offset.X.Offset + d.X,
-                    offset.Y.Scale, offset.Y.Offset + d.Y
-                )
-            end
-        end)
-    end
-
-    ------------------------------------------
-    -- LEFT SIDE TAB LIST
-    ------------------------------------------
-    local sidebar = Instance.new("Frame")
-    sidebar.Parent = main
-    sidebar.Size = UDim2.new(0,150,1,-30)      -- sedikit lebih kecil
-    sidebar.Position = UDim2.new(0,0,0,30)
-    sidebar.BackgroundColor3 = theme.card
-    sidebar.BorderSizePixel = 0
-    local sideCorner = Instance.new("UICorner", sidebar)
-    sideCorner.CornerRadius = UDim.new(0, 6)
-
-    local slist = Instance.new("UIListLayout", sidebar)
-    slist.SortOrder = Enum.SortOrder.LayoutOrder
-    slist.Padding = UDim.new(0,6)
-    slist.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    ------------------------------------------
-    -- RIGHT SIDE PAGE HOLDER
-    ------------------------------------------
-    local holder = Instance.new("Frame")
-    holder.Parent = main
-    holder.Size = UDim2.new(1,-150,1,-30)
-    holder.Position = UDim2.new(0,150,0,30)
-    holder.BackgroundTransparency = 1
-
-    ---------------------------------------------------------------------
-    -- TAB CREATOR
-    ---------------------------------------------------------------------
-    local win = {}
-
-    function win:CreateTab(name)
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1,-12,0,28)
-        tabBtn.BackgroundColor3 = theme.bg
-        tabBtn.BorderSizePixel = 0
-        tabBtn.Text = name
-        tabBtn.Font = Enum.Font.Gotham
-        tabBtn.TextSize = 13
-        tabBtn.TextColor3 = theme.text
-
-        local tabCorner = Instance.new("UICorner", tabBtn)
-        tabCorner.CornerRadius = UDim.new(0, 4)
-
-        local tabStroke = Instance.new("UIStroke", tabBtn)
-        tabStroke.Thickness = 1
-        tabStroke.Color = theme.stroke
-
-        local page = Instance.new("ScrollingFrame")
-        page.Parent = holder
-        page.Size = UDim2.new(1,0,1,0)
-        page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 3
-        page.Visible = false
-        page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-
-        local plist = Instance.new("UIListLayout", page)
-        plist.SortOrder = Enum.SortOrder.LayoutOrder
-        plist.Padding = UDim.new(0,6)
-        local pad = Instance.new("UIPadding", page)
-        pad.PaddingTop = UDim.new(0,6)
-        pad.PaddingLeft = UDim.new(0,6)
-        pad.PaddingRight = UDim.new(0,6)
-
-        -- select tab
-        tabBtn.MouseButton1Click:Connect(function()
-            for _,pg in ipairs(holder:GetChildren()) do
-                if pg:IsA("ScrollingFrame") then pg.Visible=false end
-            end
-            page.Visible = true
-        end)
-
-        -- first tab auto-selected
-        local numPages = 0
-        for _,pg in ipairs(holder:GetChildren()) do
-            if pg:IsA("ScrollingFrame") then numPages = numPages + 1 end
-        end
-        if numPages == 1 then
-            page.Visible = true
-        end
-
-        ------------------------------------------------------------
-        -- COMPONENT API
-        ------------------------------------------------------------
+    ----------------------------------------------------------------
+    -- INTERNAL: create API for each tab
+    ----------------------------------------------------------------
+    local function createTabApi(pageFrame)
         local api = {}
+        local page = pageFrame
 
-        ---------------------
-        -- Label
-        ---------------------
-                ---------------------
-        -- Label  (sekarang return instance)
-        ---------------------
+        ------------------------------------------------------------
+        -- Label (static)
+        ------------------------------------------------------------
         function api:Label(text)
             local lbl = Instance.new("TextLabel")
             lbl.Parent = page
-            lbl.Size = UDim2.new(1,-4,0,20)
+            lbl.Size = UDim2.new(1,-4,0,18)
             lbl.BackgroundTransparency = 1
-            lbl.Text = text
-            lbl.Font = Enum.Font.GothamBold
-            lbl.TextSize = 14
-            lbl.TextColor3 = theme.text
+            lbl.Text = text or ""
+            lbl.Font = Enum.Font.GothamSemibold
+            lbl.TextSize = 13
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.TextColor3 = theme.text
 
-            -- boleh diabaikan kalau nggak dipakai
+            local layout = page:FindFirstChildOfClass("UIListLayout")
+            if not layout then
+                layout = Instance.new("UIListLayout", page)
+                layout.Padding = UDim.new(0,4)
+                layout.FillDirection = Enum.FillDirection.Vertical
+                layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+                layout.SortOrder = Enum.SortOrder.LayoutOrder
+            end
+
             return lbl
         end
 
-        ---------------------
-        -- TextBox
-        ---------------------
-        function api:Box(placeholder, callback)
+        ------------------------------------------------------------
+        -- LiveLabel (auto-update teks)
+        ------------------------------------------------------------
+        function api:LiveLabel(getTextFn, refreshDelay)
+            refreshDelay = refreshDelay or 0.5
+            local lbl = self:Label("")
+            task.spawn(function()
+                while lbl.Parent do
+                    local ok, txt = pcall(getTextFn)
+                    if ok and typeof(txt) == "string" then
+                        lbl.Text = txt
+                    end
+                    task.wait(refreshDelay)
+                end
+            end)
+            return lbl
+        end
+
+        ------------------------------------------------------------
+        -- Button
+        ------------------------------------------------------------
+        function api:Button(text, callback)
             callback = callback or function() end
 
-            local fr = Instance.new("Frame")
+            local fr = Instance.new("TextButton")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,32)
+            fr.Size = UDim2.new(1,-4,0,28)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
+            fr.Text = text or "Button"
+            fr.Font = Enum.Font.GothamSemibold
+            fr.TextSize = 13
+            fr.TextColor3 = theme.text
+            local corner = Instance.new("UICorner", fr)
+            corner.CornerRadius = UDim.new(0,4)
 
-            local box = Instance.new("TextBox")
-            box.Parent = fr
-            box.PlaceholderText = placeholder
-            box.Text = ""
-            box.Size = UDim2.new(1,-12,1,-6)
-            box.Position = UDim2.new(0,6,0,3)
-            box.BackgroundColor3 = theme.bg
-            box.BorderSizePixel = 0
-            box.Font = Enum.Font.Gotham
-            box.TextSize = 13
-            box.TextColor3 = theme.text
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
 
-            box.FocusLost:Connect(function()
-                callback(box.Text)
-            end)
+            fr.MouseButton1Click:Connect(callback)
 
             return {
-                Set = function(_,v)
-                    box.Text = v
+                Set = function(_, v)
+                    fr.Text = tostring(v)
                 end,
-                Get = function()
-                    return box.Text
-                end,
-                Object = box
+                Object = fr,
             }
         end
 
-        ---------------------
+        ------------------------------------------------------------
         -- Toggle
-        ---------------------
+        ------------------------------------------------------------
         function api:Toggle(text, callback)
             callback = callback or function() end
             
@@ -337,12 +227,16 @@ function library:CreateWindow(title)
             local frCorner = Instance.new("UICorner", fr)
             frCorner.CornerRadius = UDim.new(0,4)
 
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
+
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
             lbl.Size = UDim2.new(1,-40,1,0)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
-            lbl.Text = text
+            lbl.Text = text or "Toggle"
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
             lbl.Font = Enum.Font.Gotham
@@ -372,28 +266,29 @@ function library:CreateWindow(title)
             click.Text = ""
 
             local state = false
+
             local function apply()
                 tick.Text = state and "✓" or ""
                 callback(state)
             end
+
             click.MouseButton1Click:Connect(function()
                 state = not state
                 apply()
             end)
 
             return {
-    Set = function(_,v)
-        state = v and true or false
-        apply()
-    end,
-    Object = fr,
-}
-
+                Set = function(_, v)
+                    state = v and true or false
+                    apply()
+                end,
+                Object = fr,
+            }
         end
 
-        ---------------------
+        ------------------------------------------------------------
         -- Slider
-        ---------------------
+        ------------------------------------------------------------
         function api:Slider(text, min, max, default, callback)
             callback = callback or function() end
             min = min or 0
@@ -408,9 +303,13 @@ function library:CreateWindow(title)
             local frCorner = Instance.new("UICorner", fr)
             frCorner.CornerRadius = UDim.new(0,4)
 
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
+
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
-            lbl.Text = text
+            lbl.Text = text or "Slider"
             lbl.Size = UDim2.new(1,-8,0,16)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
@@ -456,6 +355,7 @@ function library:CreateWindow(title)
                     update(i.Position.X)
                 end
             end)
+
             bar.InputEnded:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 
                 or i.UserInputType == Enum.UserInputType.Touch then
@@ -476,84 +376,59 @@ function library:CreateWindow(title)
                 Set = function(_, v)
                     v = math.clamp(v or value, min, max)
                     setFromPct((v-min)/(max-min))
-                end
+                end,
+                Object = fr,
             }
         end
 
-        ---------------------
-        -- TextBox
-        ---------------------
+        ------------------------------------------------------------
+        -- Box (TextBox)
+        ------------------------------------------------------------
         function api:Box(placeholder, callback)
-    callback = callback or function() end
+            callback = callback or function() end
 
-    local fr = Instance.new("Frame")
-    fr.Parent = page
-    fr.Size = UDim2.new(1,-4,0,30)
-    fr.BackgroundColor3 = theme.card
-    fr.BorderSizePixel = 0
-    local frCorner = Instance.new("UICorner", fr)
-    frCorner.CornerRadius = UDim.new(0,4)
+            local fr = Instance.new("Frame")
+            fr.Parent = page
+            fr.Size = UDim2.new(1,-4,0,32)
+            fr.BackgroundColor3 = theme.card
+            fr.BorderSizePixel = 0
+            local frCorner = Instance.new("UICorner", fr)
+            frCorner.CornerRadius = UDim.new(0,4)
 
-    local box = Instance.new("TextBox")
-    box.Parent = fr
-    box.PlaceholderText = placeholder
-    box.Text = ""
-    box.Size = UDim2.new(1,-12,1,-6)
-    box.Position = UDim2.new(0,6,0,3)
-    box.BackgroundColor3 = theme.bg
-    box.BorderSizePixel = 0
-    box.Font = Enum.Font.Gotham
-    box.TextSize = 12
-    box.TextColor3 = theme.text
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
 
-    box.FocusLost:Connect(function()
-        callback(box.Text)
-    end)
+            local box = Instance.new("TextBox")
+            box.Parent = fr
+            box.PlaceholderText = placeholder or ""
+            box.Text = ""
+            box.Size = UDim2.new(1,-12,1,-6)
+            box.Position = UDim2.new(0,6,0,3)
+            box.BackgroundColor3 = theme.bg
+            box.BorderSizePixel = 0
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 13
+            box.TextColor3 = theme.text
 
-    return {
-        Set = function(_,v)
-            box.Text = v
-        end,
-        Get = function()
-            return box.Text
-        end,
-        Object = fr, -- PENTING: supaya CollapseGroup bisa hide
-    }
-end
+            box.FocusLost:Connect(function()
+                callback(box.Text)
+            end)
 
+            return {
+                Set = function(_, v)
+                    box.Text = v
+                end,
+                Get = function()
+                    return box.Text
+                end,
+                Object = fr,
+            }
+        end
 
-        ---------------------
-        -- Button
-        ---------------------
-        function api:Button(text, callback)
-    callback = callback or function() end
-
-    local fr = Instance.new("TextButton")
-    fr.Parent = page
-    fr.Size = UDim2.new(1,-4,0,28)
-    fr.BackgroundColor3 = theme.card
-    fr.BorderSizePixel = 0
-    fr.Text = text
-    fr.Font = Enum.Font.GothamSemibold
-    fr.TextSize = 13
-    fr.TextColor3 = theme.text
-    local frCorner = Instance.new("UICorner", fr)
-    frCorner.CornerRadius = UDim.new(0,4)
-
-    fr.MouseButton1Click:Connect(callback)
-
-    return {
-        Set = function(_, v)
-            fr.Text = tostring(v)
-        end,
-        Object = fr,
-    }
-end
-
-
-        ---------------------
-        -- Dropdown (Single Select)
-        ---------------------
+        ------------------------------------------------------------
+        -- Dropdown (single select)
+        ------------------------------------------------------------
         function api:Dropdown(text, list, callback)
             callback = callback or function() end
             list = list or {}
@@ -562,11 +437,14 @@ end
             local fr = Instance.new("Frame")
             fr.Parent = page
             fr.Size = UDim2.new(1,-4,0,30)
-            fr.AutomaticSize = Enum.AutomaticSize.Y
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
             local frCorner = Instance.new("UICorner", fr)
             frCorner.CornerRadius = UDim.new(0,4)
+
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
 
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
@@ -577,7 +455,7 @@ end
             lbl.TextColor3 = theme.text
             lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text
+            lbl.Text = text or "Dropdown"
 
             local arrow = Instance.new("TextLabel")
             arrow.Parent = fr
@@ -610,10 +488,10 @@ end
             headBtn.Text = ""
 
             local function rebuild(opts)
-                for _,c in ipairs(holder:GetChildren()) do
+                for _, c in ipairs(holder:GetChildren()) do
                     if c:IsA("TextButton") then c:Destroy() end
                 end
-                for _,opt in ipairs(opts) do
+                for _, opt in ipairs(opts) do
                     local b = Instance.new("TextButton")
                     b.Parent = holder
                     b.Size = UDim2.new(1,0,0,24)
@@ -628,13 +506,14 @@ end
 
                     b.MouseButton1Click:Connect(function()
                         selected = opt
-                        lbl.Text = text.." : "..opt
+                        lbl.Text = (text or "Dropdown").." : "..opt
                         holder.Visible = false
                         open = false
                         callback(opt)
                     end)
                 end
             end
+
             rebuild(list)
 
             headBtn.MouseButton1Click:Connect(function()
@@ -645,242 +524,274 @@ end
             return {
                 Set = function(_, opt)
                     selected = opt
-                    lbl.Text = text.." : "..opt
+                    lbl.Text = (text or "Dropdown").." : "..opt
                 end,
                 SetOptions = function(_, opts)
                     list = opts or {}
                     rebuild(list)
-                end
+                end,
+                Object = fr,
             }
         end
 
-        ---------------------
-        -- LiveLabel (text dinamis, pakai function)
-        ---------------------
-        function api:LiveLabel(getTextFn, refreshDelay)
-            -- getTextFn = function() return "teks..." end
-            -- refreshDelay = detik update (default 0.5)
-            refreshDelay = refreshDelay or 0.5
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = page
-            lbl.Size = UDim2.new(1,-4,0,40)
-            lbl.AutomaticSize = Enum.AutomaticSize.Y
-            lbl.BackgroundTransparency = 1
-            lbl.Text = ""
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.TextYAlignment = Enum.TextYAlignment.Top
-            lbl.TextWrapped = true
-
-            -- loop update teks
-            task.spawn(function()
-                while lbl.Parent do
-                    local ok, txt = pcall(getTextFn)
-                    if ok and txt ~= nil then
-                        lbl.Text = tostring(txt)
-                    end
-                    task.wait(refreshDelay)
-                end
-            end)
-
-            return lbl
-        end
-
         ------------------------------------------------------------
--- GENERIC COLLAPSE GROUP COMPONENT
-------------------------------------------------------------
- ------------------------------------------------------------
--- GENERIC COLLAPSE GROUP COMPONENT
-------------------------------------------------------------
-function api:CreateCollapseGroup(title, buildFn)
-    local group = {}
-    group.IsOpen = false
-    group.Items  = {}
-
-    -- helper: set visibility semua item
-    function group:SetOpen(open)
-        self.IsOpen = open and true or false
-
-        -- update label header (▼ / ▲)
-        local suffix = self.IsOpen and " ▲" or " ▼"
-        if self.Header and self.Header.Set then
-            self.Header:Set(title .. suffix)
-        end
-
-        for _, ctrl in ipairs(self.Items) do
-            if ctrl then
-                local obj = ctrl.Object or ctrl
-                if obj and obj.Visible ~= nil then
-                    obj.Visible = self.IsOpen
-                end
-            end
-        end
-    end
-
-    function group:Toggle()
-        self:SetOpen(not self.IsOpen)
-    end
-
-    -- header button (pakai Button milik tab ini)
-    group.Header = self:Button(title .. " ▼", function()
-        group:Toggle()
-    end)
-
-    -- helper untuk dipakai di buildFn
-    local function add(ctrl)
-        if ctrl then
-            local obj = ctrl.Object or ctrl
-            if obj and obj.Visible ~= nil then
-                obj.Visible = group.IsOpen  -- start collapsed
-            end
-            table.insert(group.Items, ctrl)
-        end
-        return ctrl
-    end
-
-    -- bangun isi group (user-defined)
-    if typeof(buildFn) == "function" then
-        buildFn(add, group)
-    end
-
-    -- awalnya collapse
-    group:SetOpen(false)
-
-    return group
-end
-
-
-
-
-        ---------------------
-        -- Multi Dropdown
-        ---------------------
+        -- MultiDropdown (multi select)
+        ------------------------------------------------------------
         function api:MultiDropdown(text, list, callback)
             callback = callback or function() end
             list = list or {}
-
             local selected = {}
 
             local fr = Instance.new("Frame")
             fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,32)
-            fr.AutomaticSize = Enum.AutomaticSize.Y
+            fr.Size = UDim2.new(1,-4,0,30)
             fr.BackgroundColor3 = theme.card
             fr.BorderSizePixel = 0
             local frCorner = Instance.new("UICorner", fr)
             frCorner.CornerRadius = UDim.new(0,4)
 
+            local stroke = Instance.new("UIStroke", fr)
+            stroke.Thickness = 1
+            stroke.Color = theme.stroke
+
             local lbl = Instance.new("TextLabel")
             lbl.Parent = fr
-            lbl.Size = UDim2.new(1,-30,0,32)
+            lbl.Size = UDim2.new(1,-30,0,30)
             lbl.Position = UDim2.new(0,8,0,0)
             lbl.BackgroundTransparency = 1
-            lbl.TextColor3 = theme.text
             lbl.Font = Enum.Font.Gotham
+            lbl.TextColor3 = theme.text
             lbl.TextSize = 12
             lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text.." : None"
+            lbl.Text = text or "MultiDropdown"
 
-            local arrow = Instance.new("TextLabel", fr)
-            arrow.Size = UDim2.new(0,18,0,32)
+            local arrow = Instance.new("TextLabel")
+            arrow.Parent = fr
+            arrow.Size = UDim2.new(0,18,0,30)
             arrow.Position = UDim2.new(1,-18,0,0)
+            arrow.BackgroundTransparency = 1
+            arrow.Text = "v"
             arrow.Font = Enum.Font.GothamBold
             arrow.TextColor3 = theme.accent
-            arrow.Text = "v"
-            arrow.BackgroundTransparency = 1
 
-            local holder = Instance.new("Frame", fr)
-            holder.Position = UDim2.new(0,0,0,32)
+            local holder = Instance.new("Frame")
+            holder.Parent = fr
+            holder.Position = UDim2.new(0,0,0,30)
             holder.Size = UDim2.new(1,0,0,0)
             holder.BackgroundColor3 = theme.bg
-            holder.Visible = false
             holder.BorderSizePixel = 0
+            holder.Visible = false
             holder.AutomaticSize = Enum.AutomaticSize.Y
             local hCorner = Instance.new("UICorner", holder)
             hCorner.CornerRadius = UDim.new(0,4)
+
             local hlist = Instance.new("UIListLayout", holder)
             hlist.Padding = UDim.new(0,2)
 
             local open = false
             local headBtn = Instance.new("TextButton")
             headBtn.Parent = fr
+            headBtn.Size = UDim2.new(1,0,0,30)
             headBtn.BackgroundTransparency = 1
-            headBtn.Size = UDim2.new(1,0,0,32)
             headBtn.Text = ""
+
+            local function updateText()
+                local chosen = {}
+                for k, v in pairs(selected) do
+                    if v then table.insert(chosen, k) end
+                end
+                if #chosen == 0 then
+                    lbl.Text = text or "MultiDropdown"
+                else
+                    lbl.Text = (text or "MultiDropdown").." : "..table.concat(chosen, ", ")
+                end
+            end
+
+            local function rebuild(opts)
+                for _, c in ipairs(holder:GetChildren()) do
+                    if c:IsA("TextButton") then c:Destroy() end
+                end
+                for _, opt in ipairs(opts) do
+                    local b = Instance.new("TextButton")
+                    b.Parent = holder
+                    b.Size = UDim2.new(1,0,0,24)
+                    b.BackgroundColor3 = theme.card
+                    b.BorderSizePixel = 0
+                    b.Text = "[ ] "..opt
+                    b.Font = Enum.Font.Gotham
+                    b.TextSize = 12
+                    b.TextColor3 = theme.text
+                    b.TextXAlignment = Enum.TextXAlignment.Left
+                    local bc = Instance.new("UICorner", b)
+                    bc.CornerRadius = UDim.new(0,4)
+
+                    selected[opt] = selected[opt] or false
+
+                    local function apply()
+                        b.Text = (selected[opt] and "[x] " or "[ ] ")..opt
+                        callback(opt, selected[opt])
+                        updateText()
+                    end
+
+                    b.MouseButton1Click:Connect(function()
+                        selected[opt] = not selected[opt]
+                        apply()
+                    end)
+
+                    apply()
+                end
+            end
+
+            rebuild(list)
 
             headBtn.MouseButton1Click:Connect(function()
                 open = not open
                 holder.Visible = open
             end)
 
-            local function updateText()
-                local list2 = {}
-                for k,v in pairs(selected) do
-                    if v then table.insert(list2,k) end
-                end
-                table.sort(list2)
-                if #list2 == 0 then
-                    lbl.Text = text.." : None"
-                else
-                    lbl.Text = text.." : "..table.concat(list2,", ")
-                end
-            end
-
-            local function rebuild(opts)
-                for _,c in ipairs(holder:GetChildren()) do
-                    if c:IsA("TextButton") then c:Destroy() end
-                end
-                for _,opt in ipairs(opts) do
-                    local b = Instance.new("TextButton")
-                    b.Parent = holder
-                    b.Size = UDim2.new(1,0,0,24)
-                    b.BackgroundColor3 = theme.card
-                    b.BorderSizePixel = 0
-                    b.Text = opt
-                    b.Font = Enum.Font.Gotham
-                    b.TextSize = 12
-                    b.TextColor3 = theme.text
-                    local bc = Instance.new("UICorner", b)
-                    bc.CornerRadius = UDim.new(0,4)
-
-                    b.MouseButton1Click:Connect(function()
-                        selected[opt] = not selected[opt]
-                        callback(opt, selected[opt])
-                        updateText()
-                    end)
-                end
-                updateText()
-            end
-
-            rebuild(list)
-
             return {
-    Set = function(_, opt, state)
-        selected[opt] = state and true or false
-        updateText()
-    end,
-    List = function()
-        local t={}
-        for k,v in pairs(selected) do if v then table.insert(t,k) end end
-        return t
-    end,
-    SetOptions = function(_, opts)
-        list = opts or {}
-        rebuild(list)
-    end,
-    Object = fr,
-}
+                Set = function(_, opt, state)
+                    selected[opt] = state and true or false
+                    rebuild(list)
+                end,
+                List = function()
+                    local t = {}
+                    for k,v in pairs(selected) do
+                        if v then table.insert(t,k) end
+                    end
+                    return t
+                end,
+                SetOptions = function(_, opts)
+                    list = opts or {}
+                    rebuild(list)
+                end,
+                Object = fr,
+            }
+        end
 
+        ------------------------------------------------------------
+        -- Collapse Group
+        ------------------------------------------------------------
+        function api:CreateCollapseGroup(title, buildFn)
+            local group = {}
+            group.IsOpen = false
+            group.Items  = {}
+
+            function group:SetOpen(open)
+                self.IsOpen = open and true or false
+                local suffix = self.IsOpen and " ▲" or " ▼"
+                if self.Header and self.Header.Set then
+                    self.Header:Set(title .. suffix)
+                end
+
+                for _, ctrl in ipairs(self.Items) do
+                    if ctrl then
+                        local obj = ctrl.Object or ctrl
+                        if obj and obj.Visible ~= nil then
+                            obj.Visible = self.IsOpen
+                        end
+                    end
+                end
+            end
+
+            function group:Toggle()
+                self:SetOpen(not self.IsOpen)
+            end
+
+            local header = self:Button(title .. " ▼", function()
+                group:Toggle()
+            end)
+            group.Header = header
+
+            local function add(ctrl)
+                if ctrl then
+                    local obj = ctrl.Object or ctrl
+                    if obj and obj.Visible ~= nil then
+                        obj.Visible = group.IsOpen
+                    end
+                    table.insert(group.Items, ctrl)
+                end
+                return ctrl
+            end
+
+            if typeof(buildFn) == "function" then
+                buildFn(add, group)
+            end
+
+            group:SetOpen(false)
+            return group
         end
 
         return api
     end
 
-    return win
+    ----------------------------------------------------------------
+    -- PUBLIC: CreateTab
+    ----------------------------------------------------------------
+    function window:CreateTab(name)
+        name = name or "Tab"
+
+        -- tab button
+        local btn = Instance.new("TextButton")
+        btn.Parent = tabBar
+        btn.Size = UDim2.new(1,0,0,28)
+        btn.BackgroundColor3 = theme.card
+        btn.BorderSizePixel = 0
+        btn.Font = Enum.Font.GothamSemibold
+        btn.TextSize = 12
+        btn.TextColor3 = theme.text
+        btn.Text = name
+        local bc = Instance.new("UICorner", btn)
+        bc.CornerRadius = UDim.new(0,4)
+
+        local btnStroke = Instance.new("UIStroke", btn)
+        btnStroke.Color = theme.stroke
+        btnStroke.Thickness = 1
+
+        -- page frame
+        local page = Instance.new("Frame")
+        page.Parent = pageHolder
+        page.Size = UDim2.new(1,0,1,0)
+        page.BackgroundColor3 = theme.bg
+        page.BorderSizePixel = 0
+        page.Visible = false
+
+        local layout = Instance.new("UIListLayout", page)
+        layout.Padding = UDim.new(0,4)
+        layout.FillDirection = Enum.FillDirection.Vertical
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+        local tabApi = createTabApi(page)
+        window._tabs[name] = { Button = btn, Page = page, Api = tabApi }
+
+        local function setActive()
+            for _, info in pairs(window._tabs) do
+                info.Page.Visible = false
+                info.Button.BackgroundColor3 = theme.card
+            end
+            page.Visible = true
+            btn.BackgroundColor3 = theme.bg
+            window._activeTab = name
+        end
+
+        btn.MouseButton1Click:Connect(setActive)
+
+        if not window._activeTab then
+            setActive()
+        end
+
+        return tabApi
+    end
+
+    return window
 end
+
+--==============================================================
+-- END UI LIBRARY
+--==============================================================
+
+return CreateWindow
 
 
 ----------------------------------------------------------------
