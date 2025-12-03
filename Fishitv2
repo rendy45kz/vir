@@ -205,6 +205,66 @@ function library:CreateWindow(title)
     -- TAB CREATOR
     ---------------------------------------------------------------------
     local win = {}
+    ------------------------------------------------------------
+-- GENERIC COLLAPSE GROUP COMPONENT
+------------------------------------------------------------
+function api:CreateCollapseGroup(title, buildFn)
+    local group = {}
+    group.IsOpen = false
+    group.Items  = {}
+
+    -- helper: set visibility semua item
+    function group:SetOpen(open)
+        self.IsOpen = open and true or false
+
+        -- update label header (▼ / ▲)
+        local suffix = self.IsOpen and " ▲" or " ▼"
+        if self.Header and self.Header.Set then
+            self.Header:Set(title .. suffix)
+        end
+
+        for _, ctrl in ipairs(self.Items) do
+            if ctrl then
+                local obj = ctrl.Object or ctrl
+                if obj and obj.Visible ~= nil then
+                    obj.Visible = self.IsOpen
+                end
+            end
+        end
+    end
+
+    function group:Toggle()
+        self:SetOpen(not self.IsOpen)
+    end
+
+    -- header button (pakai Button milik tab ini)
+    group.Header = self:Button(title .. " ▼", function()
+        group:Toggle()
+    end)
+
+    -- helper untuk dipakai di buildFn
+    local function add(ctrl)
+        if ctrl then
+            local obj = ctrl.Object or ctrl
+            if obj and obj.Visible ~= nil then
+                obj.Visible = group.IsOpen  -- start collapsed
+            end
+            table.insert(group.Items, ctrl)
+        end
+        return ctrl
+    end
+
+    -- bangun isi group (user-defined)
+    if typeof(buildFn) == "function" then
+        buildFn(add, group)
+    end
+
+    -- awalnya collapse
+    group:SetOpen(false)
+
+    return group
+end
+
 
     function win:CreateTab(name)
         local tabBtn = Instance.new("TextButton")
@@ -381,11 +441,13 @@ function library:CreateWindow(title)
             end)
 
             return {
-                Set = function(_,v)
-                    state = v and true or false
-                    apply()
-                end
-            }
+    Set = function(_,v)
+        state = v and true or false
+        apply()
+    end,
+    Object = fr,
+}
+
         end
 
         ---------------------
@@ -477,63 +539,35 @@ function library:CreateWindow(title)
             }
         end
 
-        ---------------------
-        -- TextBox
-        ---------------------
-        function api:Box(placeholder, callback)
-            callback = callback or function() end
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,30)
-            fr.BackgroundColor3 = theme.card
-            fr.BorderSizePixel = 0
-            local frCorner = Instance.new("UICorner", fr)
-            frCorner.CornerRadius = UDim.new(0,4)
-
-            local box = Instance.new("TextBox")
-            box.Parent = fr
-            box.PlaceholderText = placeholder
-            box.Text = ""
-            box.Size = UDim2.new(1,-12,1,-6)
-            box.Position = UDim2.new(0,6,0,3)
-            box.BackgroundColor3 = theme.bg
-            box.BorderSizePixel = 0
-            box.Font = Enum.Font.Gotham
-            box.TextSize = 12
-            box.TextColor3 = theme.text
-
-            box.FocusLost:Connect(function()
-                callback(box.Text)
-            end)
-
-            return {
-                Set = function(_,v)
-                    box.Text = v
-                end
-            }
-        end
-
+        
         ---------------------
         -- Button
         ---------------------
         function api:Button(text, callback)
-            callback = callback or function() end
+    callback = callback or function() end
 
-            local fr = Instance.new("TextButton")
-            fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,28)
-            fr.BackgroundColor3 = theme.card
-            fr.BorderSizePixel = 0
-            fr.Text = text
-            fr.Font = Enum.Font.GothamSemibold
-            fr.TextSize = 13
-            fr.TextColor3 = theme.text
-            local frCorner = Instance.new("UICorner", fr)
-            frCorner.CornerRadius = UDim.new(0,4)
+    local fr = Instance.new("TextButton")
+    fr.Parent = page
+    fr.Size = UDim2.new(1,-4,0,28)
+    fr.BackgroundColor3 = theme.card
+    fr.BorderSizePixel = 0
+    fr.Text = text
+    fr.Font = Enum.Font.GothamSemibold
+    fr.TextSize = 13
+    fr.TextColor3 = theme.text
+    local frCorner = Instance.new("UICorner", fr)
+    frCorner.CornerRadius = UDim.new(0,4)
 
-            fr.MouseButton1Click:Connect(callback)
-        end
+    fr.MouseButton1Click:Connect(callback)
+
+    return {
+        Set = function(_, v)
+            fr.Text = tostring(v)
+        end,
+        Object = fr,
+    }
+end
+
 
         ---------------------
         -- Dropdown (Single Select)
@@ -673,63 +707,6 @@ function library:CreateWindow(title)
             return lbl
         end
 
-        ------------------------------------------------------------
--- GENERIC COLLAPSE GROUP COMPONENT
-------------------------------------------------------------
- function api:CreateCollapseGroup(tab, title, buildFn)
-    local group = {}
-    group.IsOpen = false
-    group.Items  = {}
-
-    -- helper: set visibility semua item
-    function group:SetOpen(open)
-        self.IsOpen = open and true or false
-
-        -- update label header (▼ / ▲)
-        local suffix = self.IsOpen and " ▲" or " ▼"
-        if self.Header and self.Header.Set then
-            -- kalau library-mu support Set(text)
-            self.Header:Set(title .. suffix)
-        end
-
-        for _, ctrl in ipairs(self.Items) do
-            if ctrl and ctrl.Visible ~= nil then
-                ctrl.Visible = self.IsOpen
-            end
-        end
-    end
-
-    function group:Toggle()
-        self:SetOpen(not self.IsOpen)
-    end
-
-    -- header button
-    group.Header = tab:Button(title .. " ▼", function()
-        group:Toggle()
-    end)
-
-    -- helper untuk dipakai di buildFn
-    local function add(ctrl)
-        if ctrl then
-            ctrl.Visible = group.IsOpen  -- start: collapsed (false)
-            table.insert(group.Items, ctrl)
-        end
-        return ctrl
-    end
-
-    -- bangun isi group (user-defined)
-    if typeof(buildFn) == "function" then
-        buildFn(add, group)
-    end
-
-    -- awalnya collapse
-    group:SetOpen(false)
-
-    return group
-end
-
-
-
         ---------------------
         -- Multi Dropdown
         ---------------------
@@ -833,20 +810,22 @@ end
             rebuild(list)
 
             return {
-                Set = function(_, opt, state)
-                    selected[opt] = state and true or false
-                    updateText()
-                end,
-                List = function()
-                    local t={}
-                    for k,v in pairs(selected) do if v then table.insert(t,k) end end
-                    return t
-                end,
-                SetOptions = function(_, opts)
-                    list = opts or {}
-                    rebuild(list)
-                end
-            }
+    Set = function(_, opt, state)
+        selected[opt] = state and true or false
+        updateText()
+    end,
+    List = function()
+        local t={}
+        for k,v in pairs(selected) do if v then table.insert(t,k) end end
+        return t
+    end,
+    SetOptions = function(_, opts)
+        list = opts or {}
+        rebuild(list)
+    end,
+    Object = fr,
+}
+
         end
 
         return api
@@ -2238,7 +2217,7 @@ Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
 
 local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
 
-local weatherGroup = CreateCollapseGroup(TabShop, "Auto Buy Weather", function(add, group)
+local weatherGroup = TabShop:CreateCollapseGroup("Auto Buy Weather", function(add, group)
     -- Toggle Enable
     local toggleAuto = add(TabShop:Toggle("Enable Auto Weather", function(v)
         Farm.AutoWeatherEnabled = v
@@ -2259,10 +2238,11 @@ local weatherGroup = CreateCollapseGroup(TabShop, "Auto Buy Weather", function(a
         end
     end))
 
-    -- kalau mau simpan handle-nya:
+    -- simpan kalau mau dipakai lagi
     group.ToggleAuto = toggleAuto
     group.Dropdown   = ddWeather
 end)
+
 
 ----------------------------------------------------------------
 farmUI:Label("Auto Enchant")
