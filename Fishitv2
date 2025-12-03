@@ -33,6 +33,7 @@ function library:CreateWindow(title)
 
     -- main window (diperkecil)
     local main = Instance.new("Frame")
+
     main.Parent = gui
     main.Size = UDim2.new(0, 460, 0, 300)             -- dulu 520 x 340
     main.Position = UDim2.new(.5, -230, .5, -150)
@@ -2143,116 +2144,127 @@ local farmUI = TabFarm
 ----------------------------------------------------------------
 -- AUTO RESPAWN BY FISH COUNT (FARM TAB)
 ----------------------------------------------------------------
-TabFarm:Label("Auto Respawn / Teleport by Fish Count")
+----------------------------------------------------------------
+-- AUTO RESPAWN BY FISH COUNT (FARM TAB)
+----------------------------------------------------------------
+local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport", function(add, group)
 
--- live info counter
-TabFarm:LiveLabel(function()
-    local fs = Farm.FishStats or {}
-    local total   = fs.Total   or 0
-    local session = fs.Session or 0
-    local limit   = fs.RespawnThreshold or 500
-    local onoff   = fs.RespawnEnabled and "ON" or "OFF"
+    -- live info counter
+    add(TabFarm:LiveLabel(function()
+        local fs = Farm.FishStats or {}
+        local total   = fs.Total   or 0
+        local session = fs.Session or 0
+        local limit   = fs.RespawnThreshold or 500
+        local onoff   = fs.RespawnEnabled and "ON" or "OFF"
 
-    return string.format(
-        "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
-        onoff, session, total, limit
-    )
-end, 0.5)
+        return string.format(
+            "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
+            onoff, session, total, limit
+        )
+    end, 0.5))
 
--- input jumlah ikan sebelum respawn (tidak hardcode)
-TabFarm:Box("Fish count to respawn", function(txt)
-    local n = tonumber(txt)
-    if not n or n <= 0 then return end
-    n = math.floor(n)
-    Farm.FishStats.RespawnThreshold = n
-    print("[AutoRespawnFish] Threshold di-set ke:", n)
-end)
+    -- input jumlah ikan sebelum respawn (tidak hardcode)
+    add(TabFarm:Box("Fish count to respawn", function(txt)
+        local n = tonumber(txt)
+        if not n or n <= 0 then return end
+        n = math.floor(n)
+        Farm.FishStats.RespawnThreshold = n
+        print("[AutoRespawnFish] Threshold di-set ke:", n)
+    end))
 
--- toggle ON/OFF respawn
-TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
-    Farm.FishStats.RespawnEnabled = state and true or false
+    -- toggle ON/OFF respawn
+    add(TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
+        Farm.FishStats.RespawnEnabled = state and true or false
 
-    if state then
-        -- simpan posisi awal sebagai "tempat semula"
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            Farm.FishStats.OriginCFrame = hrp.CFrame
-            Farm.FishStats.Session = 0
-            print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
+        if state then
+            -- simpan posisi awal sebagai "tempat semula"
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                Farm.FishStats.OriginCFrame = hrp.CFrame
+                Farm.FishStats.Session = 0
+                print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
+            else
+                warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
+            end
         else
-            warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
+            print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
         end
-    else
-        print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
-    end
+    end))
 end)
-
-
-farmUI:Label("Auto Favorite")
-
--- BY RARITY
-farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
-    Farm.AutoFavoriteRarityEnabled = v
-end)
-
-local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
-
-farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
-    Farm.FavoriteRarity[r] = state
-end)
-
--- BY MUTATION (VariantId)
-farmUI:Toggle("Enable Auto Favorite by Mutation", function(v)
-    Farm.AutoFavoriteMutationEnabled = v
-end)
-
-local mutationList = {
-    "Galaxy",
-    "Fairy Dust",
-    "Gemstone",
-    "1x1x1x1",
-    "Stone",
-    "Gold",
-    "Albino",
-    "Frozen",
-    "Sandy",
-    "Ghost",
-    "Radioactive",
-    "Holographic",
-    "Noob",
-    "Corrupt",
-    "Lightning",
-    "Midnight",
-    "Shiny",
-}
-
-farmUI:MultiDropdown("Auto kinyis kinyis", mutationList, function(name, state)
-    Farm.FavoriteMutations[name] = state
-end)
-
-
 
 ----------------------------------------------------------------
-farmUI:Label("Auto Sell")
+-- AUTO FAVORITE (FARM TAB)
+----------------------------------------------------------------
+local favGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group)
 
-farmUI:Dropdown("Sell Mode", {
-    "Off","10 Fish","20 Fish","30 Fish","50 Fish"
-}, function(opt)
-    if opt=="Off" then
-        Farm.AutoSellEnabled=false
-        autoSellCount=0
-    else
-        Farm.AutoSellEnabled=true
-        local n = tonumber(opt:match("(%d+)"))
-        Farm.AutoSellThreshold = n or 30
-    end
+    -- BY RARITY
+    add(farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
+        Farm.AutoFavoriteRarityEnabled = v
+    end))
+
+    local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
+
+    add(farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
+        Farm.FavoriteRarity[r] = state
+    end))
+
+    -- BY MUTATION (VariantId)
+    add(farmUI:Toggle("Enable Auto Favorite by Mutation", function(v)
+        Farm.AutoFavoriteMutationEnabled = v
+    end))
+
+    local mutationList = {
+        "Galaxy",
+        "Fairy Dust",
+        "Gemstone",
+        "1x1x1x1",
+        "Stone",
+        "Gold",
+        "Albino",
+        "Frozen",
+        "Sandy",
+        "Ghost",
+        "Radioactive",
+        "Holographic",
+        "Noob",
+        "Corrupt",
+        "Lightning",
+        "Midnight",
+        "Shiny",
+    }
+
+    add(farmUI:MultiDropdown("Auto kinyis kinyis", mutationList, function(name, state)
+        Farm.FavoriteMutations[name] = state
+    end))
 end)
 
-farmUI:Box("Sell Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then Farm.AutoSellDelay = n end
+----------------------------------------------------------------
+-- AUTO SELL (FARM TAB)
+----------------------------------------------------------------
+local sellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
+
+    add(farmUI:Dropdown("Sell Mode", {
+        "Off","10 Fish","20 Fish","30 Fish","50 Fish"
+    }, function(opt)
+        if opt=="Off" then
+            Farm.AutoSellEnabled=false
+            autoSellCount=0
+        else
+            Farm.AutoSellEnabled=true
+            local n = tonumber(opt:match("(%d+)"))
+            Farm.AutoSellThreshold = n or 30
+        end
+    end))
+
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then
+            Farm.AutoSellDelay = n
+        end
+    end))
 end)
+
 
 Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
 Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
