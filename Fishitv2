@@ -2144,10 +2144,7 @@ local farmUI = TabFarm
 ----------------------------------------------------------------
 -- AUTO RESPAWN BY FISH COUNT (FARM TAB)
 ----------------------------------------------------------------
-----------------------------------------------------------------
--- AUTO RESPAWN BY FISH COUNT (FARM TAB)
-----------------------------------------------------------------
-local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport", function(add, group)
+local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport by Fish Count", function(add, group)
 
     -- live info counter
     add(TabFarm:LiveLabel(function()
@@ -2163,7 +2160,7 @@ local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport", func
         )
     end, 0.5))
 
-    -- input jumlah ikan sebelum respawn (tidak hardcode)
+    -- input jumlah ikan sebelum respawn
     add(TabFarm:Box("Fish count to respawn", function(txt)
         local n = tonumber(txt)
         if not n or n <= 0 then return end
@@ -2177,7 +2174,6 @@ local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport", func
         Farm.FishStats.RespawnEnabled = state and true or false
 
         if state then
-            -- simpan posisi awal sebagai "tempat semula"
             local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
             local hrp  = char and char:FindFirstChild("HumanoidRootPart")
             if hrp then
@@ -2193,11 +2189,11 @@ local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport", func
     end))
 end)
 
+
 ----------------------------------------------------------------
 -- AUTO FAVORITE (FARM TAB)
 ----------------------------------------------------------------
 local favGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group)
-
     -- BY RARITY
     add(farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
         Farm.AutoFavoriteRarityEnabled = v
@@ -2239,11 +2235,11 @@ local favGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group
     end))
 end)
 
+
 ----------------------------------------------------------------
 -- AUTO SELL (FARM TAB)
 ----------------------------------------------------------------
 local sellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
-
     add(farmUI:Dropdown("Sell Mode", {
         "Off","10 Fish","20 Fish","30 Fish","50 Fish"
     }, function(opt)
@@ -2264,7 +2260,6 @@ local sellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
         end
     end))
 end)
-
 
 Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
 Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
