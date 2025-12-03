@@ -1062,23 +1062,16 @@ local function FastBlatant()
     ------------------------------------------------------------
     -- 2) CHARGE
     ------------------------------------------------------------
-    pcall(function()
-        Events.chargeRod:InvokeServer(ts)
+    task.spawn(function()
+        pcall(function()
+            Events.chargeRod:InvokeServer(ts)
+            task.wait(Config.FastChargeDelay)
+            Events.startMini:InvokeServer(ts)
+        end)
+
     end)
 
-    ------------------------------------------------------------
-    -- 3) **DELAY WAJIB** supaya bobber SPAWN
-    ------------------------------------------------------------
-    task.wait(Config.FastChargeDelay)
-
-    ------------------------------------------------------------
-    -- 4) MINIGAME
-    ------------------------------------------------------------
-    pcall(function()
-        -- kalau game-mu butuh args berbeda, masukkan di sini
-        Events.startMini:InvokeServer(ts)
-    end)
-
+    
     ------------------------------------------------------------
     -- 5) COMPLETE (tunggu dikit biar minigame kebuka)
     ------------------------------------------------------------
