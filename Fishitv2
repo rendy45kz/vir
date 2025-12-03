@@ -221,9 +221,9 @@ function library:CreateWindow(title)
         local tabCorner = Instance.new("UICorner", tabBtn)
         tabCorner.CornerRadius = UDim.new(0, 4)
 
-        local tabStroke = Instance.new("UIStroke", tabBtn)
-        tabStroke.Thickness = 1
-        tabStroke.Color = theme.stroke
+       -- local tabStroke = Instance.new("UIStroke", tabBtn)
+       -- tabStroke.Thickness = 1
+       -- tabStroke.Color = theme.stroke
 
         local page = Instance.new("ScrollingFrame")
         page.Parent = holder
@@ -656,16 +656,63 @@ function api:CreateCollapseGroup(title, buildFn)
     group.IsOpen = false
     group.Items  = {}
 
-    -- helper: set visibility semua item
+    ------------------------------------------------------------
+    -- HEADER CUSTOM (Frame + Label kiri + Icon kanan)
+    ------------------------------------------------------------
+    local headerFrame = Instance.new("Frame")
+    headerFrame.Parent = page
+    headerFrame.Size = UDim2.new(1, -4, 0, 28)
+    headerFrame.BackgroundColor3 = theme.card
+    headerFrame.BorderSizePixel = 0
+
+    local corner = Instance.new("UICorner", headerFrame)
+    corner.CornerRadius = UDim.new(0, 4)
+
+    local stroke = Instance.new("UIStroke", headerFrame)
+    stroke.Thickness = 1
+    stroke.Color = theme.stroke
+
+    -- text kiri
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Parent = headerFrame
+    titleLabel.Size = UDim2.new(1, -30, 1, 0)
+    titleLabel.Position = UDim2.new(0, 8, 0, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    titleLabel.Font = Enum.Font.GothamSemibold
+    titleLabel.TextSize = 13
+    titleLabel.TextColor3 = theme.text
+    titleLabel.Text = title
+
+    -- icon kanan
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Parent = headerFrame
+    iconLabel.Size = UDim2.new(0, 20, 1, 0)
+    iconLabel.Position = UDim2.new(1, -22, 0, 0)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Font = Enum.Font.GothamBold
+    iconLabel.TextSize = 16
+    iconLabel.TextColor3 = theme.accent
+    iconLabel.TextXAlignment = Enum.TextXAlignment.Center
+    iconLabel.Text = "▼"  -- default collapsed
+
+    -- invisible button untuk klik
+    local click = Instance.new("TextButton")
+    click.Parent = headerFrame
+    click.Size = UDim2.new(1, 0, 1, 0)
+    click.BackgroundTransparency = 1
+    click.Text = ""
+
+    ------------------------------------------------------------
+    -- SET VISIBILITY
+    ------------------------------------------------------------
     function group:SetOpen(open)
         self.IsOpen = open and true or false
 
-        -- update label header (▼ / ▲)
-        local suffix = self.IsOpen and " ▲" or " ▼"
-        if self.Header and self.Header.Set then
-            self.Header:Set(title .. suffix)
-        end
+        -- ubah icon
+        iconLabel.Text = self.IsOpen and "▲" or "▼"
 
+        -- ubah item visibility
         for _, ctrl in ipairs(self.Items) do
             if ctrl then
                 local obj = ctrl.Object or ctrl
@@ -680,33 +727,36 @@ function api:CreateCollapseGroup(title, buildFn)
         self:SetOpen(not self.IsOpen)
     end
 
-    -- header button (pakai Button milik tab ini)
-    group.Header = self:Button(title .. " ▼", function()
+    click.MouseButton1Click:Connect(function()
         group:Toggle()
     end)
 
-    -- helper untuk dipakai di buildFn
+    -- return header sebagai object
+    group.Header = { Object = headerFrame, Set = function(_, txt) titleLabel.Text = txt end }
+
+    ------------------------------------------------------------
+    -- BUILDER
+    ------------------------------------------------------------
     local function add(ctrl)
         if ctrl then
             local obj = ctrl.Object or ctrl
-            if obj and obj.Visible ~= nil then
-                obj.Visible = group.IsOpen  -- start collapsed
+            if obj then
+                obj.Visible = false
             end
             table.insert(group.Items, ctrl)
         end
         return ctrl
     end
 
-    -- bangun isi group (user-defined)
     if typeof(buildFn) == "function" then
         buildFn(add, group)
     end
 
-    -- awalnya collapse
     group:SetOpen(false)
 
     return group
 end
+
 
 
         ---------------------
