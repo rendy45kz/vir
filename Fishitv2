@@ -484,38 +484,43 @@ function library:CreateWindow(title)
         -- TextBox
         ---------------------
         function api:Box(placeholder, callback)
-            callback = callback or function() end
+    callback = callback or function() end
 
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1,-4,0,30)
-            fr.BackgroundColor3 = theme.card
-            fr.BorderSizePixel = 0
-            local frCorner = Instance.new("UICorner", fr)
-            frCorner.CornerRadius = UDim.new(0,4)
+    local fr = Instance.new("Frame")
+    fr.Parent = page
+    fr.Size = UDim2.new(1,-4,0,30)
+    fr.BackgroundColor3 = theme.card
+    fr.BorderSizePixel = 0
+    local frCorner = Instance.new("UICorner", fr)
+    frCorner.CornerRadius = UDim.new(0,4)
 
-            local box = Instance.new("TextBox")
-            box.Parent = fr
-            box.PlaceholderText = placeholder
-            box.Text = ""
-            box.Size = UDim2.new(1,-12,1,-6)
-            box.Position = UDim2.new(0,6,0,3)
-            box.BackgroundColor3 = theme.bg
-            box.BorderSizePixel = 0
-            box.Font = Enum.Font.Gotham
-            box.TextSize = 12
-            box.TextColor3 = theme.text
+    local box = Instance.new("TextBox")
+    box.Parent = fr
+    box.PlaceholderText = placeholder
+    box.Text = ""
+    box.Size = UDim2.new(1,-12,1,-6)
+    box.Position = UDim2.new(0,6,0,3)
+    box.BackgroundColor3 = theme.bg
+    box.BorderSizePixel = 0
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.TextColor3 = theme.text
 
-            box.FocusLost:Connect(function()
-                callback(box.Text)
-            end)
+    box.FocusLost:Connect(function()
+        callback(box.Text)
+    end)
 
-            return {
-                Set = function(_,v)
-                    box.Text = v
-                end
-            }
-        end
+    return {
+        Set = function(_,v)
+            box.Text = v
+        end,
+        Get = function()
+            return box.Text
+        end,
+        Object = fr, -- PENTING: supaya CollapseGroup bisa hide
+    }
+end
+
 
         ---------------------
         -- Button
