@@ -1035,6 +1035,7 @@ local function doOneBlatantCycle()
     end
 end
 
+-- FAST CYCLE BLATANT MODE
 local function Fishingspeed()
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -1043,49 +1044,76 @@ local function Fishingspeed()
         return
     end
 
-    local spamDel   = math.max(tonumber(Config.SpamDelay)  or 0.02, 0.001)
+    -- jaga-jaga kalau config nil / terlalu kecil
+    local spamDel   = math.max(tonumber(Config.SpamDelay)  or 0.02, 0.005)
     local fishDel   = math.max(tonumber(Config.FishDelay)  or 0.60, 0.02)
     local catchDel  = math.max(tonumber(Config.CatchDelay) or 0.80, 0.02)
 
-    local castCount = 3      -- jumlah cast paralel
-    local gapCast   = 0.03   -- jeda antar cast
-    local reelCount = 8      -- kali spam completeFish
+    local castCount     = 3    -- berapa banyak cast paralel
+    local completeCount = 6    -- berapa kali spam completeFish
 
-    -- equip rod
+    ----------------------------------------------------------------
+    -- 1) EQUIP ROD SLOT 1
+    ----------------------------------------------------------------
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
 
-    -- charge + minigame seakan bareng (pakai task.spawn)
+    ----------------------------------------------------------------
+    -- 2) CHARGE + MINIGAME CEPAT (SEAKAN BARENG)
+    ----------------------------------------------------------------
     pcall(function()
+        -- waktu server (kalau kamu punya util getServerTime, pakai itu)
+        local baseTs = os.clock()
+
         for i = 1, castCount do
             task.spawn(function()
-                local t = getServerTime()
-                
-                    Events.charge:InvokeServer(1755848498.4834)
-                    task.wait(0.01)
-                    Events.minigame:InvokeServer(1.2854545116425, 1)
-                
+                -- sedikit offset biar nggak super sama persis
+                local ts = baseTs + (i - 1) * 0.01
 
-                
+                -- CHARGE
+                pcall(function()
+                    -- kalau game kamu butuh timestamp spesifik, ganti ts ini
+                    Events.charge:InvokeServer(ts)
+                end)
+
+                -- delay super kecil lalu MINIGAME
+                task.wait(spamDel)
+
+                pcall(function()
+                    -- pakai nilai yang kamu kasih tadi
+                    -- 1.2854545116425 = progress, 1 = (?) misalnya difficulty
+                    Events.minigame:InvokeServer(1.2854545116425, 1)
+                end)
             end)
 
-            task.wait(spamDel * catchDel)
+            -- jeda antar cast biar gak numpuk banget
+            task.wait(spamDel * 0.5)
         end
     end)
 
-    -- FishDelay dipercepat (boleh kamu ubah faktor 0.33)
-    task.wait(catchDel )
-pcall(function()
+    ----------------------------------------------------------------
+    -- 3) TUNGGU SAMPAI IKAN "NYANGKUT"
+    ----------------------------------------------------------------
+    -- boleh pakai fishDel atau catchDel, pilih yang berasa paling aman
+    task.wait(math.min(fishDel, catchDel) * 0.5)
+
+    ----------------------------------------------------------------
+    -- 4) SPAM COMPLETE FISH (IKAN NAIK)
+    ----------------------------------------------------------------
+    for i = 1, completeCount do
+        pcall(function()
             Events.completeFish:FireServer()
         end)
-    
+        task.wait(0.01) -- sangat kecil, tapi kasih jeda biar request nggak ke-stack
+    end
 
-    -- CatchDelay dipakai untuk jeda akhir sebelum loop berikut
-    -- task.wait(catchDel * 0.3)
+    ----------------------------------------------------------------
+    -- 5) (OPSIONAL) TUNGGU SEDIKIT SEBELUM LOOP BERIKUTNYA
+    ----------------------------------------------------------------
+    -- kalau fungsi ini dipanggil dalam while true loop, kamu bisa kasih:
+    -- task.wait(catchDel * 0.2)
 end
-
-
 
 
 ------------------------------------------------------------
@@ -1108,10 +1136,13 @@ local function mainFishingLoop2()
     if loopRunning then return end
     loopRunning = true
     
-    while Config.BlatantFish do
-        local ok, err = pcall(Fishingspeed)        
-        --task.wait(0.001)
+    task.spawn(function()
+    while AutoFishing and Config.BlatantMode do
+        Fishingspeed()
+        -- kalau masih terlalu cepat / rubberband, tambahin delay kecil di sini
+        --task.wait(0.05)
     end
+end)
     loopRunning = false    
 end
 
@@ -1132,6 +1163,8 @@ function Fishing:Start2()
     if Config.BlatantFish then return end
     Config.BlatantFish = true
     task.spawn(mainFishingLoop2)
+    
+    
 end
 
 function Fishing:Stop2()
