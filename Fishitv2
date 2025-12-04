@@ -1043,11 +1043,17 @@ Config.FastDelay     = Config.FastDelay     or 0.01   -- micro delay (user input
 Config.ReelDelay     = Config.ReelDelay     or 1.0    -- delay sebelum looping
 Config.CompleteDelay = Config.CompleteDelay or 0.5    -- delay sebelum completeFish
 
+
 ----------------------------------------------------------------
 -- FAST BLATANT ACTION (mirip ThanHub)
 ----------------------------------------------------------------
 local function FastBlatant()
     local ts = tick()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Sigma1 = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/RequestFishingMinigameStarted"]
+    local RFChargeFishingRod = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RF/ChargeFishingRod"]
+
+
 
     -- EQUIP ROD SLOT 1
     pcall(function()
@@ -1057,25 +1063,27 @@ local function FastBlatant()
     ------------------------------------------------------------
     -- 1) CHARGE
     ------------------------------------------------------------
+task.spawn(function()    
     pcall(function()
-        Events.chargeRod:InvokeServer(ts)
+        RFChargeFishingRod:InvokeServer(1764881385.2037618)
     end)
+end)
 
     ------------------------------------------------------------
     -- 2) DELAY KECIL (WAJIB, supaya bobber spawn)
     ------------------------------------------------------------
     -- ThanHub juga pakai delay kecil di sini, tidak benar-benar 0 detik.
-    local microDelay = math.max(tonumber(Config.FashDelay or 0.3) * 0.2, 0.05)
-    task.wait(microDelay)
+    -- local microDelay = math.max(tonumber(Config.FashDelay or 0.3) * 0.2, 0.05)
+    --task.wait(microDelay)
 
     ------------------------------------------------------------
     -- 3) MINIGAME
     ------------------------------------------------------------
-    pcall(function()
-        -- kalau game butuh argumen lain (misal progress / difficulty)
-        -- tinggal tambahkan di sini: startMini:InvokeServer(ts, 1) dsb.
-        Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+task.spawn(function()
+    pcall(function()        
+        Sigma1:InvokeServer(-139.6379699707,0.99647927980797)
     end)
+end)
 
     ------------------------------------------------------------
     -- 4) COMPLETE DELAY (SEBELUM COMPLETEFISH)
