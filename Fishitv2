@@ -1038,45 +1038,54 @@ end
 ----------------------------------------------------------------
 -- CONFIG DEFAULT
 ----------------------------------------------------------------
-----------------------------------------------------------------
--- CONFIG
-----------------------------------------------------------------
-Config.BlatantFast       = Config.BlatantFast or false
-Config.FastChargeDelay   = Config.FastChargeDelay or 0.05   -- delay setelah charge
-Config.FastMiniDelay     = Config.FastMiniDelay   or 0.10   -- delay sebelum complete
-Config.FastCycleDelay    = Config.FastCycleDelay  or 0.05   -- delay antar cycle
+Config.BlatantFast   = Config.BlatantFast   or false
+Config.FastDelay     = Config.FastDelay     or 0.01   -- micro delay (user input)
+Config.ReelDelay     = Config.ReelDelay     or 1.0    -- delay sebelum looping
+Config.CompleteDelay = Config.CompleteDelay or 0.5    -- delay sebelum completeFish
 
 ----------------------------------------------------------------
--- FUNGSI FAST BLATANT
+-- FAST BLATANT ACTION (mirip ThanHub)
 ----------------------------------------------------------------
 local function FastBlatant()
     local ts = tick()
 
-    ------------------------------------------------------------
-    -- 1) EQUIP ROD
-    ------------------------------------------------------------
+    -- EQUIP ROD SLOT 1
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
 
     ------------------------------------------------------------
-    -- 2) CHARGE
+    -- 1) CHARGE
     ------------------------------------------------------------
-    task.spawn(function()
-        pcall(function()
-            Events.chargeRod:InvokeServer(ts)
-            task.wait(Config.FastChargeDelay)
-            Events.startMini:InvokeServer(ts)
-        end)
-
+    pcall(function()
+        Events.chargeRod:InvokeServer(ts)
     end)
 
-    
     ------------------------------------------------------------
-    -- 5) COMPLETE (tunggu dikit biar minigame kebuka)
+    -- 2) DELAY KECIL (WAJIB, supaya bobber spawn)
     ------------------------------------------------------------
-    task.wait(Config.FastMiniDelay)
+    -- ThanHub juga pakai delay kecil di sini, tidak benar-benar 0 detik.
+    local microDelay = math.max(tonumber(Config.FastDelay) or 0.01, 0.05)
+    task.wait(microDelay)
 
+    ------------------------------------------------------------
+    -- 3) MINIGAME
+    ------------------------------------------------------------
+    pcall(function()
+        -- kalau game butuh argumen lain (misal progress / difficulty)
+        -- tinggal tambahkan di sini: startMini:InvokeServer(ts, 1) dsb.
+        Events.startMini:InvokeServer(ts)
+    end)
+
+    ------------------------------------------------------------
+    -- 4) COMPLETE DELAY (SEBELUM COMPLETEFISH)
+    ------------------------------------------------------------
+    local compDelay = math.max(tonumber(Config.CompleteDelay) or 0.01, 0.01)
+    task.wait(compDelay)
+
+    ------------------------------------------------------------
+    -- 5) COMPLETEFISH (IKAN NAIK)
+    ------------------------------------------------------------
     pcall(function()
         Events.completeFish:FireServer()
     end)
@@ -1094,8 +1103,12 @@ local function StartFastLoop()
     task.spawn(function()
         while RunningFast and Config.BlatantFast do
             FastBlatant()
-            task.wait(Config.FastCycleDelay)
+
+            -- REEL DELAY = jeda antar siklus, mirip “Reel Delay” ThanHub
+            local reel = math.max(tonumber(Config.ReelDelay) or 0.01, 0.01)
+            task.wait(reel)
         end
+
         RunningFast = false
     end)
 end
@@ -1103,8 +1116,6 @@ end
 local function StopFastLoop()
     RunningFast = false
 end
-
-
 
 
 ------------------------------------------------------------
@@ -1160,32 +1171,40 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
     end
 end)
 
+
 ----------------------------------------------------------------
--- GUI
+-- GUI SETUP
 ----------------------------------------------------------------
-TabAuto:Toggle("⚡ Blatant Fast Mode", function(v)
-    Config.BlatantFast = v
-    if v then StartFastLoop() else StopFastLoop() end
+TabAuto:Toggle("⚡ Blatant Fast Cycle", function(v)
+    Config.BlatantFast = v and true or false
+    if v then
+        StartFastLoop()
+    else
+        StopFastLoop()
+    end
 end)
 
-TabAuto:Box("Charge Delay", function(v)
-    local n = tonumber(v)
-    if n then Config.FastChargeDelay = math.clamp(n, 0.02, 1) end
+TabAuto:Box("Reel Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        Config.ReelDelay = math.clamp(n, 0.01, 5)
+    end
 end)
 
-TabAuto:Box("MiniGame Delay", function(v)
-    local n = tonumber(v)
-    if n then Config.FastMiniDelay = math.clamp(n, 0.02, 1) end
+TabAuto:Box("Complete Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        Config.CompleteDelay = math.clamp(n, 0.01, 5)
+    end
 end)
 
-TabAuto:Box("Cycle Delay", function(v)
-    local n = tonumber(v)
-    if n then Config.FastCycleDelay = math.clamp(n, 0.02, 1) end
+TabAuto:Box("Fast Micro Delay", function(txt)
+    local n = tonumber(txt)
+    if n then
+        -- user bebas isi 0.01, tapi di dalam fungsi selalu dipaksa minimal 0.05
+        Config.FastDelay = math.clamp(n, 0.001, 0.2)
+    end
 end)
-
-
-
-
 
 ----------------------------------------------------------------
 -- TAB SHOP – BUY OLD ROD (VULN)
