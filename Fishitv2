@@ -1000,16 +1000,16 @@ local function doOneBlatantCycle()
 
     -- charge
     pcall(function()
-        Events.chargeRod:InvokeServer(now)
+        Events.chargeRod:InvokeServer(100)
     end)
     task.wait(0.001)
 
     -- start minigame
     local okStart = pcall(function()
         if typeof(Events.startMini.InvokeServer) == "function" then
-            return Events.startMini:InvokeServer(getServerTime())
+            return Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
         else
-            Events.startMini:FireServer(getServerTime())
+            Events.startMini:FireServer(-1.233184814453125, 0.9945034885633273)
             return true
         end
     end)
@@ -1065,7 +1065,7 @@ local function FastBlatant()
     -- 2) DELAY KECIL (WAJIB, supaya bobber spawn)
     ------------------------------------------------------------
     -- ThanHub juga pakai delay kecil di sini, tidak benar-benar 0 detik.
-    local microDelay = math.max(tonumber(Config.FastDelay) or 0.01, 0.05)
+    local microDelay = math.max(tonumber(Config.FashDelay or 0.3) * 0.2, 0.05)
     task.wait(microDelay)
 
     ------------------------------------------------------------
@@ -1074,7 +1074,7 @@ local function FastBlatant()
     pcall(function()
         -- kalau game butuh argumen lain (misal progress / difficulty)
         -- tinggal tambahkan di sini: startMini:InvokeServer(ts, 1) dsb.
-        Events.startMini:InvokeServer(ts)
+        Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
     end)
 
     ------------------------------------------------------------
