@@ -1066,30 +1066,13 @@ local function FastBlatant()
 task.spawn(function()    
     pcall(function()
         RFChargeFishingRod:InvokeServer(1764881385.2037618)
-    end)
-end)
-
-    ------------------------------------------------------------
-    -- 2) DELAY KECIL (WAJIB, supaya bobber spawn)
-    ------------------------------------------------------------
-    -- ThanHub juga pakai delay kecil di sini, tidak benar-benar 0 detik.
-    -- local microDelay = math.max(tonumber(Config.FashDelay or 0.3) * 0.2, 0.05)
-    --task.wait(microDelay)
-
-    ------------------------------------------------------------
-    -- 3) MINIGAME
-    ------------------------------------------------------------
-task.spawn(function()
-    pcall(function()        
+        task.wait(Config.ReelDelay * Config.CompleteDelay)
         Sigma1:InvokeServer(-139.6379699707,0.99647927980797)
     end)
+   task.wait(0.01)
 end)
 
-    ------------------------------------------------------------
-    -- 4) COMPLETE DELAY (SEBELUM COMPLETEFISH)
-    ------------------------------------------------------------
-    local compDelay = math.max(tonumber(Config.CompleteDelay) or 0.01, 0.01)
-    task.wait(compDelay)
+    task.wait(Config.CompleteDelay)
 
     ------------------------------------------------------------
     -- 5) COMPLETEFISH (IKAN NAIK)
@@ -1111,10 +1094,7 @@ local function StartFastLoop()
     task.spawn(function()
         while RunningFast and Config.BlatantFast do
             FastBlatant()
-
-            -- REEL DELAY = jeda antar siklus, mirip “Reel Delay” ThanHub
-            local reel = math.max(tonumber(Config.ReelDelay) or 0.01, 0.01)
-            task.wait(reel)
+            task.wait(Config.ReelDelay)
         end
 
         RunningFast = false
