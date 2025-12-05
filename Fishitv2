@@ -1630,7 +1630,7 @@ local ENCHANT_ALTAR_CFRAME = CFrame.new(
 )
 
 local ENCHANT_ALTAR_CFRAME2 = CFrame.new(
-    127.55653381347656, 1480.493408203125, -600.629638671875
+    127.5, 1480.4, -600.6
 )
 
 local function ensureCharacter()
