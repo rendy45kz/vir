@@ -1629,6 +1629,10 @@ local ENCHANT_ALTAR_CFRAME = CFrame.new(
     0.935071886, 3.85574985e-08, 0.354458153
 )
 
+local ENCHANT_ALTAR_CFRAME2 = CFrame.new(
+    127.55653381347656, 1480.493408203125, -600.629638671875
+)
+
 local function ensureCharacter()
     local char = LocalPlayer.Character
     if not char or not char.Parent then
@@ -1917,6 +1921,103 @@ local function doEnchantCast()
 end
 
 
+local function doEnchantCast2()
+    -- kalau dua-duanya OFF, langsung nggak usah jalan
+    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+        return
+    end
+
+    local char = ensureCharacter()
+    if not char then return end
+
+    local hrp  = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local curPos   = hrp.Position
+    local flatCur  = Vector3.new(curPos.X, 0, curPos.Z)
+    local flatAltr = Vector3.new(ENCHANT_ALTAR_CFRAME2.X, 0, ENCHANT_ALTAR_CFRAME2.Z)
+
+    -- TELEPORT KE ALTAR JIKA JAUH
+    if (flatCur - flatAltr).Magnitude > 5 then
+        hrp.CFrame = ENCHANT_ALTAR_CFRAME2 + Vector3.new(0, 5, 0)
+
+        -- dulu: task.wait(1)
+        -- sekarang: wait pendek + cek toggle biar bisa batal
+        local t = 0
+        local maxDelay = 0.8
+        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
+            task.wait(0.1)
+            t += 0.1
+        end
+        -- kalau di tengah² user matiin toggle → stop di sini
+        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+            return
+        end
+    end
+
+    -- CARI ENCHANT STONE DI HOTBAR
+    local hotBarIndex = nil
+    if DataReplion and PlayerStatsUtility and ItemUtility then
+        local equipped = DataReplion:Get("EquippedItems") or {}
+
+        for k, v in pairs(equipped) do
+            local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
+                return it.UUID == v
+            end)
+            if invItem then
+                local okI, itemData = pcall(function()
+                    return ItemUtility:GetItemData(invItem.Id)
+                end)
+                if okI and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+                    hotBarIndex = k
+                    break
+                end
+            end
+        end
+
+        -- kalau belum ada yang ke-equip, equip 1 batu enchant dulu
+        if not hotBarIndex then
+            local equippedList = DataReplion:Get("EquippedItems") or {}
+            if #equippedList > 0 then
+                Enchant:EquipEnchantStone(equippedList[#equippedList])
+                hotBarIndex = #equippedList
+            end
+        end
+    end
+
+    if not hotBarIndex then
+        hotBarIndex = 2 -- fallback
+    end
+
+    -- EQUIP STONE
+    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+        return
+    end
+
+    pcall(function()
+        RE_EquipHotbar:FireServer(hotBarIndex)
+    end)
+
+    -- tunggu pendek tapi bisa dibatalkan
+    do
+        local t = 0
+        local maxDelay = 0.2
+        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
+            task.wait(0.05)
+            t += 0.05
+        end
+        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
+            return
+        end
+    end
+
+    -- AKTIVASI ALTAR
+    pcall(function()
+        RE_ActivateEnchant:FireServer()
+    end)
+end
+
+
 ------------------------------------------------------------
 -- START AUTO ENCHANT SLOT 1 (SATU KALI PROSES)
 ------------------------------------------------------------
@@ -1970,7 +2071,7 @@ function Enchant:StartAutoEnchant2()
         return
     end
 
-    doEnchantCast()
+    doEnchantCast2()
     print("[AutoEnchant] Proses enchant SLOT 2 dijalankan → target:", target2)
 end
 
