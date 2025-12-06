@@ -1574,6 +1574,13 @@ local RE_ActivateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
 local RE_EquipItem       = net:FindFirstChild("RE/EquipItem")
 local RE_UnequipItem     = net:FindFirstChild("RE/UnequipItem")
 
+-- kemungkinan nama remote untuk jual item / enchant stone
+local RF_SellInventoryItem =
+    net:FindFirstChild("RF/SellInventoryItem")
+    or net:FindFirstChild("RF/SellItem")
+    or net:FindFirstChild("RF/SellEnchantStone")
+
+
 ------------------------------------------------------------
 -- IMPORT MODULES (Replion, PlayerStatsUtility, ItemUtility,
 --                 TierUtility, Enchants)
@@ -1616,7 +1623,14 @@ local EnchantConfig = {
     Delay2 = 2,  -- detik antar enchant slot 2
     TargetEnchant1 = {}, -- isinya [namaEnchant] = true
     TargetEnchant2 = "", -- single string
+
+    -- ENCHANT STONE MANAGER
+    AutoSellStones         = false,
+    AutoUnfavoriteStones   = false,
+    SellStonesDelay        = 5,   -- detik antara sell enchant stone
+    UnfavoriteStonesDelay  = 5,   -- detik cek & unfavorite enchant stone
 }
+
 local Enchant = {}
 local loop1Running = false
 local loop2Running = false
@@ -1656,19 +1670,132 @@ function Enchant:ListInventoryEnchantStones()
         local ok, itemData = pcall(function()
             return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
         end)
-        if ok and itemData and itemData.Data then
-            if itemData.Data.Type == "EnchantStones" then
-                table.insert(enchantStones, {
-                    UUID = item.UUID,
-                    Id   = item.Id,
-                    Name = itemData.Data.Name or "Unknown",
-                    Type = itemData.Data.Type or "Unknown",
-                })
-            end
+        if ok and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+            local meta = item.Metadata or {}
+            local fav  = (meta.Favorite or meta.IsFavorite or meta.IsFavorited) == true
+
+            table.insert(enchantStones, {
+                UUID     = item.UUID,
+                Id       = item.Id,
+                Name     = itemData.Data.Name or "Unknown",
+                Type     = itemData.Data.Type or "Unknown",
+                Favorite = fav,
+            })
         end
     end
 
     return enchantStones
+end
+
+------------------------------------------------------------
+-- AUTO SELL / UNFAVORITE ENCHANT STONES
+------------------------------------------------------------
+
+local sellStonesLoopRunning      = false
+local unfavStonesLoopRunning     = false
+
+-- sekali jalan: jual semua enchant stone (apapun namanya)
+function Enchant:SellEnchantStonesOnce()
+    if not RF_SellInventoryItem then
+        warn("[AutoEnchant] RF_SellInventoryItem tidak ditemukan, cek nama remote sell enchant.")
+        return
+    end
+
+    local stones = self:ListInventoryEnchantStones()
+    if #stones == 0 then
+        -- tidak ada batu
+        return
+    end
+
+    for _, stone in ipairs(stones) do
+        pcall(function()
+            RF_SellInventoryItem:InvokeServer(stone.UUID)
+        end)
+        task.wait(0.05)
+    end
+
+    print(string.format("[AutoEnchant] SellEnchantStonesOnce: %d stones dijual.", #stones))
+end
+
+-- sekali jalan: Unfavorite semua enchant stone yang lagi Favorite
+function Enchant:UnfavoriteEnchantStonesOnce()
+    if not RE_FavoriteItem then
+        warn("[AutoEnchant] RE_FavoriteItem tidak ditemukan, tidak bisa Unfavorite enchant stones.")
+        return
+    end
+
+    local stones = self:ListInventoryEnchantStones()
+    local count  = 0
+
+    for _, stone in ipairs(stones) do
+        if stone.Favorite then
+            count += 1
+            pcall(function()
+                RE_FavoriteItem:FireServer(stone.UUID) -- toggle off Favorite
+            end)
+            task.wait(0.05)
+        end
+    end
+
+    if count > 0 then
+        print(string.format("[AutoEnchant] UnfavoriteEnchantStonesOnce: %d stones di-unfavorite.", count))
+    end
+end
+
+-- LOOP AUTO SELL
+local function AutoSellStonesLoop()
+    if sellStonesLoopRunning then return end
+    sellStonesLoopRunning = true
+    print("[AutoEnchant] AutoSellStonesLoop START")
+
+    while EnchantConfig.AutoSellStones do
+        local ok, err = pcall(function()
+            Enchant:SellEnchantStonesOnce()
+        end)
+        if not ok then
+            warn("[AutoEnchant] AutoSellStonesLoop error:", err)
+        end
+
+        local delay = EnchantConfig.SellStonesDelay or 5
+        delay = math.clamp(delay, 0.5, 120)
+
+        local t = 0
+        while t < delay and EnchantConfig.AutoSellStones do
+            task.wait(0.1)
+            t += 0.1
+        end
+    end
+
+    sellStonesLoopRunning = false
+    print("[AutoEnchant] AutoSellStonesLoop STOP")
+end
+
+-- LOOP AUTO UNFAVORITE
+local function AutoUnfavoriteStonesLoop()
+    if unfavStonesLoopRunning then return end
+    unfavStonesLoopRunning = true
+    print("[AutoEnchant] AutoUnfavoriteStonesLoop START")
+
+    while EnchantConfig.AutoUnfavoriteStones do
+        local ok, err = pcall(function()
+            Enchant:UnfavoriteEnchantStonesOnce()
+        end)
+        if not ok then
+            warn("[AutoEnchant] AutoUnfavoriteStonesLoop error:", err)
+        end
+
+        local delay = EnchantConfig.UnfavoriteStonesDelay or 5
+        delay = math.clamp(delay, 0.5, 120)
+
+        local t = 0
+        while t < delay and EnchantConfig.AutoUnfavoriteStones do
+            task.wait(0.1)
+            t += 0.1
+        end
+    end
+
+    unfavStonesLoopRunning = false
+    print("[AutoEnchant] AutoUnfavoriteStonesLoop STOP")
 end
 
 ------------------------------------------------------------
@@ -2341,6 +2468,36 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     EnchantConfig.AutoEnchant2 = state
     if state then
         task.spawn(AutoEnchantLoop2)
+    end
+end)
+
+farmUI:Label("Enchant Stone Manager")
+
+farmUI:Toggle("Auto Sell Enchant Stones", function(state)
+    EnchantConfig.AutoSellStones = state
+    if state then
+        task.spawn(AutoSellStonesLoop)
+    end
+end)
+
+farmUI:Box("Sell Stones Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        EnchantConfig.SellStonesDelay = math.clamp(n, 0.5, 120)
+    end
+end)
+
+farmUI:Toggle("Auto Unfavorite Enchant Stones", function(state)
+    EnchantConfig.AutoUnfavoriteStones = state
+    if state then
+        task.spawn(AutoUnfavoriteStonesLoop)
+    end
+end)
+
+farmUI:Box("Unfavorite Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        EnchantConfig.UnfavoriteStonesDelay = math.clamp(n, 0.5, 120)
     end
 end)
 
