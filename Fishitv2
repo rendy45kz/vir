@@ -613,9 +613,6 @@ end
             }
         end
 
-        ---------------------
-        -- LiveLabel (text dinamis, pakai function)
-        ---------------------
         function api:LiveLabel(getTextFn, refreshDelay)
     refreshDelay = refreshDelay or 0.5
 
@@ -643,13 +640,13 @@ end
         end
     end)
 
-    -- RETURN OBJECT untuk CollapseGroup !!!
+    -- penting: return table dengan Object, supaya CollapseGroup bisa hide/show
     return {
         Object = lbl
     }
 end
 
-           ------------------------------------------------------------
+------------------------------------------------------------
 -- GENERIC COLLAPSE GROUP COMPONENT
 ------------------------------------------------------------
 function api:CreateCollapseGroup(title, buildFn)
@@ -732,8 +729,11 @@ function api:CreateCollapseGroup(title, buildFn)
         group:Toggle()
     end)
 
-    -- return header sebagai object
-    group.Header = { Object = headerFrame, Set = function(_, txt) titleLabel.Text = txt end }
+    -- header supaya bisa diakses (kalau perlu)
+    group.Header = {
+        Object = headerFrame,
+        Set    = function(_, txt) titleLabel.Text = txt end
+    }
 
     ------------------------------------------------------------
     -- BUILDER
@@ -742,7 +742,7 @@ function api:CreateCollapseGroup(title, buildFn)
         if ctrl then
             local obj = ctrl.Object or ctrl
             if obj then
-                obj.Visible = false
+                obj.Visible = false -- awalnya di-hide, muncul saat expand
             end
             table.insert(group.Items, ctrl)
         end
@@ -757,6 +757,7 @@ function api:CreateCollapseGroup(title, buildFn)
 
     return group
 end
+
 
 
 
@@ -2473,8 +2474,16 @@ end)
 
 local sellStoneGroup = TabFarm:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
+    add(TabFarm:LiveLabel(function()
+        return string.format(
+            "Status: %s\nSuccess: %d\nFailed: %d\nLast: %s",
+            EnchantStoneStats.Status,
+            EnchantStoneStats.Success,
+            EnchantStoneStats.Failed,
+            EnchantStoneStats.LastLog
+        )
+    end, 0.4))
 
-    -- TOGGLE
     add(TabFarm:Toggle("Enable Auto Sell Enchant Stone", function(state)
         EnchantConfig.AutoSellStones = state
         if state then
@@ -2482,15 +2491,14 @@ local sellStoneGroup = TabFarm:CreateCollapseGroup("Auto Sell Enchant Stone", fu
         end
     end))
 
-    -- DELAY
     add(TabFarm:Box("Sell Delay (seconds)", function(txt)
         local n = tonumber(txt)
         if n then
             EnchantConfig.SellStonesDelay = math.clamp(n, 0.5, 60)
         end
     end))
-end)
 
+end)
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
