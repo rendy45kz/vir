@@ -2378,14 +2378,10 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
 
 local net = netIndex:WaitForChild("net")
 
--- Cari remote yang benar, jangan bikin script nge-freeze di WaitForChild
-local RF_SellItem =
-    net:FindFirstChild("RF/SellItem")
-    or net:FindFirstChild("RF/SellItems")
+-- di spy keliatan RF/SellItem (tanpa 's')
+local RF_Folder   = net:WaitForChild("RF")
+local RF_SellItem = RF_Folder:WaitForChild("SellItem")
 
-if not RF_SellItem then
-    warn("[AutoSellEnchant] RF_SellItem remote not found (check name in ReplicatedStorage/net).")
-end
 
 ------------------------------------------------------------
 -- STATE
@@ -2411,85 +2407,66 @@ local EnchantSell = {
 function Enchant:ListInventoryEnchantStones()
     local enchantStones = {}
 
-    if not (DataReplion and ItemUtility) then 
-        warn("[Enchant] Replion atau ItemUtility belum siap")
-        return enchantStones 
+    if not DataReplion then
+        warn("[Enchant] DataReplion belum siap")
+        return enchantStones
     end
 
-    ------------------------------------------------
-    -- Coba baca Inventory dengan 3 metode berbeda
-    ------------------------------------------------
+    -- coba dua cara get, biar aman
     local inventory
-    local ok, res = pcall(function()
+    local ok1, res1 = pcall(function()
         return DataReplion:Get({ "Inventory" })
     end)
-
-    if ok and res then
-        inventory = res
+    if ok1 and res1 then
+        inventory = res1
     else
-        -- Coba metode lain (kadang game pakai ini)
         local ok2, res2 = pcall(function()
             return DataReplion:Get("Inventory")
         end)
         if ok2 and res2 then
             inventory = res2
         else
-            warn("Replion Inventory gagal dibaca:", res)
+            warn("[Enchant] Gagal baca Inventory dari Replion:", res1)
             return enchantStones
         end
     end
 
-    ------------------------------------------------
-    -- DUMP INVENTORY (Permintaan Kamu)
-    ------------------------------------------------
-    print("====== INVENTORY DUMP ======")
-    for k, v in pairs(inventory) do
-        print("Bucket:", k, "Type:", typeof(v))
-        if typeof(v) == "table" then
-            local count = 0
-            for _ in pairs(v) do count += 1 end
-            print("   Count:", count)
-        end
-    end
-    print("===========")
+    -- sesuai dump: semua item ada di bucket "Items"
+    local items = inventory.Items or inventory["Items"] or {}
+    
+    for _, item in pairs(items) do
+        if item then
+            local name = tostring(item.Name or ""):lower()
+            local idStr = tostring(item.Id or ""):lower()
 
-    ------------------------------------------------
-    -- Sekarang cari EnchantStone di SEMUA bucket
-    ------------------------------------------------
-    for bucketName, bucket in pairs(inventory) do
-        if typeof(bucket) == "table" then
-            for _, item in pairs(bucket) do
-                if item and item.Id then
-                    
-                    local ok3, itemData = pcall(function()
-                        return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
-                    end)
+            -- DETEKSI ENCHANT STONE: pakai nama/id yang mengandung "enchant" & "stone"
+            local isEnchant =
+                (name:find("enchant") and name:find("stone"))
+                or (idStr:find("enchant") and idStr:find("stone"))
 
-                    if ok3 and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-                        table.insert(enchantStones, {
-                            UUID = item.UUID,
-                            Id   = item.Id,
-                            Name = itemData.Data.Name or "Unknown",
-                            Bucket = bucketName,
-                            Metadata = item.Metadata or {}
-                        })
-                    end
-                end
+            if isEnchant then
+                table.insert(enchantStones, {
+                    UUID = item.UUID,
+                    Id   = item.Id,
+                    Name = item.Name or "Unknown",
+                })
             end
         end
     end
+
+    -- debug ringan (boleh hapus kalau sudah oke)
+    print("[Enchant] Ditemukan", #enchantStones, "Enchant Stone di Inventory.Items")
 
     return enchantStones
 end
 
 
-local function StartAutoSellEnchantLoop()
+ local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
     EnchantSell.Running = true
 
     task.spawn(function()
         while EnchantSell.Enabled do
-
             local stones = Enchant:ListInventoryEnchantStones()
 
             if #stones == 0 then
@@ -2499,7 +2476,7 @@ local function StartAutoSellEnchantLoop()
                 for _, stone in ipairs(stones) do
                     if not EnchantSell.Enabled then break end
 
-                    EnchantSell.Status = "selling " .. (stone.Name or stone.Id or "?")
+                    EnchantSell.Status = "selling "..(stone.Name or stone.Id or "?")
 
                     if RF_SellItem and stone.UUID then
                         local ok, res = pcall(function()
@@ -2524,7 +2501,7 @@ local function StartAutoSellEnchantLoop()
             end
         end
 
-        EnchantSell.Status = "idle"
+        EnchantSell.Status  = "idle"
         EnchantSell.Running = false
     end)
 end
@@ -2559,6 +2536,7 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
     end))
 
 end)
+
 
 
 
