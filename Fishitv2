@@ -2403,12 +2403,19 @@ local EnchantSell = {
 ------------------------------------------------------------
 -- LIST INVENTORY ENCHANT STONES
 ------------------------------------------------------------
+
+
+------------------------------------------------------------
+-- AUTO SELL LOOP
+-----------------
 function Enchant:ListInventoryEnchantStones()
     local out = {}
 
-    if not (DataReplion and ItemUtility) then return out end
+    if not (DataReplion and ItemUtility) then
+        return out
+    end
 
-    -- kalau di bagian lain pakai Get({ "Inventory" }), samakan:
+    -- Ambil semua inventory
     local okInv, inventory = pcall(function()
         return DataReplion:Get({ "Inventory" })
     end)
@@ -2416,20 +2423,31 @@ function Enchant:ListInventoryEnchantStones()
         return out
     end
 
-    local items = inventory["Items"] or {}
+    ----------------------------------------------------
+    -- 🔥 SOLUSI: SCAN SEMUA BUCKET DI DALAM INVENTORY
+    ----------------------------------------------------
+    for bucketName, bucket in pairs(inventory) do
+        if typeof(bucket) == "table" then
+            for _, item in pairs(bucket) do
 
-    for _, item in pairs(items) do
-        if item and item.Id then
-            local ok, itemData = pcall(function()
-                return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
-            end)
+                if item and item.Id then
+                    local ok, itemData = pcall(function()
+                        return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
+                    end)
 
-            if ok and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-                table.insert(out, {
-                    UUID = item.UUID,
-                    Id   = item.Id,
-                    Name = itemData.Data.Name or "Unknown",
-                })
+                    if ok and itemData and itemData.Data then
+                        if itemData.Data.Type == "EnchantStones" then
+
+                            table.insert(out, {
+                                UUID = item.UUID,
+                                Id   = item.Id,
+                                Name = itemData.Data.Name or "Unknown",
+                                Bucket = bucketName, -- DEBUG PENTING
+                            })
+                        end
+                    end
+                end
+
             end
         end
     end
@@ -2437,9 +2455,6 @@ function Enchant:ListInventoryEnchantStones()
     return out
 end
 
-------------------------------------------------------------
--- AUTO SELL LOOP
-------------------------------------------------------------
 local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
     EnchantSell.Running = true
