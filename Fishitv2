@@ -2377,10 +2377,8 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
+local RF_SellItem = net:WaitForChild("RF/ellItem")
 
--- di spy keliatan RF/SellItem (tanpa 's')
-local RF_Folder   = net:WaitForChild("RF")
-local RF_SellItem = RF_Folder:WaitForChild("SellItem")
 
 
 ------------------------------------------------------------
@@ -2407,42 +2405,43 @@ local EnchantSell = {
 function Enchant:ListInventoryEnchantStones()
     local enchantStones = {}
 
+    ------------------------------------------------
+    -- 1) Cek dulu Replion-nya
+    ------------------------------------------------
     if not DataReplion then
-        warn("[Enchant] DataReplion belum siap")
+        -- JANGAN panggil :Get() kalau nil, cukup warn & return kosong
+        -- warn("[Enchant] DataReplion masih nil, inventory belum siap")
         return enchantStones
     end
 
-    -- coba dua cara get, biar aman
+    ------------------------------------------------
+    -- 2) Ambil Inventory dengan aman
+    ------------------------------------------------
     local inventory
-    local ok1, res1 = pcall(function()
-        return DataReplion:Get({ "Inventory" })
+    local ok, res = pcall(function()
+        -- beberapa game pakai { "Inventory" }, sebagian lagi "Inventory"
+        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
     end)
-    if ok1 and res1 then
-        inventory = res1
-    else
-        local ok2, res2 = pcall(function()
-            return DataReplion:Get("Inventory")
-        end)
-        if ok2 and res2 then
-            inventory = res2
-        else
-            warn("[Enchant] Gagal baca Inventory dari Replion:", res1)
-            return enchantStones
-        end
+
+    if not ok or not res then
+        -- warn("[Enchant] Gagal baca Inventory dari Replion:", res)
+        return enchantStones
     end
 
-    -- sesuai dump: semua item ada di bucket "Items"
+    inventory = res
     local items = inventory.Items or inventory["Items"] or {}
-    
+
+    ------------------------------------------------
+    -- 3) Cari item yang namanya mengandung "Enchant" & "Stone"
+    ------------------------------------------------
     for _, item in pairs(items) do
         if item then
             local name = tostring(item.Name or ""):lower()
             local idStr = tostring(item.Id or ""):lower()
 
-            -- DETEKSI ENCHANT STONE: pakai nama/id yang mengandung "enchant" & "stone"
             local isEnchant =
-                (name:find("enchant") and name:find("stone"))
-                or (idStr:find("enchant") and idStr:find("stone"))
+                (name:find("enchant") and name:find("stone")) or
+                (idStr:find("enchant") and idStr:find("stone"))
 
             if isEnchant then
                 table.insert(enchantStones, {
@@ -2453,9 +2452,6 @@ function Enchant:ListInventoryEnchantStones()
             end
         end
     end
-
-    -- debug ringan (boleh hapus kalau sudah oke)
-    print("[Enchant] Ditemukan", #enchantStones, "Enchant Stone di Inventory.Items")
 
     return enchantStones
 end
