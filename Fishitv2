@@ -2409,51 +2409,79 @@ local EnchantSell = {
 -- AUTO SELL LOOP
 -----------------
 function Enchant:ListInventoryEnchantStones()
-    local out = {}
+    local enchantStones = {}
 
-    if not (DataReplion and ItemUtility) then
-        return out
+    if not (DataReplion and ItemUtility) then 
+        warn("[Enchant] Replion atau ItemUtility belum siap")
+        return enchantStones 
     end
 
-    -- Ambil semua inventory
-    local okInv, inventory = pcall(function()
+    ------------------------------------------------
+    -- Coba baca Inventory dengan 3 metode berbeda
+    ------------------------------------------------
+    local inventory
+    local ok, res = pcall(function()
         return DataReplion:Get({ "Inventory" })
     end)
-    if not okInv or not inventory then
-        return out
+
+    if ok and res then
+        inventory = res
+    else
+        -- Coba metode lain (kadang game pakai ini)
+        local ok2, res2 = pcall(function()
+            return DataReplion:Get("Inventory")
+        end)
+        if ok2 and res2 then
+            inventory = res2
+        else
+            warn("Replion Inventory gagal dibaca:", res)
+            return enchantStones
+        end
     end
 
-    ----------------------------------------------------
-    -- 🔥 SOLUSI: SCAN SEMUA BUCKET DI DALAM INVENTORY
-    ----------------------------------------------------
+    ------------------------------------------------
+    -- DUMP INVENTORY (Permintaan Kamu)
+    ------------------------------------------------
+    print("====== INVENTORY DUMP ======")
+    for k, v in pairs(inventory) do
+        print("Bucket:", k, "Type:", typeof(v))
+        if typeof(v) == "table" then
+            local count = 0
+            for _ in pairs(v) do count += 1 end
+            print("   Count:", count)
+        end
+    end
+    print("===========")
+
+    ------------------------------------------------
+    -- Sekarang cari EnchantStone di SEMUA bucket
+    ------------------------------------------------
     for bucketName, bucket in pairs(inventory) do
         if typeof(bucket) == "table" then
             for _, item in pairs(bucket) do
-
                 if item and item.Id then
-                    local ok, itemData = pcall(function()
+                    
+                    local ok3, itemData = pcall(function()
                         return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
                     end)
 
-                    if ok and itemData and itemData.Data then
-                        if itemData.Data.Type == "EnchantStones" then
-
-                            table.insert(out, {
-                                UUID = item.UUID,
-                                Id   = item.Id,
-                                Name = itemData.Data.Name or "Unknown",
-                                Bucket = bucketName, -- DEBUG PENTING
-                            })
-                        end
+                    if ok3 and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+                        table.insert(enchantStones, {
+                            UUID = item.UUID,
+                            Id   = item.Id,
+                            Name = itemData.Data.Name or "Unknown",
+                            Bucket = bucketName,
+                            Metadata = item.Metadata or {}
+                        })
                     end
                 end
-
             end
         end
     end
 
-    return out
+    return enchantStones
 end
+
 
 local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
