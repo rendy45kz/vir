@@ -2366,31 +2366,56 @@ local EnchantSell = {
 ---------------------------
 -- GET INVENTORY → ENCHANT STONES
 ---------------------------
-local function ListInventoryEnchantStones()
-    local result = {}
+------------------------------------------------------------
+-- LIST INVENTORY ENCHANT STONES  (FIX "NO STONE")
+------------------------------------------------------------
+function Enchant:ListInventoryEnchantStones()
+    local enchantStones = {}
+    if not (DataReplion and ItemUtility) then
+        return enchantStones
+    end
 
-    if not DataReplion then return result end
+    -- Ambil semua data inventory dari Replion
+    local inventory = DataReplion:Get({ "Inventory" }) or {}
 
-    local inv = DataReplion:Get("Inventory")
-    if not inv then return result end
+    -- Kita TIDAK lagi ngandelin inventory["Items"] saja.
+    -- Kita scan semua bucket di dalam Inventory.
+    for bucketName, bucket in pairs(inventory) do
+        if type(bucket) == "table" then
+            for _, item in pairs(bucket) do
+                if item and item.Id then
+                    local ok, itemData = pcall(function()
+                        -- di game ini enchant stone pakai tipe "EnchantStones"
+                        return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
+                    end)
 
-    local items = inv["Items"] or {}
+                    if ok and itemData and itemData.Data then
+                        local isStoneType =
+                            itemData.Data.Type == "EnchantStones"
+                            or bucketName == "EnchantStones"
+                            or bucketName == "Enchant Stones"
 
-    for _, item in ipairs(items) do
-        if not item or not item.UUID then continue end
-
-        -- IDENTIFIKASI ENCHANT STONE
-        local name = tostring(item.Name or item.Id):lower()
-        local t    = tostring(item.Type or ""):lower()
-        local st   = tostring(item.SubType or ""):lower()
-
-        if name:find("enchant") or t == "enchantstone" or st:find("enchant") then
-            table.insert(result, item)
+                        if isStoneType then
+                            table.insert(enchantStones, {
+                                UUID = item.UUID,
+                                Id   = item.Id,
+                                Name = itemData.Data.Name or "Unknown",
+                                Type = itemData.Data.Type or "EnchantStones",
+                                Bucket = bucketName,
+                            })
+                        end
+                    end
+                end
+            end
         end
     end
 
-    return result
+    -- debug opsional (boleh hapus kalau sudah yakin jalan)
+    -- print("[Enchant] Ditemukan", #enchantStones, "Enchant Stone di inventory")
+
+    return enchantStones
 end
+
 
 
 ---------------------------
