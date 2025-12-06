@@ -1274,6 +1274,7 @@ local RF_SellAllItems     = net:WaitForChild("RF/SellAllItems")
 local RF_PurchaseWeather  = net:WaitForChild("RF/PurchaseWeatherEvent")
 local RE_ActivateEnchant  = net:WaitForChild("RE/ActivateEnchantingAltar")
 local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
+local RF_SellItem         = net:WaitForChild("RF/SellItem")  -- <== penting
 
 ----------------------------------------------------------------
 -- TAB FARM (MAIN)
@@ -1640,6 +1641,16 @@ local EnchantStoneStats = {
     LastLog  = "",
 }
 
+local EnchantSell = {
+    Enabled   = false,
+    Delay     = 1,
+    Status    = "idle",
+    Success   = 0,
+    Failed    = 0,
+    LastError = "",
+    Running   = false,
+}
+
 
 local Enchant = {}
 local loop1Running = false
@@ -1744,59 +1755,76 @@ end
 
 
 -- LOOP AUTO SELL
-local function AutoSellStonesLoop()
-    if sellStonesLoopRunning then return end
-    sellStonesLoopRunning = true
-    print("[AutoEnchant] AutoSellStonesLoop START")
+local function StartAutoSellEnchantLoop()
+    if EnchantSell.Running then return end
+    EnchantSell.Running = true
 
-    while EnchantConfig.AutoSellStones do
-        local ok, err = pcall(function()
-            Enchant:SellEnchantStonesOnce()
-        end)
-        if not ok then
-            warn("[AutoEnchant] AutoSellStonesLoop error:", err)
+    task.spawn(function()
+        while EnchantSell.Enabled do
+            local stones = ListInventoryEnchantStones()
+
+            if #stones == 0 then
+                EnchantSell.Status = "idle (no stone)"
+                task.wait(EnchantSell.Delay)
+            else
+                for _, stone in ipairs(stones) do
+                    if not EnchantSell.Enabled then break end
+
+                    EnchantSell.Status = "selling "..(stone.Name or stone.Id or "???")
+
+                    local uuid = stone.UUID
+                    if uuid then
+                        local ok, res = pcall(function()
+                            return RF_SellItem:InvokeServer(uuid)
+                        end)
+
+                        if ok then
+                            EnchantSell.Success += 1
+                            EnchantSell.LastError = ""
+                        else
+                            EnchantSell.Failed += 1
+                            EnchantSell.LastError = tostring(res)
+                            warn("[AutoSellEnchant] gagal jual:", res)
+                        end
+                    else
+                        EnchantSell.Failed += 1
+                        EnchantSell.LastError = "UUID nil"
+                        warn("[AutoSellEnchant] item tanpa UUID")
+                    end
+
+                    task.wait(EnchantSell.Delay)
+                end
+            end
         end
 
-        local delay = EnchantConfig.SellStonesDelay or 5
-        delay = math.clamp(delay, 0.5, 120)
-
-        local t = 0
-        while t < delay and EnchantConfig.AutoSellStones do
-            task.wait(0.1)
-            t += 0.1
-        end
-    end
-
-    sellStonesLoopRunning = false
-    print("[AutoEnchant] AutoSellStonesLoop STOP")
+        EnchantSell.Status  = "idle"
+        EnchantSell.Running = false
+    end)
 end
 
--- LOOP AUTO UNFAVORITE
-local function AutoUnfavoriteStonesLoop()
-    if unfavStonesLoopRunning then return end
-    unfavStonesLoopRunning = true
-    print("[AutoEnchant] AutoUnfavoriteStonesLoop START")
 
-    while EnchantConfig.AutoUnfavoriteStones do
-        local ok, err = pcall(function()
-            Enchant:UnfavoriteEnchantStonesOnce()
-        end)
-        if not ok then
-            warn("[AutoEnchant] AutoUnfavoriteStonesLoop error:", err)
-        end
+local function ListInventoryEnchantStones()
+    local result = {}
+    if not DataReplion then return result end
 
-        local delay = EnchantConfig.UnfavoriteStonesDelay or 5
-        delay = math.clamp(delay, 0.5, 120)
+    local inv = DataReplion:Get("Inventory")
+    if not inv then return result end
 
-        local t = 0
-        while t < delay and EnchantConfig.AutoUnfavoriteStones do
-            task.wait(0.1)
-            t += 0.1
+    -- paling sering batu enchant disimpan di slot "Items"
+    local items = inv["Items"] or {}
+    for _, item in ipairs(items) do
+        if item and item.UUID then
+            -- filter kira-kira: tipe / identifier Enchant Stone
+            -- kalau tidak cocok, print dulu untuk lihat datanya
+            if item.Type == "EnchantStone"
+            or item.SubType == "Enchant Stone"
+            or tostring(item.Id):lower():find("enchant") then
+                table.insert(result, item)
+            end
         end
     end
 
-    unfavStonesLoopRunning = false
-    print("[AutoEnchant] AutoUnfavoriteStonesLoop STOP")
+    return result
 end
 
 ------------------------------------------------------------
@@ -2472,32 +2500,35 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-local sellStoneGroup = TabFarm:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
+local enchantSellGroup = TabShop:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-    add(TabFarm:LiveLabel(function()
+    -- Live label status
+    add(TabShop:LiveLabel(function()
         return string.format(
-            "Status: %s\nSuccess: %d\nFailed: %d\nLast: %s",
-            EnchantStoneStats.Status,
-            EnchantStoneStats.Success,
-            EnchantStoneStats.Failed,
-            EnchantStoneStats.LastLog
+            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
+            EnchantSell.Status,
+            EnchantSell.Success,
+            EnchantSell.Failed,
+            EnchantSell.LastError ~= "" and EnchantSell.LastError or "-"
         )
-    end, 0.4))
+    end, 0.5))
 
-    add(TabFarm:Toggle("Enable Auto Sell Enchant Stone", function(state)
-        EnchantConfig.AutoSellStones = state
-        if state then
-            task.spawn(AutoSellStonesLoop)
+    -- Toggle on/off
+    add(TabShop:Toggle("Enable Auto Sell Enchant Stone", function(v)
+        EnchantSell.Enabled = v
+        if v then
+            StartAutoSellEnchantLoop()
         end
     end))
 
-    add(TabFarm:Box("Sell Delay (seconds)", function(txt)
+    -- Delay box
+    add(TabShop:Box("Sell Delay (seconds)", function(txt)
         local n = tonumber(txt)
         if n then
-            EnchantConfig.SellStonesDelay = math.clamp(n, 0.5, 60)
+            EnchantSell.Delay = math.clamp(n, 0.1, 10)
+            print("[AutoSellEnchant] delay set to", EnchantSell.Delay)
         end
     end))
-
 end)
 
 -- expose ke global kalau nanti mau dipakai modul lain
