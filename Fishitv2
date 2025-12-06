@@ -2462,41 +2462,7 @@ local function StartAutoSellEnchantLoop()
 end
 
 
-------------------------------------------------------------
--- GUI (CollapseGroup + LiveLabel)
--- letakkan di tab/section farmUI milikmu
-------------------------------------------------------------
-local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-    -- live status
-    add(farmUI:LiveLabel(function()
-        return string.format(
-            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
-            EnchantSell.Status,
-            EnchantSell.Success,
-            EnchantSell.Failed,
-            EnchantSell.LastError
-        )
-    end, 0.3))
-
-    -- toggle ON/OFF
-    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
-        EnchantSell.Enabled = v and true or false
-        if v then
-            StartAutoSellEnchantLoop()
-        end
-    end))
-
-    -- delay input
-    add(farmUI:Box("Sell Delay (seconds)", function(txt)
-        local n = tonumber(txt)
-        if n then
-            EnchantSell.Delay = math.clamp(n, 0.1, 10)
-            -- print("[AutoSellEnchant] Delay set to", EnchantSell.Delay)
-        end
-    end))
-
-end)
 
 
 
@@ -2789,6 +2755,41 @@ TabEvent:Toggle("Auto Teleport Selected Event", function(state)
     end
 end)
 
+------------------------------------------------------------
+-- GUI (CollapseGroup + LiveLabel)
+-- letakkan di tab/section farmUI milikmu
+------------------------------------------------------------
+local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
+
+    -- live status
+    add(farmUI:LiveLabel(function()
+        return string.format(
+            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
+            EnchantSell.Status,
+            EnchantSell.Success,
+            EnchantSell.Failed,
+            EnchantSell.LastError
+        )
+    end, 0.3))
+
+    -- toggle ON/OFF
+    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
+        EnchantSell.Enabled = v and true or false
+        if v then
+            StartAutoSellEnchantLoop()
+        end
+    end))
+
+    -- delay input
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then
+            EnchantSell.Delay = math.clamp(n, 0.1, 10)
+            -- print("[AutoSellEnchant] Delay set to", EnchantSell.Delay)
+        end
+    end))
+
+end)
 
 ----------------------------------------------------------------
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
