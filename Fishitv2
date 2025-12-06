@@ -2385,20 +2385,7 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
-
-local RF_SellItem do
-    local rfFolder = net:FindFirstChild("RF")
-    if rfFolder then
-        -- di spy: RF/SellItem  (kalau dev ganti nama ke SellItems, tetap ketemu)
-        RF_SellItem = rfFolder:FindFirstChild("SellItem") 
-                    or rfFolder:FindFirstChild("SellItems")
-    end
-end
-
-if not RF_SellItem then
-    warn("[AutoSellEnchant] RF_SellItem remote tidak ditemukan, cek nama di ReplicatedStorage.net.RF")
-end
-
+local RF_SellItem : net:FindFirstChild("RF/SellItem")
 
 ------------------------------------------------------------
 -- STATE / COUNTER
