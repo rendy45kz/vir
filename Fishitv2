@@ -1432,8 +1432,6 @@ end
 local autoSellCount     = 0
 local autoSellCooldown  = false
 
-local autoSellCountStone     = 0
-local autoSellCooldownStone  = false
 
 RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     if not info or not info.InventoryItem then return end
@@ -1530,20 +1528,7 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
         end
     end
 
-    if Farm.AutoSellStone then
-        autoSellCountStone += 1
-        if autoSellCountStone >= Farm.AutoSellThresholdStone and not autoSellCooldownStone then
-            autoSellCooldownStone = true
-            task.spawn(function()
-                pcall(function()
-                    RF_SellItem:InvokeServer()
-                end)
-                task.wait(Farm.AutoSellStoneDelay)
-                autoSellCountStone    = 0
-                autoSellCooldownStone = false
-            end)
-        end
-    end
+    
 end)
 
 ----------------------------------------------------------------
@@ -1599,11 +1584,6 @@ local RE_ActivateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
 local RE_EquipItem       = net:FindFirstChild("RE/EquipItem")
 local RE_UnequipItem     = net:FindFirstChild("RE/UnequipItem")
 
--- kemungkinan nama remote untuk jual item / enchant stone
-local RF_SellInventoryItem =
-    net:FindFirstChild("RF/SellInventoryItem")
-    or net:FindFirstChild("RF/SellItem")
-    or net:FindFirstChild("RF/SellEnchantStone")
 
 
 ------------------------------------------------------------
@@ -2326,6 +2306,11 @@ end)
 ------------------------------------------------------------
 -- REMOTE
 ------------------------------------------------------------
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
 local RF_SellItem = net:WaitForChild("RF"):WaitForChild("SellItem")
 
 
@@ -2388,7 +2373,7 @@ local function StartAutoSellEnchantLoop()
     task.spawn(function()
         while EnchantSell.Enabled do
 
-            local stones = Enchant:ListInventoryEnchantStones()  -- FIXED!!! ✔
+            local stones = Enchant:ListInventoryEnchantStones()
 
             if #stones == 0 then
                 EnchantSell.Status = "idle (no stones)"
