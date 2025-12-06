@@ -1631,6 +1631,14 @@ local EnchantConfig = {
     UnfavoriteStonesDelay  = 5,   -- detik cek & unfavorite enchant stone
 }
 
+local EnchantStoneStats = {
+    Status   = "Idle",
+    Success  = 0,
+    Failed   = 0,
+    LastLog  = "",
+}
+
+
 local Enchant = {}
 local loop1Running = false
 local loop2Running = false
@@ -1697,50 +1705,41 @@ local unfavStonesLoopRunning     = false
 -- sekali jalan: jual semua enchant stone (apapun namanya)
 function Enchant:SellEnchantStonesOnce()
     if not RF_SellInventoryItem then
-        warn("[AutoEnchant] RF_SellInventoryItem tidak ditemukan, cek nama remote sell enchant.")
+        warn("[AutoEnchant] RF_SellInventoryItem tidak ditemukan.")
+        EnchantStoneStats.Status = "Error"
+        EnchantStoneStats.LastLog = "Remote Sell tidak ditemukan!"
         return
     end
 
     local stones = self:ListInventoryEnchantStones()
     if #stones == 0 then
-        -- tidak ada batu
+        EnchantStoneStats.Status = "Idle"
+        EnchantStoneStats.LastLog = "Tidak ada enchant stone"
         return
     end
 
+    EnchantStoneStats.Status = "Selling..."
+
     for _, stone in ipairs(stones) do
-        pcall(function()
-            RF_SellInventoryItem:InvokeServer(stone.UUID)
+        local ok, result = pcall(function()
+            return RF_SellInventoryItem:InvokeServer(stone.UUID)
         end)
+
+        if ok then
+            EnchantStoneStats.Success += 1
+            EnchantStoneStats.LastLog =
+                "Sold: " .. stone.Name .. " [" .. stone.UUID .. "]"
+        else
+            EnchantStoneStats.Failed += 1
+            EnchantStoneStats.LastLog = "Failed: " .. tostring(result)
+        end
+
         task.wait(0.05)
     end
 
-    print(string.format("[AutoEnchant] SellEnchantStonesOnce: %d stones dijual.", #stones))
+    EnchantStoneStats.Status = "Idle"
 end
 
--- sekali jalan: Unfavorite semua enchant stone yang lagi Favorite
-function Enchant:UnfavoriteEnchantStonesOnce()
-    if not RE_FavoriteItem then
-        warn("[AutoEnchant] RE_FavoriteItem tidak ditemukan, tidak bisa Unfavorite enchant stones.")
-        return
-    end
-
-    local stones = self:ListInventoryEnchantStones()
-    local count  = 0
-
-    for _, stone in ipairs(stones) do
-        if stone.Favorite then
-            count += 1
-            pcall(function()
-                RE_FavoriteItem:FireServer(stone.UUID) -- toggle off Favorite
-            end)
-            task.wait(0.05)
-        end
-    end
-
-    if count > 0 then
-        print(string.format("[AutoEnchant] UnfavoriteEnchantStonesOnce: %d stones di-unfavorite.", count))
-    end
-end
 
 -- LOOP AUTO SELL
 local function AutoSellStonesLoop()
@@ -2471,35 +2470,36 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-farmUI:Label("Enchant Stone Manager")
+local sellStoneGroup = TabFarm:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-farmUI:Toggle("Auto Sell Enchant Stones", function(state)
-    EnchantConfig.AutoSellStones = state
-    if state then
-        task.spawn(AutoSellStonesLoop)
-    end
+    -- LIVE LABEL STATUS
+    add(TabFarm:LiveLabel(function()
+        return string.format(
+            "Status: %s\nSuccess: %d\nFailed: %d\nLast: %s",
+            EnchantStoneStats.Status,
+            EnchantStoneStats.Success,
+            EnchantStoneStats.Failed,
+            EnchantStoneStats.LastLog
+        )
+    end, 0.4))
+
+    -- TOGGLE
+    add(TabFarm:Toggle("Enable Auto Sell Enchant Stone", function(state)
+        EnchantConfig.AutoSellStones = state
+        if state then
+            task.spawn(AutoSellStonesLoop)
+        end
+    end))
+
+    -- DELAY
+    add(TabFarm:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then
+            EnchantConfig.SellStonesDelay = math.clamp(n, 0.5, 60)
+        end
+    end))
 end)
 
-farmUI:Box("Sell Stones Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        EnchantConfig.SellStonesDelay = math.clamp(n, 0.5, 120)
-    end
-end)
-
-farmUI:Toggle("Auto Unfavorite Enchant Stones", function(state)
-    EnchantConfig.AutoUnfavoriteStones = state
-    if state then
-        task.spawn(AutoUnfavoriteStonesLoop)
-    end
-end)
-
-farmUI:Box("Unfavorite Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        EnchantConfig.UnfavoriteStonesDelay = math.clamp(n, 0.5, 120)
-    end
-end)
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
