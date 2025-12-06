@@ -617,36 +617,37 @@ end
         -- LiveLabel (text dinamis, pakai function)
         ---------------------
         function api:LiveLabel(getTextFn, refreshDelay)
-            -- getTextFn = function() return "teks..." end
-            -- refreshDelay = detik update (default 0.5)
-            refreshDelay = refreshDelay or 0.5
+    refreshDelay = refreshDelay or 0.5
 
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = page
-            lbl.Size = UDim2.new(1,-4,0,40)
-            lbl.AutomaticSize = Enum.AutomaticSize.Y
-            lbl.BackgroundTransparency = 1
-            lbl.Text = ""
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.TextYAlignment = Enum.TextYAlignment.Top
-            lbl.TextWrapped = true
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = page
+    lbl.Size = UDim2.new(1,-4,0,40)
+    lbl.AutomaticSize = Enum.AutomaticSize.Y
+    lbl.BackgroundTransparency = 1
+    lbl.Text = ""
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 13
+    lbl.TextColor3 = theme.text
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextYAlignment = Enum.TextYAlignment.Top
+    lbl.TextWrapped = true
 
-            -- loop update teks
-            task.spawn(function()
-                while lbl.Parent do
-                    local ok, txt = pcall(getTextFn)
-                    if ok and txt ~= nil then
-                        lbl.Text = tostring(txt)
-                    end
-                    task.wait(refreshDelay)
-                end
-            end)
-
-            return lbl
+    -- update loop
+    task.spawn(function()
+        while lbl.Parent do
+            local ok, txt = pcall(getTextFn)
+            if ok and txt ~= nil then
+                lbl.Text = tostring(txt)
+            end
+            task.wait(refreshDelay)
         end
+    end)
+
+    -- RETURN OBJECT untuk CollapseGroup !!!
+    return {
+        Object = lbl
+    }
+end
 
            ------------------------------------------------------------
 -- GENERIC COLLAPSE GROUP COMPONENT
