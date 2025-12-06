@@ -1318,6 +1318,10 @@ local Farm = {
     AutoSellThreshold = 30,
     AutoSellDelay     = 1.0,
 
+    AutoSellStone = false,
+    StoneThreshold = 30,
+    AutoSellStoneDelay = 1.0,
+
     AutoWeatherEnabled = false,
     AutoWeatherList = {
         ["Storm"]=false, ["Cloudy"]=false, ["Snow"]=false,
@@ -1428,6 +1432,9 @@ end
 local autoSellCount     = 0
 local autoSellCooldown  = false
 
+local autoSellCountStone     = 0
+local autoSellCooldownStone  = false
+
 RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     if not info or not info.InventoryItem then return end
     local uuid = info.InventoryItem.UUID
@@ -1519,6 +1526,21 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
                 task.wait(Farm.AutoSellDelay)
                 autoSellCount    = 0
                 autoSellCooldown = false
+            end)
+        end
+    end
+
+    if Farm.AutoSellStone then
+        autoSellCountStone += 1
+        if autoSellCountStone >= Farm.AutoSellThresholdStone and not autoSellCooldownStone then
+            autoSellCooldownStone = true
+            task.spawn(function()
+                pcall(function()
+                    RF_SellItem:InvokeServer()
+                end)
+                task.wait(Farm.AutoSellStoneDelay)
+                autoSellCountStone    = 0
+                autoSellCooldownStone = false
             end)
         end
     end
@@ -2266,6 +2288,25 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
     if n then Farm.AutoSellDelay = n end
 end)
 
+farmUI:Dropdown("Sell Mode", {
+    "Off","10 Stone","20 Stone","30 Stone","50 Stone"
+}, function(opt)
+    if opt=="Off" then
+        Farm.AutoSellStone=false
+        autoSellCountStone=0
+    else
+        Farm.AutoSellStone=true
+        local n = tonumber(opt:match("(%d+)"))
+        Farm.AutoSellThresholdStone = n or 30
+    end
+end)
+
+farmUI:Box("Sell Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then Farm.AutoSellStoneDelay = n end
+end)
+
+
 Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
 Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
 
@@ -2510,36 +2551,6 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-local enchantSellGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
-
-    -- Live label status
-    add(farmUI:LiveLabel(function()
-        return string.format(
-            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
-            EnchantSell.Status,
-            EnchantSell.Success,
-            EnchantSell.Failed,
-            EnchantSell.LastError ~= "" and EnchantSell.LastError or "-"
-        )
-    end, 0.5))
-
-    -- Toggle on/off
-    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
-        EnchantSell.Enabled = v
-        if v then
-            StartAutoSellEnchantLoop()
-        end
-    end))
-
-    -- Delay box
-    add(farmUI:Box("Sell Delay (seconds)", function(txt)
-        local n = tonumber(txt)
-        if n then
-            EnchantSell.Delay = math.clamp(n, 0.1, 10)
-            print("[AutoSellEnchant] delay set to", EnchantSell.Delay)
-        end
-    end))
-end)
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
