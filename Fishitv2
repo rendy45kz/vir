@@ -1625,32 +1625,8 @@ local EnchantConfig = {
     Delay1 = 2,  -- detik antar enchant slot 1
     Delay2 = 2,  -- detik antar enchant slot 2
     TargetEnchant1 = {}, -- isinya [namaEnchant] = true
-    TargetEnchant2 = "", -- single string
-
-    -- ENCHANT STONE MANAGER
-    AutoSellStones         = false,
-    AutoUnfavoriteStones   = false,
-    SellStonesDelay        = 5,   -- detik antara sell enchant stone
-    UnfavoriteStonesDelay  = 5,   -- detik cek & unfavorite enchant stone
+    TargetEnchant2 = "", -- single string    
 }
-
-local EnchantStoneStats = {
-    Status   = "Idle",
-    Success  = 0,
-    Failed   = 0,
-    LastLog  = "",
-}
-
-local EnchantSell = {
-    Enabled   = false,
-    Delay     = 1,
-    Status    = "idle",
-    Success   = 0,
-    Failed    = 0,
-    LastError = "",
-    Running   = false,
-}
-
 
 local Enchant = {}
 local loop1Running = false
@@ -1706,125 +1682,6 @@ function Enchant:ListInventoryEnchantStones()
     end
 
     return enchantStones
-end
-
-------------------------------------------------------------
--- AUTO SELL / UNFAVORITE ENCHANT STONES
-------------------------------------------------------------
-
-local sellStonesLoopRunning      = false
-local unfavStonesLoopRunning     = false
-
--- sekali jalan: jual semua enchant stone (apapun namanya)
-function Enchant:SellEnchantStonesOnce()
-    if not RF_SellInventoryItem then
-        warn("[AutoEnchant] RF_SellInventoryItem tidak ditemukan.")
-        EnchantStoneStats.Status = "Error"
-        EnchantStoneStats.LastLog = "Remote Sell tidak ditemukan!"
-        return
-    end
-
-    local stones = self:ListInventoryEnchantStones()
-    if #stones == 0 then
-        EnchantStoneStats.Status = "Idle"
-        EnchantStoneStats.LastLog = "Tidak ada enchant stone"
-        return
-    end
-
-    EnchantStoneStats.Status = "Selling..."
-
-    for _, stone in ipairs(stones) do
-        local ok, result = pcall(function()
-            return RF_SellInventoryItem:InvokeServer(stone.UUID)
-        end)
-
-        if ok then
-            EnchantStoneStats.Success += 1
-            EnchantStoneStats.LastLog =
-                "Sold: " .. stone.Name .. " [" .. stone.UUID .. "]"
-        else
-            EnchantStoneStats.Failed += 1
-            EnchantStoneStats.LastLog = "Failed: " .. tostring(result)
-        end
-
-        task.wait(0.05)
-    end
-
-    EnchantStoneStats.Status = "Idle"
-end
-
-
--- LOOP AUTO SELL
-local function StartAutoSellEnchantLoop()
-    if EnchantSell.Running then return end
-    EnchantSell.Running = true
-
-    task.spawn(function()
-        while EnchantSell.Enabled do
-            local stones = ListInventoryEnchantStones()
-
-            if #stones == 0 then
-                EnchantSell.Status = "idle (no stone)"
-                task.wait(EnchantSell.Delay)
-            else
-                for _, stone in ipairs(stones) do
-                    if not EnchantSell.Enabled then break end
-
-                    EnchantSell.Status = "selling "..(stone.Name or stone.Id or "???")
-
-                    local uuid = stone.UUID
-                    if uuid then
-                        local ok, res = pcall(function()
-                            return RF_SellItem:InvokeServer(uuid)
-                        end)
-
-                        if ok then
-                            EnchantSell.Success += 1
-                            EnchantSell.LastError = ""
-                        else
-                            EnchantSell.Failed += 1
-                            EnchantSell.LastError = tostring(res)
-                            warn("[AutoSellEnchant] gagal jual:", res)
-                        end
-                    else
-                        EnchantSell.Failed += 1
-                        EnchantSell.LastError = "UUID nil"
-                        warn("[AutoSellEnchant] item tanpa UUID")
-                    end
-
-                    task.wait(EnchantSell.Delay)
-                end
-            end
-        end
-
-        EnchantSell.Status  = "idle"
-        EnchantSell.Running = false
-    end)
-end
-
-
-local function ListInventoryEnchantStones()
-    local result = {}
-    if not DataReplion then return result end
-
-    local inv = DataReplion:Get("Inventory")
-    if not inv then return result end
-
-    -- paling sering batu enchant disimpan di slot "Items"
-    local items = inv["Items"] or {}
-    for _, item in ipairs(items) do
-        if item and item.UUID then
-            -- filter kira-kira: tipe / identifier Enchant Stone
-            -- kalau tidak cocok, print dulu untuk lihat datanya
-            if item.Type == "EnchantStone"
-            or item.SubType == "Enchant Stone"
-            or tostring(item.Id):lower():find("enchant") then
-                table.insert(result, item)
-            end
-        end
-    end
-
-    return result
 end
 
 ------------------------------------------------------------
@@ -2500,10 +2357,10 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-local enchantSellGroup = TabShop:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
+local enchantSellGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
     -- Live label status
-    add(TabShop:LiveLabel(function()
+    add(farmUI:LiveLabel(function()
         return string.format(
             "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
             EnchantSell.Status,
@@ -2514,7 +2371,7 @@ local enchantSellGroup = TabShop:CreateCollapseGroup("Auto Sell Enchant Stone", 
     end, 0.5))
 
     -- Toggle on/off
-    add(TabShop:Toggle("Enable Auto Sell Enchant Stone", function(v)
+    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
         EnchantSell.Enabled = v
         if v then
             StartAutoSellEnchantLoop()
@@ -2522,7 +2379,7 @@ local enchantSellGroup = TabShop:CreateCollapseGroup("Auto Sell Enchant Stone", 
     end))
 
     -- Delay box
-    add(TabShop:Box("Sell Delay (seconds)", function(txt)
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
         local n = tonumber(txt)
         if n then
             EnchantSell.Delay = math.clamp(n, 0.1, 10)
