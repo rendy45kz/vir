@@ -2377,7 +2377,7 @@ local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
-local RF_SellItem = net:WaitForChild("RF/ellItem")
+local RF_SellItem = net:WaitForChild("RF/SellItem")
 
 
 
@@ -2502,36 +2502,7 @@ end
     end)
 end
 
-------------------------------------------------------------
--- GUI (CollapseGroup di farmUI)
-------------------------------------------------------------
-local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-    add(farmUI:LiveLabel(function()
-        return string.format(
-            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
-            EnchantSell.Status,
-            EnchantSell.Success,
-            EnchantSell.Failed,
-            EnchantSell.LastError
-        )
-    end, 0.3))
-
-    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
-        EnchantSell.Enabled = v
-        if v then
-            StartAutoSellEnchantLoop()
-        end
-    end))
-
-    add(farmUI:Box("Sell Delay (seconds)", function(txt)
-        local n = tonumber(txt)
-        if n then
-            EnchantSell.Delay = math.clamp(n, 0.1, 10)
-        end
-    end))
-
-end)
 
 
 
