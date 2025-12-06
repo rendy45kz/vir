@@ -2346,7 +2346,7 @@ end)
 -- REMOTE
 ---------------------------
 -- Wajib cocok dengan SS kamu: RF/SellItem
-local RF_SellItem = netFolder:WaitForChild("RF/SellItem")
+local RF_SellItem = net:WaitForChild("RF/SellItem")
 
 
 ---------------------------
