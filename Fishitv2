@@ -2369,6 +2369,155 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
+------------------------------------------------------------
+-- NET / REMOTE
+------------------------------------------------------------
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
+
+-- Cari remote yang benar, jangan bikin script nge-freeze di WaitForChild
+local RF_SellItem =
+    net:FindFirstChild("RF/SellItem")
+    or net:FindFirstChild("RF/SellItems")
+
+if not RF_SellItem then
+    warn("[AutoSellEnchant] RF_SellItem remote not found (check name in ReplicatedStorage/net).")
+end
+
+------------------------------------------------------------
+-- STATE
+------------------------------------------------------------
+local EnchantSell = {
+    Enabled   = false,
+    Delay     = 1,
+    Status    = "idle",
+    Success   = 0,
+    Failed    = 0,
+    LastError = "-",
+    Running   = false,
+}
+
+------------------------------------------------------------
+-- LIST INVENTORY ENCHANT STONES
+------------------------------------------------------------
+function Enchant:ListInventoryEnchantStones()
+    local out = {}
+
+    if not (DataReplion and ItemUtility) then return out end
+
+    -- kalau di bagian lain pakai Get({ "Inventory" }), samakan:
+    local okInv, inventory = pcall(function()
+        return DataReplion:Get({ "Inventory" })
+    end)
+    if not okInv or not inventory then
+        return out
+    end
+
+    local items = inventory["Items"] or {}
+
+    for _, item in pairs(items) do
+        if item and item.Id then
+            local ok, itemData = pcall(function()
+                return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
+            end)
+
+            if ok and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+                table.insert(out, {
+                    UUID = item.UUID,
+                    Id   = item.Id,
+                    Name = itemData.Data.Name or "Unknown",
+                })
+            end
+        end
+    end
+
+    return out
+end
+
+------------------------------------------------------------
+-- AUTO SELL LOOP
+------------------------------------------------------------
+local function StartAutoSellEnchantLoop()
+    if EnchantSell.Running then return end
+    EnchantSell.Running = true
+
+    task.spawn(function()
+        while EnchantSell.Enabled do
+
+            local stones = Enchant:ListInventoryEnchantStones()
+
+            if #stones == 0 then
+                EnchantSell.Status = "idle (no stones)"
+                task.wait(EnchantSell.Delay)
+            else
+                for _, stone in ipairs(stones) do
+                    if not EnchantSell.Enabled then break end
+
+                    EnchantSell.Status = "selling " .. (stone.Name or stone.Id or "?")
+
+                    if RF_SellItem and stone.UUID then
+                        local ok, res = pcall(function()
+                            return RF_SellItem:InvokeServer(stone.UUID)
+                        end)
+
+                        if ok then
+                            EnchantSell.Success += 1
+                            EnchantSell.LastError = "-"
+                        else
+                            EnchantSell.Failed += 1
+                            EnchantSell.LastError = tostring(res)
+                            warn("[AutoSellEnchant] error:", res)
+                        end
+                    else
+                        EnchantSell.Failed += 1
+                        EnchantSell.LastError = "No Remote or UUID"
+                    end
+
+                    task.wait(EnchantSell.Delay)
+                end
+            end
+        end
+
+        EnchantSell.Status = "idle"
+        EnchantSell.Running = false
+    end)
+end
+
+------------------------------------------------------------
+-- GUI (CollapseGroup di farmUI)
+------------------------------------------------------------
+local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
+
+    add(farmUI:LiveLabel(function()
+        return string.format(
+            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
+            EnchantSell.Status,
+            EnchantSell.Success,
+            EnchantSell.Failed,
+            EnchantSell.LastError
+        )
+    end, 0.3))
+
+    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
+        EnchantSell.Enabled = v
+        if v then
+            StartAutoSellEnchantLoop()
+        end
+    end))
+
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then
+            EnchantSell.Delay = math.clamp(n, 0.1, 10)
+        end
+    end))
+
+end)
+
+
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
