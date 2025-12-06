@@ -2288,25 +2288,6 @@ farmUI:Box("Sell Delay (seconds)", function(txt)
     if n then Farm.AutoSellDelay = n end
 end)
 
-farmUI:Dropdown("Sell Mode", {
-    "Off","10 Stone","20 Stone","30 Stone","50 Stone"
-}, function(opt)
-    if opt=="Off" then
-        Farm.AutoSellStone=false
-        autoSellCountStone=0
-    else
-        Farm.AutoSellStone=true
-        local n = tonumber(opt:match("(%d+)"))
-        Farm.AutoSellThresholdStone = n or 30
-    end
-end)
-
-farmUI:Box("Sell Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then Farm.AutoSellStoneDelay = n end
-end)
-
-
 Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
 Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
 
@@ -2342,92 +2323,72 @@ end)
 -- AUTO SELL ENCHANT STONE - FULL & CLEAN VERSION
 ------------------------------------------------------------
 
----------------------------
+------------------------------------------------------------
 -- REMOTE
----------------------------
--- Wajib cocok dengan SS kamu: RF/SellItem
-local RF_SellItem = net:WaitForChild("RF/SellItem")
+------------------------------------------------------------
+local RF_SellItem = net:WaitForChild("RF"):WaitForChild("SellItem")
 
 
----------------------------
--- STATE TRACKING
----------------------------
+------------------------------------------------------------
+-- STATE
+------------------------------------------------------------
 local EnchantSell = {
-    Enabled   = false,
-    Delay     = 1,
-    Status    = "idle",
-    Success   = 0,
-    Failed    = 0,
+    Enabled = false,
+    Delay   = 1,
+    Status  = "idle",
+    Success = 0,
+    Failed  = 0,
     LastError = "-",
-    Running   = false,
+    Running = false,
 }
 
 
----------------------------
--- GET INVENTORY → ENCHANT STONES
----------------------------
 ------------------------------------------------------------
--- LIST INVENTORY ENCHANT STONES  (FIX "NO STONE")
+-- FIXED LIST INVENTORY FUNCTION
+-- 100% HARUS DIPANGGIL VIA Enchant:ListInventoryEnchantStones()
 ------------------------------------------------------------
 function Enchant:ListInventoryEnchantStones()
-    local enchantStones = {}
-    if not (DataReplion and ItemUtility) then
-        return enchantStones
-    end
+    local out = {}
 
-    -- Ambil semua data inventory dari Replion
-    local inventory = DataReplion:Get({ "Inventory" }) or {}
+    if not (DataReplion and ItemUtility) then return out end
 
-    -- Kita TIDAK lagi ngandelin inventory["Items"] saja.
-    -- Kita scan semua bucket di dalam Inventory.
-    for bucketName, bucket in pairs(inventory) do
-        if type(bucket) == "table" then
-            for _, item in pairs(bucket) do
-                if item and item.Id then
-                    local ok, itemData = pcall(function()
-                        -- di game ini enchant stone pakai tipe "EnchantStones"
-                        return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
-                    end)
+    local inventory = DataReplion:Get("Inventory")
+    if not inventory then return out end
 
-                    if ok and itemData and itemData.Data then
-                        local isStoneType =
-                            itemData.Data.Type == "EnchantStones"
-                            or bucketName == "EnchantStones"
-                            or bucketName == "Enchant Stones"
+    -- game biasanya simpan di Inventory.Items
+    local items = inventory["Items"] or {}
 
-                        if isStoneType then
-                            table.insert(enchantStones, {
-                                UUID = item.UUID,
-                                Id   = item.Id,
-                                Name = itemData.Data.Name or "Unknown",
-                                Type = itemData.Data.Type or "EnchantStones",
-                                Bucket = bucketName,
-                            })
-                        end
-                    end
-                end
+    for _, item in ipairs(items) do
+        if item and item.Id then
+            local ok, itemData = pcall(function()
+                return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
+            end)
+
+            if ok and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
+                table.insert(out, {
+                    UUID = item.UUID,
+                    Id = item.Id,
+                    Name = itemData.Data.Name or "Unknown",
+                })
             end
         end
     end
 
-    -- debug opsional (boleh hapus kalau sudah yakin jalan)
-    -- print("[Enchant] Ditemukan", #enchantStones, "Enchant Stone di inventory")
-
-    return enchantStones
+    return out
 end
 
 
-
----------------------------
--- AUTO SELL LOOP
----------------------------
+------------------------------------------------------------
+-- AUTO SELL LOOP (FIXED)
+------------------------------------------------------------
 local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
     EnchantSell.Running = true
 
     task.spawn(function()
         while EnchantSell.Enabled do
-            local stones = ListInventoryEnchantStones()
+
+            local stones = Enchant:ListInventoryEnchantStones()  -- FIXED!!! ✔
 
             if #stones == 0 then
                 EnchantSell.Status = "idle (no stones)"
@@ -2436,28 +2397,18 @@ local function StartAutoSellEnchantLoop()
                 for _, stone in ipairs(stones) do
                     if not EnchantSell.Enabled then break end
 
-                    local uuid = stone.UUID
-                    local n = stone.Name or stone.Id or "Unknown"
+                    EnchantSell.Status = "selling " .. (stone.Name or stone.Id)
 
-                    EnchantSell.Status = "selling " .. n
+                    local ok, res = pcall(function()
+                        return RF_SellItem:InvokeServer(stone.UUID)
+                    end)
 
-                    if uuid then
-                        local ok, res = pcall(function()
-                            return RF_SellItem:InvokeServer(uuid)
-                        end)
-
-                        if ok then
-                            EnchantSell.Success += 1
-                            EnchantSell.LastError = "-"
-                        else
-                            EnchantSell.Failed += 1
-                            EnchantSell.LastError = tostring(res)
-                            warn("[AutoSellEnchant] error:", res)
-                        end
+                    if ok then
+                        EnchantSell.Success += 1
+                        EnchantSell.LastError = "-"
                     else
                         EnchantSell.Failed += 1
-                        EnchantSell.LastError = "UUID nil"
-                        warn("[AutoSellEnchant] ERROR: UUID tidak ditemukan")
+                        EnchantSell.LastError = tostring(res)
                     end
 
                     task.wait(EnchantSell.Delay)
@@ -2472,13 +2423,10 @@ end
 
 
 ------------------------------------------------------------
--- GUI SECTION (CollapseGroup)
+-- GUI
 ------------------------------------------------------------
 local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-    -------------------------------
-    -- LIVE LABEL STATUS
-    -------------------------------
     add(farmUI:LiveLabel(function()
         return string.format(
             "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
@@ -2489,32 +2437,21 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
         )
     end, 0.3))
 
-    -------------------------------
-    -- TOGGLE ON/OFF
-    -------------------------------
     add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
         EnchantSell.Enabled = v
-        if v then
-            StartAutoSellEnchantLoop()
-        end
+        if v then StartAutoSellEnchantLoop() end
     end))
 
-    -------------------------------
-    -- INPUT DELAY
-    -------------------------------
     add(farmUI:Box("Sell Delay (seconds)", function(txt)
         local n = tonumber(txt)
         if n then
             EnchantSell.Delay = math.clamp(n, 0.1, 10)
-            print("[AutoSellEnchant] delay =", EnchantSell.Delay)
         end
     end))
 
 end)
 
-------------------------------------------------------------
--- END OF AUTO SELL ENCHANT STONE MODULE
-------------------------------------------------------------
+
 
 
 ----------------------------------------------------------------
