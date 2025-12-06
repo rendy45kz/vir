@@ -2473,16 +2473,6 @@ end)
 
 local sellStoneGroup = TabFarm:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
-    -- LIVE LABEL STATUS
-    add(TabFarm:LiveLabel(function()
-        return string.format(
-            "Status: %s\nSuccess: %d\nFailed: %d\nLast: %s",
-            EnchantStoneStats.Status,
-            EnchantStoneStats.Success,
-            EnchantStoneStats.Failed,
-            EnchantStoneStats.LastLog
-        )
-    end, 0.4))
 
     -- TOGGLE
     add(TabFarm:Toggle("Enable Auto Sell Enchant Stone", function(state)
