@@ -2357,7 +2357,7 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-end)
+end
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
