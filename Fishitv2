@@ -2299,13 +2299,6 @@ local weatherGroup = TabShop:CreateCollapseGroup("Auto Buy Weather", function(ad
     group.Dropdown   = ddWeather
 end)
 
-------------------------------------------------------------
--- AUTO SELL ENCHANT STONE
-------------------------------------------------------------
-------------------------------------------------------------
---  AUTO SELL ENCHANT STONE
-------------------------------------------------------------
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- ambil net (sama seperti remotes lain di script kamu)
@@ -2414,6 +2407,120 @@ local function StartAutoSellEnchantLoop()
 
             local stones = Enchant:ListInventoryEnchantStones()
 
+------------------------------------------------------------
+--  AUTO SELL ENCHANT STONE (WITH FAVORITE PROTECTION)
+------------------------------------------------------------
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
+
+-- di Sigma Spy: "RF/SellItem"
+local RF_SellItem = net:FindFirstChild("RF/SellItem")
+if not RF_SellItem then
+    warn("[AutoSellEnchant] RF/SellItem tidak ditemukan di net, cek lagi nama remote-nya")
+end
+
+Enchant = Enchant or {}
+
+------------------------------------------------------------
+-- STATE COUNTER
+------------------------------------------------------------
+local EnchantSell = {
+    Enabled   = false,
+    Delay     = 1,
+    Status    = "idle",
+    Success   = 0,
+    Failed    = 0,
+    LastInfo  = "-",   -- <-- untuk teks di "Last"
+    Running   = false,
+}
+
+------------------------------------------------------------
+-- Helper: cek apakah metadata item = favorite
+------------------------------------------------------------
+local function IsFavorite(meta)
+    if not meta then return false end
+    if meta.Favorite == true then return true end
+    if meta.IsFavorite == true then return true end
+    if meta.IsFavorited == true then return true end
+    return false
+end
+
+------------------------------------------------------------
+-- LIST INVENTORY ENCHANT STONES
+--  * Mengambil info Favorite
+--  * Tidak bikin error kalau Replion / Inventory belum siap
+------------------------------------------------------------
+function Enchant:ListInventoryEnchantStones()
+    local list = {}
+
+    if not DataReplion or type(DataReplion.Get) ~= "function" or not ItemUtility then
+        return list
+    end
+
+    local inventory
+    local ok, res = pcall(function()
+        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
+    end)
+    if not ok or not res then
+        return list
+    end
+    inventory = res
+
+    local items = inventory.Items or inventory["Items"] or {}
+    if type(items) ~= "table" then
+        return list
+    end
+
+    for _, item in pairs(items) do
+        if item and item.Id then
+            local ok2, itemData = pcall(function()
+                return ItemUtility.GetItemDataFromItemType("Items", item.Id)
+            end)
+
+            if ok2 and itemData and itemData.Data then
+                local nm = string.lower(itemData.Data.Name or "")
+                local isEnchantStone = (nm:find("enchant") and nm:find("stone"))
+
+                if isEnchantStone then
+                    local meta = item.Metadata or {}
+                    table.insert(list, {
+                        UUID     = item.UUID,
+                        Id       = item.Id,
+                        Name     = itemData.Data.Name or "Unknown",
+                        Favorite = IsFavorite(meta),
+                    })
+                end
+            end
+        end
+    end
+
+    return list
+end
+
+------------------------------------------------------------
+-- AUTO SELL LOOP
+------------------------------------------------------------
+local function StartAutoSellEnchantLoop()
+    if EnchantSell.Running then return end
+    EnchantSell.Running = true
+
+    task.spawn(function()
+        while EnchantSell.Enabled do
+
+            if not RF_SellItem then
+                EnchantSell.Status   = "remote not found"
+                EnchantSell.LastInfo = "RF_SellItem nil"
+                break
+            end
+
+            local stones = Enchant:ListInventoryEnchantStones()
+
             if #stones == 0 then
                 EnchantSell.Status = "idle (no stones)"
                 task.wait(EnchantSell.Delay)
@@ -2422,25 +2529,33 @@ local function StartAutoSellEnchantLoop()
                     if not EnchantSell.Enabled then break end
 
                     local name = stone.Name or stone.Id or "?"
-                    EnchantSell.Status = "selling " .. name
 
-                    if stone.UUID then
-                        local ok, res = pcall(function()
-                            return RF_SellItem:InvokeServer(stone.UUID)
-                        end)
-
-                        if ok then
-                            EnchantSell.Success += 1
-                            EnchantSell.LastError = "-"
-                        else
-                            EnchantSell.Failed += 1
-                            EnchantSell.LastError = tostring(res)
-                            warn("[AutoSellEnchant] error:", res)
-                        end
+                    -- JIKA FAVORITE → SKIP, jangan dijual
+                    if stone.Favorite then
+                        EnchantSell.Status   = "skip (favorite)"
+                        EnchantSell.LastInfo = "Skip favorite: " .. name
+                        -- tidak menambah Success / Failed
                     else
-                        EnchantSell.Failed   += 1
-                        EnchantSell.LastError = "UUID nil"
-                        warn("[AutoSellEnchant] UUID enchant stone nil")
+                        EnchantSell.Status = "selling " .. name
+
+                        if stone.UUID then
+                            local ok, res = pcall(function()
+                                return RF_SellItem:InvokeServer(stone.UUID)
+                            end)
+
+                            if ok then
+                                EnchantSell.Success += 1
+                                EnchantSell.LastInfo = "Sold: " .. name
+                            else
+                                EnchantSell.Failed  += 1
+                                EnchantSell.LastInfo = "Error: " .. tostring(res)
+                                warn("[AutoSellEnchant] error:", res)
+                            end
+                        else
+                            EnchantSell.Failed  += 1
+                            EnchantSell.LastInfo = "UUID nil for " .. name
+                            warn("[AutoSellEnchant] UUID enchant stone nil")
+                        end
                     end
 
                     task.wait(EnchantSell.Delay)
@@ -2455,7 +2570,6 @@ end
 
 ------------------------------------------------------------
 -- GUI: CollapseGroup + LiveLabel
---   letakkan di tab farm (farmUI)
 ------------------------------------------------------------
 local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
@@ -2466,15 +2580,27 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
             EnchantSell.Status,
             EnchantSell.Success,
             EnchantSell.Failed,
-            EnchantSell.LastError
+            EnchantSell.LastInfo
         )
     end, 0.3))
 
     -- toggle ON / OFF
     add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
         EnchantSell.Enabled = v and true or false
+
         if v then
+            -- saat dinyalakan, biarkan counter tetap (biar kelihatan total)
             StartAutoSellEnchantLoop()
+        else
+            -- SAAT DIMATIKAN:
+            -- loop akan berhenti (Enabled = false),
+            -- dan Success/Failed TIDAK akan bertambah lagi.
+            EnchantSell.Status   = "idle (stopped)"
+            EnchantSell.LastInfo = "Stopped by user"
+            -- kalau mau reset counter tiap stop, uncomment 3 baris bawah:
+            EnchantSell.Success = 0
+            EnchantSell.Failed  = 0
+            EnchantSell.LastInfo = "-"
         end
     end))
 
@@ -2483,13 +2609,10 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
         local n = tonumber(txt)
         if n then
             EnchantSell.Delay = math.clamp(n, 0.1, 10)
-            -- print("[AutoSellEnchant] Delay set to", EnchantSell.Delay)
         end
     end))
 
 end)
-
-
 
 ----------------------------------------------------------------
 farmUI:Label("Auto Enchant")
