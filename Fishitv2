@@ -2323,8 +2323,7 @@ farmUI:LiveLabel(function()
         r.Enchant1 or "None",
         r.Enchant2 or "None"
     )
-end, 0.5) -- 0.5 = update setiap 0.5 detik
-
+end, 0.5)
 
 
 -- daftar enchant dari Enchants
@@ -2357,7 +2356,6 @@ farmUI:Toggle("Auto Enchant Slot 2", function(state)
     end
 end)
 
-end
 
 -- expose ke global kalau nanti mau dipakai modul lain
 _G.AegisEnchant       = Enchant
