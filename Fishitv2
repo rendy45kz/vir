@@ -2169,50 +2169,60 @@ local farmUI = TabFarm
 ----------------------------------------------------------------
 -- AUTO RESPAWN BY FISH COUNT (FARM TAB)
 ----------------------------------------------------------------
-TabFarm:Label("Auto Respawn / Teleport by Fish Count")
+-- AUTO RESPAWN / TELEPORT BY FISH COUNT (COLLAPSE GROUP)
+local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport by Fish Count", function(add, group)
 
--- live info counter
-TabFarm:LiveLabel(function()
-    local fs = Farm.FishStats or {}
-    local total   = fs.Total   or 0
-    local session = fs.Session or 0
-    local limit   = fs.RespawnThreshold or 500
-    local onoff   = fs.RespawnEnabled and "ON" or "OFF"
+    ------------------------------------------------
+    -- LIVE INFO COUNTER
+    ------------------------------------------------
+    add(TabFarm:LiveLabel(function()
+        local fs      = Farm.FishStats or {}
+        local total   = fs.Total   or 0
+        local session = fs.Session or 0
+        local limit   = fs.RespawnThreshold or 500
+        local onoff   = fs.RespawnEnabled and "ON" or "OFF"
 
-    return string.format(
-        "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
-        onoff, session, total, limit
-    )
-end, 0.5)
+        return string.format(
+            "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
+            onoff, session, total, limit
+        )
+    end, 0.5))
 
--- input jumlah ikan sebelum respawn (tidak hardcode)
-TabFarm:Box("Fish count to respawn", function(txt)
-    local n = tonumber(txt)
-    if not n or n <= 0 then return end
-    n = math.floor(n)
-    Farm.FishStats.RespawnThreshold = n
-    print("[AutoRespawnFish] Threshold di-set ke:", n)
-end)
+    ------------------------------------------------
+    -- INPUT JUMLAH IKAN SEBELUM RESPAWN
+    ------------------------------------------------
+    add(TabFarm:Box("Fish count to respawn", function(txt)
+        local n = tonumber(txt)
+        if not n or n <= 0 then return end
+        n = math.floor(n)
+        Farm.FishStats.RespawnThreshold = n
+        print("[AutoRespawnFish] Threshold di-set ke:", n)
+    end))
 
--- toggle ON/OFF respawn
-TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
-    Farm.FishStats.RespawnEnabled = state and true or false
+    ------------------------------------------------
+    -- TOGGLE ON/OFF RESPawn + TELEPORT
+    ------------------------------------------------
+    add(TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
+        Farm.FishStats.RespawnEnabled = state and true or false
 
-    if state then
-        -- simpan posisi awal sebagai "tempat semula"
-        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            Farm.FishStats.OriginCFrame = hrp.CFrame
-            Farm.FishStats.Session = 0
-            print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
+        if state then
+            -- simpan posisi awal sebagai "tempat semula"
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                Farm.FishStats.OriginCFrame = hrp.CFrame
+                Farm.FishStats.Session = 0
+                print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
+            else
+                warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
+            end
         else
-            warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
+            print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
         end
-    else
-        print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
-    end
+    end))
+
 end)
+
 
 
 local favoriteGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group)
@@ -2543,73 +2553,80 @@ end)
 -- AUTO ENCHANT (Farm tab)
 ------------------------------------------------------------
 
-farmUI:Label("Auto Enchant")
-
 ------------------------------------------------
--- LIVE INFO ROD
+-- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
-farmUI:LiveLabel(function()
-    local r =
-        (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
-        or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
-        or nil
+local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, group)
 
-    if not r then
-        return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
+    ------------------------------------------------
+    -- LIVE INFO ROD
+    ------------------------------------------------
+    add(farmUI:LiveLabel(function()
+        local r =
+            (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
+            or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
+            or nil
+
+        if not r then
+            return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
+        end
+
+        return string.format(
+            "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
+            r.Name or "N/A",
+            r.Enchant1 or "None",
+            r.Enchant2 or "None"
+        )
+    end, 0.5))
+
+    ------------------------------------------------
+    -- GET LIST ENCHANT
+    ------------------------------------------------
+    local enchantNames = {}
+    if Enchant and typeof(Enchant.GetListEnchant) == "function" then
+        local ok, list = pcall(function()
+            return Enchant:GetListEnchant()
+        end)
+        if ok and type(list) == "table" then
+            enchantNames = list
+        end
     end
 
-    return string.format(
-        "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
-        r.Name or "N/A",
-        r.Enchant1 or "None",
-        r.Enchant2 or "None"
-    )
-end, 0.5)
+    ------------------------------------------------
+    -- SLOT 1 (MULTI TARGET)
+    ------------------------------------------------
+    add(farmUI:Label("Enchant Slot 1 (Multiple Target)"))
 
-------------------------------------------------
--- GET LIST ENCHANT
-------------------------------------------------
-local enchantNames = {}
-if Enchant and typeof(Enchant.GetListEnchant) == "function" then
-    local ok, list = pcall(function()
-        return Enchant:GetListEnchant()
-    end)
-    if ok and type(list) == "table" then
-        enchantNames = list
-    end
-end
+    add(farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
+        EnchantConfig.TargetEnchant1[name] = state and true or false
+    end))
 
-------------------------------------------------
--- SLOT 1 (MULTI TARGET)
-------------------------------------------------
-farmUI:Label("Enchant Slot 1 (Multiple Target)")
-farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
-    EnchantConfig.TargetEnchant1[name] = state and true or false
+    add(farmUI:Toggle("Enable Auto Enchant Slot 1", function(state)
+        EnchantConfig.AutoEnchant1 = state
+        if state and typeof(AutoEnchantLoop1) == "function" then
+            task.spawn(AutoEnchantLoop1)
+        end
+    end))
+
+    ------------------------------------------------
+    -- SLOT 2 (SINGLE TARGET)
+    ------------------------------------------------
+    add(farmUI:Label("Enchant Slot 2 (Single Target)"))
+
+    add(farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
+        EnchantConfig.TargetEnchant2 = name
+        print("[AutoEnchant] TargetEnchant2 =", name)
+    end))
+
+    add(farmUI:Toggle("Enable Auto Enchant Slot 2", function(state)
+        EnchantConfig.AutoEnchant2 = state
+        if state and typeof(AutoEnchantLoop2) == "function" then
+            task.spawn(AutoEnchantLoop2)
+        end
+    end))
+
 end)
 
-farmUI:Toggle("Enable Auto Enchant Slot 1", function(state)
-    EnchantConfig.AutoEnchant1 = state
-    if state then
-        task.spawn(AutoEnchantLoop1)
-    end
-end)
-
-------------------------------------------------
--- SLOT 2 (SINGLE TARGET)
-------------------------------------------------
-farmUI:Label("Enchant Slot 2 (Single Target)")
-
-farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
-    EnchantConfig.TargetEnchant2 = name
-    print("[AutoEnchant] TargetEnchant2 =", name)
-end)
-
-farmUI:Toggle("Enable Auto Enchant Slot 2", function(state)
-    EnchantConfig.AutoEnchant2 = state
-    if state then
-        task.spawn(AutoEnchantLoop2)
-    end
-end)
 
 
 -- expose ke global kalau mau dipakai modul lain
