@@ -2297,9 +2297,9 @@ end)
 ------------------------------------------------------------
 --  AUTO SELL ENCHANT STONE (WITH FAVORITE PROTECTION)
 ------------------------------------------------------------
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- ambil net (sama seperti remotes lain di script kamu)
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
