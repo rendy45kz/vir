@@ -2215,49 +2215,60 @@ TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
 end)
 
 
-farmUI:Label("Auto Favorite")
+local favoriteGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group)
 
--- BY RARITY
-farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
-    Farm.AutoFavoriteRarityEnabled = v
+    ------------------------------------------------
+    -- TITLE
+    ------------------------------------------------
+    add(farmUI:Label("Auto Favorite System"))
+
+    ------------------------------------------------
+    -- FAVORITE BY RARITY
+    ------------------------------------------------
+    add(farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
+        Farm.AutoFavoriteRarityEnabled = v
+    end))
+
+    local rarityList = {
+        "COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"
+    }
+
+    add(farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
+        Farm.FavoriteRarity[r] = state
+    end))
+
+    ------------------------------------------------
+    -- FAVORITE BY MUTATION (VARIANT)
+    ------------------------------------------------
+    add(farmUI:Toggle("Enable Auto Favorite by Mutation", function(v)
+        Farm.AutoFavoriteMutationEnabled = v
+    end))
+
+    local mutationList = {
+        "Galaxy",
+        "Fairy Dust",
+        "Gemstone",
+        "1x1x1x1",
+        "Stone",
+        "Gold",
+        "Albino",
+        "Frozen",
+        "Sandy",
+        "Ghost",
+        "Radioactive",
+        "Holographic",
+        "Noob",
+        "Corrupt",
+        "Lightning",
+        "Midnight",
+        "Shiny",
+    }
+
+    add(farmUI:MultiDropdown("Mutation Favorite List", mutationList, function(name, state)
+        Farm.FavoriteMutations[name] = state
+    end))
+
 end)
-
-local rarityList = {"COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"}
-
-farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
-    Farm.FavoriteRarity[r] = state
-end)
-
--- BY MUTATION (VariantId)
-farmUI:Toggle("Enable Auto Favorite by Mutation", function(v)
-    Farm.AutoFavoriteMutationEnabled = v
-end)
-
-local mutationList = {
-    "Galaxy",
-    "Fairy Dust",
-    "Gemstone",
-    "1x1x1x1",
-    "Stone",
-    "Gold",
-    "Albino",
-    "Frozen",
-    "Sandy",
-    "Ghost",
-    "Radioactive",
-    "Holographic",
-    "Noob",
-    "Corrupt",
-    "Lightning",
-    "Midnight",
-    "Shiny",
-}
-
-farmUI:MultiDropdown("Auto kinyis kinyis", mutationList, function(name, state)
-    Farm.FavoriteMutations[name] = state
-end)
-
-
 
 ----------------------------------------------------------------
 local autoSellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
