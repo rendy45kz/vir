@@ -264,9 +264,6 @@ function library:CreateWindow(title)
         local api = {}
 
         ---------------------
-        -- Label
-        ---------------------
-                ---------------------
         -- Label  (sekarang return instance)
         ---------------------
         function api:Label(text)
@@ -280,7 +277,6 @@ function library:CreateWindow(title)
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-            -- boleh diabaikan kalau nggak dipakai
             return lbl
         end
 
