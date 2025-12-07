@@ -2302,29 +2302,30 @@ end)
 ------------------------------------------------------------
 -- AUTO SELL ENCHANT STONE
 ------------------------------------------------------------
+------------------------------------------------------------
+--  AUTO SELL ENCHANT STONE
+------------------------------------------------------------
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- NET / REMOTE (sesuai struktur sleitnick_net)
+-- ambil net (sama seperti remotes lain di script kamu)
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
 
 local net = netIndex:WaitForChild("net")
 
-local RF_SellItem     = net:FindFirstChild("RF/SellItem")
-
-
+-- di Sigma Spy: "RF/SellItem"
+local RF_SellItem = net:FindFirstChild("RF/SellItem")
 if not RF_SellItem then
-    warn("[AutoSellEnchant] RF_SellItem remote tidak ditemukan, cek nama di ReplicatedStorage.net.RF")
+    warn("[AutoSellEnchant] RF/SellItem tidak ditemukan di net, cek lagi nama remote-nya")
 end
 
-
-------------------------------------------------------------
--- STATE / COUNTER
-------------------------------------------------------------
 Enchant = Enchant or {}
 
+------------------------------------------------------------
+-- STATE COUNTER
+------------------------------------------------------------
 local EnchantSell = {
     Enabled   = false,
     Delay     = 1,
@@ -2335,76 +2336,68 @@ local EnchantSell = {
     Running   = false,
 }
 
-
 ------------------------------------------------------------
--- LIST INVENTORY ENCHANT STONES (SANGAT AMAN)
--- Tidak akan error walaupun DataReplion / Inventory belum siap.
+-- LIST INVENTORY ENCHANT STONES
+--   * TIDAK error kalau Replion / Inventory belum siap
+--   * Cari di Inventory.Items
+--   * Deteksi berdasar nama item: mengandung "enchant" & "stone"
 ------------------------------------------------------------
 function Enchant:ListInventoryEnchantStones()
-    local enchantStones = {}
+    local list = {}
 
-    -- 1) Cek Replion & ItemUtility dulu
-    if not DataReplion or type(DataReplion.Get) ~= "function" then
-        -- Inventory belum siap, jangan paksa :Get()
-        return enchantStones
+    -- kalau Replion / ItemUtility belum siap, jangan maksa
+    if not DataReplion or type(DataReplion.Get) ~= "function" or not ItemUtility then
+        return list
     end
 
-    ------------------------------------------------
-    -- 2) Ambil Inventory dengan aman (2 cara)
-    ------------------------------------------------
+    -- ambil Inventory dengan aman
     local inventory
-
     local ok, res = pcall(function()
-        return DataReplion:Get({ "Inventory" })
-               or DataReplion:Get("Inventory")
+        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
     end)
-
     if not ok or not res then
-        -- Gagal baca inventory, jangan bikin error ke seluruh script
-        -- warn("[AutoSellEnchant] Gagal baca Inventory:", res)
-        return enchantStones
+        -- gagal baca inventory, biarkan saja (jangan bikin error merah)
+        return list
     end
-
     inventory = res
 
-    -- sesuai dump: semua item ada di bucket "Items"
+    -- semua itemmu ada di bucket "Items" (sesuai dump)
     local items = inventory.Items or inventory["Items"] or {}
     if type(items) ~= "table" then
-        return enchantStones
+        return list
     end
 
-    ------------------------------------------------
-    -- 3) Deteksi Enchant Stone via nama / id
-    --    (contoh di game: "Enchant Stone", "Super Enchant Stone")
-    ------------------------------------------------
     for _, item in pairs(items) do
-        if item then
-            local name  = tostring(item.Name or ""):lower()
-            local idStr = tostring(item.Id   or ""):lower()
+        if item and item.Id then
+            -- ambil data item dari ItemUtility, tapi pakai tipe "Items"
+            local ok2, itemData = pcall(function()
+                return ItemUtility.GetItemDataFromItemType("Items", item.Id)
+            end)
 
-            local isEnchant =
-                (name:find("enchant") and name:find("stone")) or
-                (idStr:find("enchant") and idStr:find("stone"))
+            if ok2 and itemData and itemData.Data then
+                local nm = string.lower(itemData.Data.Name or "")
+                -- contoh nama di game: "Enchant Stone", "Super Enchant Stone"
+                local isEnchantStone = (nm:find("enchant") and nm:find("stone"))
 
-            if isEnchant then
-                table.insert(enchantStones, {
-                    UUID = item.UUID,
-                    Id   = item.Id,
-                    Name = item.Name or "Unknown",
-                })
+                if isEnchantStone then
+                    table.insert(list, {
+                        UUID = item.UUID,
+                        Id   = item.Id,
+                        Name = itemData.Data.Name or "Unknown",
+                    })
+                end
             end
         end
     end
 
-    -- debug ringan (boleh dihapus)
-    -- print("[AutoSellEnchant] Ditemukan", #enchantStones, "Enchant Stone")
+    -- debug kecil (boleh kamu matikan)
+    -- print("[AutoSellEnchant] Ditemukan", #list, "Enchant Stone di Inventory.Items")
 
-    return enchantStones
+    return list
 end
 
-
 ------------------------------------------------------------
--- AUTO SELL LOOP
+-- LOOP AUTO SELL
 ------------------------------------------------------------
 local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
@@ -2413,7 +2406,6 @@ local function StartAutoSellEnchantLoop()
     task.spawn(function()
         while EnchantSell.Enabled do
 
-            -- kalau remote nggak ada, stop supaya nggak spam error
             if not RF_SellItem then
                 EnchantSell.Status    = "remote not found"
                 EnchantSell.LastError = "RF_SellItem nil"
@@ -2448,7 +2440,7 @@ local function StartAutoSellEnchantLoop()
                     else
                         EnchantSell.Failed   += 1
                         EnchantSell.LastError = "UUID nil"
-                        warn("[AutoSellEnchant] UUID item nil")
+                        warn("[AutoSellEnchant] UUID enchant stone nil")
                     end
 
                     task.wait(EnchantSell.Delay)
@@ -2461,8 +2453,41 @@ local function StartAutoSellEnchantLoop()
     end)
 end
 
+------------------------------------------------------------
+-- GUI: CollapseGroup + LiveLabel
+--   letakkan di tab farm (farmUI)
+------------------------------------------------------------
+local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
 
+    -- status live
+    add(farmUI:LiveLabel(function()
+        return string.format(
+            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
+            EnchantSell.Status,
+            EnchantSell.Success,
+            EnchantSell.Failed,
+            EnchantSell.LastError
+        )
+    end, 0.3))
 
+    -- toggle ON / OFF
+    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
+        EnchantSell.Enabled = v and true or false
+        if v then
+            StartAutoSellEnchantLoop()
+        end
+    end))
+
+    -- delay
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then
+            EnchantSell.Delay = math.clamp(n, 0.1, 10)
+            -- print("[AutoSellEnchant] Delay set to", EnchantSell.Delay)
+        end
+    end))
+
+end)
 
 
 
