@@ -1102,6 +1102,28 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
     end
 end)
 
+-- Toggle utama
+TabAuto:Toggle("Enable Bltant Mode", function(state)
+    if state then
+        
+    end
+end)
+
+TabAuto:Box("Reel Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 0.02, 3.0)
+        Config.CatchDelay = n        
+    end
+end)
+
+TabAuto:Box("Complate Delay (seconds)", function(txt)
+    local n = tonumber(txt)
+    if n then
+        n = math.clamp(n, 0.02, 3.0)
+        Config.CatchDelay = n        
+    end
+end)
 
 ----------------------------------------------------------------
 -- TAB SHOP – BUY OLD ROD (VULN)
