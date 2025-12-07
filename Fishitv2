@@ -2300,78 +2300,74 @@ end)
 
 farmUI:Label("Auto Enchant")  -- judul kecil di atas group (opsional)
 
-local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, group)
+farmUI:Label("Auto Enchant")
 
-    ------------------------------------------------
-    -- LIVE LABEL INFO ROD + ENCHANT
-    ------------------------------------------------
-    add(farmUI:LiveLabel(function()
-        -- fungsi fallback: coba beberapa kemungkinan
-        local r =
-            (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
-            or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
-            or nil
+------------------------------------------------
+-- LIVE INFO ROD
+------------------------------------------------
+farmUI:LiveLabel(function()
+    local r =
+        (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
+        or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
+        or nil
 
-        if not r then
-            return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
-        end
-
-        return string.format(
-            "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
-            r.Name or "N/A",
-            r.Enchant1 or "None",
-            r.Enchant2 or "None"
-        )
-    end, 0.5))
-
-    ------------------------------------------------
-    -- LIST NAMA ENCHANT
-    ------------------------------------------------
-    local enchantNames = {}
-    if Enchant and typeof(Enchant.GetListEnchant) == "function" then
-        local ok, list = pcall(function()
-            return Enchant:GetListEnchant()
-        end)
-        if ok and type(list) == "table" then
-            enchantNames = list
-        end
+    if not r then
+        return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
     end
 
-    ------------------------------------------------
-    -- SLOT 1 : MULTI TARGET
-    ------------------------------------------------
-    add(farmUI:Label("Enchant 1 (Target Bisa Banyak)"))
+    return string.format(
+        "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
+        r.Name or "N/A",
+        r.Enchant1 or "None",
+        r.Enchant2 or "None"
+    )
+end, 0.5)
 
-    add(farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
-        EnchantConfig.TargetEnchant1[name] = state and true or false
-    end))
+------------------------------------------------
+-- GET LIST ENCHANT
+------------------------------------------------
+local enchantNames = {}
+if Enchant and typeof(Enchant.GetListEnchant) == "function" then
+    local ok, list = pcall(function()
+        return Enchant:GetListEnchant()
+    end)
+    if ok and type(list) == "table" then
+        enchantNames = list
+    end
+end
 
-    add(farmUI:Toggle("Auto Enchant Slot 1", function(state)
-        EnchantConfig.AutoEnchant1 = state
-        if state and typeof(AutoEnchantLoop1) == "function" then
-            task.spawn(AutoEnchantLoop1)
-        end
-    end))
-
-    ------------------------------------------------
-    -- SLOT 2 : SINGLE TARGET
-    ------------------------------------------------
-    add(farmUI:Label(""))
-    add(farmUI:Label("Enchant 2 (Target Single)"))
-
-    add(farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
-        EnchantConfig.TargetEnchant2 = name
-        print("[AutoEnchant] TargetEnchant2 =", name)
-    end))
-
-    add(farmUI:Toggle("Auto Enchant Slot 2", function(state)
-        EnchantConfig.AutoEnchant2 = state
-        if state and typeof(AutoEnchantLoop2) == "function" then
-            task.spawn(AutoEnchantLoop2)
-        end
-    end))
-
+------------------------------------------------
+-- SLOT 1 (MULTI TARGET)
+------------------------------------------------
+farmUI:Label("Enchant Slot 1 (Multiple Target)")
+farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
+    EnchantConfig.TargetEnchant1[name] = state and true or false
 end)
+
+farmUI:Toggle("Enable Auto Enchant Slot 1", function(state)
+    EnchantConfig.AutoEnchant1 = state
+    if state then
+        task.spawn(AutoEnchantLoop1)
+    end
+end)
+
+------------------------------------------------
+-- SLOT 2 (SINGLE TARGET)
+------------------------------------------------
+farmUI:Label("Enchant Slot 2 (Single Target)")
+
+farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
+    EnchantConfig.TargetEnchant2 = name
+    print("[AutoEnchant] TargetEnchant2 =", name)
+end)
+
+farmUI:Toggle("Enable Auto Enchant Slot 2", function(state)
+    EnchantConfig.AutoEnchant2 = state
+    if state then
+        task.spawn(AutoEnchantLoop2)
+    end
+end)
+
 
 -- expose ke global kalau mau dipakai modul lain
 _G.AegisEnchant       = Enchant
