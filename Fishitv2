@@ -2260,24 +2260,31 @@ end)
 
 
 ----------------------------------------------------------------
-farmUI:Label("Auto Sell")
+local autoSellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
 
-farmUI:Dropdown("Sell Mode", {
-    "Off","10 Fish","20 Fish","30 Fish","50 Fish"
-}, function(opt)
-    if opt=="Off" then
-        Farm.AutoSellEnabled=false
-        autoSellCount=0
-    else
-        Farm.AutoSellEnabled=true
-        local n = tonumber(opt:match("(%d+)"))
-        Farm.AutoSellThreshold = n or 30
-    end
-end)
+    -- Label
+    add(farmUI:Label("Pengaturan Auto Sell"))
 
-farmUI:Box("Sell Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then Farm.AutoSellDelay = n end
+    -- Dropdown Sell Mode
+    add(farmUI:Dropdown("Sell Mode", {
+        "Off","10 Fish","20 Fish","30 Fish","50 Fish"
+    }, function(opt)
+        if opt == "Off" then
+            Farm.AutoSellEnabled = false
+            autoSellCount = 0
+        else
+            Farm.AutoSellEnabled = true
+            local n = tonumber(opt:match("(%d+)"))
+            Farm.AutoSellThreshold = n or 30
+        end
+    end))
+
+    -- Input Sell Delay
+    add(farmUI:Box("Sell Delay (seconds)", function(txt)
+        local n = tonumber(txt)
+        if n then Farm.AutoSellDelay = n end
+    end))
+
 end)
 
 Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
@@ -2287,7 +2294,7 @@ local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
 
 local weatherGroup = TabShop:CreateCollapseGroup("Auto Buy Weather", function(add, group)
 
-    -- Toggle Enable
+    -- Toggle Enable Auto Weather
     add(TabShop:Toggle("Enable Auto Weather", function(v)
         Farm.AutoWeatherEnabled = v
         if v and typeof(StartWeatherLoop) == "function" then
@@ -2308,6 +2315,7 @@ local weatherGroup = TabShop:CreateCollapseGroup("Auto Buy Weather", function(ad
     end))
 
 end)
+
 
 
 ------------------------------------------------------------
