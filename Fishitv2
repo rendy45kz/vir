@@ -157,7 +157,7 @@ function library:CreateWindow(title)
     titleSub.TextSize = 11
     titleSub.TextColor3 = theme.subText
     titleSub.TextXAlignment = Enum.TextXAlignment.Right
-    titleSub.Text = "AegisHub • Fish It!"
+    
 
     -- minimize button
     local mini = Instance.new("TextButton")
@@ -400,76 +400,109 @@ function library:CreateWindow(title)
         ------------------------------------------------
         -- Toggle
         ------------------------------------------------
-        function api:Toggle(text, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
+        ------------------------------------------------
+-- Toggle (dengan indikator ON / OFF yang jelas)
+------------------------------------------------
+function api:Toggle(text, callback, opts)
+    callback = callback or function() end
+    opts = opts or {}
 
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 28)
-            applyCard(fr, theme.card, opts.borderColor)
+    local fr = Instance.new("Frame")
+    fr.Parent = page
+    fr.Size = UDim2.new(1, -4, 0, 30)
+    applyCard(fr, theme.card, opts.borderColor)
 
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = fr
-            lbl.Size = UDim2.new(1, -50, 1, 0)
-            lbl.Position = UDim2.new(0, 8, 0, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text or ""
+    -- label kiri
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = fr
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.new(0, 8, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextColor3 = theme.text
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Text = text or ""
 
-            local btn = Instance.new("Frame")
-            btn.Parent = fr
-            btn.Size = UDim2.new(0, 32, 0, 18)
-            btn.Position = UDim2.new(1, -38, 0.5, -9)
-            btn.BackgroundColor3 = theme.bg
-            btn.BorderSizePixel = 0
-            local bc = Instance.new("UICorner", btn)
-            bc.CornerRadius = UDim.new(1, 0)
-            applyStroke(btn, theme.borderSoft)
+    -- container switch kanan
+    local btn = Instance.new("Frame")
+    btn.Parent = fr
+    btn.Size = UDim2.new(0, 60, 0, 18)
+    btn.Position = UDim2.new(1, -70, 0.5, -9)
+    btn.BackgroundColor3 = theme.bg
+    btn.BorderSizePixel = 0
+    local btnCorner = Instance.new("UICorner", btn)
+    btnCorner.CornerRadius = UDim.new(1, 0)
+    applyStroke(btn, theme.borderSoft)
 
-            local fill = Instance.new("Frame")
-            fill.Parent = btn
-            fill.Size = UDim2.new(0.4, 0, 1, 0)
-            fill.Position = UDim2.new(0, 0, 0, 0)
-            fill.BackgroundColor3 = theme.borderSoft
-            fill.BorderSizePixel = 0
-            local fc = Instance.new("UICorner", fill)
-            fc.CornerRadius = UDim.new(1, 0)
+    -- "slider" kecil di dalam pill
+    local fill = Instance.new("Frame")
+    fill.Parent = btn
+    fill.Size = UDim2.new(0.45, 0, 1, 0)
+    fill.Position = UDim2.new(0, 0, 0, 0)
+    fill.BackgroundColor3 = theme.borderSoft
+    fill.BorderSizePixel = 0
+    local fillCorner = Instance.new("UICorner", fill)
+    fillCorner.CornerRadius = UDim.new(1, 0)
 
-            local click = Instance.new("TextButton")
-            click.Parent = fr
-            click.Size = UDim2.new(1, 0, 1, 0)
-            click.BackgroundTransparency = 1
-            click.Text = ""
+    -- teks ON / OFF di pill
+    local stateLabel = Instance.new("TextLabel")
+    stateLabel.Parent = btn
+    stateLabel.Size = UDim2.new(1, 0, 1, 0)
+    stateLabel.BackgroundTransparency = 1
+    stateLabel.Font = Enum.Font.GothamBold
+    stateLabel.TextSize = 11
+    stateLabel.TextXAlignment = Enum.TextXAlignment.Center
 
-            local state = false
-            local function apply()
-                if state then
-                    tween(btn, 0.12, {BackgroundColor3 = theme.accent})
-                    tween(fill, 0.12, {Position = UDim2.new(0.55, 0, 0, 0)})
-                else
-                    tween(btn, 0.12, {BackgroundColor3 = theme.bg})
-                    tween(fill, 0.12, {Position = UDim2.new(0, 0, 0, 0)})
-                end
-                callback(state)
-            end
+    -- area klik full baris
+    local click = Instance.new("TextButton")
+    click.Parent = fr
+    click.Size = UDim2.new(1, 0, 1, 0)
+    click.BackgroundTransparency = 1
+    click.Text = ""
 
-            click.MouseButton1Click:Connect(function()
-                state = not state
-                apply()
-            end)
+    local state = false
 
-            return {
-                Set = function(_, v)
-                    state = v and true or false
-                    apply()
-                end,
-                Object = fr,
-            }
+    local function apply()
+        if state then
+            -- ON
+            tween(btn, 0.12, {BackgroundColor3 = theme.accent})
+            tween(fill, 0.12, {
+                Position = UDim2.new(0.55, 0, 0, 0),
+                BackgroundColor3 = theme.success,
+            })
+            stateLabel.Text = ""
+            stateLabel.TextColor3 = theme.bg
+        else
+            -- OFF
+            tween(btn, 0.12, {BackgroundColor3 = theme.bg})
+            tween(fill, 0.12, {
+                Position = UDim2.new(0, 0, 0, 0),
+                BackgroundColor3 = theme.borderSoft,
+            })
+            stateLabel.Text = ""
+            stateLabel.TextColor3 = theme.subText
         end
+
+        -- callback ke user
+        callback(state)
+    end
+
+    click.MouseButton1Click:Connect(function()
+        state = not state
+        apply()
+    end)
+
+    -- API ke luar
+    return {
+        Set = function(_, v)
+            state = v and true or false
+            apply()
+        end,
+        Object = fr,
+    }
+end
+
 
         ------------------------------------------------
         -- Slider
