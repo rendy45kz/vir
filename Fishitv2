@@ -2774,12 +2774,12 @@ local function ScanInventoryTotems()
                     -- fallback: pakai Name kalau tidak ada di map Id
                     if not key and v.Name then
                         local low = string.lower(tostring(v.Name))
-                        if low:find("luck") then
-                            key = "Luck"
-                        elseif low:find("mutation") then
-                            key = "Mutation"
-                        elseif low:find("shiny") then
-                            key = "Shiny"
+                        if low:find("luck totem") then
+                            key = "Luck Totem"
+                        elseif low:find("mutation totem") then
+                            key = "Mutation Totem"
+                        elseif low:find("shiny totem") then
+                            key = "Shiny Totem"
                         end
                     end
 
@@ -2812,17 +2812,6 @@ local function GetTotemCount()
     print(string.format("[Totem] Count → Luck=%d | Mutation=%d | Shiny=%d",
         count.Luck, count.Mutation, count.Shiny))
 
-    return count, byType
-end
-
--- helper: balikin count + list item
-local function GetTotemCount()
-    local byType = ScanInventoryTotems()
-    local count = {
-        Luck     = #byType.Luck,
-        Mutation = #byType.Mutation,
-        Shiny    = #byType.Shiny,
-    }
     return count, byType
 end
 
