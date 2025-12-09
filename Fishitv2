@@ -2676,6 +2676,14 @@ end)
 ------------------------------------------------------------
 -- TOTEM TOOLS (Spawn 9x Luck / Mutation / Shiny sekali klik)
 ------------------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ambil net (sama seperti remotes lain di script kamu)
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+
+local net = netIndex:WaitForChild("net")
 
 local RE_TotemSpawned = net:WaitForChild("RE/TotemSpawned")
 local RE_SpawnTotem   = net:WaitForChild("RE/SpawnTotem")
@@ -2688,37 +2696,51 @@ local TotemDisplayName = {
 }
 
 ------------------------------------------------------------
--- BACA INVENTORY: CARI ITEM TOTEM BERDASARKAN NAME
--- (pakai ItemUtility:GetItemData lalu cek Data.Name)
+-- BACA INVENTORY: CARI TOTEM DI Inventory.Items
+-- mirip ListInventoryEnchantStones yang kamu kirim
 ------------------------------------------------------------
 local function GetTotemEntriesByName(displayName)
     local list = {}
 
-    if not (DataReplion and ItemUtility and displayName) then
+    if not DataReplion or type(DataReplion.Get) ~= "function" or not ItemUtility then
+        return list
+    end
+    if not displayName or displayName == "" then
         return list
     end
 
-    -- pakai pola yang sama dengan script enchant stones (pakai { "Inventory" })
-    local inventory = DataReplion:Get({ "Inventory" }) or {}
+    local inv
+    local ok, res = pcall(function()
+        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
+    end)
+    if not ok or not res then
+        return list
+    end
+    inv = res
 
-    for bucketName, bucket in pairs(inventory) do
-        if type(bucket) == "table" then
-            for _, item in pairs(bucket) do
-                if item and item.Id then
-                    local ok, itemData = pcall(function()
-                        return ItemUtility:GetItemData(item.Id)
-                    end)
+    local items = inv.Items or inv["Items"] or {}
+    if type(items) ~= "table" then
+        return list
+    end
 
-                    if ok and itemData and itemData.Data then
-                        if itemData.Data.Name == displayName then
-                            table.insert(list, {
-                                UUID  = item.UUID,
-                                Id    = item.Id,
-                                Name  = itemData.Data.Name,
-                                Bucket = bucketName,
-                            })
-                        end
-                    end
+    local targetLower = string.lower(displayName)
+
+    for _, item in pairs(items) do
+        if item and item.Id then
+            local ok2, itemData = pcall(function()
+                -- SAMA seperti fungsi enchant yang kamu kirim
+                return ItemUtility.GetItemDataFromItemType("Items", item.Id)
+            end)
+
+            if ok2 and itemData and itemData.Data then
+                local nm = string.lower(itemData.Data.Name or "")
+                -- match nama exact / mengandung (biar aman kalau ada spasi beda)
+                if nm == targetLower or nm:find(targetLower, 1, true) then
+                    table.insert(list, {
+                        UUID = item.UUID,
+                        Id   = item.Id,
+                        Name = itemData.Data.Name or "Unknown",
+                    })
                 end
             end
         end
@@ -2764,7 +2786,7 @@ local function GetTotemRingPositions(count, radius)
 end
 
 ------------------------------------------------------------
--- SPAWN 9x TOTEM SEKALI (PAKAI 9 UUID BERBEDA)
+-- SPAWN 9x TOTEM SEKALI (BUTUH ≥ 9 ITEM)
 ------------------------------------------------------------
 local function SpawnTotemRingOnce(totemKey)
     local displayName = TotemDisplayName[totemKey]
@@ -2789,13 +2811,13 @@ local function SpawnTotemRingOnce(totemKey)
         local pos   = positions[i]
 
         if entry and entry.UUID then
-            -- kirim UUID ke server
+            -- server spawn totem pakai UUID
             pcall(function()
                 RE_SpawnTotem:FireServer(entry.UUID)
             end)
 
-            -- paksa efek client ke posisi tertentu (sesuai hasil spy RE/TotemSpawned)
-            if pos then
+            -- paksa efek client ke posisi ring (sesuai hasil spy RE/TotemSpawned)
+            if pos and RE_TotemSpawned and RE_TotemSpawned.OnClientEvent then
                 pcall(function()
                     firesignal(RE_TotemSpawned.OnClientEvent, pos)
                 end)
@@ -2813,12 +2835,8 @@ end
 ------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
 
-    -- Live label stok totem
+    -- live label stok totem
     add(farmUI:LiveLabel(function()
-        if not DataReplion then
-            return "Totem owned:\nLuck Totem    : ?\nMutation Totem: ?\nShiny Totem   : ?"
-        end
-
         local c = GetAllTotemCounts()
 
         return string.format(
@@ -2831,22 +2849,22 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
 
     add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh stok ≥ 9)"))
 
-    -- Luck
     add(farmUI:Button("Spawn 9x Luck Totem", function()
         SpawnTotemRingOnce("Luck")
     end))
 
-    -- Mutation
     add(farmUI:Button("Spawn 9x Mutation Totem", function()
         SpawnTotemRingOnce("Mutation")
     end))
 
-    -- Shiny
     add(farmUI:Button("Spawn 9x Shiny Totem", function()
         SpawnTotemRingOnce("Shiny")
     end))
 
 end)
+
+
+
 
 
 ------------------------------------------------
