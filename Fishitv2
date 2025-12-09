@@ -2673,16 +2673,52 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
 
 end)
 
-------------------------------------------------------------
--- TOTEM TOOLS (Spawn 9x Luck / Mutation / Shiny sekali klik)
-------------------------------------------------------------
-local SpawnTotemRE = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net:WaitForChild("RE/SpawnTotem")
+----------------------------------------------------------------
+-- TOTEM SYSTEM - FINAL VERSION
+----------------------------------------------------------------
 
+-- Remote SpawnTotem
+local NetFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :FindFirstChild("sleitnick_net@0.2.0")
+
+local SpawnTotemRE = NetFolder.net:WaitForChild("RE/SpawnTotem")
+
+----------------------------------------------------------------
+-- BACA JUMLAH TOTEM PLAYER DARI INVENTORY
+----------------------------------------------------------------
+local function GetTotemCount()
+    local count = {
+        Luck = 0,
+        Mutation = 0,
+        Shiny = 0,
+    }
+
+    local inv
+    pcall(function()
+        inv = DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
+    end)
+
+    if not inv then return count end
+
+    local items = inv.Items or {}
+    for _, item in pairs(items) do
+        if item and item.Id then
+            if item.Id == 1 then count.Luck += 1 end
+            if item.Id == 2 then count.Mutation += 1 end
+            if item.Id == 3 then count.Shiny += 1 end
+        end
+    end
+
+    return count
+end
+
+----------------------------------------------------------------
+-- SPREAD 9 TOTEM AROUND PLAYER (CIRCLE 360 / 9 = 40°)
+----------------------------------------------------------------
 local function SpawnTotem9x(totemId)
     local ply = game.Players.LocalPlayer
-    local char = ply.Character
-    if not char then return end
-
+    local char = ply.Character or ply.CharacterAdded:Wait()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
@@ -2699,103 +2735,68 @@ local function SpawnTotem9x(totemId)
     end
 end
 
+----------------------------------------------------------------
+-- GUI TAB TOTEM
+----------------------------------------------------------------
+local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add)
 
-local function GetTotemCount()
-    local counts = {
-        Luck = 0,
-        Mutation = 0,
-        Shiny = 0,
-    }
-
-    local inv
-    pcall(function()
-        inv = DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
-    end)
-
-    if not inv then return counts end
-
-    local items = inv.Items or {}
-    for _, item in pairs(items) do
-        if item and item.Id then
-            if item.Id == 1 then counts.Luck += 1 end
-            if item.Id == 2 then counts.Mutation += 1 end
-            if item.Id == 3 then counts.Shiny += 1 end
-        end
-    end
-
-    return counts
-end
-
-
-
-------------------------------------------------------------
--- HITUNG POSISI 9 TOTEM MENGELILINGI PLAYER
-------------------------------------------------------------
-local function GetTotemRingPositions(count, radius)
-    count  = count or 9
-    radius = radius or 10
-
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp  = char:WaitForChild("HumanoidRootPart")
-    local center = hrp.Position
-
-    local result = {}
-    local step = (2 * math.pi) / count
-
-    for i = 0, count - 1 do
-        local angle = step * i
-        local x = center.X + math.cos(angle) * radius
-        local z = center.Z + math.sin(angle) * radius
-        table.insert(result, Vector3.new(x, center.Y, z))
-    end
-
-    return result
-end
-
-local group = TabMisc:CreateCollapseGroup("Totem Tools (Spawn 9x)", function(add)
-
-    -- Live label jumlah totem
-    add(TabMisc:LiveLabel(function()
+    --------------------------------------------------------
+    -- LIVE LABEL (JUMLAH TOTEM)
+    --------------------------------------------------------
+    add(farmUI:LiveLabel(function()
         local c = GetTotemCount()
         return string.format(
-            "Totem owned:\nLuck Totem     : %d\nMutation Totem : %d\nShiny Totem    : %d",
+            "Totem owned:\n" ..
+            "Luck Totem     : %d\n" ..
+            "Mutation Totem : %d\n" ..
+            "Shiny Totem    : %d",
             c.Luck, c.Mutation, c.Shiny
         )
     end, 0.5))
 
-    add(TabMisc:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh ≥ 9)"))
+    --------------------------------------------------------
+    -- INFO
+    --------------------------------------------------------
+    add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh stok ≥ 9)"))
 
-    -- Luck Totem
-    add(TabMisc:Button("Spawn 9x Luck Totem", function()
+    --------------------------------------------------------
+    -- BUTTON: SPAWN LUCK TOTEM
+    --------------------------------------------------------
+    add(farmUI:Button("Spawn 9x Luck Totem", function()
         local c = GetTotemCount()
         if c.Luck < 9 then
-            warn("Not enough Luck Totem! Need 9.")
+            warn("[Totem] Not enough Luck Totem! Need ≥ 9.")
             return
         end
         SpawnTotem9x(1)
     end))
 
-    -- Mutation Totem
-    add(TabMisc:Button("Spawn 9x Mutation Totem", function()
+    --------------------------------------------------------
+    -- BUTTON: SPAWN MUTATION TOTEM
+    --------------------------------------------------------
+    add(farmUI:Button("Spawn 9x Mutation Totem", function()
         local c = GetTotemCount()
         if c.Mutation < 9 then
-            warn("Not enough Mutation Totem! Need 9.")
+            warn("[Totem] Not enough Mutation Totem! Need ≥ 9.")
             return
         end
         SpawnTotem9x(2)
     end))
 
-    -- Shiny Totem
-    add(TabMisc:Button("Spawn 9x Shiny Totem", function()
+    --------------------------------------------------------
+    -- BUTTON: SPAWN SHINY TOTEM
+    --------------------------------------------------------
+    add(farmUI:Button("Spawn 9x Shiny Totem", function()
         local c = GetTotemCount()
         if c.Shiny < 9 then
-            warn("Not enough Shiny Totem! Need 9.")
+            warn("[Totem] Not enough Shiny Totem! Need ≥ 9.")
             return
         end
         SpawnTotem9x(3)
     end))
 
 end)
+
 
 
 
