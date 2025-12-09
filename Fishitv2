@@ -2686,7 +2686,7 @@ local RE_TotemSpawned = net:WaitForChild("RE/TotemSpawned")
 local RE_SpawnTotem   = net:WaitForChild("RE/SpawnTotem")
 
 -- potions folder (tempat Luck / Mutation / Shiny Totem)
-local PotionsFolder = ReplicatedStorage:WaitForChild("Potions")
+local PotionsFolder = ReplicatedStorage:WaitForChild("Items")
 
 -- nama friendly → nama ModuleScript di Potions
 local TotemNameMap = {
