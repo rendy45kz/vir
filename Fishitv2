@@ -2731,35 +2731,49 @@ end
 ----------------------------------------------------------------
 -- SCAN INVENTORY: CARI TOTEM DI SEMUA BUCKET
 ----------------------------------------------------------------
+----------------------------------------------------------------
+-- SCAN DATA REPLION: CARI TOTEM DI MANA SAJA
+----------------------------------------------------------------
 local function ScanInventoryTotems()
     local byType = {
-        Luck     = {},   -- list item Luck Totem
-        Mutation = {},   -- list item Mutation Totem
-        Shiny    = {},   -- list item Shiny Totem
+        Luck     = {},
+        Mutation = {},
+        Shiny    = {},
     }
 
     if not DataReplion or type(DataReplion.Get) ~= "function" then
+        warn("[Totem] DataReplion tidak siap.")
         return byType
     end
 
-    local inv
-    pcall(function()
-        inv = DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
+    -- ambil *seluruh* data replion
+    local root
+    local ok, res = pcall(function()
+        return DataReplion:Get()
     end)
-    if type(inv) ~= "table" then
+    if not ok or type(res) ~= "table" then
+        warn("[Totem] Gagal Get() dari DataReplion.")
         return byType
     end
+    root = res
 
-    -- loop semua bucket: Items, Potions, dll
-    for bucketName, bucket in pairs(inv) do
-        if type(bucket) == "table" then
-            for _, item in pairs(bucket) do
-                if item and item.Id then
-                    local key = TotemIdToKey[item.Id]
+    -- helper rekursif: jalan di semua table dan cari item yang punya Id
+    local visited = {}
 
-                    -- fallback ekstra pakai nama kalau ada
-                    if not key and item.Name then
-                        local low = string.lower(tostring(item.Name))
+    local function walk(tbl)
+        if type(tbl) ~= "table" then return end
+        if visited[tbl] then return end
+        visited[tbl] = true
+
+        for _, v in pairs(tbl) do
+            if type(v) == "table" then
+                -- kalau bentuknya kaya item
+                if v.Id then
+                    local key = TotemIdToKey[v.Id]
+
+                    -- fallback: pakai Name kalau tidak ada di map Id
+                    if not key and v.Name then
+                        local low = string.lower(tostring(v.Name))
                         if low:find("luck") then
                             key = "Luck"
                         elseif low:find("mutation") then
@@ -2770,14 +2784,35 @@ local function ScanInventoryTotems()
                     end
 
                     if key and byType[key] then
-                        table.insert(byType[key], item)
+                        table.insert(byType[key], v)
                     end
                 end
+
+                -- lanjut turun
+                walk(v)
             end
         end
     end
 
+    walk(root)
+
     return byType
+end
+
+-- helper: balikin count + list
+local function GetTotemCount()
+    local byType = ScanInventoryTotems()
+    local count = {
+        Luck     = #byType.Luck,
+        Mutation = #byType.Mutation,
+        Shiny    = #byType.Shiny,
+    }
+
+    -- debug singkat ke console
+    print(string.format("[Totem] Count → Luck=%d | Mutation=%d | Shiny=%d",
+        count.Luck, count.Mutation, count.Shiny))
+
+    return count, byType
 end
 
 -- helper: balikin count + list item
@@ -2804,7 +2839,6 @@ local function SpawnTotem9xType(totemKey)
         return
     end
 
-    -- ambil sampai 9 item pertama
     for i = 1, 9 do
         local item = list[i]
         if item and item.UUID then
@@ -2817,6 +2851,7 @@ local function SpawnTotem9xType(totemKey)
 
     print(string.format("[Totem] Spawn 9x %s selesai.", needName))
 end
+
 
 ----------------------------------------------------------------
 -- GUI TOTEM (DI TAB MISC)
