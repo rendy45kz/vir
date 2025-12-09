@@ -2673,12 +2673,183 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
 
 end)
 
+------------------------------------------------------------
+-- TOTEM TOOLS (Spawn 9x Luck / Mutation / Shiny sekali klik)
+------------------------------------------------------------
 
+-- remotes
+local RE_TotemSpawned = net:WaitForChild("RE/TotemSpawned")
+local RE_SpawnTotem   = net:WaitForChild("RE/SpawnTotem")
 
+-- potions folder (tempat Luck / Mutation / Shiny Totem)
+local PotionsFolder = ReplicatedStorage:WaitForChild("Potions")
+
+-- nama friendly → nama ModuleScript di Potions
+local TotemNameMap = {
+    Luck     = "Luck Totem",
+    Mutation = "Mutation Totem",
+    Shiny    = "Shiny Totem",
+}
+
+-- ambil Id totem dari module Potions
+local function GetTotemIdByName(potionName)
+    local module = PotionsFolder:FindFirstChild(potionName)
+    if not module then
+        warn("[Totem] Module potion tidak ditemukan:", potionName)
+        return nil
+    end
+
+    local ok, data = pcall(require, module)
+    if ok and data and data.Data and data.Data.Id then
+        return data.Data.Id
+    end
+
+    warn("[Totem] Data.Id tidak valid untuk:", potionName)
+    return nil
+end
+
+-- cache semua Id totem
+local TotemIDs = {
+    Luck     = GetTotemIdByName(TotemNameMap.Luck),
+    Mutation = GetTotemIdByName(TotemNameMap.Mutation),
+    Shiny    = GetTotemIdByName(TotemNameMap.Shiny),
+}
 
 ------------------------------------------------------------
--- AUTO ENCHANT (Farm tab)
+-- HITUNG JUMLAH TOTEM DI INVENTORY (pakai Replion Data)
 ------------------------------------------------------------
+local function CountTotemInInventory(totemId)
+    if not (DataReplion and totemId) then return 0 end
+
+    local inventory = DataReplion:Get({ "Inventory" }) or {}
+    local total = 0
+
+    for bucketName, bucket in pairs(inventory) do
+        if type(bucket) == "table" then
+            for _, item in pairs(bucket) do
+                if item and item.Id == totemId then
+                    -- beberapa game pakai Amount / Count, fallback 1
+                    local amt = item.Amount or item.Count or 1
+                    total += amt
+                end
+            end
+        end
+    end
+
+    return total
+end
+
+local function GetAllTotemCounts()
+    return {
+        Luck     = TotemIDs.Luck     and CountTotemInInventory(TotemIDs.Luck)     or 0,
+        Mutation = TotemIDs.Mutation and CountTotemInInventory(TotemIDs.Mutation) or 0,
+        Shiny    = TotemIDs.Shiny    and CountTotemInInventory(TotemIDs.Shiny)    or 0,
+    }
+end
+
+------------------------------------------------------------
+-- HITUNG POSISI 9 TOTEM MENGELILINGI PLAYER
+------------------------------------------------------------
+local function GetTotemRingPositions(count, radius)
+    count  = count or 9
+    radius = radius or 10
+
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char:WaitForChild("HumanoidRootPart")
+    local center = hrp.Position
+
+    local result = {}
+    local step = (2 * math.pi) / count
+
+    for i = 0, count - 1 do
+        local angle = step * i
+        local x = center.X + math.cos(angle) * radius
+        local z = center.Z + math.sin(angle) * radius
+        table.insert(result, Vector3.new(x, center.Y, z))
+    end
+
+    return result
+end
+
+------------------------------------------------------------
+-- SPAWN 9x TOTEM SEKALI KLIK (HANYA JIKA STOK ≥ 9)
+------------------------------------------------------------
+local function SpawnTotemRingOnce(totemKey)
+    local totemId = TotemIDs[totemKey]
+    if not totemId then
+        warn("[Totem] ID totem tidak ditemukan untuk type:", totemKey)
+        return
+    end
+
+    local counts = GetAllTotemCounts()
+    local have = counts[totemKey] or 0
+
+    if have < 9 then
+        warn(string.format("[Totem] %s kurang, butuh 9. Punya: %d",
+            TotemNameMap[totemKey] or totemKey, have))
+        return
+    end
+
+    local positions = GetTotemRingPositions(9, 10) -- 9 totem, radius 10 stud
+
+    for _, pos in ipairs(positions) do
+        -- kirim ke server (wajib)
+        pcall(function()
+            RE_SpawnTotem:FireServer(totemId)
+        end)
+
+        -- paksa efek client ke posisi tertentu (sesuai hasil spy)
+        pcall(function()
+            firesignal(RE_TotemSpawned.OnClientEvent, pos)
+        end)
+
+        task.wait(0.05)
+    end
+
+    print(string.format("[Totem] Berhasil spawn 9x %s di sekitar player.",
+        TotemNameMap[totemKey] or totemKey))
+end
+
+------------------------------------------------------------
+-- UI TAB FARM – TOTEM TOOLS
+------------------------------------------------------------
+local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
+
+    -- Live label stok totem
+    add(farmUI:LiveLabel(function()
+        if not DataReplion then
+            return "Luck Totem    : ?\nMutation Totem: ?\nShiny Totem   : ?"
+        end
+
+        local c = GetAllTotemCounts()
+
+        return string.format(
+            "Totem owned:\nLuck Totem    : %d\nMutation Totem: %d\nShiny Totem   : %d",
+            c.Luck or 0,
+            c.Mutation or 0,
+            c.Shiny or 0
+        )
+    end, 0.5))
+
+    add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh stok ≥ 9)"))
+
+    -- Luck
+    add(farmUI:Button("Spawn 9x Luck Totem", function()
+        SpawnTotemRingOnce("Luck")
+    end))
+
+    -- Mutation
+    add(farmUI:Button("Spawn 9x Mutation Totem", function()
+        SpawnTotemRingOnce("Mutation")
+    end))
+
+    -- Shiny
+    add(farmUI:Button("Spawn 9x Shiny Totem", function()
+        SpawnTotemRingOnce("Shiny")
+    end))
+
+end)
+
 
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
