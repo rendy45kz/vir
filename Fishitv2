@@ -2674,133 +2674,188 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
 end)
 
 ----------------------------------------------------------------
--- TOTEM SYSTEM - FINAL VERSION
+-- TOTEM SYSTEM - FIXED COUNT + SPAWN
 ----------------------------------------------------------------
 
--- Remote SpawnTotem
+-- ambil remote SpawnTotem
 local NetFolder = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
-    :FindFirstChild("sleitnick_net@0.2.0")
+    :WaitForChild("sleitnick_net@0.2.0")
 
-local SpawnTotemRE = NetFolder.net:WaitForChild("RE/SpawnTotem")
+local SpawnTotemRE = NetFolder:WaitForChild("net"):WaitForChild("RE/SpawnTotem")
 
 ----------------------------------------------------------------
--- BACA JUMLAH TOTEM PLAYER DARI INVENTORY
+-- BACA DEFINISI TOTEM DARI ReplicatedStorage.Potions
 ----------------------------------------------------------------
-local function GetTotemCount()
-    local count = {
-        Luck = 0,
-        Mutation = 0,
-        Shiny = 0,
+local PotionsFolder = ReplicatedStorage:WaitForChild("Potions")
+
+local TotemDefs = {
+    Luck     = { Id = nil, Name = "Luck Totem" },
+    Mutation = { Id = nil, Name = "Mutation Totem" },
+    Shiny    = { Id = nil, Name = "Shiny Totem" },
+}
+
+local TotemIdToKey = {}  -- [Id] = "Luck"/"Mutation"/"Shiny"
+
+do
+    print("===== DEBUG TOTEM MODULES =====")
+    for _,mod in ipairs(PotionsFolder:GetChildren()) do
+        if mod:IsA("ModuleScript") then
+            local ok, data = pcall(require, mod)
+            if ok and data and data.Data then
+                local id   = data.Data.Id
+                local name = data.Data.Name or mod.Name
+                local low  = string.lower(name)
+
+                if low:find("luck") then
+                    TotemDefs.Luck.Id  = id
+                    TotemDefs.Luck.Name = name
+                    TotemIdToKey[id] = "Luck"
+                elseif low:find("mutation") then
+                    TotemDefs.Mutation.Id  = id
+                    TotemDefs.Mutation.Name = name
+                    TotemIdToKey[id] = "Mutation"
+                elseif low:find("shiny") then
+                    TotemDefs.Shiny.Id  = id
+                    TotemDefs.Shiny.Name = name
+                    TotemIdToKey[id] = "Shiny"
+                end
+
+                print(string.format("Module: %s | ItemName: %s | Id:%s", mod.Name, name, tostring(id)))
+            end
+        end
+    end
+    print("================================")
+end
+
+----------------------------------------------------------------
+-- SCAN INVENTORY: CARI TOTEM DI SEMUA BUCKET
+----------------------------------------------------------------
+local function ScanInventoryTotems()
+    local byType = {
+        Luck     = {},   -- list item Luck Totem
+        Mutation = {},   -- list item Mutation Totem
+        Shiny    = {},   -- list item Shiny Totem
     }
+
+    if not DataReplion or type(DataReplion.Get) ~= "function" then
+        return byType
+    end
 
     local inv
     pcall(function()
         inv = DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
     end)
+    if type(inv) ~= "table" then
+        return byType
+    end
 
-    if not inv then return count end
+    -- loop semua bucket: Items, Potions, dll
+    for bucketName, bucket in pairs(inv) do
+        if type(bucket) == "table" then
+            for _, item in pairs(bucket) do
+                if item and item.Id then
+                    local key = TotemIdToKey[item.Id]
 
-    local items = inv.Items or {}
-    for _, item in pairs(items) do
-        if item and item.Id then
-            if item.Id == 1 then count.Luck += 1 end
-            if item.Id == 2 then count.Mutation += 1 end
-            if item.Id == 3 then count.Shiny += 1 end
+                    -- fallback ekstra pakai nama kalau ada
+                    if not key and item.Name then
+                        local low = string.lower(tostring(item.Name))
+                        if low:find("luck") then
+                            key = "Luck"
+                        elseif low:find("mutation") then
+                            key = "Mutation"
+                        elseif low:find("shiny") then
+                            key = "Shiny"
+                        end
+                    end
+
+                    if key and byType[key] then
+                        table.insert(byType[key], item)
+                    end
+                end
+            end
         end
     end
 
-    return count
+    return byType
+end
+
+-- helper: balikin count + list item
+local function GetTotemCount()
+    local byType = ScanInventoryTotems()
+    local count = {
+        Luck     = #byType.Luck,
+        Mutation = #byType.Mutation,
+        Shiny    = #byType.Shiny,
+    }
+    return count, byType
 end
 
 ----------------------------------------------------------------
--- SPREAD 9 TOTEM AROUND PLAYER (CIRCLE 360 / 9 = 40°)
+-- SPAWN 9 TOTEM (PAKAI UUID ITEM)
 ----------------------------------------------------------------
-local function SpawnTotem9x(totemId)
-    local ply = game.Players.LocalPlayer
-    local char = ply.Character or ply.CharacterAdded:Wait()
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
+local function SpawnTotem9xType(totemKey)
+    local count, byType = GetTotemCount()
+    local list = byType[totemKey] or {}
+    local needName = TotemDefs[totemKey] and TotemDefs[totemKey].Name or totemKey
 
-    for i = 1, 9 do
-        local angle = math.rad((i - 1) * 40)
-        local offset = Vector3.new(math.cos(angle) * 10, 0, math.sin(angle) * 10)
-        local pos = hrp.Position + offset
-
-        pcall(function()
-            SpawnTotemRE:FireServer(totemId, pos)
-        end)
-
-        task.wait(0.1)
+    if #list < 9 then
+        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, #list))
+        return
     end
+
+    -- ambil sampai 9 item pertama
+    for i = 1, 9 do
+        local item = list[i]
+        if item and item.UUID then
+            pcall(function()
+                SpawnTotemRE:FireServer(item.UUID)
+            end)
+            task.wait(0.1)
+        end
+    end
+
+    print(string.format("[Totem] Spawn 9x %s selesai.", needName))
 end
 
 ----------------------------------------------------------------
--- GUI TAB TOTEM
+-- GUI TOTEM (DI TAB MISC)
 ----------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add)
 
-    --------------------------------------------------------
-    -- LIVE LABEL (JUMLAH TOTEM)
-    --------------------------------------------------------
+    -- live label jumlah totem
     add(farmUI:LiveLabel(function()
         local c = GetTotemCount()
+        local nLuck     = TotemDefs.Luck.Name     or "Luck Totem"
+        local nMutation = TotemDefs.Mutation.Name or "Mutation Totem"
+        local nShiny    = TotemDefs.Shiny.Name    or "Shiny Totem"
+
         return string.format(
-            "Totem owned:\n" ..
-            "Luck Totem     : %d\n" ..
-            "Mutation Totem : %d\n" ..
-            "Shiny Totem    : %d",
-            c.Luck, c.Mutation, c.Shiny
+            "Totem owned:\n%s : %d\n%s : %d\n%s : %d",
+            nLuck, c.Luck,
+            nMutation, c.Mutation,
+            nShiny, c.Shiny
         )
     end, 0.5))
 
-    --------------------------------------------------------
-    -- INFO
-    --------------------------------------------------------
-    add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh stok ≥ 9)"))
+    add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, stok harus ≥ 9)"))
 
-    --------------------------------------------------------
-    -- BUTTON: SPAWN LUCK TOTEM
-    --------------------------------------------------------
+    -- Luck
     add(farmUI:Button("Spawn 9x Luck Totem", function()
-        local c = GetTotemCount()
-        if c.Luck < 9 then
-            warn("[Totem] Not enough Luck Totem! Need ≥ 9.")
-            return
-        end
-        SpawnTotem9x(1)
+        SpawnTotem9xType("Luck")
     end))
 
-    --------------------------------------------------------
-    -- BUTTON: SPAWN MUTATION TOTEM
-    --------------------------------------------------------
+    -- Mutation
     add(farmUI:Button("Spawn 9x Mutation Totem", function()
-        local c = GetTotemCount()
-        if c.Mutation < 9 then
-            warn("[Totem] Not enough Mutation Totem! Need ≥ 9.")
-            return
-        end
-        SpawnTotem9x(2)
+        SpawnTotem9xType("Mutation")
     end))
 
-    --------------------------------------------------------
-    -- BUTTON: SPAWN SHINY TOTEM
-    --------------------------------------------------------
+    -- Shiny
     add(farmUI:Button("Spawn 9x Shiny Totem", function()
-        local c = GetTotemCount()
-        if c.Shiny < 9 then
-            warn("[Totem] Not enough Shiny Totem! Need ≥ 9.")
-            return
-        end
-        SpawnTotem9x(3)
+        SpawnTotem9xType("Shiny")
     end))
 
 end)
-
-
-
-
-
 
 
 ------------------------------------------------
