@@ -2802,6 +2802,110 @@ local function ScanInventoryTotems()
     return byType
 end
 
+----------------------------------------------------------------
+-- DEBUG 1: STRUCTURE MODULE TOTEM DI ReplicatedStorage.Potions
+----------------------------------------------------------------
+local function DebugTotemModules()
+    local potionsFolder = ReplicatedStorage:FindFirstChild("Potions")
+
+    print("===== DEBUG TOTEM MODULES =====")
+
+    if not potionsFolder then
+        warn("ReplicatedStorage.Potions TIDAK ditemukan")
+        return
+    end
+
+    for _, mod in ipairs(potionsFolder:GetChildren()) do
+        if mod:IsA("ModuleScript") then
+            local ok, data = pcall(require, mod)
+            if ok and data and data.Data then
+                local d = data.Data
+                print(string.rep("-", 50))
+                print("Module Name :", mod.Name)
+                print("  Data.Name  :", d.Name)
+                print("  Data.Id    :", d.Id)
+                print("  Data.Type  :", d.Type)
+                print("  FULL DATA  :", HttpService:JSONEncode(d))
+            else
+                warn("Gagal require module:", mod.Name, " | Error:", data)
+            end
+        end
+    end
+
+    print("===== END DEBUG TOTEM MODULES =====")
+end
+
+
+----------------------------------------------------------------
+-- DEBUG 2: STRUCTURE ITEM TOTEM DI INVENTORY / REPLION
+----------------------------------------------------------------
+local function DebugTotemInventory()
+    print("===== DEBUG INVENTORY TOTEM =====")
+
+    if not DataReplion or type(DataReplion.Get) ~= "function" then
+        warn("DataReplion belum siap / tidak ada method Get")
+        return
+    end
+    if not ItemUtility then
+        warn("ItemUtility belum ada")
+        return
+    end
+
+    -- Ambil inventory (dua kemungkinan key)
+    local okInv, inv = pcall(function()
+        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
+    end)
+
+    if not okInv or not inv then
+        warn("Inventory tidak ditemukan dari DataReplion")
+        return
+    end
+
+    -- Coba beberapa container yang mungkin ada
+    local containers = {
+        "Items",
+        "Potions",
+        "Inventory",
+        "Bag",
+        "Backpack",
+    }
+
+    for _, key in ipairs(containers) do
+        local bucket = inv[key]
+        if type(bucket) == "table" then
+            print("---- CONTAINER:", key, " (count =", #bucket, ") ----")
+            for idx, item in pairs(bucket) do
+                if type(item) == "table" and item.Id then
+                    -- Coba treat sebagai POTION/TOTEM
+                    local okData, itemData = pcall(function()
+                        return ItemUtility.GetItemDataFromItemType("Potions", item.Id)
+                    end)
+
+                    if okData and itemData and itemData.Data then
+                        local d = itemData.Data
+                        local nameLower = string.lower(d.Name or "")
+
+                        -- Filter hanya yg berkaitan Totem
+                        if nameLower:find("totem") then
+                            print(string.rep("-", 60))
+                            print("Index      :", idx)
+                            print("Container  :", key)
+                            print("Id         :", item.Id)
+                            print("UUID       :", item.UUID)
+                            print("Amount     :", item.Amount)
+                            print("ItemName   :", d.Name)
+                            print("Data.Type  :", d.Type or "nil")
+                            print("Raw Item   :", HttpService:JSONEncode(item))
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    print("===== END DEBUG INVENTORY TOTEM =====")
+end
+
 
 ----------------------------------------------------------------
 -- AUTO SPAWN TOTEM x9 (SEPERTI DI VIDEO)
@@ -2949,6 +3053,13 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
 
     add(farmUI:Button("Spawn 9x Shiny Totem", function()
         SpawnTotem9x("Shiny")
+    end))
+    add(farmUI:Button("Debug Totem Module, function()
+        DebugTotemModules()
+    end))
+
+    add(farmUI:Button("Debug Totem Inventory", function()
+        DebugTotemInventory()
     end))
 end)
 
