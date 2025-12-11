@@ -2802,6 +2802,94 @@ local function ScanInventoryTotems()
     return byType
 end
 
+
+----------------------------------------------------------------
+-- AUTO SPAWN TOTEM x9 (SEPERTI DI VIDEO)
+----------------------------------------------------------------
+
+local HRP = LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+
+-- 9 titik mengelilingi player (circle)
+local function GenerateTotemPositions(centerCFrame, radius)
+    local points = {}
+    for i = 1, 9 do
+        local angle = (i / 9) * math.pi * 2
+        local x = math.cos(angle) * radius
+        local z = math.sin(angle) * radius
+
+        -- tinggi acak (supaya seperti video: ada yang di atas dan sedikit di bawah)
+        local y = math.random(-2, 6)
+
+        table.insert(points, centerCFrame.Position + Vector3.new(x, y, z))
+    end
+    return points
+end
+
+
+-- Fungsi spawn berdasarkan UUID (item yang kamu punya)
+local function SpawnTotemUUID(uuid)
+    pcall(function()
+        SpawnTotemRE:FireServer(uuid)
+    end)
+end
+
+
+-- FUNGSI FINAL PENTING
+local function SpawnTotem9x(totemKey)
+    local counts, byType = GetTotemCount()
+    local total = counts[totemKey] or 0
+    local needName = TotemDefs[totemKey].Name
+
+    if total < 9 then
+        warn("[Totem] Kamu butuh 9x", needName, "tapi hanya punya:", total)
+        return
+    end
+
+    -- Simpan posisi awal
+    local origin = HRP.CFrame
+
+    -- Angkat player ke udara
+    HRP.CFrame = origin + Vector3.new(0, 35, 0)
+    task.wait(0.2)
+
+    -- Buat titik-titik spawn
+    local positions = GenerateTotemPositions(HRP.CFrame, 12)
+
+    -- Ambil list item totem
+    local list = byType[totemKey]
+    local used = 9
+
+    for _, item in ipairs(list) do
+        local uuid = item.UUID
+        local amt = item.Amount or 1
+
+        if uuid then
+            for i = 1, math.min(amt, used) do
+                if used <= 0 then break end
+
+                -- pindahkan player ke titik spawn
+                HRP.CFrame = CFrame.new(positions[10 - used])
+
+                task.wait(0.05)
+
+                -- spawn totem
+                SpawnTotemUUID(uuid)
+
+                used -= 1
+                task.wait(0.15)
+            end
+        end
+
+        if used <= 0 then break end
+    end
+
+    -- Kembalikan player ke posisi awal
+    task.wait(0.2)
+    HRP.CFrame = origin
+
+    print("[Totem] Selesai spawn 9x", needName)
+end
+
 -- hitung total stok (pakai Amount/Quantity kalau ada)
 local function GetTotemCount()
     local byType = ScanInventoryTotems()
@@ -2831,77 +2919,38 @@ local function GetTotemCount()
     return count, byType
 end
 
-----------------------------------------------------------------
--- SPAWN 9x TOTEM DARI STOK PLAYER
-----------------------------------------------------------------
-local function SpawnTotem9xType(totemKey)
-    local counts, byType = GetTotemCount()
-    local needName = TotemDefs[totemKey] and TotemDefs[totemKey].Name or totemKey
 
-    local total = counts[totemKey] or 0
-    if total < 9 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
-        return
-    end
 
-    local remaining = 9
-    for _, item in ipairs(byType[totemKey] or {}) do
-        if remaining <= 0 then break end
-        local uuid = item.UUID
-        if uuid then
-            local amt = item.Amount or item.Quantity or item.Count or remaining
-            local use = math.min(amt, remaining)
-
-            for i = 1, use do
-                pcall(function()
-                    SpawnTotemRE:FireServer(uuid)
-                end)
-                task.wait(0.1)
-            end
-
-            remaining -= use
-        end
-    end
-
-    print(string.format("[Totem] Spawn 9x %s selesai.", needName))
-end
-
-----------------------------------------------------------------
--- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
-----------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
 
     -- live label stok
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
-        local l = counts.Luck     or 0
-        local m = counts.Mutation or 0
-        local s = counts.Shiny    or 0
-
         return string.format(
             "Totem owned:\n" ..
             "Luck Totem     : %d\n" ..
             "Mutation Totem : %d\n" ..
             "Shiny Totem    : %d",
-            l, m, s
+            counts.Luck or 0,
+            counts.Mutation or 0,
+            counts.Shiny or 0
         )
     end, 1.0))
 
-    add(farmUI:Label("Spawn 9 Totem mengelilingi player (sekali klik, butuh stok ≥ 9)"))
+    add(farmUI:Label("Spawn 9 Totem seperti di video (butuh stok ≥ 9)"))
 
     add(farmUI:Button("Spawn 9x Luck Totem", function()
-        SpawnTotem9xType("Luck")
+        SpawnTotem9x("Luck")
     end))
 
     add(farmUI:Button("Spawn 9x Mutation Totem", function()
-        SpawnTotem9xType("Mutation")
+        SpawnTotem9x("Mutation")
     end))
 
     add(farmUI:Button("Spawn 9x Shiny Totem", function()
-        SpawnTotem9xType("Shiny")
+        SpawnTotem9x("Shiny")
     end))
 end)
-
 
 
 
