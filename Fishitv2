@@ -2671,9 +2671,7 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
         end
     end))
 
-end)
-
-Saya mau seperti ini saja cuma tambah Live label Coutdownnya saja 
+end) 
 
 ----------------------------------------------------------------
 -- AUTO SPAWN TOTEM
@@ -2837,6 +2835,10 @@ local function SpawnTotem9xType(totemKey)
                     SpawnTotemRE:FireServer(uuid)
                 end)
                 task.wait(0.1)
+                pcall(function()                
+             Events.equipHotbar:FireServer(1)                            
+        end)
+
             end
 
             remaining -= use
@@ -2863,12 +2865,9 @@ local function AutoTotemLoop()
         
         SpawnTotem9xType(TotemConfig.SelectedKey)
         task.wait(0.05)
-        pcall(function()
-                if Events and Events.equipHotbar then
-                    Events.equipHotbar:FireServer(1)
-                end
-            
-end)
+        pcall(function()                
+             Events.equipHotbar:FireServer(1)                            
+        end)
 
         local t = 0
         local interval = TotemConfig.Interval or 3600
