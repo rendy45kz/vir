@@ -2871,7 +2871,7 @@ local function AutoTotemLoop()
                 Events.equipHotbar:FireServer(1)
             end
         end)
-
+end)
         local t = 0
         local interval = TotemConfig.Interval or 3600
         while TotemConfig.AutoSpawn and t < interval do
