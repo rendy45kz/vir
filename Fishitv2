@@ -2843,9 +2843,6 @@ local function SpawnTotem9xType(totemKey)
 end
 
 ----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM)
-----------------------------------------------------------------
-----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM) + LIVE COUNTDOWN
 ----------------------------------------------------------------
 local TotemConfig = {
@@ -2949,7 +2946,7 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Auto Spawn 9x / 1 Ja
 
         if TotemConfig.AutoSpawn then
             nextSpawnAt = 0 -- reset supaya label nggak ngaco sebelum loop set
-            task.spawn(AutoTotemLoop)
+            AutoTotemLoop()
         else
             nextSpawnAt = 0
         end
