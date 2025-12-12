@@ -2880,7 +2880,7 @@ local function AutoTotemLoop()
 
     while TotemConfig.AutoSpawn do
         SpawnTotem9xType(TotemConfig.SelectedKey)
-        WAIT(0.05)
+        
         pcall(function()
             if Events and Events.equipHotbar then
                 Events.equipHotbar:FireServer(1)
@@ -2901,33 +2901,23 @@ end
 ----------------------------------------------------------------
 -- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
 ----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
+local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
 
-    -- live label stok + countdown
+    -- live label stok
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
         local l = counts.Luck     or 0
         local m = counts.Mutation or 0
         local s = counts.Shiny    or 0
 
-        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
-        local left = 0
-        if TotemConfig.AutoSpawn and nextSpawnAt > 0 then
-            left = nextSpawnAt - tick()
-        end
-
         return string.format(
-            "Auto: %s\n" ..
-            "Next spawn in: %s\n\n" ..
             "Totem owned:\n" ..
             "Luck Totem     : %d\n" ..
             "Mutation Totem : %d\n" ..
             "Shiny Totem    : %d",
-            status,
-            (TotemConfig.AutoSpawn and nextSpawnAt > 0) and fmtTimeLeft(left) or "--:--",
             l, m, s
         )
-    end, 0.25))
+    end, 1.0))
 
     -- dropdown pilih jenis totem
     local keyByLabel = {
@@ -2947,20 +2937,15 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         end
     end))
 
-    -- toggle auto spawn (langsung spawn, lalu 1 jam lagi)
-    add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
+    
+    -- toggle auto spawn 9x per 1 jam
+    add(farmUI:Toggle("Enable Auto Spawn 9x (per 1 jam)", function(state)
         TotemConfig.AutoSpawn = state and true or false
-
-        if TotemConfig.AutoSpawn then
-            nextSpawnAt = 0 -- reset supaya label nggak ngaco sebelum loop set
+        if state then
             SPAWN(AutoTotemLoop)
-        else
-            nextSpawnAt = 0
         end
     end))
 end)
-
-
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
