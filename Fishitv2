@@ -2817,12 +2817,12 @@ local function SpawnTotem9xType(totemKey)
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
-    if total < 1 then
+    if total < 9 then
         warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
         return
     end
 
-    local remaining = 1
+    local remaining = 9
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
         local uuid = item.UUID
@@ -2843,7 +2843,7 @@ local function SpawnTotem9xType(totemKey)
 end
 
 ----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM) + LIVE COUNTDOWN
+-- CONFIG AUTO TOTEM (PER 1 JAM)
 ----------------------------------------------------------------
 local TotemConfig = {
     SelectedKey = "Luck",
@@ -2852,39 +2852,21 @@ local TotemConfig = {
 }
 
 local autoTotemLoopRunning = false
-local nextSpawnAt = 0  -- tick() target berikutnya
-
-local function fmtTimeLeft(sec)
-    sec = math.max(0, math.floor(sec or 0))
-    local h = math.floor(sec / 3600)
-    local m = math.floor((sec % 3600) / 60)
-    local s = sec % 60
-    if h > 0 then
-        return string.format("%02d:%02d:%02d", h, m, s)
-    else
-        return string.format("%02d:%02d", m, s)
-    end
-end
 
 local function AutoTotemLoop()
     if autoTotemLoopRunning then return end
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 9x sekali (1x per jam)
+        -- spawn 1x (9 totem) dari jenis yang dipilih
         SpawnTotem9xType(TotemConfig.SelectedKey)
-        task.wait(0.05)
-        -- setelah spawn, equip rod slot 1
-        pcall(function()
-            Events.equipHotbar:FireServer(1)
-        end)
 
-        -- set jadwal berikutnya
-        nextSpawnAt = tick() + (TotemConfig.Interval or 3600)
-
-        -- tunggu sampai waktunya (bisa diputus toggle OFF)
-        while TotemConfig.AutoSpawn and tick() < nextSpawnAt do
-            task.wait(0.2)
+        -- tunggu 1 jam (bisa di-off dari toggle)
+        local t = 0
+        local interval = TotemConfig.Interval or 3600
+        while TotemConfig.AutoSpawn and t < interval do
+            task.wait(1)
+            t += 1
         end
     end
 
@@ -2892,35 +2874,25 @@ local function AutoTotemLoop()
 end
 
 ----------------------------------------------------------------
--- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS (TOGGLE ONLY)
+-- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
 ----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Auto Spawn 9x / 1 Jam)", function(add, group)
+local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
 
-    -- live label stok + countdown
+    -- live label stok
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
         local l = counts.Luck     or 0
         local m = counts.Mutation or 0
         local s = counts.Shiny    or 0
 
-        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
-        local left = 0
-        if TotemConfig.AutoSpawn and nextSpawnAt > 0 then
-            left = nextSpawnAt - tick()
-        end
-
         return string.format(
-            "Auto: %s\n" ..
-            "Next spawn in: %s\n\n" ..
             "Totem owned:\n" ..
             "Luck Totem     : %d\n" ..
             "Mutation Totem : %d\n" ..
             "Shiny Totem    : %d",
-            status,
-            (TotemConfig.AutoSpawn and nextSpawnAt > 0) and fmtTimeLeft(left) or "--:--",
             l, m, s
         )
-    end, 0.25))
+    end, 1.0))
 
     -- dropdown pilih jenis totem
     local keyByLabel = {
@@ -2940,18 +2912,20 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Auto Spawn 9x / 1 Ja
         end
     end))
 
-    -- toggle auto spawn (langsung spawn, lalu 1 jam lagi)
-    add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
-        TotemConfig.AutoSpawn = state and true or false
+    -- tombol spawn manual sekali (9x)
+    add(farmUI:Button("Spawn 9x Sekarang", function()
+        SpawnTotem9xType(TotemConfig.SelectedKey)
+    end))
 
-        if TotemConfig.AutoSpawn then
-            nextSpawnAt = 0 -- reset supaya label nggak ngaco sebelum loop set
-            AutoTotemLoop()
-        else
-            nextSpawnAt = 0
+    -- toggle auto spawn 9x per 1 jam
+    add(farmUI:Toggle("Enable Auto Spawn 9x (per 1 jam)", function(state)
+        TotemConfig.AutoSpawn = state and true or false
+        if state then
+            task.spawn(AutoTotemLoop)
         end
     end))
 end)
+
 
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
