@@ -2873,7 +2873,7 @@ local function AutoTotemLoop()
     while TotemConfig.AutoSpawn do
         SpawnTotem9xType(TotemConfig.SelectedKey)
 
-        taak.wait(0.05)
+        task.wait(0.05)
 
         pcall(function()
             Events.equipHotbar:FireServer(1)
