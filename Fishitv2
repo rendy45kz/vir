@@ -2673,8 +2673,10 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
 
 end)
 
+Saya mau seperti ini saja cuma tambah Live label Coutdownnya saja 
+
 ----------------------------------------------------------------
--- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
+-- AUTO SPAWN TOTEM
 ----------------------------------------------------------------
 
 -- folder definisi totem
@@ -2835,6 +2837,9 @@ local function SpawnTotem9xType(totemKey)
                     SpawnTotemRE:FireServer(uuid)
                 end)
                 task.wait(0.1)
+                pcall(function()
+                    Events.equipHotbar:FireServer(1)
+                end)
             end
 
             remaining -= use
@@ -2843,7 +2848,7 @@ local function SpawnTotem9xType(totemKey)
 end
 
 ----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM) + LIVE COUNTDOWN
+-- CONFIG AUTO TOTEM (PER 1 JAM)
 ----------------------------------------------------------------
 local TotemConfig = {
     SelectedKey = "Luck",
@@ -2852,49 +2857,29 @@ local TotemConfig = {
 }
 
 local autoTotemLoopRunning = false
-local nextSpawnAt = 0
-
-local function fmtTimeLeft(sec)
-    sec = math.max(0, math.floor(sec or 0))
-    local h = math.floor(sec / 3600)
-    local m = math.floor((sec % 3600) / 60)
-    local s = sec % 60
-    if h > 0 then
-        return string.format("%02d:%02d:%02d", h, m, s)
-    else
-        return string.format("%02d:%02d", m, s)
-    end
-end
 
 local function AutoTotemLoop()
     if autoTotemLoopRunning then return end
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 1x
+        
         SpawnTotem9xType(TotemConfig.SelectedKey)
         task.wait(0.05)
-
-        -- equip hotbar 1 setelah spawn
         pcall(function()
             if Events and Events.equipHotbar then
                 Events.equipHotbar:FireServer(1)
             end
         end)
 
-        -- set countdown berikutnya
-        local interval = TotemConfig.Interval or 3600
-        nextSpawnAt = tick() + interval
-
-        -- tunggu interval (bisa diputus toggle OFF)
         local t = 0
+        local interval = TotemConfig.Interval or 3600
         while TotemConfig.AutoSpawn and t < interval do
             task.wait(1)
             t += 1
         end
     end
 
-    nextSpawnAt = 0
     autoTotemLoopRunning = false
 end
 
@@ -2903,30 +2888,21 @@ end
 ----------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
-    -- live label stok + countdown
+    -- live label stok
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
         local l = counts.Luck     or 0
         local m = counts.Mutation or 0
         local s = counts.Shiny    or 0
 
-        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
-        local leftStr = "--:--"
-        if TotemConfig.AutoSpawn and nextSpawnAt and nextSpawnAt > 0 then
-            leftStr = fmtTimeLeft(nextSpawnAt - tick())
-        end
-
         return string.format(
-            "Auto: %s\n" ..
-            "Next spawn in: %s\n\n" ..
             "Totem owned:\n" ..
             "Luck Totem     : %d\n" ..
             "Mutation Totem : %d\n" ..
             "Shiny Totem    : %d",
-            status, leftStr,
             l, m, s
         )
-    end, 0.25))
+    end, 1.0))
 
     -- dropdown pilih jenis totem
     local keyByLabel = {
@@ -2946,18 +2922,15 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         end
     end))
 
+
     -- toggle auto spawn totem
     add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
-        if TotemConfig.AutoSpawn then
-            nextSpawnAt = 0
+        if state then
             task.spawn(AutoTotemLoop)
-        else
-            nextSpawnAt = 0
         end
     end))
 end)
-
 
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
