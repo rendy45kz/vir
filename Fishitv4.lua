@@ -2946,7 +2946,7 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
     add(farmUI:Toggle("Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if state then
-            _.spawn(AutoTotemLoop)
+            _spawn(AutoTotemLoop)
         end
     end))
 end)
