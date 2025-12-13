@@ -2836,7 +2836,7 @@ local function SpawnTotem1xType(totemKey)
                 SpawnTotemRE:FireServer(uuid) -- sekali saja
             end)
 
-            task.wait(0.05)
+            _wait(0.05)
 
             -- setelah spawn, equip rod slot 1 (sesuai request kamu)
             pcall(function()
@@ -2891,7 +2891,7 @@ local function AutoTotemLoop()
         end
 
         -- tunggu ringan + bisa stop cepat
-        task.wait(0.25)
+         _wai(0.25)
     end
 
     autoTotemLoopRunning = false
@@ -2937,11 +2937,15 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem (1x / Jam)", fun
         end
     end))
 
+    add(farmUI:Button("Spawn Sekarang", function()
+        SpawnTotem1xType(TotemConfig.SelectedKey)
+    end))
+
     add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if TotemConfig.AutoSpawn then
             nextSpawnAt = 0
-            task.spawn(AutoTotemLoop)
+            _spawn(AutoTotemLoop)
         else
             nextSpawnAt = 0
         end
