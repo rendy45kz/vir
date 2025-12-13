@@ -2918,10 +2918,13 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
         end
     end))
 
-    -- tombol spawn manual sekali (9x)
-    add(farmUI:Button("Spawn Totem Manual, function()
-        SpawnTotem9xType(TotemConfig.SelectedKey)
-    end))
+-- tombol spawn manual sekali
+add(farmUI:Button("Spawn Totem Manual", function()
+    SpawnTotem9xType(TotemConfig.SelectedKey)
+end))
+
+
+    
 
     -- toggle auto spawn 9x per 1 jam
     add(farmUI:Toggle("Auto Spawn Totem", function(state)
