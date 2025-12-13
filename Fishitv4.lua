@@ -2835,12 +2835,12 @@ local function SpawnTotem9xType(totemKey)
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
-    if total < 9 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
+    if total < 1 then
+        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
         return
     end
 
-    local remaining = 9
+    local remaining = 1
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
         local uuid = item.UUID
@@ -2852,7 +2852,8 @@ local function SpawnTotem9xType(totemKey)
                 pcall(function()
                     SpawnTotemRE:FireServer(uuid)
                 end)
-                _wait(0.1)
+                _wait(0.05)
+                equipRodAfterRespawn()
             end
 
             remaining -= use
@@ -2878,9 +2879,8 @@ local function AutoTotemLoop()
     while TotemConfig.AutoSpawn do
         -- spawn 1x (9 totem) dari jenis yang dipilih
         SpawnTotem9xType(TotemConfig.SelectedKey)
-pcall(function()
-            Events.equipHotbar:FireServer(1)
-        end)
+        _wait(0.05)
+        equipRodAfterRespawn()
 
         -- tunggu 1 jam (bisa di-off dari toggle)
         local t = 0
