@@ -2809,18 +2809,18 @@ end
 ----------------------------------------------------------------
 -- SPAWN 9x TOTEM DARI STOK PLAYER
 ----------------------------------------------------------------
-local function SpawnTotem(totemKey)
+local function SpawnTotem9xType(totemKey)
     local counts, byType = GetTotemCount()
     local def = TotemDefs[totemKey]
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
-    if total < 1 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
+    if total < 9 then
+        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
         return
     end
 
-    local remaining = 1
+    local remaining = 9
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
         local uuid = item.UUID
@@ -2840,15 +2840,10 @@ local function SpawnTotem(totemKey)
     end
 end
 
+
 ----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM)
 ----------------------------------------------------------------
-local TotemConfig = {
-    SelectedKey = "Luck",
-    AutoSpawn   = false,
-    Interval    = 3600, -- 1 jam (detik)
-}
-
 local autoTotemLoopRunning = false
 
 local function AutoTotemLoop()
@@ -2856,9 +2851,10 @@ local function AutoTotemLoop()
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        
-        SpawnTotem(TotemConfig.SelectedKey)
-        
+        -- spawn 1x (9 totem) dari jenis yang dipilih
+        SpawnTotem9xType(TotemConfig.SelectedKey)
+
+        -- tunggu 1 jam (bisa di-off dari toggle)
         local t = 0
         local interval = TotemConfig.Interval or 3600
         while TotemConfig.AutoSpawn and t < interval do
@@ -2870,11 +2866,10 @@ local function AutoTotemLoop()
     autoTotemLoopRunning = false
 end
 
-
 ----------------------------------------------------------------
 -- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
 ----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
+local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
 
     -- live label stok
     add(farmUI:LiveLabel(function()
@@ -2911,8 +2906,8 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
     end))
 
     -- tombol spawn manual sekali (9x)
-    add(farmUI:Button("Spawn ", function()         
-        SpawnTotem(TotemConfig.SelectedKey)
+    add(farmUI:Button("Spawn 9x Sekarang", function()
+        SpawnTotem9xType(TotemConfig.SelectedKey)
     end))
 
     -- toggle auto spawn 9x per 1 jam
@@ -2923,9 +2918,6 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         end
     end))
 end)
-
-
-
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
