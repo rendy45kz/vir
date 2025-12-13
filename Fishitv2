@@ -2944,7 +2944,166 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
     end))
 end)
 
+----------------------------------------------------------------
+-- CAMERA CONTROLLER (OBSERVER + FREECAM)
+----------------------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local CameraController = {
+    Enabled = false,
+    Mode = "Normal", -- Normal | Observer | Freecam
+    Speed = 60,
+}
+
+-- backup camera
+local savedCamType
+local savedSubject
+local freecamCFrame
+
+----------------------------------------------------------------
+-- RESTORE CAMERA
+----------------------------------------------------------------
+local function RestoreCamera()
+    CameraController.Enabled = false
+    CameraController.Mode = "Normal"
+
+    Camera.CameraType = savedCamType or Enum.CameraType.Custom
+    Camera.CameraSubject = savedSubject or LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+
+    RunService:UnbindFromRenderStep("FREECAM_STEP")
+end
+
+----------------------------------------------------------------
+-- OBSERVER MODE (SPECTATE PLAYER)
+----------------------------------------------------------------
+local function StartObserver(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+
+    savedCamType = Camera.CameraType
+    savedSubject = Camera.CameraSubject
+
+    CameraController.Enabled = true
+    CameraController.Mode = "Observer"
+
+    Camera.CameraType = Enum.CameraType.Custom
+    local hum = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if hum then
+        Camera.CameraSubject = hum
+    end
+end
+
+----------------------------------------------------------------
+-- FREECAM MODE
+----------------------------------------------------------------
+local moveDir = Vector3.zero
+local rotX, rotY = 0, 0
+
+local function StartFreecam()
+    savedCamType = Camera.CameraType
+    savedSubject = Camera.CameraSubject
+
+    CameraController.Enabled = true
+    CameraController.Mode = "Freecam"
+
+    Camera.CameraType = Enum.CameraType.Scriptable
+    freecamCFrame = Camera.CFrame
+
+    RunService:BindToRenderStep("FREECAM_STEP", Enum.RenderPriority.Camera.Value, function(dt)
+        local cf = freecamCFrame
+
+        -- rotation
+        cf = CFrame.Angles(0, rotX, 0) * CFrame.Angles(rotY, 0, 0) * CFrame.new(cf.Position)
+
+        -- movement
+        cf = cf + (cf.RightVector * moveDir.X + cf.UpVector * moveDir.Y + cf.LookVector * moveDir.Z)
+            * CameraController.Speed * dt
+
+        freecamCFrame = cf
+        Camera.CFrame = cf
+    end)
+end
+
+----------------------------------------------------------------
+-- INPUT HANDLER (FREECAM)
+----------------------------------------------------------------
+UserInputService.InputBegan:Connect(function(i, g)
+    if g or CameraController.Mode ~= "Freecam" then return end
+
+    if i.KeyCode == Enum.KeyCode.W then moveDir += Vector3.new(0,0,1) end
+    if i.KeyCode == Enum.KeyCode.S then moveDir += Vector3.new(0,0,-1) end
+    if i.KeyCode == Enum.KeyCode.A then moveDir += Vector3.new(-1,0,0) end
+    if i.KeyCode == Enum.KeyCode.D then moveDir += Vector3.new(1,0,0) end
+    if i.KeyCode == Enum.KeyCode.Space then moveDir += Vector3.new(0,1,0) end
+    if i.KeyCode == Enum.KeyCode.LeftControl then moveDir += Vector3.new(0,-1,0) end
+end)
+
+UserInputService.InputEnded:Connect(function(i)
+    if CameraController.Mode ~= "Freecam" then return end
+
+    if i.KeyCode == Enum.KeyCode.W then moveDir -= Vector3.new(0,0,1) end
+    if i.KeyCode == Enum.KeyCode.S then moveDir -= Vector3.new(0,0,-1) end
+    if i.KeyCode == Enum.KeyCode.A then moveDir -= Vector3.new(-1,0,0) end
+    if i.KeyCode == Enum.KeyCode.D then moveDir -= Vector3.new(1,0,0) end
+    if i.KeyCode == Enum.KeyCode.Space then moveDir -= Vector3.new(0,1,0) end
+    if i.KeyCode == Enum.KeyCode.LeftControl then moveDir -= Vector3.new(0,-1,0) end
+end)
+
+UserInputService.InputChanged:Connect(function(i)
+    if CameraController.Mode ~= "Freecam" then return end
+    if i.UserInputType == Enum.UserInputType.MouseMovement then
+        rotX -= i.Delta.X * 0.002
+        rotY -= i.Delta.Y * 0.002
+        rotY = math.clamp(rotY, -1.5, 1.5)
+    end
+end)
+
+----------------------------------------------------------------
+-- CAMERA TAB
+----------------------------------------------------------------
+local camGroup = farmUI:CreateCollapseGroup("Camera / Observer", function(add, group)
+
+    add(farmUI:Label("Observer & Infinite Camera"))
+
+    ------------------------------------------------------------
+    -- OBSERVER DROPDOWN
+    ------------------------------------------------------------
+    local playerNames = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(playerNames, p.Name)
+        end
+    end
+
+    add(farmUI:Dropdown("Observer Player", playerNames, function(name)
+        local plr = Players:FindFirstChild(name)
+        if plr then
+            StartObserver(plr)
+        end
+    end))
+
+    ------------------------------------------------------------
+    -- FREECAM TOGGLE
+    ------------------------------------------------------------
+    add(farmUI:Toggle("Enable Infinite Camera (Freecam)", function(state)
+        if state then
+            StartFreecam()
+        else
+            RestoreCamera()
+        end
+    end))
+
+    ------------------------------------------------------------
+    -- RESET CAMERA
+    ------------------------------------------------------------
+    add(farmUI:Button("Reset Camera (Normal)", function()
+        RestoreCamera()
+    end))
+end)
 
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
