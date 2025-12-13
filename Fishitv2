@@ -2857,7 +2857,7 @@ local function AutoTotemLoop()
 
     while TotemConfig.AutoSpawn do
         
-        SpawnTotem9xType(TotemConfig.SelectedKey)
+        SpawnTotem(TotemConfig.SelectedKey)
         
         local t = 0
         local interval = TotemConfig.Interval or 3600
@@ -2911,7 +2911,9 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
     end))
 
     -- tombol spawn manual sekali (9x)
-    add(    add(farmUI:Button("Spawn ", function()         SpawnTotem(TotemConfig.SelectedKey)))
+    add(farmUI:Button("Spawn ", function()         
+        SpawnTotem(TotemConfig.SelectedKey)
+    end))
 
     -- toggle auto spawn 9x per 1 jam
     add(farmUI:Toggle("Enable Auto Spawn 9x (per 1 jam)", function(state)
