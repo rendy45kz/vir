@@ -2835,12 +2835,12 @@ local function SpawnTotem9xType(totemKey)
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
-    if total < 1 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
+    if total < 9 then
+        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
         return
     end
 
-    local remaining = 1
+    local remaining = 9
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
         local uuid = item.UUID
@@ -2852,7 +2852,7 @@ local function SpawnTotem9xType(totemKey)
                 pcall(function()
                     SpawnTotemRE:FireServer(uuid)
                 end)
-                _wait(0.1)
+                task.wait(0.1)
             end
 
             remaining -= use
@@ -2861,7 +2861,8 @@ local function SpawnTotem9xType(totemKey)
 end
 
 ----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM) + LIVE COUNTDOWN
+-- CONFIG AUTO TOTEM (PER 1 JAM)
+----------------------------------------------------------------
 local TotemConfig = {
     SelectedKey = "Luck",
     AutoSpawn   = false,
@@ -2869,53 +2870,31 @@ local TotemConfig = {
 }
 
 local autoTotemLoopRunning = false
-local totemTimeLeft = 0 -- detik (untuk LiveLabel)
-
-local function fmtTimeLeft(sec)
-    sec = math.max(0, math.floor(tonumber(sec) or 0))
-    local h = math.floor(sec / 3600)
-    local m = math.floor((sec % 3600) / 60)
-    local s = sec % 60
-    if h > 0 then
-        return string.format("%02d:%02d:%02d", h, m, s)
-    end
-    return string.format("%02d:%02d", m, s)
-end
 
 local function AutoTotemLoop()
     if autoTotemLoopRunning then return end
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 1x dari jenis yang dipilih
+        -- spawn 1x (9 totem) dari jenis yang dipilih
         SpawnTotem9xType(TotemConfig.SelectedKey)
-
-        -- setelah spawn, equip rod slot 1 (jaga-jaga)
-        pcall(function()
-            if Events and Events.equipHotbar then
-                Events.equipHotbar:FireServer(1)
-            end
+pcall(function()
+            Events.equipHotbar:FireServer(1)
         end)
 
-        -- countdown 1 jam (bisa di-OFF dari toggle)
-        local interval = tonumber(TotemConfig.Interval) or 3600
-        totemTimeLeft = interval
-
-        while TotemConfig.AutoSpawn and totemTimeLeft > 0 do
-            _wait(1)
-            totemTimeLeft -= 1
-        end
-
-        if not TotemConfig.AutoSpawn then
-            break
+        -- tunggu 1 jam (bisa di-off dari toggle)
+        local t = 0
+        local interval = TotemConfig.Interval or 3600
+        while TotemConfig.AutoSpawn and t < interval do
+            task.wait(1)
+            t += 1
         end
     end
 
-    totemTimeLeft = 0
     autoTotemLoopRunning = false
 end
 
-
+----------------------------------------------------------------
 -- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
 ----------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
@@ -2928,14 +2907,10 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         local s = counts.Shiny    or 0
 
         return string.format(
-            "Auto: %s\n" ..
-            "Next spawn in: %s\n\n" ..
             "Totem owned:\n" ..
             "Luck Totem     : %d\n" ..
             "Mutation Totem : %d\n" ..
             "Shiny Totem    : %d",
-            (TotemConfig.AutoSpawn and "ON" or "OFF"),
-            (TotemConfig.AutoSpawn and fmtTimeLeft(totemTimeLeft) or "--:--"),
             l, m, s
         )
     end, 1.0))
@@ -2962,10 +2937,11 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
     add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if state then
-            _spawn(AutoTotemLoop)
+            task.spawn(AutoTotemLoop)
         end
     end))
 end)
+
 
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
