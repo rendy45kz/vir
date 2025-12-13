@@ -1,3 +1,21 @@
+--[[ Compatibility helpers (some executors don't expose 'task') ]]--
+local _task  = rawget(_G, "task")
+local _wait  = (_task and _task.wait) or wait
+local _spawn = (_task and _task.spawn) or function(fn, ...)
+    local co = coroutine.create(fn)
+    local ok, err = coroutine.resume(co, ...)
+    if not ok then warn(err) end
+    return co
+end
+local _delay = (_task and _task.delay) or function(t, fn, ...)
+    local args = table.pack(...)
+    return _spawn(function()
+        _wait(t)
+        fn(table.unpack(args, 1, args.n))
+    end)
+end
+
+
 ----------------------------------------------------------------
 -- AegisHub UI – Neon Card Redesigned
 ----------------------------------------------------------------
@@ -628,7 +646,7 @@ end
 
             btn.MouseButton1Click:Connect(function()
                 tween(btn, 0.08, {BackgroundColor3 = theme.accent2})
-                task.delay(0.08, function()
+                _delay(0.08, function()
                     tween(btn, 0.12, {BackgroundColor3 = theme.card2})
                 end)
                 callback()
@@ -897,13 +915,13 @@ end
             lbl.TextWrapped = true
             lbl.Text = ""
 
-            task.spawn(function()
+            _spawn(function()
                 while lbl.Parent do
                     local ok, txt = pcall(getTextFn)
                     if ok and txt ~= nil then
                         lbl.Text = tostring(txt)
                     end
-                    task.wait(refreshDelay)
+                    _wait(refreshDelay)
                 end
             end)
 
@@ -1098,7 +1116,7 @@ local function doOneBlatantCycle()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     -- if not hrp then
         -- warn("[BlatantFish] HRP not found")
-        -- task.wait(0.01)
+        -- _wait(0.01)
         -- return
     -- end
 
@@ -1121,7 +1139,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.chargeRod:InvokeServer(100)
     end)
-    task.wait(0.001)
+    _wait(0.001)
 
     -- start minigame
     local okStart = pcall(function()
@@ -1141,7 +1159,7 @@ local function doOneBlatantCycle()
     ----------------------------------------------------------------
     -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
     ----------------------------------------------------------------
-    task.wait(catchDel)
+    _wait(catchDel)
 
     ----------------------------------------------------------------
     -- 4) SPAM FISHING COMPLETED (ikan naik)
@@ -1150,7 +1168,7 @@ local function doOneBlatantCycle()
         pcall(function()            
             Events.completeFish:FireServer()
         end)
-       task.wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
+       _wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
     end
 end
 
@@ -1163,7 +1181,7 @@ local function mainFishingLoop()
     
     while Config.AutoFish do
         local ok, err = pcall(doOneBlatantCycle)        
-        --task.wait(0.001)
+        --_wait(0.001)
     end
 
     loopRunning = false
@@ -1175,7 +1193,7 @@ local Fishing = {}
 function Fishing:Start()
     if Config.AutoFish then return end
     Config.AutoFish = true
-    task.spawn(mainFishingLoop)
+    _spawn(mainFishingLoop)
 end
 
 function Fishing:Stop()
@@ -1547,7 +1565,7 @@ local function RespawnAndReturnToOrigin()
     local hrp = newChar:WaitForChild("HumanoidRootPart")
 
     -- kasih jeda dikit biar load
-    task.wait(0.6)
+    _wait(0.6)
 
     -- teleport ke posisi asal + offset atas dikit
     hrp.CFrame = origin + Vector3.new(0, 5, 0)
@@ -1559,7 +1577,7 @@ local function RespawnAndReturnToOrigin()
     Farm.FishStats.Session = 0
     print("[AutoRespawnFish] Respawn & balik ke posisi asal. Session counter reset.")
 
-    task.delay(1, function()
+    _delay(1, function()
         respawnBusy = false
     end)
 end
@@ -1656,11 +1674,11 @@ RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
         autoSellCount += 1
         if autoSellCount >= Farm.AutoSellThreshold and not autoSellCooldown then
             autoSellCooldown = true
-            task.spawn(function()
+            _spawn(function()
                 pcall(function()
                     RF_SellAllItems:InvokeServer()
                 end)
-                task.wait(Farm.AutoSellDelay)
+                _wait(Farm.AutoSellDelay)
                 autoSellCount    = 0
                 autoSellCooldown = false
             end)
@@ -1682,7 +1700,7 @@ end
 local function StartWeatherLoop(weather)
     if WeatherThreads[weather] then return end
 
-    WeatherThreads[weather] = task.spawn(function()
+    WeatherThreads[weather] = _spawn(function()
         while Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather] do
             pcall(function()
                 RF_PurchaseWeather:InvokeServer(weather)
@@ -1694,7 +1712,7 @@ local function StartWeatherLoop(weather)
                 if not (Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather]) then
                     break
                 end
-                task.wait(1)
+                _wait(1)
             end
         end
         WeatherThreads[weather] = nil
@@ -1841,7 +1859,7 @@ function Enchant:EquipEnchantStone(unequipUUID)
         pcall(function()
             RE_UnequipItem:FireServer(unequipUUID)
         end)
-        task.wait(0.15)
+        _wait(0.15)
     end
 
     if RE_EquipItem then
@@ -1998,12 +2016,12 @@ local function doEnchantCast()
     if (flatCur - flatAltr).Magnitude > 5 then
         hrp.CFrame = ENCHANT_ALTAR_CFRAME + Vector3.new(0, 5, 0)
 
-        -- dulu: task.wait(1)
+        -- dulu: _wait(1)
         -- sekarang: wait pendek + cek toggle biar bisa batal
         local t = 0
         local maxDelay = 0.8
         while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            task.wait(0.1)
+            _wait(0.1)
             t += 0.1
         end
         -- kalau di tengah² user matiin toggle → stop di sini
@@ -2060,7 +2078,7 @@ local function doEnchantCast()
         local t = 0
         local maxDelay = 0.2
         while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            task.wait(0.05)
+            _wait(0.05)
             t += 0.05
         end
         if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
@@ -2095,12 +2113,12 @@ local function doEnchantCast2()
     if (flatCur - flatAltr).Magnitude > 5 then
         hrp.CFrame = ENCHANT_ALTAR_CFRAME2 + Vector3.new(0, 5, 0)
 
-        -- dulu: task.wait(1)
+        -- dulu: _wait(1)
         -- sekarang: wait pendek + cek toggle biar bisa batal
         local t = 0
         local maxDelay = 0.8
         while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            task.wait(0.1)
+            _wait(0.1)
             t += 0.1
         end
         -- kalau di tengah² user matiin toggle → stop di sini
@@ -2157,7 +2175,7 @@ local function doEnchantCast2()
         local t = 0
         local maxDelay = 0.2
         while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            task.wait(0.05)
+            _wait(0.05)
             t += 0.05
         end
         if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
@@ -2250,7 +2268,7 @@ local function AutoEnchantLoop1()
         local total = EnchantConfig.Delay1 or 2
         local t = 0
         while t < total and EnchantConfig.AutoEnchant1 do
-            task.wait(0.1)
+            _wait(0.1)
             t += 0.1
         end
     end
@@ -2278,7 +2296,7 @@ local function AutoEnchantLoop2()
         local total = EnchantConfig.Delay2 or 2
         local t = 0
         while t < total and EnchantConfig.AutoEnchant2 do
-            task.wait(0.1)
+            _wait(0.1)
             t += 0.1
         end
     end
@@ -2569,7 +2587,7 @@ local function StartAutoSellEnchantLoop()
     if EnchantSell.Running then return end
     EnchantSell.Running = true
 
-    task.spawn(function()
+    _spawn(function()
         while EnchantSell.Enabled do
 
             if not RF_SellItem then
@@ -2582,7 +2600,7 @@ local function StartAutoSellEnchantLoop()
 
             if #stones == 0 then
                 EnchantSell.Status = "idle (no stones)"
-                task.wait(EnchantSell.Delay)
+                _wait(EnchantSell.Delay)
             else
                 for _, stone in ipairs(stones) do
                     if not EnchantSell.Enabled then break end
@@ -2617,7 +2635,7 @@ local function StartAutoSellEnchantLoop()
                         end
                     end
 
-                    task.wait(EnchantSell.Delay)
+                    _wait(EnchantSell.Delay)
                 end
             end
         end
@@ -2670,12 +2688,8 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
             EnchantSell.Delay = math.clamp(n, 0.1, 10)
         end
     end))
-end) 
+end)
 
-
-----------------------------------------------------------------
--- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
-----------------------------------------------------------------
 
 ----------------------------------------------------------------
 -- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
@@ -2812,8 +2826,9 @@ local function GetTotemCount()
     return count, byType
 end
 
+
 ----------------------------------------------------------------
--- SPAWN 9x TOTEM DARI STOK PLAYER
+-- SPAWN 1x TOTEM DARI STOK PLAYER (versi stabil: sama seperti yang 9x, tapi 1x)
 ----------------------------------------------------------------
 local function SpawnTotem9xType(totemKey)
     local counts, byType = GetTotemCount()
@@ -2821,30 +2836,35 @@ local function SpawnTotem9xType(totemKey)
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
-    if total < 9 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 9.", needName, total))
+    if total < 1 then
+        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
         return
     end
 
-    local remaining = 9
+    -- spawn cuma 1x
+    local remaining = 1
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
+
         local uuid = item.UUID
         if uuid then
-            local amt = item.Amount or item.Quantity or item.Count or remaining
-            local use = math.min(amt, remaining)
+            pcall(function()
+                SpawnTotemRE:FireServer(uuid)
+            end)
+            task.wait(1)
 
-            for i = 1, use do
-                pcall(function()
-                    SpawnTotemRE:FireServer(uuid)
-                end)
-                task.wait(0.1)
-            end
+            -- setelah spawn, equip slot 1
+            pcall(function()
+                if Events and Events.equipHotbar then
+                    Events.equipHotbar:FireServer(1)
+                end
+            end)
 
-            remaining -= use
+            remaining -= 1
         end
     end
 end
+
 
 ----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM)
@@ -2862,7 +2882,7 @@ local function AutoTotemLoop()
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 1x (9 totem) dari jenis yang dipilih
+        -- spawn 1x dari jenis yang dipilih
         SpawnTotem9xType(TotemConfig.SelectedKey)
 
         -- tunggu 1 jam (bisa di-off dari toggle)
@@ -2876,6 +2896,7 @@ local function AutoTotemLoop()
 
     autoTotemLoopRunning = false
 end
+
 
 ----------------------------------------------------------------
 -- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
@@ -2917,12 +2938,12 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
     end))
 
     -- tombol spawn manual sekali (9x)
-    add(farmUI:Button("Spawn 9x Sekarang", function()
+    add(farmUI:Button("Spawn Totem Manual, function()
         SpawnTotem9xType(TotemConfig.SelectedKey)
     end))
 
     -- toggle auto spawn 9x per 1 jam
-    add(farmUI:Toggle("Enable Auto Spawn 9x (per 1 jam)", function(state)
+    add(farmUI:Toggle("Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if state then
             task.spawn(AutoTotemLoop)
@@ -2933,10 +2954,13 @@ end)
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
-local enchantGroup = farmU        add(farmUI:Button("Spawn Totem Manual", function()armUI:Button("Spawn Totem Manual", function()---------
+local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, group)
+
+    ------------------------------------------------
     -- LIVE INFO ROD
-    --------------------
-    add(farmUI:Toggle("Auto Spawn Totem", function(state)    local r =
+    ------------------------------------------------
+    add(farmUI:LiveLabel(function()
+        local r =
             (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
             or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
             or nil
@@ -2961,7 +2985,8 @@ local enchantGroup = farmU        add(farmUI:Button("Spawn Totem Manual", functi
         local ok, list = pcall(function()
             return Enchant:GetListEnchant()
         end)
-              enchantNames = list
+        if ok and type(list) == "table" then
+            enchantNames = list
         end
     end
 
@@ -2977,7 +3002,7 @@ local enchantGroup = farmU        add(farmUI:Button("Spawn Totem Manual", functi
     add(farmUI:Toggle("Enable Auto Enchant Slot 1", function(state)
         EnchantConfig.AutoEnchant1 = state
         if state and typeof(AutoEnchantLoop1) == "function" then
-            task.spawn(AutoEnchantLoop1)
+            _spawn(AutoEnchantLoop1)
         end
     end))
 
@@ -2994,7 +3019,7 @@ local enchantGroup = farmU        add(farmUI:Button("Spawn Totem Manual", functi
     add(farmUI:Toggle("Enable Auto Enchant Slot 2", function(state)
         EnchantConfig.AutoEnchant2 = state
         if state and typeof(AutoEnchantLoop2) == "function" then
-            task.spawn(AutoEnchantLoop2)
+            _spawn(AutoEnchantLoop2)
         end
     end))
 
@@ -3183,7 +3208,7 @@ local function EventAutoLoop()
             end
         end
 
-        task.wait(1.5)
+        _wait(1.5)
     end
 
     -- toggle OFF → balikin posisi
@@ -3223,7 +3248,7 @@ TabEvent:Toggle("Auto Teleport Selected Event", function(state)
     EventConfig.AutoEvent = state
     print("[AegisHub Event] AutoEvent =", state)
     if state then
-        task.spawn(EventAutoLoop)
+        _spawn(EventAutoLoop)
     end
 end)
 
@@ -3534,9 +3559,9 @@ if currentNPC and ddNPC and ddNPC.Set then
 end
 
 -- OPTIONAL: auto-refresh daftar NPC setiap beberapa detik TANPA bikin dropdown baru
-task.spawn(function()
+_spawn(function()
     while true do
-        task.wait(8)
+        _wait(8)
         if ddNPC and ddNPC.SetOptions then
             local newList = scanNPC_Models()
             ddNPC:SetOptions(newList)
@@ -3569,9 +3594,9 @@ end)
 ------------------------------------------------------------
 -- AUTO REFRESH NPC & PLAYER LIST (TANPA BUAT DROPDOWN BARU)
 ------------------------------------------------------------
-task.spawn(function()
+_spawn(function()
     while true do
-        task.wait(8)
+        _wait(8)
 
         local newNPC = scanNPC_Models()
         if ddNPC and ddNPC.SetOptions and newNPC then
@@ -3610,7 +3635,7 @@ TabMisc:Toggle("Enable Anti AFK", function(state)
         if AntiAFKConn then AntiAFKConn:Disconnect() end
         AntiAFKConn = LocalPlayer.Idled:Connect(function()
             VirtualUser:Button2Down(Vector2.new(), Workspace.CurrentCamera.CFrame)
-            task.wait(0.6)
+            _wait(0.6)
             VirtualUser:Button2Up(Vector2.new(), Workspace.CurrentCamera.CFrame)
         end)
     else
@@ -3757,7 +3782,7 @@ end
 -- HELPER BARU – GUI / KAMERA / ANIMASI
 -- =========================
 local function SembunyikanNotifikasiIkan()
-    task.spawn(function()
+    _spawn(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
         local notifPath = ReplicatedStorage:FindFirstChild("Packages")        
         local NetFolder = notifPath:FindFirstChild("_Index") 
@@ -3773,7 +3798,7 @@ local function SembunyikanNotifikasiIkan()
 end
 
 local function TampilkanNotifikasiIkan()
-    task.spawn(function()
+    _spawn(function()
         local ReplicatedStorage = game:GetService("ReplicatedStorage")
         local REObtainedNewFishNotification = ReplicatedStorage
             .Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
