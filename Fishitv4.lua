@@ -2692,12 +2692,19 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
 end)
 
 ----------------------------------------------------------------
--- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
+-- AUTO SPAWN TOTEM (1x / interval) + LIVE COUNTDOWN + COUNT
 ----------------------------------------------------------------
 
--- folder definisi totem
+-- safe wait (support _wait kalau ada)
+local function Wait(sec)
+    if typeof(_wait) == "function" then
+        return _wait(sec)
+    end
+    return task.wait(sec)
+end
+
+-- folder definisi totem + remote spawn
 local TotemFolder  = ReplicatedStorage:WaitForChild("Totems")
--- remote spawn totem
 local SpawnTotemRE = net:WaitForChild("RE/SpawnTotem")
 
 -- definisi dasar totem
@@ -2707,9 +2714,10 @@ local TotemDefs = {
     Shiny    = { Name = "Shiny Totem",    Id = nil },
 }
 
--- map Id → key ("Luck","Mutation","Shiny")
+-- map Id → key
 local TotemIdToKey = {}
 
+-- build map dari ModuleScript di ReplicatedStorage.Totems
 do
     for _, mod in ipairs(TotemFolder:GetChildren()) do
         if mod:IsA("ModuleScript") then
@@ -2717,14 +2725,14 @@ do
             if ok and data and data.Data then
                 local id    = data.Data.Id
                 local name  = data.Data.Name or mod.Name
-                local lname = string.lower(name)
+                local lname = string.lower(tostring(name))
 
                 local key
-                if lname:find("luck") then
+                if lname:find("luck", 1, true) then
                     key = "Luck"
-                elseif lname:find("mutation") then
+                elseif lname:find("mutation", 1, true) then
                     key = "Mutation"
-                elseif lname:find("shiny") then
+                elseif lname:find("shiny", 1, true) then
                     key = "Shiny"
                 end
 
@@ -2739,14 +2747,10 @@ do
 end
 
 ----------------------------------------------------------------
--- SCAN INVENTORY PLAYER → HITUNG TOTEM
+-- SCAN INVENTORY PLAYER → LIST TOTEM PER TYPE
 ----------------------------------------------------------------
 local function ScanInventoryTotems()
-    local byType = {
-        Luck     = {},
-        Mutation = {},
-        Shiny    = {},
-    }
+    local byType = { Luck = {}, Mutation = {}, Shiny = {} }
 
     if not DataReplion or type(DataReplion.Get) ~= "function" then
         return byType
@@ -2765,21 +2769,19 @@ local function ScanInventoryTotems()
         if type(item) ~= "table" then return end
 
         local id = item.Id or item.ItemId or item.ItemID
-        if not id then return end
+        local key = id and TotemIdToKey[id] or nil
 
-        local key = TotemIdToKey[id]
-
-        -- fallback pakai nama di item kalau Id belum ter-map
+        -- fallback: cek name di item/metadata kalau id belum ke-map
         if not key then
             local nm = item.Name
                 or (item.Metadata and (item.Metadata.Name or item.Metadata.DisplayName))
             if nm then
                 local low = string.lower(tostring(nm))
-                if low:find("luck") then
+                if low:find("luck", 1, true) then
                     key = "Luck"
-                elseif low:find("mutation") then
+                elseif low:find("mutation", 1, true) then
                     key = "Mutation"
-                elseif low:find("shiny") then
+                elseif low:find("shiny", 1, true) then
                     key = "Shiny"
                 end
             end
@@ -2790,7 +2792,7 @@ local function ScanInventoryTotems()
         end
     end
 
-    -- loop semua bucket di Inventory (Items / Potions / dll)
+    -- loop semua bucket Inventory (Items / Potions / dll)
     for _, bucket in pairs(invRoot) do
         if type(bucket) == "table" then
             for _, it in pairs(bucket) do
@@ -2802,20 +2804,15 @@ local function ScanInventoryTotems()
     return byType
 end
 
--- hitung total stok (pakai Amount/Quantity kalau ada)
+-- hitung total stok (pakai Amount/Quantity/Count kalau ada)
 local function GetTotemCount()
     local byType = ScanInventoryTotems()
-
-    local count = {
-        Luck     = 0,
-        Mutation = 0,
-        Shiny    = 0,
-    }
+    local count = { Luck = 0, Mutation = 0, Shiny = 0 }
 
     local function addCount(key, list)
         for _, item in ipairs(list) do
             local amt = item.Amount or item.Quantity or item.Count or 1
-            count[key] += amt
+            count[key] += (tonumber(amt) or 1)
         end
     end
 
@@ -2827,67 +2824,113 @@ local function GetTotemCount()
 end
 
 ----------------------------------------------------------------
--- SPAWN 9x TOTEM DARI STOK PLAYER
+-- SPAWN TOTEM 1x (ONCE)
 ----------------------------------------------------------------
-local function SpawnTotem9xType(totemKey)
+local TotemState = {
+    Status    = "idle",
+    Last      = "-",
+    LastError = "-",
+}
+
+local function SafeEquipRod()
+    pcall(function()
+        -- prioritas: fungsi kamu
+        if typeof(equipRodAfterRespawn) == "function" then
+            equipRodAfterRespawn()
+            return
+        end
+        -- fallback: equip hotbar slot 1
+        if Events and Events.equipHotbar then
+            Events.equipHotbar:FireServer(1)
+        end
+    end)
+end
+
+local function SpawnTotemOnce(totemKey)
     local counts, byType = GetTotemCount()
     local def = TotemDefs[totemKey]
     local needName = def and def.Name or totemKey
 
     local total = counts[totemKey] or 0
     if total < 1 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
-        return
+        TotemState.Status = "failed"
+        TotemState.Last = "No stock"
+        TotemState.LastError = string.format("%s kurang (punya %d)", needName, total)
+        return false
     end
 
-    local remaining = 1
+    TotemState.Status = "spawning"
+    TotemState.Last = "Spawning "..needName
+    TotemState.LastError = "-"
+
+    -- cari 1 item UUID untuk spawn
     for _, item in ipairs(byType[totemKey] or {}) do
-        if remaining <= 0 then break end
-        local uuid = item.UUID
+        local uuid = item and item.UUID
         if uuid then
-            local amt = item.Amount or item.Quantity or item.Count or remaining
-            local use = math.min(amt, remaining)
+            local ok, err = pcall(function()
+                SpawnTotemRE:FireServer(uuid)
+            end)
 
-            for i = 1, use do
-                pcall(function()
-                    SpawnTotemRE:FireServer(uuid)
-                end)
-                _wait(0.05)
-                equipRodAfterRespawn()
+            if ok then
+                TotemState.Status = "success"
+                TotemState.Last = "Spawned "..needName
+                TotemState.LastError = "-"
+                Wait(0.05)
+                SafeEquipRod()
+                return true
+            else
+                TotemState.Status = "failed"
+                TotemState.Last = "Spawn failed"
+                TotemState.LastError = tostring(err)
+                return false
             end
-
-            remaining -= use
         end
     end
+
+    TotemState.Status = "failed"
+    TotemState.Last = "No UUID"
+    TotemState.LastError = "UUID totem tidak ditemukan"
+    return false
 end
 
 ----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM)
+-- AUTO LOOP (1x / interval) + COUNTDOWN
 ----------------------------------------------------------------
 local TotemConfig = {
     SelectedKey = "Luck",
     AutoSpawn   = false,
-    Interval    = 3600, -- 1 jam (detik)
+    Interval    = 3600, -- 1 jam
 }
 
 local autoTotemLoopRunning = false
+local nextSpawnAt = 0
+
+local function fmtTimeLeft(sec)
+    sec = math.max(0, math.floor(sec or 0))
+    local h = math.floor(sec / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    local s = sec % 60
+    if h > 0 then
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+    return string.format("%02d:%02d", m, s)
+end
 
 local function AutoTotemLoop()
     if autoTotemLoopRunning then return end
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 1x (9 totem) dari jenis yang dipilih
-        SpawnTotem9xType(TotemConfig.SelectedKey)
-        _wait(0.05)
-        equipRodAfterRespawn()
+        -- spawn 1x sekarang
+        SpawnTotemOnce(TotemConfig.SelectedKey)
 
-        -- tunggu 1 jam (bisa di-off dari toggle)
-        local t = 0
-        local interval = TotemConfig.Interval or 3600
-        while TotemConfig.AutoSpawn and t < interval do
-            _wait(1)
-            t += 1
+        -- set jadwal berikutnya
+        local interval = tonumber(TotemConfig.Interval) or 3600
+        nextSpawnAt = tick() + interval
+
+        -- tunggu sampai waktunya (bisa diputus)
+        while TotemConfig.AutoSpawn and tick() < nextSpawnAt do
+            Wait(0.25)
         end
     end
 
@@ -2895,27 +2938,43 @@ local function AutoTotemLoop()
 end
 
 ----------------------------------------------------------------
--- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
+-- UI: FARM TAB – COLLAPSE GROUP
 ----------------------------------------------------------------
 local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
-    -- live label stok
+    -- live label: status + countdown + count
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
-        local l = counts.Luck     or 0
+        local l = counts.Luck or 0
         local m = counts.Mutation or 0
-        local s = counts.Shiny    or 0
+        local s = counts.Shiny or 0
+
+        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
+        local left = 0
+        if TotemConfig.AutoSpawn and nextSpawnAt > 0 then
+            left = nextSpawnAt - tick()
+        end
+
+        local selName = (TotemDefs[TotemConfig.SelectedKey] and TotemDefs[TotemConfig.SelectedKey].Name)
+            or TotemConfig.SelectedKey
 
         return string.format(
-            "Totem owned:\n" ..
-            "Luck Totem     : %d\n" ..
-            "Mutation Totem : %d\n" ..
-            "Shiny Totem    : %d",
+            "Auto: %s\n" ..
+            "Selected: %s\n" ..
+            "Next spawn in: %s\n\n" ..
+            "Status: %s\nLast: %s\nErr: %s\n\n" ..
+            "Totem owned:\nLuck     : %d\nMutation : %d\nShiny    : %d",
+            status,
+            tostring(selName),
+            (TotemConfig.AutoSpawn and nextSpawnAt > 0) and fmtTimeLeft(left) or "--:--",
+            TotemState.Status,
+            TotemState.Last,
+            TotemState.LastError,
             l, m, s
         )
-    end, 1.0))
+    end, 0.25))
 
-    -- dropdown pilih jenis totem
+    -- dropdown type
     local keyByLabel = {
         ["Luck Totem"]     = "Luck",
         ["Mutation Totem"] = "Mutation",
@@ -2933,11 +2992,18 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         end
     end))
 
-    -- toggle auto spawn 9x per 1 jam
-    add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
+    -- toggle auto
+    add(farmUI:Toggle("Enable Auto Spawn Totem (1x / jam)", function(state)
         TotemConfig.AutoSpawn = state and true or false
-        if state then
-            _spawn(AutoTotemLoop)
+
+        if TotemConfig.AutoSpawn then
+            nextSpawnAt = 0
+            task.spawn(AutoTotemLoop)
+        else
+            nextSpawnAt = 0
+            TotemState.Status = "idle"
+            TotemState.Last = "-"
+            TotemState.LastError = "-"
         end
     end))
 end)
