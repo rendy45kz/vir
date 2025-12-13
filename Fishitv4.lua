@@ -2852,7 +2852,7 @@ local function SpawnTotem9xType(totemKey)
                 pcall(function()
                     SpawnTotemRE:FireServer(uuid)
                 end)
-                task.wait(0.1)
+                _wait(0.1)
             end
 
             remaining -= use
@@ -2886,7 +2886,7 @@ pcall(function()
         local t = 0
         local interval = TotemConfig.Interval or 3600
         while TotemConfig.AutoSpawn and t < interval do
-            task.wait(1)
+            _wait(1)
             t += 1
         end
     end
@@ -2937,7 +2937,7 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
     add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if state then
-            task.spawn(AutoTotemLoop)
+            _spawn(AutoTotemLoop)
         end
     end))
 end)
