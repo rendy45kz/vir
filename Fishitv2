@@ -2677,7 +2677,13 @@ end)
 -- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
 ----------------------------------------------------------------
 
+----------------------------------------------------------------
+-- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
+----------------------------------------------------------------
+
+-- folder definisi totem
 local TotemFolder  = ReplicatedStorage:WaitForChild("Totems")
+-- remote spawn totem
 local SpawnTotemRE = net:WaitForChild("RE/SpawnTotem")
 
 -- definisi dasar totem
@@ -2840,10 +2846,15 @@ local function SpawnTotem9xType(totemKey)
     end
 end
 
-
 ----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM)
 ----------------------------------------------------------------
+local TotemConfig = {
+    SelectedKey = "Luck",
+    AutoSpawn   = false,
+    Interval    = 3600, -- 1 jam (detik)
+}
+
 local autoTotemLoopRunning = false
 
 local function AutoTotemLoop()
@@ -2918,6 +2929,7 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
         end
     end))
 end)
+
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
@@ -3881,3 +3893,4 @@ TabMisc:Toggle("Enable Stats Overlay", function(v)
         end
     end
 end)
+
