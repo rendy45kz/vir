@@ -2672,13 +2672,12 @@ local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", fun
     end))
 end) 
 
+
 ----------------------------------------------------------------
 -- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
 ----------------------------------------------------------------
 
--- folder definisi totem
 local TotemFolder  = ReplicatedStorage:WaitForChild("Totems")
--- remote spawn totem
 local SpawnTotemRE = net:WaitForChild("RE/SpawnTotem")
 
 -- definisi dasar totem
@@ -2807,11 +2806,10 @@ local function GetTotemCount()
     return count, byType
 end
 
-
 ----------------------------------------------------------------
--- SPAWN 1x TOTEM DARI STOK PLAYER (versi stabil: sama seperti yang 9x, tapi 1x)
+-- SPAWN 9x TOTEM DARI STOK PLAYER
 ----------------------------------------------------------------
-local function SpawnTotem9xType(totemKey)
+local function SpawnTotem(totemKey)
     local counts, byType = GetTotemCount()
     local def = TotemDefs[totemKey]
     local needName = def and def.Name or totemKey
@@ -2822,30 +2820,25 @@ local function SpawnTotem9xType(totemKey)
         return
     end
 
-    -- spawn cuma 1x
     local remaining = 1
     for _, item in ipairs(byType[totemKey] or {}) do
         if remaining <= 0 then break end
-
         local uuid = item.UUID
         if uuid then
-            pcall(function()
-                SpawnTotemRE:FireServer(uuid)
-            end)
-            task.wait(1)
+            local amt = item.Amount or item.Quantity or item.Count or remaining
+            local use = math.min(amt, remaining)
 
-            -- setelah spawn, equip slot 1
-            pcall(function()
-                if Events and Events.equipHotbar then
-                    Events.equipHotbar:FireServer(1)
-                end
-            end)
+            for i = 1, use do
+                pcall(function()
+                    SpawnTotemRE:FireServer(uuid)
+                end)
+                task.wait(0.1)
+            end
 
-            remaining -= 1
+            remaining -= use
         end
     end
 end
-
 
 ----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM)
@@ -2863,10 +2856,9 @@ local function AutoTotemLoop()
     autoTotemLoopRunning = true
 
     while TotemConfig.AutoSpawn do
-        -- spawn 1x dari jenis yang dipilih
+        
         SpawnTotem9xType(TotemConfig.SelectedKey)
-
-        -- tunggu 1 jam (bisa di-off dari toggle)
+        
         local t = 0
         local interval = TotemConfig.Interval or 3600
         while TotemConfig.AutoSpawn and t < interval do
@@ -2882,7 +2874,7 @@ end
 ----------------------------------------------------------------
 -- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
 ----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
+local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
     -- live label stok
     add(farmUI:LiveLabel(function()
@@ -2918,16 +2910,11 @@ local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", fun
         end
     end))
 
--- tombol spawn manual sekali
-add(farmUI:Button("Spawn Totem Manual", function()
-    SpawnTotem9xType(TotemConfig.SelectedKey)
-end))
-
-
-    
+    -- tombol spawn manual sekali (9x)
+    add(    add(farmUI:Button("Spawn ", function()         SpawnTotem(TotemConfig.SelectedKey)))
 
     -- toggle auto spawn 9x per 1 jam
-    add(farmUI:Toggle("Auto Spawn Totem", function(state)
+    add(farmUI:Toggle("Enable Auto Spawn 9x (per 1 jam)", function(state)
         TotemConfig.AutoSpawn = state and true or false
         if state then
             task.spawn(AutoTotemLoop)
@@ -2936,16 +2923,14 @@ end))
 end)
 
 
+
 ------------------------------------------------
 -- AUTO ENCHANT (Collapse Group)
 ------------------------------------------------
-local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, group)
-
-    ------------------------------------------------
+local enchantGroup = farmU        add(farmUI:Button("Spawn Totem Manual", function()armUI:Button("Spawn Totem Manual", function()---------
     -- LIVE INFO ROD
-    ------------------------------------------------
-    add(farmUI:LiveLabel(function()
-        local r =
+    --------------------
+    add(farmUI:Toggle("Auto Spawn Totem", function(state)    local r =
             (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
             or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
             or nil
@@ -2970,8 +2955,7 @@ local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, gr
         local ok, list = pcall(function()
             return Enchant:GetListEnchant()
         end)
-        if ok and type(list) == "table" then
-            enchantNames = list
+              enchantNames = list
         end
     end
 
