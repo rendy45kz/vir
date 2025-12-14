@@ -2863,56 +2863,121 @@ end
 ----------------------------------------------------------------
 -- CONFIG AUTO TOTEM (PER 1 JAM)
 ----------------------------------------------------------------
+----------------------------------------------------------------
+-- AUTO SPAWN TOTEM (1x / jam + countdown)
+-- REQUIRE: GetTotemCount(), SpawnTotemRE, Events, _wait, _spawn
+----------------------------------------------------------------
+
 local TotemConfig = {
     SelectedKey = "Luck",
     AutoSpawn   = false,
-    Interval    = 3600, -- 1 jam (detik)
+    Interval    = 3600, -- 1 jam
 }
 
 local autoTotemLoopRunning = false
+local nextSpawnAt = 0
+
+local function fmtTimeLeft(sec)
+    sec = math.max(0, math.floor(sec or 0))
+    local h = math.floor(sec / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    local s = sec % 60
+    if h > 0 then
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+    return string.format("%02d:%02d", m, s)
+end
+
+-- spawn 1x saja (ambil 1 UUID pertama yang valid)
+local function SpawnTotemOnce(totemKey)
+    local counts, byType = GetTotemCount()
+    local total = (counts and counts[totemKey]) or 0
+    if total < 1 then
+        return false
+    end
+
+    local list = (byType and byType[totemKey]) or {}
+    for _, item in ipairs(list) do
+        local uuid = item and item.UUID
+        if uuid then
+            local ok = pcall(function()
+                SpawnTotemRE:FireServer(uuid)
+            end)
+
+            _wait(0.15)
+
+            pcall(function()
+                if Events and Events.equipHotbar then
+                    Events.equipHotbar:FireServer(1)
+                end
+            end)
+
+            return ok and true or false
+        end
+    end
+
+    return false
+end
 
 local function AutoTotemLoop()
     if autoTotemLoopRunning then return end
     autoTotemLoopRunning = true
 
-    while TotemConfig.AutoSpawn do
-        -- spawn 1x (9 totem) dari jenis yang dipilih
-        SpawnTotem9xType(TotemConfig.SelectedKey)
+    -- biar langsung spawn saat ON
+    nextSpawnAt = 0
 
-        -- tunggu 1 jam (bisa di-off dari toggle)
-        local t = 0
-        local interval = TotemConfig.Interval or 3600
-        while TotemConfig.AutoSpawn and t < interval do
-            _wait(1)
-            t += 1
+    while TotemConfig.AutoSpawn do
+        if nextSpawnAt <= 0 then
+            -- coba spawn sekarang
+            local spawned = SpawnTotemOnce(TotemConfig.SelectedKey)
+
+            -- kalau spawn berhasil, mulai cooldown 1 jam
+            -- kalau gagal (stok 0 / uuid ga ketemu), retry tiap 5 detik supaya nggak berat
+            if spawned then
+                nextSpawnAt = tick() + (TotemConfig.Interval or 3600)
+            else
+                nextSpawnAt = tick() + 5
+            end
+        end
+
+        -- tunggu sampai jadwal berikutnya
+        while TotemConfig.AutoSpawn and tick() < nextSpawnAt do
+            _wait(0.25)
+        end
+
+        -- reset agar loop melakukan spawn lagi
+        if TotemConfig.AutoSpawn then
+            nextSpawnAt = 0
         end
     end
 
     autoTotemLoopRunning = false
+    nextSpawnAt = 0
 end
 
 ----------------------------------------------------------------
--- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
+-- UI: FARM TAB – COLLAPSE GROUP
 ----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
+farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
-    -- live label stok
     add(farmUI:LiveLabel(function()
         local counts = select(1, GetTotemCount())
-        local l = counts.Luck     or 0
-        local m = counts.Mutation or 0
-        local s = counts.Shiny    or 0
+        local l = (counts and counts.Luck) or 0
+        local m = (counts and counts.Mutation) or 0
+        local s = (counts and counts.Shiny) or 0
+
+        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
+        local leftStr = "--:--"
+        if TotemConfig.AutoSpawn and nextSpawnAt > 0 then
+            leftStr = fmtTimeLeft(nextSpawnAt - tick())
+        end
 
         return string.format(
-            "Totem owned:\n" ..
-            "Luck Totem     : %d\n" ..
-            "Mutation Totem : %d\n" ..
-            "Shiny Totem    : %d",
-            l, m, s
+            "Auto: %s\nNext spawn in: %s\n\nTotem owned:\nLuck Totem     : %d\nMutation Totem : %d\nShiny Totem    : %d",
+            status, leftStr, l, m, s
         )
-    end, 1.0))
+    end, 0.25))
 
-    -- dropdown pilih jenis totem
     local keyByLabel = {
         ["Luck Totem"]     = "Luck",
         ["Mutation Totem"] = "Mutation",
@@ -2927,24 +2992,23 @@ local totemGroup = farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, 
         local key = keyByLabel[label]
         if key then
             TotemConfig.SelectedKey = key
+            -- reset timer biar ganti pilihan langsung kepake pas ON
+            if TotemConfig.AutoSpawn then
+                nextSpawnAt = 0
+            end
         end
     end))
 
-    -- tombol spawn manual sekali (9x)
-    add(farmUI:Button("Spawn Now", function()
-        SpawnTotem9xType(TotemConfig.SelectedKey)
-    end))
-
-    -- toggle auto spawn 9x per 1 jam
-    add(farmUI:Toggle("Enable Auto Spawn Totem", function(state)
+    add(farmUI:Toggle("Enable Auto Spawn Totem (1x / jam)", function(state)
         TotemConfig.AutoSpawn = state and true or false
-        if state then
+        nextSpawnAt = 0
+
+        if TotemConfig.AutoSpawn then
             _spawn(AutoTotemLoop)
         end
     end))
+
 end)
-
-
 
 
 ------------------------------------------------
@@ -3618,277 +3682,243 @@ end)
 local TabMisc = win:CreateTab("Misc")
 
 ----------------------------------------------------------------
--- CAMERA TAB (Observer + Infinite Zoom + FOV) - CLEAN/STABLE
+-- CAMERA TOOLS (Observer + Infinite Zoom + FOV) - CLEAN
 ----------------------------------------------------------------
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-----------------------------------------------------------------
--- STATE
-----------------------------------------------------------------
-local CameraState = {
-    Mode = "Normal",          -- "Normal" | "Observer"
-    TargetName = "None",
+local CameraConfig = {
+    ObserverEnabled = false,
+    TargetName = "",
+    InfiniteZoom = false,
+    MaxZoom = 5000,      -- kamu bisa ubah
+    MinZoom = 0.5,       -- kamu bisa ubah
+    DefaultFOV = 70,
+    CustomFOVEnabled = false,
+    CustomFOV = 70,
 }
 
-local SavedCam = {
+local camConn -- RenderStepped connection untuk observer
+
+-- simpan state kamera asli biar stop observer balik normal
+local camBackup = {
+    Saved = false,
     CameraType = nil,
     CameraSubject = nil,
     CFrame = nil,
     FOV = nil,
-    MouseBehavior = nil,
-    MouseIconEnabled = nil,
+    MinZoom = nil,
+    MaxZoom = nil,
 }
 
-local observerConn = nil
-local observedPlayer = nil
+local function backupCameraOnce()
+    if camBackup.Saved then return end
+    camBackup.Saved = true
 
-local InfiniteCam = {
-    Enabled = false,
-    MaxZoom = 999999,
-    MinZoom = 0.5,
-    FOV = 70,
-    SavedMaxZoom = nil,
-    SavedMinZoom = nil,
-    SavedFOV = nil,
-}
+    camBackup.CameraType = Camera.CameraType
+    camBackup.CameraSubject = Camera.CameraSubject
+    camBackup.CFrame = Camera.CFrame
+    camBackup.FOV = Camera.FieldOfView
 
-----------------------------------------------------------------
--- HELPERS
-----------------------------------------------------------------
-local function getCamera()
-    return workspace.CurrentCamera
-end
-
-local function getLocalHumanoid()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChildOfClass("Humanoid")
-end
-
-local function buildPlayerList()
-    local list = {}
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer then
-            table.insert(list, plr.Name)
-        end
-    end
-    table.sort(list)
-    if #list == 0 then
-        list[1] = "(No other players)"
-    end
-    return list
-end
-
-local function saveCameraState()
-    local cam = getCamera()
-    if not cam then return end
-
-    SavedCam.CameraType = cam.CameraType
-    SavedCam.CameraSubject = cam.CameraSubject
-    SavedCam.CFrame = cam.CFrame
-    SavedCam.FOV = cam.FieldOfView
-
-    SavedCam.MouseBehavior = UserInputService.MouseBehavior
-    SavedCam.MouseIconEnabled = UserInputService.MouseIconEnabled
-end
-
-local function restoreCameraState()
-    local cam = getCamera()
-    if not cam then return end
-
-    -- restore base cam props
-    if SavedCam.CameraType then cam.CameraType = SavedCam.CameraType end
-    if SavedCam.CFrame then cam.CFrame = SavedCam.CFrame end
-    if SavedCam.FOV then cam.FieldOfView = SavedCam.FOV end
-
-    -- paksa balik ke humanoid local (ini yang bikin stop observer bener-bener balik)
-    local hum = getLocalHumanoid()
-    if hum then
-        cam.CameraSubject = hum
-    else
-        cam.CameraSubject = SavedCam.CameraSubject
-    end
-
-    if SavedCam.MouseBehavior ~= nil then UserInputService.MouseBehavior = SavedCam.MouseBehavior end
-    if SavedCam.MouseIconEnabled ~= nil then UserInputService.MouseIconEnabled = SavedCam.MouseIconEnabled end
-
-    CameraState.Mode = "Normal"
-    CameraState.TargetName = "None"
-end
-
-----------------------------------------------------------------
--- OBSERVER
-----------------------------------------------------------------
-local function stopObserver()
-    if observerConn then
-        observerConn:Disconnect()
-        observerConn = nil
-    end
-
-    observedPlayer = nil
-    CameraState.Mode = "Normal"
-    CameraState.TargetName = "None"
-
-    _wait() -- 1 frame biar ga “ketarik balik” oleh conn lama
-    restoreCameraState()
-end
-
-local function startObserver(plr)
-    if not plr or plr == LocalPlayer then return end
-
-    -- kill old observer cleanly
-    if observerConn then
-        stopObserver()
-    end
-
-    local cam = getCamera()
-    if not cam then return end
-
-    saveCameraState()
-
-    observedPlayer = plr
-    CameraState.Mode = "Observer"
-    CameraState.TargetName = plr.Name
-
-    -- observer = camera normal yang follow target (tanpa lock input aneh di android)
-    cam.CameraType = Enum.CameraType.Scriptable
-
-    observerConn = RunService.RenderStepped:Connect(function()
-        if not observedPlayer then return end
-
-        local char = observedPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local head = char and char:FindFirstChild("Head")
-
-        if not (hrp or head) then return end
-
-        -- posisi kamera di belakang/atas target (smooth simple)
-        local focusPart = head or hrp
-        local pos = focusPart.Position
-        local backOffset = (focusPart.CFrame.LookVector * -10)
-        local upOffset = Vector3.new(0, 4, 0)
-
-        local camPos = pos + backOffset + upOffset
-        cam.CFrame = CFrame.new(camPos, pos + Vector3.new(0, 2, 0))
+    pcall(function()
+        camBackup.MinZoom = LocalPlayer.CameraMinZoomDistance
+        camBackup.MaxZoom = LocalPlayer.CameraMaxZoomDistance
     end)
 end
 
-----------------------------------------------------------------
--- INFINITE CAMERA (NORMAL DRAG) + FOV
-----------------------------------------------------------------
-local function setInfiniteCamera(state)
-    local cam = getCamera()
-    if not cam then return end
+local function restoreCamera()
+    if camConn then
+        camConn:Disconnect()
+        camConn = nil
+    end
 
-    if state then
-        if InfiniteCam.Enabled then return end
-        InfiniteCam.Enabled = true
+    CameraConfig.ObserverEnabled = false
 
-        InfiniteCam.SavedMaxZoom = LocalPlayer.CameraMaxZoomDistance
-        InfiniteCam.SavedMinZoom = LocalPlayer.CameraMinZoomDistance
-        InfiniteCam.SavedFOV = cam.FieldOfView
+    if camBackup.Saved then
+        pcall(function()
+            Camera.CameraType = camBackup.CameraType or Enum.CameraType.Custom
+            Camera.CameraSubject = camBackup.CameraSubject
+            Camera.CFrame = camBackup.CFrame or Camera.CFrame
+            Camera.FieldOfView = camBackup.FOV or 70
+        end)
 
-        LocalPlayer.CameraMaxZoomDistance = InfiniteCam.MaxZoom
-        LocalPlayer.CameraMinZoomDistance = InfiniteCam.MinZoom
-        cam.FieldOfView = InfiniteCam.FOV
+        pcall(function()
+            if camBackup.MinZoom then LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom end
+            if camBackup.MaxZoom then LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom end
+        end)
     else
-        if not InfiniteCam.Enabled then return end
-        InfiniteCam.Enabled = false
-
-        if InfiniteCam.SavedMaxZoom then LocalPlayer.CameraMaxZoomDistance = InfiniteCam.SavedMaxZoom end
-        if InfiniteCam.SavedMinZoom then LocalPlayer.CameraMinZoomDistance = InfiniteCam.SavedMinZoom end
-        if InfiniteCam.SavedFOV then cam.FieldOfView = InfiniteCam.SavedFOV end
+        -- fallback aman
+        pcall(function()
+            Camera.CameraType = Enum.CameraType.Custom
+            Camera.FieldOfView = 70
+        end)
     end
 end
 
-local function fmtTime(sec)
-    sec = math.max(0, math.floor(sec or 0))
-    local h = math.floor(sec / 3600)
-    local m = math.floor((sec % 3600) / 60)
-    local s = sec % 60
-    if h > 0 then
-        return string.format("%02d:%02d:%02d", h, m, s)
+local function getCharacterSubject(plr)
+    if not plr then return nil end
+    local ch = plr.Character
+    if not ch then return nil end
+    return ch:FindFirstChildOfClass("Humanoid") or ch:FindFirstChild("HumanoidRootPart")
+end
+
+local function startObserver(targetPlayer)
+    if not targetPlayer then return false end
+
+    backupCameraOnce()
+
+    -- paksa camera mode yang stabil buat observe
+    pcall(function()
+        Camera.CameraType = Enum.CameraType.Scriptable
+    end)
+
+    local subject = getCharacterSubject(targetPlayer)
+    if not subject then return false end
+
+    -- follow target dengan RenderStepped (ringan)
+    if camConn then camConn:Disconnect() camConn = nil end
+    camConn = RunService.RenderStepped:Connect(function()
+        local subj = getCharacterSubject(targetPlayer)
+        if not subj then return end
+
+        local hrp = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            -- posisi kamera di belakang+atas target
+            local cf = hrp.CFrame
+            Camera.CFrame = cf * CFrame.new(0, 6, 14) * CFrame.Angles(0, math.rad(180), 0)
+        else
+            -- fallback: tetap coba pakai subject
+            pcall(function()
+                Camera.CameraSubject = subj
+            end)
+        end
+
+        -- apply FOV kalau custom aktif
+        if CameraConfig.CustomFOVEnabled then
+            Camera.FieldOfView = CameraConfig.CustomFOV
+        end
+    end)
+
+    return true
+end
+
+local function applyInfiniteZoom(state)
+    CameraConfig.InfiniteZoom = state and true or false
+
+    -- kalau observer jalan, jangan ganggu mode scriptable-nya
+    pcall(function()
+        if CameraConfig.InfiniteZoom then
+            LocalPlayer.CameraMinZoomDistance = CameraConfig.MinZoom
+            LocalPlayer.CameraMaxZoomDistance = CameraConfig.MaxZoom
+        else
+            -- restore zoom dari backup kalau ada, kalau tidak pakai default Roblox
+            if camBackup.Saved and camBackup.MinZoom and camBackup.MaxZoom then
+                LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom
+                LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom
+            else
+                LocalPlayer.CameraMinZoomDistance = 0.5
+                LocalPlayer.CameraMaxZoomDistance = 128
+            end
+        end
+    end)
+end
+
+local function applyFOV()
+    if CameraConfig.CustomFOVEnabled then
+        pcall(function()
+            Camera.FieldOfView = CameraConfig.CustomFOV
+        end)
+    else
+        -- balik normal (pakai backup kalau ada)
+        pcall(function()
+            Camera.FieldOfView = (camBackup.Saved and camBackup.FOV) or CameraConfig.DefaultFOV
+        end)
     end
-    return string.format("%02d:%02d", m, s)
 end
 
 ----------------------------------------------------------------
--- UI TAB
+-- UI: CAMERA TAB (pakai farmUI agar cocok dengan GUI kamu)
 ----------------------------------------------------------------
--- kalau tab kamu namanya beda, ganti TabMisc -> tab kamu
--- contoh: local TabMisc = Window:Tab("Misc")
+farmUI:CreateCollapseGroup("Camera Tools", function(add, group)
 
-local CamCfg = {
-    SelectedPlayerName = nil,
-}
+    add(farmUI:LiveLabel(function()
+        local obs = CameraConfig.ObserverEnabled and "ON" or "OFF"
+        local inf = CameraConfig.InfiniteZoom and "ON" or "OFF"
+        local fov = CameraConfig.CustomFOVEnabled and tostring(CameraConfig.CustomFOV) or "DEFAULT"
 
-local cameraGroup = TabMisc:CreateCollapseGroup("Camera Tools", function(add, group)
-
-    add(TabMisc:LiveLabel(function()
-        local cam = getCamera()
-        local fov = cam and cam.FieldOfView or 0
-        local mode = CameraState.Mode
-        local target = CameraState.TargetName
-        local inf = InfiniteCam.Enabled and "ON" or "OFF"
+        local tname = (CameraConfig.TargetName ~= "" and CameraConfig.TargetName) or "None"
 
         return string.format(
-            "Mode: %s\nTarget: %s\nInfinite Zoom: %s\nFOV: %d",
-            mode, target, inf, math.floor(fov)
+            "Observer: %s\nTarget: %s\nInfinite Zoom: %s\nFOV: %s",
+            obs, tname, inf, fov
         )
     end, 0.25))
 
-    add(TabMisc:Dropdown("Observer Target", buildPlayerList(), function(name)
-        CamCfg.SelectedPlayerName = name
+    add(farmUI:Box("Observer Target (player name)", function(txt)
+        CameraConfig.TargetName = tostring(txt or "")
     end))
 
-    add(TabMisc:Button("Start Observer", function()
-        if not CamCfg.SelectedPlayerName or CamCfg.SelectedPlayerName == "(No other players)" then return end
-        local plr = Players:FindFirstChild(CamCfg.SelectedPlayerName)
-        if plr then
-            startObserver(plr)
+    add(farmUI:Toggle("Enable Observer Camera", function(state)
+        if not state then
+            restoreCamera()
+            return
+        end
+
+        CameraConfig.ObserverEnabled = true
+
+        local target = Players:FindFirstChild(CameraConfig.TargetName)
+        if not target or target == LocalPlayer then
+            -- kalau invalid, langsung stop biar nggak nyangkut
+            restoreCamera()
+            return
+        end
+
+        local ok = startObserver(target)
+        if not ok then
+            restoreCamera()
         end
     end))
 
-    add(TabMisc:Button("Stop Observer", function()
-        stopObserver()
+    add(farmUI:Button("Stop Observer (Restore Camera)", function()
+        restoreCamera()
     end))
 
-    add(TabMisc:Toggle("Enable Infinite Camera (Normal)", function(state)
-        setInfiniteCamera(state and true or false)
+    add(farmUI:Label(" "))
+
+    add(farmUI:Toggle("Enable Infinite Zoom", function(state)
+        backupCameraOnce()
+        applyInfiniteZoom(state)
     end))
 
-    add(TabMisc:Box("Set FOV (40-520)", function(txt)
+    add(farmUI:Box("Max Zoom Distance (e.g. 5000)", function(txt)
         local n = tonumber(txt)
-        if not n then return end
-        n = math.clamp(math.floor(n), 40, 520)
-        InfiniteCam.FOV = n
-
-        -- apply langsung kalau infinite aktif
-        if InfiniteCam.Enabled then
-            local cam = getCamera()
-            if cam then cam.FieldOfView = n end
+        if n and n > 50 then
+            CameraConfig.MaxZoom = n
+            if CameraConfig.InfiniteZoom then
+                applyInfiniteZoom(true)
+            end
         end
     end))
 
-    add(TabMisc:Button("Reset Camera (Back To You)", function()
-        stopObserver()
-        setInfiniteCamera(false)
-        restoreCameraState()
+    add(farmUI:Toggle("Enable Custom FOV", function(state)
+        backupCameraOnce()
+        CameraConfig.CustomFOVEnabled = state and true or false
+        applyFOV()
     end))
-end)
 
-----------------------------------------------------------------
--- SAFETY: kalau character respawn, pastikan observer stop biar ga nyangkut
-----------------------------------------------------------------
-LocalPlayer.CharacterAdded:Connect(function()
-    _wait(0.25)
-    if CameraState.Mode == "Observer" then
-        stopObserver()
-    end
+    add(farmUI:Box("FOV (e.g. 70 - 120)", function(txt)
+        local n = tonumber(txt)
+        if n and n >= 40 and n <= 120 then
+            CameraConfig.CustomFOV = n
+            if CameraConfig.CustomFOVEnabled then
+                applyFOV()
+            end
+        end
+    end))
+
 end)
 
 
