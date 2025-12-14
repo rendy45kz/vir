@@ -417,155 +417,111 @@ function library:CreateWindow(title)
             }
         end
 
+        ------------------------------------------------
+        -- Toggle
+        ------------------------------------------------
+        ------------------------------------------------
+-- Toggle (dengan indikator ON / OFF yang jelas)
+------------------------------------------------
 function api:Toggle(text, callback, opts)
-	callback = callback or function() end
-	opts = opts or {}
+    callback = callback or function() end
+    opts = opts or {}
 
-	local UIS = game:GetService("UserInputService")
-	local RunService = game:GetService("RunService")
+    local fr = Instance.new("Frame")
+    fr.Parent = page
+    fr.Size = UDim2.new(1, -4, 0, 30)
+    applyCard(fr, theme.card, opts.borderColor)
 
-	local fr = Instance.new("Frame")
-	fr.Parent = page
-	fr.Size = UDim2.new(1, -4, 0, 30)
-	applyCard(fr, theme.card, opts.borderColor)
+    -- label kiri
+    local lbl = Instance.new("TextLabel")
+    lbl.Parent = fr
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.new(0, 8, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 12
+    lbl.TextColor3 = theme.text
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Text = text or ""
 
-	-- label kiri
-	local lbl = Instance.new("TextLabel")
-	lbl.Parent = fr
-	lbl.Size = UDim2.new(1, -80, 1, 0)
-	lbl.Position = UDim2.new(0, 8, 0, 0)
-	lbl.BackgroundTransparency = 1
-	lbl.Font = Enum.Font.Gotham
-	lbl.TextSize = 12
-	lbl.TextColor3 = theme.text
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.Text = text or ""
+    -- container switch kanan
+    local btn = Instance.new("Frame")
+    btn.Parent = fr
+    btn.Size = UDim2.new(0, 60, 0, 18)
+    btn.Position = UDim2.new(1, -70, 0.5, -9)
+    btn.BackgroundColor3 = theme.bg
+    btn.BorderSizePixel = 0
+    local btnCorner = Instance.new("UICorner", btn)
+    btnCorner.CornerRadius = UDim.new(1, 0)
+    applyStroke(btn, theme.borderSoft)
 
-	-- container switch
-	local btn = Instance.new("Frame")
-	btn.Parent = fr
-	btn.Size = UDim2.new(0, 60, 0, 18)
-	btn.Position = UDim2.new(1, -70, 0.5, -9)
-	btn.BackgroundColor3 = theme.bg
-	btn.BorderSizePixel = 0
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-	applyStroke(btn, theme.borderSoft)
+    -- "slider" kecil di dalam pill
+    local fill = Instance.new("Frame")
+    fill.Parent = btn
+    fill.Size = UDim2.new(0.45, 0, 1, 0)
+    fill.Position = UDim2.new(0, 0, 0, 0)
+    fill.BackgroundColor3 = theme.borderSoft
+    fill.BorderSizePixel = 0
+    local fillCorner = Instance.new("UICorner", fill)
+    fillCorner.CornerRadius = UDim.new(1, 0)
 
-	-- slider
-	local fill = Instance.new("Frame")
-	fill.Parent = btn
-	fill.Size = UDim2.new(0.45, 0, 1, 0)
-	fill.Position = UDim2.new(0, 0, 0, 0)
-	fill.BackgroundColor3 = theme.borderSoft
-	fill.BorderSizePixel = 0
-	Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+    -- teks ON / OFF di pill
+    local stateLabel = Instance.new("TextLabel")
+    stateLabel.Parent = btn
+    stateLabel.Size = UDim2.new(1, 0, 1, 0)
+    stateLabel.BackgroundTransparency = 1
+    stateLabel.Font = Enum.Font.GothamBold
+    stateLabel.TextSize = 11
+    stateLabel.TextXAlignment = Enum.TextXAlignment.Center
 
-	-- ON / OFF text
-	local stateLabel = Instance.new("TextLabel")
-	stateLabel.Parent = btn
-	stateLabel.Size = UDim2.new(1, 0, 1, 0)
-	stateLabel.BackgroundTransparency = 1
-	stateLabel.Font = Enum.Font.GothamBold
-	stateLabel.TextSize = 11
+    -- area klik full baris
+    local click = Instance.new("TextButton")
+    click.Parent = fr
+    click.Size = UDim2.new(1, 0, 1, 0)
+    click.BackgroundTransparency = 1
+    click.Text = ""
 
-	-- click overlay
-	local click = Instance.new("TextButton")
-	click.Parent = fr
-	click.Size = UDim2.new(1, 0, 1, 0)
-	click.BackgroundTransparency = 1
-	click.Text = ""
+    local state = false
 
-	--------------------------------------------------
-	-- STATE
-	--------------------------------------------------
-	local state = false
-	local dragging = false
-	local dragConn
+    local function apply()
+        if state then
+            -- ON
+            tween(btn, 0.12, {BackgroundColor3 = theme.accent})
+            tween(fill, 0.12, {
+                Position = UDim2.new(0.55, 0, 0, 0),
+                BackgroundColor3 = theme.success,
+            })
+            stateLabel.Text = "ON"
+            stateLabel.TextColor3 = theme.bg
+        else
+            -- OFF
+            tween(btn, 0.12, {BackgroundColor3 = theme.bg})
+            tween(fill, 0.12, {
+                Position = UDim2.new(0, 0, 0, 0),
+                BackgroundColor3 = theme.borderSoft,
+            })
+            stateLabel.Text = "OFF"
+            stateLabel.TextColor3 = theme.subText
+        end
 
-	local function apply(instant)
-		local t = instant and 0 or 0.12
+        -- callback ke user
+        callback(state)
+    end
 
-		if state then
-			tween(btn, t, { BackgroundColor3 = theme.accent })
-			tween(fill, t, {
-				Position = UDim2.new(0.55, 0, 0, 0),
-				BackgroundColor3 = theme.success
-			})
-			stateLabel.Text = "ON"
-			stateLabel.TextColor3 = theme.bg
-		else
-			tween(btn, t, { BackgroundColor3 = theme.bg })
-			tween(fill, t, {
-				Position = UDim2.new(0, 0, 0, 0),
-				BackgroundColor3 = theme.borderSoft
-			})
-			stateLabel.Text = "OFF"
-			stateLabel.TextColor3 = theme.subText
-		end
+    click.MouseButton1Click:Connect(function()
+        state = not state
+        apply()
+    end)
 
-		callback(state)
-	end
-
-	--------------------------------------------------
-	-- DRAG LOGIC
-	--------------------------------------------------
-	local function updateDrag(x)
-		local btnAbsX = btn.AbsolutePosition.X
-		local btnW = btn.AbsoluteSize.X
-		local fillW = fill.AbsoluteSize.X
-
-		local pos = math.clamp(x - btnAbsX - fillW / 2, 0, btnW - fillW)
-		local alpha = pos / (btnW - fillW)
-
-		fill.Position = UDim2.fromScale(alpha, 0)
-
-		state = alpha >= 0.5
-	end
-
-	fill.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = true
-
-			dragConn = RunService.RenderStepped:Connect(function()
-				if dragging then
-					updateDrag(UIS:GetMouseLocation().X)
-				end
-			end)
-		end
-	end)
-
-	UIS.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 and dragging then
-			dragging = false
-			if dragConn then
-				dragConn:Disconnect()
-				dragConn = nil
-			end
-			apply()
-		end
-	end)
-
-	--------------------------------------------------
-	-- CLICK TOGGLE
-	--------------------------------------------------
-	click.MouseButton1Click:Connect(function()
-		if dragging then return end
-		state = not state
-		apply()
-	end)
-
-	-- initial
-	apply(true)
-
-	return {
-		Set = function(_, v)
-			state = v and true or false
-			apply()
-		end,
-		Object = fr,
-	}
+    -- API ke luar
+    return {
+        Set = function(_, v)
+            state = v and true or false
+            apply()
+        end,
+        Object = fr,
+    }
 end
-
 
 
         ------------------------------------------------
@@ -4505,4 +4461,5 @@ TabMisc:Toggle("Enable Stats Overlay", function(v)
         end
     end
 end)
+
 
