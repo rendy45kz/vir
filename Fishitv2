@@ -3618,274 +3618,278 @@ end)
 local TabMisc = win:CreateTab("Misc")
 
 ----------------------------------------------------------------
--- CAMERA TOOLS (Observer + Freecam/Infinite) - DELTA SAFE
+-- CAMERA TAB (Observer + Infinite Zoom + FOV) - CLEAN/STABLE
 ----------------------------------------------------------------
-do
-    local Players = game:GetService("Players")
-    local UserInputService = game:GetService("UserInputService")
-    local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
-    local LocalPlayer = Players.LocalPlayer
-    local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
 
-    local CamState = {
-        Mode = "Normal", -- "Normal" | "Observer" | "Freecam"
-        TargetName = "None",
-        LockPart = "HumanoidRootPart", -- "HumanoidRootPart" / "Head"
-    }
+----------------------------------------------------------------
+-- STATE
+----------------------------------------------------------------
+local CameraState = {
+    Mode = "Normal",          -- "Normal" | "Observer"
+    TargetName = "None",
+}
 
-    local Saved = {
-        CameraType = nil,
-        CameraSubject = nil,
-        CFrame = nil,
-        FOV = nil,
-        MouseBehavior = nil,
-        MouseIconEnabled = nil,
-    }
+local SavedCam = {
+    CameraType = nil,
+    CameraSubject = nil,
+    CFrame = nil,
+    FOV = nil,
+    MouseBehavior = nil,
+    MouseIconEnabled = nil,
+}
 
-    local function saveCamera()
-        Camera = workspace.CurrentCamera
-        Saved.CameraType = Camera.CameraType
-        Saved.CameraSubject = Camera.CameraSubject
-        Saved.CFrame = Camera.CFrame
-        Saved.FOV = Camera.FieldOfView
-        Saved.MouseBehavior = UserInputService.MouseBehavior
-        Saved.MouseIconEnabled = UserInputService.MouseIconEnabled
-    end
+local observerConn = nil
+local observedPlayer = nil
 
-    local function restoreCamera()
-        Camera = workspace.CurrentCamera
-        if Saved.CameraType then Camera.CameraType = Saved.CameraType end
-        if Saved.CameraSubject then Camera.CameraSubject = Saved.CameraSubject end
-        if Saved.CFrame then Camera.CFrame = Saved.CFrame end
-        if Saved.FOV then Camera.FieldOfView = Saved.FOV end
+local InfiniteCam = {
+    Enabled = false,
+    MaxZoom = 999999,
+    MinZoom = 0.5,
+    FOV = 70,
+    SavedMaxZoom = nil,
+    SavedMinZoom = nil,
+    SavedFOV = nil,
+}
 
-        if Saved.MouseBehavior ~= nil then UserInputService.MouseBehavior = Saved.MouseBehavior end
-        if Saved.MouseIconEnabled ~= nil then UserInputService.MouseIconEnabled = Saved.MouseIconEnabled end
+----------------------------------------------------------------
+-- HELPERS
+----------------------------------------------------------------
+local function getCamera()
+    return workspace.CurrentCamera
+end
 
-        CamState.Mode = "Normal"
-        CamState.TargetName = "None"
-    end
+local function getLocalHumanoid()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
 
-    local function getTargetPart(plr)
-        if not plr then return nil end
-        local char = plr.Character
-        if not char then return nil end
-        return char:FindFirstChild(CamState.LockPart)
-            or char:FindFirstChild("HumanoidRootPart")
-            or char:FindFirstChild("Head")
-    end
-
-    ------------------------------------------------------------
-    -- OBSERVER / SPECTATE
-    ------------------------------------------------------------
-    local observerConn
-    local function stopObserver()
-        if observerConn then observerConn:Disconnect() observerConn = nil end
-        restoreCamera()
-    end
-
-    local function startObserver(plr)
-        if not plr or plr == LocalPlayer then return end
-        local part = getTargetPart(plr)
-        if not part then return end
-
-        saveCamera()
-        Camera = workspace.CurrentCamera
-        Camera.CameraType = Enum.CameraType.Custom
-
-        CamState.Mode = "Observer"
-        CamState.TargetName = plr.Name
-
-        if observerConn then observerConn:Disconnect() observerConn = nil end
-        observerConn = RunService.RenderStepped:Connect(function()
-            if CamState.Mode ~= "Observer" then return end
-            local target = Players:FindFirstChild(CamState.TargetName)
-            if not target then return end
-            local p = getTargetPart(target)
-            if not p then return end
-
-            local hum = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                Camera.CameraSubject = hum
-            else
-                local back = (p.CFrame * CFrame.new(0, 2, 8))
-                Camera.CFrame = CFrame.new(back.Position, p.Position)
-            end
-        end)
-    end
-
-    ------------------------------------------------------------
-    -- FREECAM / INFINITE CAMERA
-    ------------------------------------------------------------
-    local freecamConn1, freecamConn2
-    local freecamEnabled = false
-    local yaw, pitch = 0, 0
-
-    local function disconnectFreecam()
-        if freecamConn1 then freecamConn1:Disconnect() freecamConn1=nil end
-        if freecamConn2 then freecamConn2:Disconnect() freecamConn2=nil end
-    end
-
-    local function startFreecam()
-        saveCamera()
-        Camera = workspace.CurrentCamera
-        Camera.CameraType = Enum.CameraType.Scriptable
-
-        UserInputService.MouseIconEnabled = false
-        UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
-
-        freecamEnabled = true
-        CamState.Mode = "Freecam"
-        CamState.TargetName = "None"
-
-        local speedBase = 2.0
-        local rotSpeed = 0.0025
-
-        yaw = 0
-        pitch = 0
-
-        freecamConn1 = UserInputService.InputChanged:Connect(function(input)
-            if not freecamEnabled then return end
-            if input.UserInputType == Enum.UserInputType.MouseMovement then
-                yaw -= input.Delta.X * rotSpeed
-                pitch -= input.Delta.Y * rotSpeed
-                pitch = math.clamp(pitch, -1.45, 1.45)
-            end
-        end)
-
-        freecamConn2 = RunService.RenderStepped:Connect(function(dt)
-            if not freecamEnabled then return end
-
-            local cf = Camera.CFrame
-            local rot = CFrame.fromOrientation(pitch, yaw, 0)
-
-            local move = Vector3.zero
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += Vector3.new(0,0,-1) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then move += Vector3.new(0,0, 1) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then move += Vector3.new(-1,0,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Vector3.new( 1,0,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.E) then move += Vector3.new(0, 1,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Q) then move += Vector3.new(0,-1,0) end
-
-            local spd = speedBase
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                spd = speedBase * 4
-            end
-
-            if move.Magnitude > 0 then
-                move = move.Unit
-                local worldMove = (rot:VectorToWorldSpace(move))
-                Camera.CFrame = CFrame.new(cf.Position + (worldMove * spd * dt)) * rot
-            else
-                Camera.CFrame = CFrame.new(cf.Position) * rot
-            end
-        end)
-    end
-
-    local function stopFreecam()
-        freecamEnabled = false
-        disconnectFreecam()
-        restoreCamera()
-    end
-
-    ------------------------------------------------------------
-    -- UI HELPERS
-    ------------------------------------------------------------
-    local function buildPlayerList()
-        local names = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then
-                table.insert(names, p.Name)
-            end
+local function buildPlayerList()
+    local list = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(list, plr.Name)
         end
-        table.sort(names)
-        if #names == 0 then
-            names = {"(No other players)"}
-        end
-        return names
+    end
+    table.sort(list)
+    if #list == 0 then
+        list[1] = "(No other players)"
+    end
+    return list
+end
+
+local function saveCameraState()
+    local cam = getCamera()
+    if not cam then return end
+
+    SavedCam.CameraType = cam.CameraType
+    SavedCam.CameraSubject = cam.CameraSubject
+    SavedCam.CFrame = cam.CFrame
+    SavedCam.FOV = cam.FieldOfView
+
+    SavedCam.MouseBehavior = UserInputService.MouseBehavior
+    SavedCam.MouseIconEnabled = UserInputService.MouseIconEnabled
+end
+
+local function restoreCameraState()
+    local cam = getCamera()
+    if not cam then return end
+
+    -- restore base cam props
+    if SavedCam.CameraType then cam.CameraType = SavedCam.CameraType end
+    if SavedCam.CFrame then cam.CFrame = SavedCam.CFrame end
+    if SavedCam.FOV then cam.FieldOfView = SavedCam.FOV end
+
+    -- paksa balik ke humanoid local (ini yang bikin stop observer bener-bener balik)
+    local hum = getLocalHumanoid()
+    if hum then
+        cam.CameraSubject = hum
+    else
+        cam.CameraSubject = SavedCam.CameraSubject
     end
 
-    ------------------------------------------------------------
-    -- UI: TAB MISC – CAMERA GROUP (CLEAN)
-    ------------------------------------------------------------
-    local playerOptions = buildPlayerList()
-    local ddObserver
+    if SavedCam.MouseBehavior ~= nil then UserInputService.MouseBehavior = SavedCam.MouseBehavior end
+    if SavedCam.MouseIconEnabled ~= nil then UserInputService.MouseIconEnabled = SavedCam.MouseIconEnabled end
 
-    TabMisc:CreateCollapseGroup("Camera Tools", function(add, group)
-        add(TabMisc:LiveLabel(function()
-            return string.format(
-                "Mode: %s\nTarget: %s\nLockPart: %s\n\nFreecam:\nWASD/QE move\nSHIFT speed",
-                CamState.Mode,
-                CamState.TargetName,
-                CamState.LockPart
-            )
-        end, 0.25))
+    CameraState.Mode = "Normal"
+    CameraState.TargetName = "None"
+end
 
-        add(TabMisc:Dropdown("Lock Part", {"HumanoidRootPart","Head"}, function(v)
-            CamState.LockPart = v or "HumanoidRootPart"
-        end))
+----------------------------------------------------------------
+-- OBSERVER
+----------------------------------------------------------------
+local function stopObserver()
+    if observerConn then
+        observerConn:Disconnect()
+        observerConn = nil
+    end
 
-        ddObserver = TabMisc:Dropdown("Observer Target", playerOptions, function(name)
-            if not name or name == "(No other players)" then return end
-            local plr = Players:FindFirstChild(name)
-            if plr then startObserver(plr) end
-        end)
-        add(ddObserver)
+    observedPlayer = nil
+    CameraState.Mode = "Normal"
+    CameraState.TargetName = "None"
 
-        add(TabMisc:Button("Refresh Player List", function()
-            playerOptions = buildPlayerList()
-            if ddObserver and ddObserver.SetOptions then
-                ddObserver:SetOptions(playerOptions)
-            end
-        end))
+    _wait() -- 1 frame biar ga “ketarik balik” oleh conn lama
+    restoreCameraState()
+end
 
-        add(TabMisc:Toggle("Enable Observer", function(state)
-            if state then
-                if CamState.Mode == "Freecam" then stopFreecam() end
-                local list = buildPlayerList()
-                local first = list[1]
-                if first and first ~= "(No other players)" then
-                    local plr = Players:FindFirstChild(first)
-                    if plr then startObserver(plr) end
-                end
-            else
-                if CamState.Mode == "Observer" then
-                    stopObserver()
-                end
-            end
-        end))
+local function startObserver(plr)
+    if not plr or plr == LocalPlayer then return end
 
-        add(TabMisc:Toggle("Enable Freecam (Infinite)", function(state)
-            if state then
-                if CamState.Mode == "Observer" then stopObserver() end
-                startFreecam()
-            else
-                if CamState.Mode == "Freecam" then
-                    stopFreecam()
-                end
-            end
-        end))
+    -- kill old observer cleanly
+    if observerConn then
+        stopObserver()
+    end
 
-        add(TabMisc:Button("Reset Camera (Normal)", function()
-            stopObserver()
-            stopFreecam()
-            restoreCamera()
-        end))
-    end)
+    local cam = getCamera()
+    if not cam then return end
 
-    -- auto update list kalau ada player masuk/keluar
-    Players.PlayerAdded:Connect(function()
-        if ddObserver and ddObserver.SetOptions then
-            ddObserver:SetOptions(buildPlayerList())
-        end
-    end)
-    Players.PlayerRemoving:Connect(function()
-        if ddObserver and ddObserver.SetOptions then
-            ddObserver:SetOptions(buildPlayerList())
-        end
+    saveCameraState()
+
+    observedPlayer = plr
+    CameraState.Mode = "Observer"
+    CameraState.TargetName = plr.Name
+
+    -- observer = camera normal yang follow target (tanpa lock input aneh di android)
+    cam.CameraType = Enum.CameraType.Scriptable
+
+    observerConn = RunService.RenderStepped:Connect(function()
+        if not observedPlayer then return end
+
+        local char = observedPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local head = char and char:FindFirstChild("Head")
+
+        if not (hrp or head) then return end
+
+        -- posisi kamera di belakang/atas target (smooth simple)
+        local focusPart = head or hrp
+        local pos = focusPart.Position
+        local backOffset = (focusPart.CFrame.LookVector * -10)
+        local upOffset = Vector3.new(0, 4, 0)
+
+        local camPos = pos + backOffset + upOffset
+        cam.CFrame = CFrame.new(camPos, pos + Vector3.new(0, 2, 0))
     end)
 end
+
+----------------------------------------------------------------
+-- INFINITE CAMERA (NORMAL DRAG) + FOV
+----------------------------------------------------------------
+local function setInfiniteCamera(state)
+    local cam = getCamera()
+    if not cam then return end
+
+    if state then
+        if InfiniteCam.Enabled then return end
+        InfiniteCam.Enabled = true
+
+        InfiniteCam.SavedMaxZoom = LocalPlayer.CameraMaxZoomDistance
+        InfiniteCam.SavedMinZoom = LocalPlayer.CameraMinZoomDistance
+        InfiniteCam.SavedFOV = cam.FieldOfView
+
+        LocalPlayer.CameraMaxZoomDistance = InfiniteCam.MaxZoom
+        LocalPlayer.CameraMinZoomDistance = InfiniteCam.MinZoom
+        cam.FieldOfView = InfiniteCam.FOV
+    else
+        if not InfiniteCam.Enabled then return end
+        InfiniteCam.Enabled = false
+
+        if InfiniteCam.SavedMaxZoom then LocalPlayer.CameraMaxZoomDistance = InfiniteCam.SavedMaxZoom end
+        if InfiniteCam.SavedMinZoom then LocalPlayer.CameraMinZoomDistance = InfiniteCam.SavedMinZoom end
+        if InfiniteCam.SavedFOV then cam.FieldOfView = InfiniteCam.SavedFOV end
+    end
+end
+
+local function fmtTime(sec)
+    sec = math.max(0, math.floor(sec or 0))
+    local h = math.floor(sec / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    local s = sec % 60
+    if h > 0 then
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+    return string.format("%02d:%02d", m, s)
+end
+
+----------------------------------------------------------------
+-- UI TAB
+----------------------------------------------------------------
+-- kalau tab kamu namanya beda, ganti TabMisc -> tab kamu
+-- contoh: local TabMisc = Window:Tab("Misc")
+
+local CamCfg = {
+    SelectedPlayerName = nil,
+}
+
+local cameraGroup = TabMisc:CreateCollapseGroup("Camera Tools", function(add, group)
+
+    add(TabMisc:LiveLabel(function()
+        local cam = getCamera()
+        local fov = cam and cam.FieldOfView or 0
+        local mode = CameraState.Mode
+        local target = CameraState.TargetName
+        local inf = InfiniteCam.Enabled and "ON" or "OFF"
+
+        return string.format(
+            "Mode: %s\nTarget: %s\nInfinite Zoom: %s\nFOV: %d",
+            mode, target, inf, math.floor(fov)
+        )
+    end, 0.25))
+
+    add(TabMisc:Dropdown("Observer Target", buildPlayerList(), function(name)
+        CamCfg.SelectedPlayerName = name
+    end))
+
+    add(TabMisc:Button("Start Observer", function()
+        if not CamCfg.SelectedPlayerName or CamCfg.SelectedPlayerName == "(No other players)" then return end
+        local plr = Players:FindFirstChild(CamCfg.SelectedPlayerName)
+        if plr then
+            startObserver(plr)
+        end
+    end))
+
+    add(TabMisc:Button("Stop Observer", function()
+        stopObserver()
+    end))
+
+    add(TabMisc:Toggle("Enable Infinite Camera (Normal)", function(state)
+        setInfiniteCamera(state and true or false)
+    end))
+
+    add(TabMisc:Box("Set FOV (40-520)", function(txt)
+        local n = tonumber(txt)
+        if not n then return end
+        n = math.clamp(math.floor(n), 40, 520)
+        InfiniteCam.FOV = n
+
+        -- apply langsung kalau infinite aktif
+        if InfiniteCam.Enabled then
+            local cam = getCamera()
+            if cam then cam.FieldOfView = n end
+        end
+    end))
+
+    add(TabMisc:Button("Reset Camera (Back To You)", function()
+        stopObserver()
+        setInfiniteCamera(false)
+        restoreCameraState()
+    end))
+end)
+
+----------------------------------------------------------------
+-- SAFETY: kalau character respawn, pastikan observer stop biar ga nyangkut
+----------------------------------------------------------------
+LocalPlayer.CharacterAdded:Connect(function()
+    _wait(0.25)
+    if CameraState.Mode == "Observer" then
+        stopObserver()
+    end
+end)
 
 
 TabMisc:Label("Anti AFK")
