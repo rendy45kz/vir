@@ -3681,6 +3681,231 @@ end)
 
 local TabMisc = win:CreateTab("Misc")
 
+----------------------------------------------------------------
+-- TAB MISC : CAMERA (Observer Target Dropdown + Infinite Zoom)
+----------------------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local CamCfg = {
+    ObserverEnabled = false,
+    TargetName = "Off",
+    InfiniteZoom = false,
+
+    _saved = {
+        CamType = nil,
+        CamSubject = nil,
+        CamCFrame = nil,
+        MaxZoom = nil,
+        MinZoom = nil,
+    },
+
+    _conn = nil,
+    _dropdown = nil, -- handle dropdown object
+}
+
+local function getHumanoid(plr)
+    local ch = plr and plr.Character
+    if not ch then return nil end
+    return ch:FindFirstChildOfClass("Humanoid")
+end
+
+local function buildPlayerList()
+    local list = { "Off" }
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
+    end
+    table.sort(list, function(a, b)
+        if a == "Off" then return true end
+        if b == "Off" then return false end
+        return a:lower() < b:lower()
+    end)
+    return list
+end
+
+local function refreshDropdown()
+    if CamCfg._dropdown and CamCfg._dropdown.SetOptions then
+        CamCfg._dropdown:SetOptions(buildPlayerList())
+    end
+
+    -- kalau target sekarang sudah tidak ada, auto balik Off + stop observer
+    if CamCfg.TargetName ~= "Off" and not Players:FindFirstChild(CamCfg.TargetName) then
+        CamCfg.TargetName = "Off"
+        if CamCfg._dropdown and CamCfg._dropdown.Set then
+            CamCfg._dropdown:Set("Off")
+        end
+        CamCfg.ObserverEnabled = false
+    end
+end
+
+local function stopObserver()
+    CamCfg.ObserverEnabled = false
+
+    if CamCfg._conn then
+        CamCfg._conn:Disconnect()
+        CamCfg._conn = nil
+    end
+
+    pcall(function()
+        if CamCfg._saved.CamType then
+            Camera.CameraType = CamCfg._saved.CamType
+        else
+            Camera.CameraType = Enum.CameraType.Custom
+        end
+
+        if CamCfg._saved.CamSubject then
+            Camera.CameraSubject = CamCfg._saved.CamSubject
+        else
+            local myHum = getHumanoid(LocalPlayer)
+            if myHum then Camera.CameraSubject = myHum end
+        end
+
+        -- optional restore cframe (kadang bikin "teleport view", jadi aman saja)
+        -- if CamCfg._saved.CamCFrame then Camera.CFrame = CamCfg._saved.CamCFrame end
+    end)
+end
+
+local function startObserver()
+    if CamCfg.ObserverEnabled then return end
+    if not CamCfg.TargetName or CamCfg.TargetName == "Off" then return end
+
+    CamCfg.ObserverEnabled = true
+
+    -- save state sekali
+    CamCfg._saved.CamType = Camera.CameraType
+    CamCfg._saved.CamSubject = Camera.CameraSubject
+    CamCfg._saved.CamCFrame = Camera.CFrame
+
+    CamCfg._conn = RunService.RenderStepped:Connect(function()
+        if not CamCfg.ObserverEnabled then return end
+
+        local tname = CamCfg.TargetName
+        if not tname or tname == "Off" then
+            stopObserver()
+            return
+        end
+
+        local targetPlr = Players:FindFirstChild(tname)
+        if not targetPlr then
+            stopObserver()
+            return
+        end
+
+        local hum = getHumanoid(targetPlr)
+        if not hum then
+            -- target respawn, tunggu humanoid ada
+            return
+        end
+
+        -- cara paling stabil & compatible mobile:
+        Camera.CameraType = Enum.CameraType.Custom
+        Camera.CameraSubject = hum
+    end)
+end
+
+local function setInfiniteZoom(state)
+    CamCfg.InfiniteZoom = state and true or false
+
+    pcall(function()
+        if CamCfg._saved.MaxZoom == nil then
+            CamCfg._saved.MaxZoom = LocalPlayer.CameraMaxZoomDistance
+            CamCfg._saved.MinZoom = LocalPlayer.CameraMinZoomDistance
+        end
+
+        if CamCfg.InfiniteZoom then
+            LocalPlayer.CameraMaxZoomDistance = 1e6
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        else
+            if CamCfg._saved.MaxZoom then
+                LocalPlayer.CameraMaxZoomDistance = CamCfg._saved.MaxZoom
+            end
+            if CamCfg._saved.MinZoom then
+                LocalPlayer.CameraMinZoomDistance = CamCfg._saved.MinZoom
+            end
+        end
+    end)
+end
+
+-- auto stop observer kalau kamu respawn (biar camera gak nyangkut)
+LocalPlayer.CharacterAdded:Connect(function()
+    if CamCfg.ObserverEnabled then
+        stopObserver()
+    end
+end)
+
+-- realtime auto-refresh list dropdown
+Players.PlayerAdded:Connect(function()
+    refreshDropdown()
+end)
+Players.PlayerRemoving:Connect(function(plr)
+    if plr and plr.Name == CamCfg.TargetName then
+        CamCfg.TargetName = "Off"
+        if CamCfg._dropdown and CamCfg._dropdown.Set then
+            CamCfg._dropdown:Set("Off")
+        end
+        stopObserver()
+    end
+    refreshDropdown()
+end)
+
+----------------------------------------------------------------
+-- UI : TABMISC
+----------------------------------------------------------------
+local camGroup = TabMisc:CreateCollapseGroup("Camera", function(add, group)
+
+    add(TabMisc:LiveLabel(function()
+        local obs = CamCfg.ObserverEnabled and "ON" or "OFF"
+        local tgt = CamCfg.TargetName or "Off"
+        local inf = CamCfg.InfiniteZoom and "ON" or "OFF"
+        return string.format(
+            "Observer: %s\nTarget : %s\n\nInfinite Zoom: %s",
+            obs, tgt, inf
+        )
+    end, 0.25))
+
+    -- Dropdown target (auto-refresh realtime via PlayerAdded/Removing)
+    local dd = TabMisc:Dropdown("Observer Target", buildPlayerList(), function(name)
+        CamCfg.TargetName = name or "Off"
+
+        -- kalau observer lagi ON, langsung apply target baru
+        if CamCfg.ObserverEnabled then
+            if CamCfg.TargetName == "Off" then
+                stopObserver()
+            else
+                -- render loop akan update subject otomatis
+            end
+        end
+    end)
+
+    CamCfg._dropdown = dd
+
+    -- pastikan options selalu up-to-date pas tab dibuat
+    refreshDropdown()
+
+    add(dd)
+
+    add(TabMisc:Toggle("Enable Observer View", function(state)
+        if state then
+            if CamCfg.TargetName == "Off" then
+                -- gak ada target → jangan nyalain
+                stopObserver()
+                return
+            end
+            startObserver()
+        else
+            stopObserver()
+        end
+    end))
+
+    add(TabMisc:Toggle("Infinite Zoom", function(state)
+        setInfiniteZoom(state)
+    end))
+end)
 
 
 TabMisc:Label("Anti AFK")
