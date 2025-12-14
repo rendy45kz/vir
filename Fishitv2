@@ -3770,24 +3770,39 @@ end
 local function startObserver(plr)
     if not plr or plr == LocalPlayer then return end
 
+    local cam = getCamera()
+    if not cam then return end
+
     backupCameraOnce()
-    Camera.CameraType = Enum.CameraType.Scriptable
 
-    if camConn then camConn:Disconnect() end
-    camConn = RunService.RenderStepped:Connect(function()
-        local hrp = getHumanoidRoot(plr)
-        if hrp then
-            Camera.CFrame =
-                hrp.CFrame *
-                CFrame.new(0, 6, 14) *
-                CFrame.Angles(0, math.rad(180), 0)
-        end
+    observedPlayer = plr
+    CameraState.Mode = "Observer"
+    CameraState.TargetName = plr.Name
 
-        if CameraConfig.CustomFOVEnabled then
-            Camera.FieldOfView = CameraConfig.CustomFOV
-        end
+    -- observer = camera normal yang follow target (tanpa lock input aneh di android)
+    cam.CameraType = Enum.CameraType.Scriptable
+
+    observerConn = RunService.RenderStepped:Connect(function()
+        if not observedPlayer then return end
+
+        local char = observedPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local head = char and char:FindFirstChild("Head")
+
+        if not (hrp or head) then return end
+
+        -- posisi kamera di belakang/atas target (smooth simple)
+        local focusPart = head or hrp
+        local pos = focusPart.Position
+        local backOffset = (focusPart.CFrame.LookVector * -10)
+        local upOffset = Vector3.new(0, 4, 0)
+
+        local camPos = pos + backOffset + upOffset
+        cam.CFrame = CFrame.new(camPos, pos + Vector3.new(0, 2, 0))
     end)
 end
+
+
 
 ----------------------------------------------------------------
 -- INFINITE ZOOM
