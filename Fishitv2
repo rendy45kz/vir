@@ -3682,7 +3682,7 @@ end)
 local TabMisc = win:CreateTab("Misc")
 
 ----------------------------------------------------------------
--- CAMERA TOOLS (Observer + Infinite Zoom + FOV) - CLEAN
+-- CAMERA TOOLS (Observer Dropdown + Infinite Zoom + FOV)
 ----------------------------------------------------------------
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -3690,20 +3690,24 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
+----------------------------------------------------------------
+-- CONFIG
+----------------------------------------------------------------
 local CameraConfig = {
     ObserverEnabled = false,
-    TargetName = "",
+    TargetPlayer = nil,
+
     InfiniteZoom = false,
-    MaxZoom = 5000,      -- kamu bisa ubah
-    MinZoom = 0.5,       -- kamu bisa ubah
-    DefaultFOV = 70,
+    MaxZoom = 5000,
+    MinZoom = 0.5,
+
     CustomFOVEnabled = false,
     CustomFOV = 70,
 }
 
-local camConn -- RenderStepped connection untuk observer
-
--- simpan state kamera asli biar stop observer balik normal
+----------------------------------------------------------------
+-- CAMERA BACKUP
+----------------------------------------------------------------
 local camBackup = {
     Saved = false,
     CameraType = nil,
@@ -3713,6 +3717,8 @@ local camBackup = {
     MinZoom = nil,
     MaxZoom = nil,
 }
+
+local camConn
 
 local function backupCameraOnce()
     if camBackup.Saved then return end
@@ -3736,166 +3742,141 @@ local function restoreCamera()
     end
 
     CameraConfig.ObserverEnabled = false
+    CameraConfig.TargetPlayer = nil
 
-    if camBackup.Saved then
-        pcall(function()
-            Camera.CameraType = camBackup.CameraType or Enum.CameraType.Custom
-            Camera.CameraSubject = camBackup.CameraSubject
-            Camera.CFrame = camBackup.CFrame or Camera.CFrame
-            Camera.FieldOfView = camBackup.FOV or 70
-        end)
+    pcall(function()
+        Camera.CameraType = camBackup.CameraType or Enum.CameraType.Custom
+        Camera.CameraSubject = camBackup.CameraSubject
+        Camera.CFrame = camBackup.CFrame or Camera.CFrame
+        Camera.FieldOfView = camBackup.FOV or 70
+    end)
 
-        pcall(function()
-            if camBackup.MinZoom then LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom end
-            if camBackup.MaxZoom then LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom end
-        end)
-    else
-        -- fallback aman
-        pcall(function()
-            Camera.CameraType = Enum.CameraType.Custom
-            Camera.FieldOfView = 70
-        end)
-    end
+    pcall(function()
+        LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom or 0.5
+        LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom or 128
+    end)
 end
 
-local function getCharacterSubject(plr)
+----------------------------------------------------------------
+-- OBSERVER LOGIC
+----------------------------------------------------------------
+local function getHumanoidRoot(plr)
     if not plr then return nil end
     local ch = plr.Character
     if not ch then return nil end
-    return ch:FindFirstChildOfClass("Humanoid") or ch:FindFirstChild("HumanoidRootPart")
+    return ch:FindFirstChild("HumanoidRootPart")
 end
 
-local function startObserver(targetPlayer)
-    if not targetPlayer then return false end
+local function startObserver(plr)
+    if not plr or plr == LocalPlayer then return end
 
     backupCameraOnce()
+    Camera.CameraType = Enum.CameraType.Scriptable
 
-    -- paksa camera mode yang stabil buat observe
-    pcall(function()
-        Camera.CameraType = Enum.CameraType.Scriptable
-    end)
-
-    local subject = getCharacterSubject(targetPlayer)
-    if not subject then return false end
-
-    -- follow target dengan RenderStepped (ringan)
-    if camConn then camConn:Disconnect() camConn = nil end
+    if camConn then camConn:Disconnect() end
     camConn = RunService.RenderStepped:Connect(function()
-        local subj = getCharacterSubject(targetPlayer)
-        if not subj then return end
-
-        local hrp = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local hrp = getHumanoidRoot(plr)
         if hrp then
-            -- posisi kamera di belakang+atas target
-            local cf = hrp.CFrame
-            Camera.CFrame = cf * CFrame.new(0, 6, 14) * CFrame.Angles(0, math.rad(180), 0)
-        else
-            -- fallback: tetap coba pakai subject
-            pcall(function()
-                Camera.CameraSubject = subj
-            end)
+            Camera.CFrame =
+                hrp.CFrame *
+                CFrame.new(0, 6, 14) *
+                CFrame.Angles(0, math.rad(180), 0)
         end
 
-        -- apply FOV kalau custom aktif
         if CameraConfig.CustomFOVEnabled then
             Camera.FieldOfView = CameraConfig.CustomFOV
         end
     end)
-
-    return true
 end
 
+----------------------------------------------------------------
+-- INFINITE ZOOM
+----------------------------------------------------------------
 local function applyInfiniteZoom(state)
-    CameraConfig.InfiniteZoom = state and true or false
+    CameraConfig.InfiniteZoom = state
 
-    -- kalau observer jalan, jangan ganggu mode scriptable-nya
-    pcall(function()
-        if CameraConfig.InfiniteZoom then
-            LocalPlayer.CameraMinZoomDistance = CameraConfig.MinZoom
-            LocalPlayer.CameraMaxZoomDistance = CameraConfig.MaxZoom
-        else
-            -- restore zoom dari backup kalau ada, kalau tidak pakai default Roblox
-            if camBackup.Saved and camBackup.MinZoom and camBackup.MaxZoom then
-                LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom
-                LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom
-            else
-                LocalPlayer.CameraMinZoomDistance = 0.5
-                LocalPlayer.CameraMaxZoomDistance = 128
-            end
-        end
-    end)
-end
-
-local function applyFOV()
-    if CameraConfig.CustomFOVEnabled then
-        pcall(function()
-            Camera.FieldOfView = CameraConfig.CustomFOV
-        end)
+    if state then
+        LocalPlayer.CameraMinZoomDistance = CameraConfig.MinZoom
+        LocalPlayer.CameraMaxZoomDistance = CameraConfig.MaxZoom
     else
-        -- balik normal (pakai backup kalau ada)
-        pcall(function()
-            Camera.FieldOfView = (camBackup.Saved and camBackup.FOV) or CameraConfig.DefaultFOV
-        end)
+        LocalPlayer.CameraMinZoomDistance = camBackup.MinZoom or 0.5
+        LocalPlayer.CameraMaxZoomDistance = camBackup.MaxZoom or 128
     end
 end
 
 ----------------------------------------------------------------
--- UI: CAMERA TAB (pakai farmUI agar cocok dengan GUI kamu)
+-- UI: CAMERA TAB
 ----------------------------------------------------------------
-farmUI:CreateCollapseGroup("Camera Tools", function(add, group)
+farmUI:CreateCollapseGroup("Camera Tools", function(add)
 
+    ------------------------------------------------------------
+    -- LIVE STATUS
+    ------------------------------------------------------------
     add(farmUI:LiveLabel(function()
         local obs = CameraConfig.ObserverEnabled and "ON" or "OFF"
         local inf = CameraConfig.InfiniteZoom and "ON" or "OFF"
-        local fov = CameraConfig.CustomFOVEnabled and tostring(CameraConfig.CustomFOV) or "DEFAULT"
-
-        local tname = (CameraConfig.TargetName ~= "" and CameraConfig.TargetName) or "None"
+        local fov = CameraConfig.CustomFOVEnabled and CameraConfig.CustomFOV or "DEFAULT"
+        local tgt = CameraConfig.TargetPlayer and CameraConfig.TargetPlayer.Name or "None"
 
         return string.format(
-            "Observer: %s\nTarget: %s\nInfinite Zoom: %s\nFOV: %s",
-            obs, tname, inf, fov
+            "Observer : %s\nTarget   : %s\nInfinite : %s\nFOV      : %s",
+            obs, tgt, inf, tostring(fov)
         )
-    end, 0.25))
+    end, 0.3))
 
-    add(farmUI:Box("Observer Target (player name)", function(txt)
-        CameraConfig.TargetName = tostring(txt or "")
+    ------------------------------------------------------------
+    -- PLAYER DROPDOWN (AUTO UPDATE)
+    ------------------------------------------------------------
+    local function getPlayerNames()
+        local list = {}
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then
+                table.insert(list, plr.Name)
+            end
+        end
+        return list
+    end
+
+    add(farmUI:Dropdown("Observer Target", getPlayerNames(), function(name)
+        local plr = Players:FindFirstChild(name)
+        CameraConfig.TargetPlayer = plr
     end))
 
+    ------------------------------------------------------------
+    -- OBSERVER TOGGLE
+    ------------------------------------------------------------
     add(farmUI:Toggle("Enable Observer Camera", function(state)
         if not state then
             restoreCamera()
             return
         end
 
-        CameraConfig.ObserverEnabled = true
-
-        local target = Players:FindFirstChild(CameraConfig.TargetName)
-        if not target or target == LocalPlayer then
-            -- kalau invalid, langsung stop biar nggak nyangkut
+        if not CameraConfig.TargetPlayer then
             restoreCamera()
             return
         end
 
-        local ok = startObserver(target)
-        if not ok then
-            restoreCamera()
-        end
+        CameraConfig.ObserverEnabled = true
+        startObserver(CameraConfig.TargetPlayer)
     end))
 
-    add(farmUI:Button("Stop Observer (Restore Camera)", function()
+    add(farmUI:Button("Stop Observer", function()
         restoreCamera()
     end))
 
     add(farmUI:Label(" "))
 
-    add(farmUI:Toggle("Enable Infinite Zoom", function(state)
+    ------------------------------------------------------------
+    -- INFINITE ZOOM
+    ------------------------------------------------------------
+    add(farmUI:Toggle("Infinite Zoom", function(state)
         backupCameraOnce()
         applyInfiniteZoom(state)
     end))
 
-    add(farmUI:Box("Max Zoom Distance (e.g. 5000)", function(txt)
+    add(farmUI:Box("Max Zoom (ex: 5000)", function(txt)
         local n = tonumber(txt)
-        if n and n > 50 then
+        if n and n > 100 then
             CameraConfig.MaxZoom = n
             if CameraConfig.InfiniteZoom then
                 applyInfiniteZoom(true)
@@ -3903,18 +3884,23 @@ farmUI:CreateCollapseGroup("Camera Tools", function(add, group)
         end
     end))
 
-    add(farmUI:Toggle("Enable Custom FOV", function(state)
+    ------------------------------------------------------------
+    -- FOV
+    ------------------------------------------------------------
+    add(farmUI:Toggle("Custom FOV", function(state)
         backupCameraOnce()
-        CameraConfig.CustomFOVEnabled = state and true or false
-        applyFOV()
+        CameraConfig.CustomFOVEnabled = state
+        if not state then
+            Camera.FieldOfView = camBackup.FOV or 70
+        end
     end))
 
-    add(farmUI:Box("FOV (e.g. 70 - 120)", function(txt)
+    add(farmUI:Box("FOV (40 - 120)", function(txt)
         local n = tonumber(txt)
         if n and n >= 40 and n <= 120 then
             CameraConfig.CustomFOV = n
             if CameraConfig.CustomFOVEnabled then
-                applyFOV()
+                Camera.FieldOfView = n
             end
         end
     end))
