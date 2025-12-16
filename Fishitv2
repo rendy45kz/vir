@@ -3415,7 +3415,7 @@ task.defer(function()
 
         for _, npcName in ipairs(npcNames) do
             pcall(function()
-                rf:InvokeServer(npcName, "TrickOrTreat")
+                rf:InvokeServer(npcName, "ChristmasPresents")
             end)
             task.wait(0.05) -- kecil biar aman
         end
@@ -3452,7 +3452,7 @@ task.defer(function()
             )
         end, 0.25))
 
-        add(TabEvent:Toggle("Enable Auto Trick Or Treat", function(state)
+        add(TabEvent:Toggle("Enable Auto ChristmasPresents", function(state)
             TrickCfg.Enabled = state and true or false
             if TrickCfg.Enabled then
                 nextAt = 0
