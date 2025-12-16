@@ -3441,7 +3441,7 @@ task.defer(function()
     end
 
     -- ========= UI =========
-    TabEvent:CreateCollapseGroup("Auto Trick Or Treat", function(add, group)
+    TabEvent:CreateCollapseGroup("Auto Christmas", function(add, group)
         add(TabEvent:LiveLabel(function()
             local status = TrickCfg.Enabled and "ON" or "OFF"
             local left = (TrickCfg.Enabled and nextAt > 0) and (nextAt - tick()) or 0
