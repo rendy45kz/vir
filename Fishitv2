@@ -3316,15 +3316,7 @@ end)
 -- AUTO TRICK OR TREAT (TabMisc) - Toggle + Live Countdown (2h)
 ----------------------------------------------------------------
 task.defer(function()
-    -- tunggu TabMisc siap (anti menu hilang kalau urutan load beda)
-    local tries = 0
-    while (not TabMisc) and tries < 200 do
-        task.wait(0.05)
-        tries += 1
-    end
-    if not TabMisc or type(TabMisc.CreateCollapseGroup) ~= "function" then
-        return
-    end
+    
 
     local Players = game:GetService("Players")
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3449,8 +3441,8 @@ task.defer(function()
     end
 
     -- ========= UI =========
-    TabMisc:CreateCollapseGroup("Auto Trick Or Treat", function(add, group)
-        add(TabMisc:LiveLabel(function()
+    TabEvent:CreateCollapseGroup("Auto Trick Or Treat", function(add, group)
+        add(TabEvent:LiveLabel(function()
             local status = TrickCfg.Enabled and "ON" or "OFF"
             local left = (TrickCfg.Enabled and nextAt > 0) and (nextAt - tick()) or 0
             return string.format(
@@ -3460,7 +3452,7 @@ task.defer(function()
             )
         end, 0.25))
 
-        add(TabMisc:Toggle("Enable Auto Trick Or Treat", function(state)
+        add(TabEvent:Toggle("Enable Auto Trick Or Treat", function(state)
             TrickCfg.Enabled = state and true or false
             if TrickCfg.Enabled then
                 nextAt = 0
