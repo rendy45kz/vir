@@ -3313,6 +3313,167 @@ TabEvent:Toggle("Auto Teleport Selected Event", function(state)
 end)
 
 ----------------------------------------------------------------
+-- AUTO TRICK OR TREAT (TabMisc) - Toggle + Live Countdown (2h)
+----------------------------------------------------------------
+task.defer(function()
+    -- tunggu TabMisc siap (anti menu hilang kalau urutan load beda)
+    local tries = 0
+    while (not TabMisc) and tries < 200 do
+        task.wait(0.05)
+        tries += 1
+    end
+    if not TabMisc or type(TabMisc.CreateCollapseGroup) ~= "function" then
+        return
+    end
+
+    local Players = game:GetService("Players")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+
+    -- ========= RemoteFunction resolver (Net module / sleitnick_net fallback) =========
+    local function getSpecialDialogueRF()
+        -- 1) Kalau game kamu punya Packages.Net (seperti modul contoh)
+        local ok1, rf1 = pcall(function()
+            local pkg = ReplicatedStorage:FindFirstChild("Packages")
+            if pkg and pkg:FindFirstChild("Net") then
+                local Net = require(pkg.Net)
+                if Net and typeof(Net.RemoteFunction) == "function" then
+                    return Net:RemoteFunction("SpecialDialogueEvent")
+                end
+            end
+            return nil
+        end)
+        if ok1 and rf1 then return rf1 end
+
+        -- 2) Fallback: sleitnick_net (pola yang kamu pakai di script)
+        local ok2, rf2 = pcall(function()
+            local netIndex = ReplicatedStorage:WaitForChild("Packages")
+                :WaitForChild("_Index")
+                :WaitForChild("sleitnick_net@0.2.0")
+            local net = netIndex:WaitForChild("net")
+
+            return net:FindFirstChild("RF/SpecialDialogueEvent")
+                or net:FindFirstChild("RF/SpecialDialogueEvent ")
+                or net:FindFirstChild("RF/SpecialDialogueEventEvent")
+                or net:FindFirstChild("RF/SpecialDialogueEventEvent ")
+                or net:FindFirstChild("RF/SpecialDialogueEventEvent2")
+                or net:FindFirstChild("SpecialDialogueEvent")
+        end)
+        if ok2 and rf2 then return rf2 end
+
+        return nil
+    end
+
+    -- ========= NPC scanner (ringan, tanpa depend function lain) =========
+    local function listNPCNames()
+        local found = {}
+        for _, m in ipairs(Workspace:GetDescendants()) do
+            if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
+                -- deteksi NPC: ada Humanoid ATAU ada ProximityPrompt
+                local ok = (m:FindFirstChildOfClass("Humanoid") ~= nil)
+                if not ok then
+                    for _, d in ipairs(m:GetDescendants()) do
+                        if d:IsA("ProximityPrompt") then
+                            ok = true
+                            break
+                        end
+                    end
+                end
+                if ok and m.Name and #m.Name > 0 then
+                    found[m.Name] = true
+                end
+            end
+        end
+        local list = {}
+        for name in pairs(found) do table.insert(list, name) end
+        table.sort(list)
+        return list
+    end
+
+    -- ========= Config + Loop =========
+    local TrickCfg = {
+        Enabled = false,
+        Cooldown = 7200, -- 2 jam
+    }
+
+    local loopRunning = false
+    local nextAt = 0
+
+    local function fmt(sec)
+        sec = math.max(0, math.floor(sec or 0))
+        local h = math.floor(sec / 3600)
+        local m = math.floor((sec % 3600) / 60)
+        local s = sec % 60
+        return string.format("%02d:%02d:%02d", h, m, s)
+    end
+
+    local function runOnce()
+        local rf = getSpecialDialogueRF()
+        if not rf then
+            warn("[TrickOrTreat] RemoteFunction SpecialDialogueEvent tidak ditemukan.")
+            return
+        end
+
+        local npcNames = listNPCNames()
+        if #npcNames == 0 then
+            warn("[TrickOrTreat] NPC tidak ditemukan di workspace.")
+            return
+        end
+
+        for _, npcName in ipairs(npcNames) do
+            pcall(function()
+                rf:InvokeServer(npcName, "TrickOrTreat")
+            end)
+            task.wait(0.05) -- kecil biar aman
+        end
+    end
+
+    local function loop()
+        if loopRunning then return end
+        loopRunning = true
+
+        while TrickCfg.Enabled do
+            runOnce()
+
+            nextAt = tick() + TrickCfg.Cooldown
+
+            -- countdown 2 jam (bisa diputus toggle OFF)
+            while TrickCfg.Enabled and tick() < nextAt do
+                task.wait(1)
+            end
+        end
+
+        loopRunning = false
+        nextAt = 0
+    end
+
+    -- ========= UI =========
+    TabMisc:CreateCollapseGroup("Auto Trick Or Treat", function(add, group)
+        add(TabMisc:LiveLabel(function()
+            local status = TrickCfg.Enabled and "ON" or "OFF"
+            local left = (TrickCfg.Enabled and nextAt > 0) and (nextAt - tick()) or 0
+            return string.format(
+                "Status: %s\nCooldown: 02:00:00\nNext in: %s",
+                status,
+                (TrickCfg.Enabled and nextAt > 0) and fmt(left) or "--:--:--"
+            )
+        end, 0.25))
+
+        add(TabMisc:Toggle("Enable Auto Trick Or Treat", function(state)
+            TrickCfg.Enabled = state and true or false
+            if TrickCfg.Enabled then
+                nextAt = 0
+                task.spawn(loop)
+            else
+                nextAt = 0
+            end
+        end))
+    end)
+end)
+
+
+----------------------------------------------------------------
 -- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
 ----------------------------------------------------------------
 
