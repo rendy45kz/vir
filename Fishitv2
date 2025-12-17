@@ -2920,27 +2920,6 @@ end
 farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
     ------------------------------------------------
-    -- LIVE LABEL: status + countdown + owned
-    ------------------------------------------------
-    add(farmUI:LiveLabel(function()
-        local counts = select(1, GetTotemCount()) or {}
-        local l = counts.Luck or 0
-        local m = counts.Mutation or 0
-        local s = counts.Shiny or 0
-
-        local status = TotemConfig.AutoSpawn and "ON" or "OFF"
-        local leftStr = "--:--"
-        if TotemConfig.AutoSpawn and nextSpawnAt and nextSpawnAt > 0 then
-            leftStr = fmtTimeLeft(nextSpawnAt - tick())
-        end
-
-        return string.format(
-            "Auto: %s\nNext spawn in: %s\n\nTotem owned:\nLuck Totem     : %d\nMutation Totem : %d\nShiny Totem    : %d",
-            status, leftStr, l, m, s
-        )
-    end, 0.25))
-
-    ------------------------------------------------
     -- DROPDOWN: Totem type (auto-refresh tiap buka)
     ------------------------------------------------
     local dd
