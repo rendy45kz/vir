@@ -2876,7 +2876,7 @@ local function AutoTotemLoop()
 end
 
 ----------------------------------------------------------------
--- UI: FARM TAB – AUTO SPAWN TOTEM (1x / jam)
+-- UI: FARM TAB – AUTO SPAWN TOTEM (1x / jam) [Cocok UI Kamu]
 ----------------------------------------------------------------
 
 -- format countdown
@@ -2891,12 +2891,9 @@ local function fmtTimeLeft(sec)
     return string.format("%02d:%02d", m, s)
 end
 
--- dropdown auto-refresh helpers
+-- list dropdown dinamis (ada count)
 local function BuildTotemDropdownOptions()
-    -- kalau mau pakai count realtime di dropdown, kita buat list dinamis
-    local counts = select(1, GetTotemCount())
-    counts = counts or {}
-
+    local counts = select(1, GetTotemCount()) or {}
     local l = counts.Luck or 0
     local m = counts.Mutation or 0
     local s = counts.Shiny or 0
@@ -2920,23 +2917,19 @@ local function LabelToKey(label)
     return nil
 end
 
--- buat group UI
 farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
 
     ------------------------------------------------
     -- LIVE LABEL: status + countdown + owned
     ------------------------------------------------
     add(farmUI:LiveLabel(function()
-        local counts = select(1, GetTotemCount())
-        counts = counts or {}
-
+        local counts = select(1, GetTotemCount()) or {}
         local l = counts.Luck or 0
         local m = counts.Mutation or 0
         local s = counts.Shiny or 0
 
         local status = TotemConfig.AutoSpawn and "ON" or "OFF"
         local leftStr = "--:--"
-
         if TotemConfig.AutoSpawn and nextSpawnAt and nextSpawnAt > 0 then
             leftStr = fmtTimeLeft(nextSpawnAt - tick())
         end
@@ -2948,31 +2941,23 @@ farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
     end, 0.25))
 
     ------------------------------------------------
-    -- DROPDOWN: Totem type (auto refresh tiap buka)
+    -- DROPDOWN: Totem type (auto-refresh tiap buka)
     ------------------------------------------------
-    local dd = farmUI:Dropdown("Totem Type", BuildTotemDropdownOptions(), function(label)
+    local dd
+    dd = add(farmUI:Dropdown("Totem Type", BuildTotemDropdownOptions(), function(label)
         local key = LabelToKey(label)
         if key then
             TotemConfig.SelectedKey = key
-            -- kalau lagi ON, reset timer biar pilihan baru kepakai cepat
             if TotemConfig.AutoSpawn then
-                nextSpawnAt = 0
+                nextSpawnAt = 0 -- biar pilihan baru kepakai cepat
             end
         end
-    end)
+    end))
 
-    -- auto-refresh tiap group dibuka / tiap beberapa detik (clean & ringan)
-    -- karena API kamu nggak expose event "on open", kita refresh berkala tapi ringan
-    do
-        local lastUpdate = 0
-        _spawn(function()
-            while true do
-                _wait(1.0)
-                if dd and dd.SetOptions and tick() - lastUpdate >= 2.0 then
-                    lastUpdate = tick()
-                    dd:SetOptions(BuildTotemDropdownOptions())
-                end
-            end
+    -- Refresh list hanya saat dropdown dibuka (ringan & clean)
+    if dd and dd.OnOpen and dd.SetOptions then
+        dd:OnOpen(function()
+            dd:SetOptions(BuildTotemDropdownOptions())
         end)
     end
 
@@ -2991,6 +2976,7 @@ farmUI:CreateCollapseGroup("Auto Spawn Totem", function(add, group)
     end))
 
 end)
+
 
 
 ------------------------------------------------
