@@ -3742,16 +3742,22 @@ local camGroup = TabMisc:CreateCollapseGroup("Camera", function(add, group)
 end)
 
 
+------------------------------------------------------------
+-- Anti AFK (ringan)
+------------------------------------------------------------
 TabMisc:Label("Anti AFK")
 local AntiAFKConn
 
 TabMisc:Toggle("Enable Anti AFK", function(state)
     if state then
-        if AntiAFKConn then AntiAFKConn:Disconnect() end
+        if AntiAFKConn then AntiAFKConn:Disconnect() AntiAFKConn=nil end
         AntiAFKConn = LocalPlayer.Idled:Connect(function()
-            VirtualUser:Button2Down(Vector2.new(), Workspace.CurrentCamera.CFrame)
-            _wait(0.6)
-            VirtualUser:Button2Up(Vector2.new(), Workspace.CurrentCamera.CFrame)
+            -- 1x klik kanan cukup (nggak perlu delay lama)
+            pcall(function()
+                VirtualUser:Button2Down(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+                _wait(0.15)
+                VirtualUser:Button2Up(Vector2.new(0,0), Workspace.CurrentCamera.CFrame)
+            end)
         end)
     else
         if AntiAFKConn then AntiAFKConn:Disconnect() AntiAFKConn=nil end
@@ -3759,7 +3765,7 @@ TabMisc:Toggle("Enable Anti AFK", function(state)
 end)
 
 ------------------------------------------------------------
--- FPS BOOST
+-- FPS BOOST SYSTEM (extreme lightweight)
 ------------------------------------------------------------
 TabMisc:Label("FPS Boost System")
 
@@ -3768,27 +3774,53 @@ local Misc = {
     SmoothParts  = false,
     NoLighting   = false,
     NoEffects    = false,
+    NoRodVFX     = false,
+    NoFishNotif  = false,
     FPSCap       = 120,
-
-    -- fitur baru
-    NoRodVFX     = false, -- hilangin efek rod (splash, trail, dsb)
-    NoFishNotif  = false, -- sembunyiin notifikasi fish caught
-    NoCutscene   = false, -- paksa kamera balik ke mode biasa
-    NoPlayerAnim = false, -- matikan animasi player
 }
 
--- =========================
--- HELPER FPS LAMA
--- =========================
-local function HideAllTextures()
+-- Cache & connections (biar nggak dobel)
+local conDescAll, conDescRod = nil, nil
+
+local function isEffectObj(v)
+    return v and (
+        v:IsA("ParticleEmitter") or v:IsA("Beam") or v:IsA("Trail") or
+        v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles")
+    )
+end
+
+local function isTextureObj(v)
+    return v and (v:IsA("Decal") or v:IsA("Texture"))
+end
+
+local function low(s) return string.lower(tostring(s or "")) end
+
+local function isRodVFX(obj)
+    if not isEffectObj(obj) then return false end
+    local n = low(obj.Name)
+    if n:find("rod") or n:find("cast") or n:find("fish") or n:find("splash") then
+        return true
+    end
+    local p = obj.Parent
+    while p do
+        local pn = low(p.Name)
+        if p:IsA("Tool") and pn:find("rod") then return true end
+        if pn:find("vfx") and (pn:find("rod") or pn:find("fish")) then return true end
+        p = p.Parent
+    end
+    return false
+end
+
+-- apply sekali (NO LOOP BERULANG)
+local function ApplyHideTexturesOnce()
     for _,v in ipairs(game:GetDescendants()) do
-        if v:IsA("Decal") or v:IsA("Texture") then
+        if isTextureObj(v) then
             v.Transparency = 1
         end
     end
 end
 
-local function ApplySmoothPlastic()
+local function ApplySmoothPlasticOnce()
     for _,v in ipairs(game:GetDescendants()) do
         if v:IsA("BasePart") then
             v.Material = Enum.Material.SmoothPlastic
@@ -3796,178 +3828,134 @@ local function ApplySmoothPlastic()
     end
 end
 
-local function ApplyNoLighting()
+local function ApplyNoLightingOnce()
     Lighting.GlobalShadows = false
-    Lighting.FogEnd        = 1e10
-    Lighting.Brightness    = 1
+    Lighting.FogEnd = 1e10
+    Lighting.Brightness = 1
 end
 
-local function RemoveEffects()
+local function DisableAllEffectsOnce()
     for _,v in ipairs(game:GetDescendants()) do
-        if v:IsA("ParticleEmitter")
-        or v:IsA("Beam")
-        or v:IsA("Trail")
-        or v:IsA("Smoke")
-        or v:IsA("Fire")
-        or v:IsA("Sparkles") then
+        if isEffectObj(v) then
             v.Enabled = false
         end
     end
 end
 
--- =========================
--- HELPER BARU – ROD VFX
--- =========================
-local rodConn
-
-local function isRodVFX(obj: Instance)
-    if not obj then return false end
-
-    if not (obj:IsA("ParticleEmitter")
-        or obj:IsA("Beam")
-        or obj:IsA("Trail")
-        or obj:IsA("Smoke")
-        or obj:IsA("Fire")
-        or obj:IsA("Sparkles")) then
-        return false
-    end
-
-    local function low(s)
-        return string.lower(s or "")
-    end
-
-    local name  = low(obj.Name)
-    local parent = obj.Parent
-    local pname  = parent and low(parent.Name) or ""
-
-    -- cek nama sendiri / parent
-    if name:find("rod") or name:find("fish") or name:find("cast") or name:find("splash") or name:find("dive") then
-        return true
-    end
-    if pname:find("rod") or pname:find("fishing") or pname:find("vfx") then
-        return true
-    end
-
-    -- cek tool / ancestor
-    local current = parent
-    while current do
-        local cname = low(current.Name)
-        if current:IsA("Tool") and cname:find("rod") then
-            return true
+local function DisableRodVFXOnce()
+    for _,v in ipairs(game:GetDescendants()) do
+        if isRodVFX(v) then
+            v.Enabled = false
         end
-        if cname:find("vfx") and (cname:find("rod") or cname:find("fish")) then
-            return true
-        end
-        current = current.Parent
-    end
-
-    return false
-end
-
-local function applyRodVFXToInstance(obj)
-    if isRodVFX(obj) then
-        obj.Enabled = false
     end
 end
 
-local function EnableRodOnlyEffects()
-    -- matikan semua efek rod yang sudah ada
-    for _, v in ipairs(game:GetDescendants()) do
-        applyRodVFXToInstance(v)
-    end
-
-    -- monitor efek baru (misal saat mancing mulai)
-    if rodConn then rodConn:Disconnect() rodConn = nil end
-    rodConn = game.DescendantAdded:Connect(function(o)
-        if Misc.NoRodVFX then
-            pcall(applyRodVFXToInstance, o)
+-- DescendantAdded watcher (aktif hanya jika toggle ON)
+local function StartDescendantWatcher()
+    if conDescAll then return end
+    conDescAll = game.DescendantAdded:Connect(function(v)
+        -- super ringan: cek hanya object yang baru muncul
+        if Misc.HideTextures and isTextureObj(v) then
+            v.Transparency = 1
+        end
+        if Misc.NoEffects and isEffectObj(v) then
+            v.Enabled = false
+        end
+        if Misc.NoRodVFX and isRodVFX(v) then
+            v.Enabled = false
+        end
+        if Misc.SmoothParts and v:IsA("BasePart") then
+            v.Material = Enum.Material.SmoothPlastic
         end
     end)
 end
 
-local function DisableRodOnlyEffects()
-    if rodConn then
-        rodConn:Disconnect()
-        rodConn = nil
+local function StopDescendantWatcherIfUnused()
+    -- watcher dipakai jika ada fitur yang butuh “menangkap object baru”
+    local need =
+        Misc.HideTextures or Misc.NoEffects or Misc.NoRodVFX or Misc.SmoothParts
+    if not need and conDescAll then
+        conDescAll:Disconnect()
+        conDescAll = nil
     end
 end
 
-
--- =========================
--- HELPER BARU – GUI / KAMERA / ANIMASI
--- =========================
-local function SembunyikanNotifikasiIkan()
+------------------------------------------------------------
+-- Fish Notification (lebih aman & ringan)
+-- NOTE: getconnections itu executor-only. Ini tetap kamu pakai.
+------------------------------------------------------------
+local fishNotifDisabled = false
+local function SetFishNotifDisabled(disable)
+    fishNotifDisabled = disable and true or false
     _spawn(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local notifPath = ReplicatedStorage:FindFirstChild("Packages")        
-        local NetFolder = notifPath:FindFirstChild("_Index") 
-        local sleitnickNet = NetFolder:FindFirstChild("sleitnick_net@0.2.0")
-        local net = sleitnickNet:FindFirstChild("net")
-        local REObtainedNewFishNotification = net:FindFirstChild("RE/ObtainedNewFishNotification")
-         
-        for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
-            connection:Disable()
-        end
- 
-    end)
-end
-
-local function TampilkanNotifikasiIkan()
-    _spawn(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local REObtainedNewFishNotification = ReplicatedStorage
-            .Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
- 
-        if REObtainedNewFishNotification then
-            for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
-                connection:Enable()
+        local ok, RE = pcall(function()
+            return ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
+        end)
+        if ok and RE and RE.OnClientEvent then
+            local cons = getconnections(RE.OnClientEvent)
+            for _,c in ipairs(cons) do
+                pcall(function()
+                    if fishNotifDisabled then c:Disable() else c:Enable() end
+                end)
             end
-            
-        else
-            warn("⚠️ Tidak dapat menemukan event notifikasi ikan.")
         end
     end)
 end
 
-
-
--- =========================
--- TOGGLE DI TAB MISC
--- =========================
+------------------------------------------------------------
+-- Toggles
+------------------------------------------------------------
 TabMisc:Toggle("Hide Textures", function(v)
-    Misc.HideTextures = v
-    if v then HideAllTextures() end
+    Misc.HideTextures = v and true or false
+    if Misc.HideTextures then
+        ApplyHideTexturesOnce()
+        StartDescendantWatcher()
+    else
+        StopDescendantWatcherIfUnused()
+    end
 end)
 
 TabMisc:Toggle("Smooth Plastic", function(v)
-    Misc.SmoothParts = v
-    if v then ApplySmoothPlastic() end
+    Misc.SmoothParts = v and true or false
+    if Misc.SmoothParts then
+        ApplySmoothPlasticOnce()
+        StartDescendantWatcher()
+    else
+        StopDescendantWatcherIfUnused()
+    end
 end)
 
 TabMisc:Toggle("No Lighting", function(v)
-    Misc.NoLighting = v
-    if v then ApplyNoLighting() end
+    Misc.NoLighting = v and true or false
+    if Misc.NoLighting then
+        ApplyNoLightingOnce()
+    end
+end)
+
+TabMisc:Toggle("Disable All Effects", function(v)
+    Misc.NoEffects = v and true or false
+    if Misc.NoEffects then
+        DisableAllEffectsOnce()
+        StartDescendantWatcher()
+    else
+        StopDescendantWatcherIfUnused()
+    end
 end)
 
 TabMisc:Toggle("Disable Rod VFX", function(v)
-    Misc.NoRodVFX = v
-    if v then
-        EnableRodOnlyEffects()
+    Misc.NoRodVFX = v and true or false
+    if Misc.NoRodVFX then
+        DisableRodVFXOnce()
+        StartDescendantWatcher()
     else
-        DisableRodOnlyEffects()
+        StopDescendantWatcherIfUnused()
     end
 end)
-
 
 TabMisc:Toggle("Hide Fish Caught Notification", function(v)
-    Misc.NoFishNotif = v
-    if v then
-        SembunyikanNotifikasiIkan()
-    else
-        TampilkanNotifikasiIkan()
-    end
+    Misc.NoFishNotif = v and true or false
+    SetFishNotifDisabled(Misc.NoFishNotif)
 end)
-
 
 ------------------------------------------------------------
 -- FPS CAP
@@ -3975,19 +3963,20 @@ end)
 TabMisc:Label("FPS Cap")
 TabMisc:Slider("Set FPS Cap", 30, 300, 120, function(v)
     Misc.FPSCap = v
-    if setfpscap then
-        setfpscap(v)
-    end
+    if setfpscap then pcall(setfpscap, v) end
 end)
 
 ------------------------------------------------------------
--- FPS / PING OVERLAY (TOP SCREEN)
+-- STATS OVERLAY (extreme ringan: update 0.25s)
 ------------------------------------------------------------
 TabMisc:Label("Stats Overlay")
+
+local OverlayGui, OverlayConn = nil, nil
 
 local function CreateOverlay()
     local gui = Instance.new("ScreenGui")
     gui.Name = "StatsOverlay_Aegis"
+    gui.ResetOnSpawn = false
     gui.Parent = CoreGui
 
     local label = Instance.new("TextLabel")
@@ -3999,13 +3988,21 @@ local function CreateOverlay()
     label.TextSize = 14
     label.TextColor3 = Color3.new(1,1,1)
     label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = "FPS: -- | Ping: --ms"
 
-    local fpsAvg = 0
+    local fpsAvg = 60
     local alpha = 0.18
+    local accT = 0
 
-    RunService.RenderStepped:Connect(function(dt)
-        local fps = 1/math.max(dt,1/1000)
-        fpsAvg = fpsAvg + (fps - fpsAvg)*alpha
+    if OverlayConn then OverlayConn:Disconnect() OverlayConn=nil end
+    OverlayConn = RunService.Heartbeat:Connect(function(dt)
+        -- hitung fps smoothing (update tiap frame), tapi render text hanya tiap 0.25s
+        local fps = 1 / math.max(dt, 1/1000)
+        fpsAvg = fpsAvg + (fps - fpsAvg) * alpha
+
+        accT += dt
+        if accT < 0.25 then return end
+        accT = 0
 
         local ping = 0
         pcall(function()
@@ -4013,24 +4010,20 @@ local function CreateOverlay()
             ping = tonumber(string.match(s,"(%d+)")) or 0
         end)
 
-        label.Text = string.format("FPS: %d | Ping: %dms", fpsAvg, ping)
+        label.Text = string.format("FPS: %d | Ping: %dms", math.floor(fpsAvg+0.5), ping)
     end)
 
     return gui
 end
 
-local OverlayObj = nil
-
 TabMisc:Toggle("Enable Stats Overlay", function(v)
     if v then
-        if not OverlayObj then
-            OverlayObj = CreateOverlay()
+        if not OverlayGui then
+            OverlayGui = CreateOverlay()
         end
     else
-        if OverlayObj then
-            OverlayObj:Destroy()
-            OverlayObj = nil
-        end
+        if OverlayConn then OverlayConn:Disconnect() OverlayConn=nil end
+        if OverlayGui then OverlayGui:Destroy() OverlayGui=nil end
     end
 end)
 
