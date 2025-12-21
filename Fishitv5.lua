@@ -129,6 +129,61 @@ GUI:CreateToggle({
 local teleportTab = GUI:CreateTab("Teleport", "map")
 
 --------------------------------------------------
+-- TELEPORT ISLAND
+--------------------------------------------------
+GUI:CreateSection({
+    parent = teleportTab,
+    text = "Teleport Island"
+})
+
+local islands = {
+    ["Fisherman Island"] = CFrame.new(128.62, 3.53, 2783.18),
+    ["Kohana"] = CFrame.new(-663.9, 3.04, 718.79),
+    ["Kohana Volcano"] = CFrame.new(-572.87, 22.45, 148.35),
+    ["Lost Isle"] = CFrame.new(-3618.15, 240.83, -1317.45),
+    ["Sisyphus Statue"] = CFrame.new(-3727.16, -135.07, -1014.4),
+    ["Treasure Room"] = CFrame.new(-3606.34, -266.57, -1580.97),
+    ["Esoteric Depths"] = CFrame.new(3248.37, -1301.53, 1403.82),
+    ["Coral Reefs"] = CFrame.new(-3114.78, 1.32, 2237.52),
+    ["Crater Island"] = CFrame.new(987.96, 3.3, 5148.49),
+    ["Tropical Grove"] = CFrame.new(-2095.34, 197.19, 3718.08),
+    ["Weather Machine"] = CFrame.new(-1488.51, 83.17, 1876.3),
+    ["Underground Cellar"] = CFrame.new(2135.89, -91.2, -698.5),
+    ["Ancient Jungle"] = CFrame.new(1483.11, 11.14, -300.08),
+    ["Sacred Temple"] = CFrame.new(1506.53, -22.13, -640.17),
+    ["Ancient Ruin"] = CFrame.new(6040.64, -578.44, 4715.02),
+    ["Crystalline Passage"] = CFrame.new(6049.71, -538.9, 4385.69),
+    ["Classic Island"] = CFrame.new(1246.1, 13.7, 2852.7),
+    ["Iron Cavern"] = CFrame.new(-8795.1, -580, 91.6),
+    ["Iron Cafe"] = CFrame.new(-8641.5, -542.8, 161.3),
+}
+
+local islandNames = {}
+for k in pairs(islands) do table.insert(islandNames, k) end
+table.sort(islandNames)
+
+local selectedIsland
+
+GUI:CreateDropdown({
+    parent = teleportTab,
+    text = "Select Island",
+    options = islandNames,
+    callback = function(name)
+        selectedIsland = name
+    end
+})
+
+GUI:CreateButton({
+    parent = teleportTab,
+    text = "Teleport To Island",
+    callback = function()
+        if selectedIsland then
+            smoothTeleport(islands[selectedIsland] * CFrame.new(0, 3, 0))
+        end
+    end
+})
+
+--------------------------------------------------
 -- TELEPORT PLAYER
 --------------------------------------------------
 GUI:CreateSection({ parent = teleportTab, text = "Teleport Player" })
