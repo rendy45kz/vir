@@ -315,100 +315,213 @@ GUI:CreateToggle({
 })
 
 --------------------------------------------------
--- TAB : KICK PLAYER
+-- TAB MISC : DESYNC CHARACTER
 --------------------------------------------------
-local kickTab = GUI:CreateTab("Kick", "ban")
+local RunService = game:GetService("RunService")
+local Players    = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local miscTab = GUI:CreateTab("Misc", "zap")
 
 GUI:CreateSection({
-    parent = kickTab,
-    text = "Kick Player"
+    parent = miscTab,
+    text = "Desync Character (Real Limits)"
 })
 
 --------------------------------------------------
--- PLAYER LIST
+-- UTIL
 --------------------------------------------------
-local function getKickPlayers()
-    local list = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        table.insert(list, p.Name)
-    end
-    table.sort(list)
-    return list
-end
-
-local selectedKickPlayer = nil
-
-local kickDropdown = GUI:CreateDropdown({
-    parent = kickTab,
-    text = "Select Player",
-    options = getKickPlayers(),
-    callback = function(v)
-        selectedKickPlayer = v
-    end
-})
-
-GUI:CreateButton({
-    parent = kickTab,
-    text = "Refresh Player List",
-    callback = function()
-        kickDropdown:Refresh(getKickPlayers())
-    end
-})
-
---------------------------------------------------
--- FIND KICK REMOTE (AUTO SCAN)
---------------------------------------------------
-local function findKickRemote()
-    for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
-        if r:IsA("RemoteEvent") or r:IsA("RemoteFunction") then
-            local n = r.Name:lower()
-            if n:find("kick") or n:find("ban") or n:find("remove") then
-                return r
-            end
-        end
-    end
-    return nil
+local function getHRP()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
 end
 
 --------------------------------------------------
--- KICK BUTTON
+-- STATE
 --------------------------------------------------
-GUI:CreateButton({
-    parent = kickTab,
-    text = "Kick Selected Player",
-    callback = function()
-        if not selectedKickPlayer then return end
+local Desync = {
+    VoidLock = false,
+    FakeDesync = false,
+}
 
-        local target = Players:FindFirstChild(selectedKickPlayer)
-        if not target then return end
+local savedCFrame = nil
+local desyncConn = nil
 
-        -- 1️⃣ Kick diri sendiri
-        if target == LocalPlayer then
-            LocalPlayer:Kick("Kicked by Aegis HUB")
-            return
-        end
+--------------------------------------------------
+-- VOID LOCK (REAL POSITIONING)
+--------------------------------------------------
+local VOID_CF = CFrame.new(9e6, -9e6, 9e6) -- sangat jauh dari map
 
-        -- 2️⃣ Coba kick via remote (jika game punya)
-        local remote = findKickRemote()
-        if remote then
-            pcall(function()
-                if remote:IsA("RemoteEvent") then
-                    remote:FireServer(target)
-                else
-                    remote:InvokeServer(target)
-                end
-            end)
+local function enableVoidLock()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    savedCFrame = hrp.CFrame
+    hrp.Anchored = true
+    hrp.CFrame = VOID_CF
+end
+
+local function disableVoidLock()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    hrp.Anchored = false
+    if savedCFrame then
+        hrp.CFrame = savedCFrame
+    end
+    savedCFrame = nil
+end
+
+--------------------------------------------------
+-- FAKE DESYNC (SEMI-REAL, TEMPORARY)
+--------------------------------------------------
+local function startFakeDesync()
+    if desyncConn then return end
+
+    desyncConn = RunService.RenderStepped:Connect(function()
+        if not Desync.FakeDesync then return end
+        local hrp = getHRP()
+        if not hrp then return end
+
+        -- micro jitter (visual desync)
+        local offset = CFrame.new(
+            math.random(-2,2) * 0.05,
+            math.random(-2,2) * 0.03,
+            math.random(-2,2) * 0.05
+        )
+        hrp.CFrame = hrp.CFrame * offset
+        hrp.AssemblyLinearVelocity = Vector3.new(
+            math.random(-3,3),
+            hrp.AssemblyLinearVelocity.Y,
+            math.random(-3,3)
+        )
+    end)
+end
+
+local function stopFakeDesync()
+    if desyncConn then
+        desyncConn:Disconnect()
+        desyncConn = nil
+    end
+end
+
+--------------------------------------------------
+-- UI : TOGGLES
+--------------------------------------------------
+GUI:CreateToggle({
+    parent = miscTab,
+    text = "Void Lock (Hide from Map Area)",
+    default = false,
+    callback = function(state)
+        Desync.VoidLock = state
+        if state then
+            enableVoidLock()
         else
-            warn("[Kick] Remote kick tidak ditemukan di game ini.")
+            disableVoidLock()
+        end
+    end
+})
+
+GUI:CreateToggle({
+    parent = miscTab,
+    text = "Fake Desync (Visual Glitch)",
+    default = false,
+    callback = function(state)
+        Desync.FakeDesync = state
+        if state then
+            startFakeDesync()
+        else
+            stopFakeDesync()
         end
     end
 })
 
 --------------------------------------------------
--- INFO LABEL
+-- SAFETY : RESET ON RESPAWN
 --------------------------------------------------
-GUI:CreateLabel({
-    parent = kickTab,
-    text = "⚠️ Note:\n• Kick player lain hanya berfungsi jika game punya Kick Remote\n• Kick diri sendiri selalu berfungsi"
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.2)
+    Desync.VoidLock = false
+    Desync.FakeDesync = false
+    stopFakeDesync()
+    savedCFrame = nil
+end)
+
+--------------------------------------------------
+-- ANTI LOCK CAMERA DESYNC (REAL, SAFE)
+--------------------------------------------------
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local AntiCam = {
+    Enabled = false
+}
+
+local camConn = nil
+
+local function applyCameraFix()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    Camera.CameraType = Enum.CameraType.Custom
+    Camera.CameraSubject = hum
+end
+
+local function enableAntiCam()
+    if camConn then return end
+
+    applyCameraFix()
+
+    camConn = RunService.RenderStepped:Connect(function()
+        if not AntiCam.Enabled then return end
+
+        -- Paksa camera tetap normal
+        if Camera.CameraType ~= Enum.CameraType.Custom then
+            applyCameraFix()
+        end
+
+        if Camera.CameraSubject ~= LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            applyCameraFix()
+        end
+    end)
+end
+
+local function disableAntiCam()
+    if camConn then
+        camConn:Disconnect()
+        camConn = nil
+    end
+end
+
+--------------------------------------------------
+-- UI TOGGLE
+--------------------------------------------------
+GUI:CreateToggle({
+    parent = miscTab,
+    text = "Anti Lock Camera Desync",
+    default = false,
+    callback = function(state)
+        AntiCam.Enabled = state
+        if state then
+            enableAntiCam()
+        else
+            disableAntiCam()
+        end
+    end
 })
+
+--------------------------------------------------
+-- SAFETY RESET
+--------------------------------------------------
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.2)
+    if AntiCam.Enabled then
+        applyCameraFix()
+    end
+end)
 
