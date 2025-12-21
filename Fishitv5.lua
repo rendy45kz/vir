@@ -8,10 +8,10 @@ local GUI = loadstring(game:HttpGet(
 --------------------------------------------------
 -- SERVICES
 --------------------------------------------------
-local Players     = game:GetService("Players")
+local Players      = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local Camera      = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+local Camera       = workspace.CurrentCamera
+local LocalPlayer  = Players.LocalPlayer
 
 --------------------------------------------------
 -- STATE (OBSERVER)
@@ -32,7 +32,7 @@ GUI:CreateMain({
 })
 
 --------------------------------------------------
--- MAIN TAB
+-- MAIN TAB (OBSERVER)
 --------------------------------------------------
 local mainTab = GUI:CreateTab("Main", "home")
 
@@ -76,7 +76,7 @@ local function resetCamera()
 end
 
 --------------------------------------------------
--- APPLY SPECTATE
+-- APPLY SPECTATE (REAL AUTO SWITCH)
 --------------------------------------------------
 local function applySpectate(player)
     if not observerEnabled or not player then return end
@@ -138,7 +138,7 @@ GUI:CreateToggle({
 })
 
 --------------------------------------------------
--- UNLIMITED ZOOM
+-- UNLIMITED CAMERA ZOOM
 --------------------------------------------------
 GUI:CreateToggle({
     parent = mainTab,
@@ -179,7 +179,7 @@ local function smoothTeleport(cf)
 
     local tween = TweenService:Create(
         hrp,
-        TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
         { CFrame = cf }
     )
     tween:Play()
@@ -190,7 +190,66 @@ local function smoothTeleport(cf)
 end
 
 --------------------------------------------------
--- ISLAND DATA (VECTOR3 / CFRAME MIX)
+-- TELEPORT PLAYER
+--------------------------------------------------
+GUI:CreateDropdown({
+    parent = teleportTab,
+    text = "Teleport Player",
+    options = getPlayerNames(),
+    callback = function(name)
+        local target = Players:FindFirstChild(name)
+        if not target or not target.Character then return end
+
+        local myHRP = getHRP(LocalPlayer.Character)
+        local tHRP = getHRP(target.Character)
+        if myHRP and tHRP then
+            smoothTeleport(tHRP.CFrame * CFrame.new(0, 0, -4))
+        end
+    end
+})
+
+--------------------------------------------------
+-- TELEPORT NPC
+--------------------------------------------------
+local function getNPCFolder()
+    return workspace:FindFirstChild("NPC")
+        or workspace:FindFirstChild("NPCs")
+end
+
+local function getNPCList()
+    local list = {}
+    local folder = getNPCFolder()
+    if not folder then return list end
+
+    for _, npc in ipairs(folder:GetChildren()) do
+        if npc:IsA("Model") then
+            table.insert(list, npc.Name)
+        end
+    end
+    return list
+end
+
+GUI:CreateDropdown({
+    parent = teleportTab,
+    text = "Teleport NPC",
+    options = getNPCList(),
+    callback = function(name)
+        local folder = getNPCFolder()
+        if not folder then return end
+        local npc = folder:FindFirstChild(name)
+        if not npc then return end
+
+        local npcHRP = npc:FindFirstChild("HumanoidRootPart") or npc.PrimaryPart
+        local myHRP = getHRP(LocalPlayer.Character)
+
+        if myHRP and npcHRP then
+            smoothTeleport(npcHRP.CFrame * CFrame.new(0, 0, -4))
+        end
+    end
+})
+
+--------------------------------------------------
+-- ISLAND LIST (FULL CFRAME)
 --------------------------------------------------
 local islands = {
     ["Fisherman Island"] = CFrame.new(128.62, 3.53, 2783.18),
@@ -218,7 +277,6 @@ local islands = {
     ["Iron Cafe"] = CFrame.new(-8641.5, -542.8, 161.3),
 }
 
-
 local islandList = {}
 for name in pairs(islands) do
     table.insert(islandList, name)
@@ -226,7 +284,7 @@ end
 table.sort(islandList)
 
 --------------------------------------------------
--- TELEPORT ISLAND (SMOOTH + SAFE)
+-- TELEPORT ISLAND
 --------------------------------------------------
 GUI:CreateSection({
     parent = teleportTab,
@@ -237,17 +295,192 @@ GUI:CreateDropdown({
     parent = teleportTab,
     text = "Select Island",
     options = islandList,
-    callback = function(islandName)
-        local data = islands[islandName]
-        if not data then return end
-
-        local cf
-        if typeof(data) == "CFrame" then
-            cf = data
-        else
-            cf = CFrame.new(data + Vector3.new(0, 3, 0))
+    callback = function(name)
+        local cf = islands[name]
+        if cf then
+            smoothTeleport(cf * CFrame.new(0, 3, 0))
         end
-
-        smoothTeleport(cf)
     end
 })
+
+--------------------------------------------------
+-- EVENT TAB
+--------------------------------------------------
+local eventTab = GUI:CreateTab("Event", "gift")
+
+GUI:CreateSection({
+    parent = eventTab,
+    text = "Auto Event System"
+})
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+local EventCfg = {
+    Enabled = false,
+    Cooldown = 5 -- 2 jam
+}
+
+local nextAt = 0
+local loopRunning = false
+
+--------------------------------------------------
+-- FORMAT TIME
+--------------------------------------------------
+local function fmt(sec)
+    sec = math.max(0, math.floor(sec or 0))
+    local h = math.floor(sec / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    local s = sec % 60
+    return string.format("%02d:%02d:%02d", h, m, s)
+end
+
+--------------------------------------------------
+-- LIVE LABEL
+--------------------------------------------------
+local statusLabel = GUI:CreateLabel({
+    parent = eventTab,
+    text = "Status: OFF\nCooldown: 02:00:00\nNext in: --:--:--"
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        local left = (EventCfg.Enabled and nextAt > 0) and (nextAt - tick()) or 0
+        statusLabel:Set(
+    string.format(
+        "Status: %s\nCooldown: 00:00:05\nNext in: %s",
+        EventCfg.Enabled and "ON" or "OFF",
+        (EventCfg.Enabled and nextAt > 0) and fmt(left) or "--:--:--"
+    )
+)
+
+    end
+end)
+
+--------------------------------------------------
+-- FIND REMOTE FUNCTION
+--------------------------------------------------
+local function getSpecialDialogueRF()
+    -- Net module
+    local ok1, rf1 = pcall(function()
+        local pkg = ReplicatedStorage:FindFirstChild("Packages")
+        if pkg and pkg:FindFirstChild("Net") then
+            local Net = require(pkg.Net)
+            if Net and typeof(Net.RemoteFunction) == "function" then
+                return Net:RemoteFunction("SpecialDialogueEvent")
+            end
+        end
+    end)
+    if ok1 and rf1 then return rf1 end
+
+    -- sleitnick_net fallback
+    local ok2, rf2 = pcall(function()
+        local net = ReplicatedStorage
+            :WaitForChild("Packages")
+            :WaitForChild("_Index")
+            :WaitForChild("sleitnick_net@0.2.0")
+            :WaitForChild("net")
+
+        return net:FindFirstChild("RF/SpecialDialogueEvent")
+            or net:FindFirstChild("SpecialDialogueEvent")
+    end)
+
+    if ok2 then return rf2 end
+    return nil
+end
+
+--------------------------------------------------
+-- NPC SCAN (AUTO)
+--------------------------------------------------
+local function listNPCNames()
+    local found = {}
+    for _, m in ipairs(Workspace:GetDescendants()) do
+        if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
+            if m:FindFirstChildOfClass("Humanoid") then
+                found[m.Name] = true
+            end
+        end
+    end
+
+    local list = {}
+    for n in pairs(found) do table.insert(list, n) end
+    table.sort(list)
+    return list
+end
+
+--------------------------------------------------
+-- RUN ONCE
+--------------------------------------------------
+local function runOnce()
+    local rf = getSpecialDialogueRF()
+    if not rf then
+        warn("[Event] SpecialDialogueEvent RF tidak ditemukan")
+        return
+    end
+
+    local npcList = listNPCNames()
+    if #npcList == 0 then
+        warn("[Event] NPC tidak ditemukan")
+        return
+    end
+
+    for _, npcName in ipairs(npcList) do
+        pcall(function()
+            -- Event 1
+            rf:InvokeServer(npcName, "ChristmasPresents")
+            task.wait(0.05)
+
+            -- Event 2 (Door)
+            rf:InvokeServer(npcName, "PresentsChristmasDoor")
+        end)
+
+        task.wait(0.15) -- aman, mobile-friendly
+    end
+end
+
+--------------------------------------------------
+-- LOOP SYSTEM
+--------------------------------------------------
+local function eventLoop()
+    if loopRunning then return end
+    loopRunning = true
+
+    while EventCfg.Enabled do
+        runOnce()
+        nextAt = tick() + EventCfg.Cooldown
+
+        while EventCfg.Enabled and tick() < nextAt do
+            task.wait(1)
+        end
+    end
+
+    loopRunning = false
+    nextAt = 0
+end
+
+--------------------------------------------------
+-- TOGGLE UI
+--------------------------------------------------
+
+GUI:CreateToggle({
+    parent = eventTab,
+    text = "Enable Auto Christmas Presents",
+    default = false,
+    callback = function(state)
+        EventCfg.Enabled = state
+        nextAt = 0
+
+        if state then
+            task.spawn(eventLoop)
+        end
+    end
+})
+
