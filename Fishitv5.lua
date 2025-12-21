@@ -314,3 +314,101 @@ GUI:CreateToggle({
     end
 })
 
+--------------------------------------------------
+-- TAB : KICK PLAYER
+--------------------------------------------------
+local kickTab = GUI:CreateTab("Kick", "ban")
+
+GUI:CreateSection({
+    parent = kickTab,
+    text = "Kick Player"
+})
+
+--------------------------------------------------
+-- PLAYER LIST
+--------------------------------------------------
+local function getKickPlayers()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        table.insert(list, p.Name)
+    end
+    table.sort(list)
+    return list
+end
+
+local selectedKickPlayer = nil
+
+local kickDropdown = GUI:CreateDropdown({
+    parent = kickTab,
+    text = "Select Player",
+    options = getKickPlayers(),
+    callback = function(v)
+        selectedKickPlayer = v
+    end
+})
+
+GUI:CreateButton({
+    parent = kickTab,
+    text = "Refresh Player List",
+    callback = function()
+        kickDropdown:Refresh(getKickPlayers())
+    end
+})
+
+--------------------------------------------------
+-- FIND KICK REMOTE (AUTO SCAN)
+--------------------------------------------------
+local function findKickRemote()
+    for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
+        if r:IsA("RemoteEvent") or r:IsA("RemoteFunction") then
+            local n = r.Name:lower()
+            if n:find("kick") or n:find("ban") or n:find("remove") then
+                return r
+            end
+        end
+    end
+    return nil
+end
+
+--------------------------------------------------
+-- KICK BUTTON
+--------------------------------------------------
+GUI:CreateButton({
+    parent = kickTab,
+    text = "Kick Selected Player",
+    callback = function()
+        if not selectedKickPlayer then return end
+
+        local target = Players:FindFirstChild(selectedKickPlayer)
+        if not target then return end
+
+        -- 1️⃣ Kick diri sendiri
+        if target == LocalPlayer then
+            LocalPlayer:Kick("Kicked by Aegis HUB")
+            return
+        end
+
+        -- 2️⃣ Coba kick via remote (jika game punya)
+        local remote = findKickRemote()
+        if remote then
+            pcall(function()
+                if remote:IsA("RemoteEvent") then
+                    remote:FireServer(target)
+                else
+                    remote:InvokeServer(target)
+                end
+            end)
+        else
+            warn("[Kick] Remote kick tidak ditemukan di game ini.")
+        end
+    end
+})
+
+--------------------------------------------------
+-- INFO LABEL
+--------------------------------------------------
+GUI:CreateLabel({
+    parent = kickTab,
+    text = "⚠️ Note:\n• Kick player lain hanya berfungsi jika game punya Kick Remote\n• Kick diri sendiri selalu berfungsi"
+})
+
