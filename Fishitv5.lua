@@ -272,7 +272,7 @@ GUI:CreateSection({ parent = eventTab, text = "Christmas Event" })
 
 local EventCfg = {
     Enabled = false,
-    Cooldown = 5
+    Cooldown = 3600
 }
 
 local function getEventRF()
