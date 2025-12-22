@@ -526,6 +526,17 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
+-- ANTI AFK (AUTO ON)
+--------------------------------------------------
+task.spawn(function()
+    local VirtualUser = game:GetService("VirtualUser")
+    LocalPlayer.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end)
+
+--------------------------------------------------
 -- ANTI FALL DAMAGE (AUTO ENABLE)
 --------------------------------------------------
 task.spawn(function()
