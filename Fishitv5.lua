@@ -25,6 +25,7 @@ GUI:CreateMain({
     WindowIcon = "home"
 })
 
+
 --------------------------------------------------
 -- UTIL
 --------------------------------------------------
@@ -79,6 +80,191 @@ local function getNPCList()
     table.sort(list)
     return list
 end
+
+--------------------------------------------------
+-- FARMING TAB
+--------------------------------------------------
+local farmingTab = GUI:CreateTab("Farming", "fish")
+
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Auto Fishing System"
+})
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- CONFIG (ANDROID FRIENDLY)
+--------------------------------------------------
+local FarmConfig = {
+    AutoFishing = false,
+    Method = "Fast", -- Fast / Instant
+    AutoPerfectCast = true,
+    AutoEquipRod = true,
+    InstantDelay = 1.7,
+    DelayPerLoop = 1.2
+}
+
+--------------------------------------------------
+-- NET REMOTES
+--------------------------------------------------
+local Net = require(ReplicatedStorage.Packages.Net)
+
+local ChargeFishingRod = Net:RemoteFunction("ChargeFishingRod")
+local RequestFishingMinigameStarted = Net:RemoteFunction("RequestFishingMinigameStarted")
+local CancelFishingInputs = Net:RemoteFunction("CancelFishingInputs")
+local EquipToolFromHotbar = Net:RemoteEvent("EquipToolFromHotbar")
+
+--------------------------------------------------
+-- UTILS
+--------------------------------------------------
+local function equipRod()
+    if FarmConfig.AutoEquipRod then
+        EquipToolFromHotbar:FireServer(1)
+    end
+end
+
+local function getCastPower()
+    if FarmConfig.AutoPerfectCast then
+        return 0.98
+    end
+    return math.random(70, 95) / 100
+end
+
+--------------------------------------------------
+-- AUTO FAST FISHING
+--------------------------------------------------
+local function autoFastFishing()
+    while FarmConfig.AutoFishing and FarmConfig.Method == "Fast" do
+        pcall(function()
+            equipRod()
+
+            local castPower = getCastPower()
+            local serverTime = Workspace:GetServerTimeNow()
+
+            -- Charge
+            ChargeFishingRod:InvokeServer(serverTime)
+            task.wait(0.12)
+
+            -- Start fishing
+            RequestFishingMinigameStarted:InvokeServer(
+                0,
+                castPower,
+                Workspace:GetServerTimeNow()
+            )
+        end)
+
+        task.wait(FarmConfig.DelayPerLoop)
+    end
+end
+
+--------------------------------------------------
+-- AUTO INSTANT FISHING
+--------------------------------------------------
+local function autoInstantFishing()
+    while FarmConfig.AutoFishing and FarmConfig.Method == "Instant" do
+        pcall(function()
+            equipRod()
+
+            CancelFishingInputs:InvokeServer()
+
+            RequestFishingMinigameStarted:InvokeServer(
+                0,
+                getCastPower(),
+                Workspace:GetServerTimeNow()
+            )
+        end)
+
+        task.wait(FarmConfig.InstantDelay)
+    end
+end
+
+--------------------------------------------------
+-- START FARMING
+--------------------------------------------------
+local function startAutoFishing()
+    task.spawn(function()
+        if FarmConfig.Method == "Fast" then
+            autoFastFishing()
+        else
+            autoInstantFishing()
+        end
+    end)
+end
+
+--------------------------------------------------
+-- UI CONTROLS
+--------------------------------------------------
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Auto Fishing",
+    default = false,
+    callback = function(v)
+        FarmConfig.AutoFishing = v
+        if v then
+            startAutoFishing()
+        end
+    end
+})
+
+GUI:CreateDropdown({
+    parent = farmingTab,
+    text = "Fishing Method",
+    options = {"Fast", "Instant"},
+    callback = function(v)
+        FarmConfig.Method = v
+    end
+})
+
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Auto Perfect Cast",
+    default = true,
+    callback = function(v)
+        FarmConfig.AutoPerfectCast = v
+    end
+})
+
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Auto Equip Fishing Rod",
+    default = true,
+    callback = function(v)
+        FarmConfig.AutoEquipRod = v
+    end
+})
+
+GUI:CreateSlider({
+    parent = farmingTab,
+    text = "Instant Fishing Delay",
+    min = 0.1,
+    max = 3,
+    default = 1.7,
+    precise = 2,
+    callback = function(v)
+        FarmConfig.InstantDelay = v
+    end
+})
+
+GUI:CreateSlider({
+    parent = farmingTab,
+    text = "Fast Method Loop Delay",
+    min = 0.5,
+    max = 3,
+    default = 1.2,
+    precise = 2,
+    callback = function(v)
+        FarmConfig.DelayPerLoop = v
+    end
+})
+
 
 --------------------------------------------------
 -- TAB : CAMERA
