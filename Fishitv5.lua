@@ -315,213 +315,239 @@ GUI:CreateToggle({
 })
 
 --------------------------------------------------
--- TAB MISC : DESYNC CHARACTER
+-- PLAYER TAB
 --------------------------------------------------
-local RunService = game:GetService("RunService")
-local Players    = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local miscTab = GUI:CreateTab("Misc", "zap")
+local playerTab = GUI:CreateTab("Player", "user")
 
 GUI:CreateSection({
-    parent = miscTab,
-    text = "Desync Character (Real Limits)"
+    parent = playerTab,
+    text = "Player Movement"
 })
 
 --------------------------------------------------
--- UTIL
+-- SERVICES
 --------------------------------------------------
-local function getHRP()
-    local char = LocalPlayer.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 --------------------------------------------------
--- STATE
+-- PLAYER STATE
 --------------------------------------------------
-local Desync = {
-    VoidLock = false,
-    FakeDesync = false,
+local PlayerCfg = {
+    Speed = 16,
+    Jump = 50,
+    Fly = false,
+    FlySpeed = 60,
+    NoClip = false,
+    WalkOnWater = false,
+    SwimSpeed = false,
+    SwimValue = 30
 }
 
-local savedCFrame = nil
-local desyncConn = nil
-
 --------------------------------------------------
--- VOID LOCK (REAL POSITIONING)
+-- CHARACTER UTILS
 --------------------------------------------------
-local VOID_CF = CFrame.new(9e6, -9e6, 9e6) -- sangat jauh dari map
-
-local function enableVoidLock()
-    local hrp = getHRP()
-    if not hrp then return end
-
-    savedCFrame = hrp.CFrame
-    hrp.Anchored = true
-    hrp.CFrame = VOID_CF
+local function getChar()
+    return LocalPlayer.Character
 end
 
-local function disableVoidLock()
-    local hrp = getHRP()
-    if not hrp then return end
+local function getHum()
+    local c = getChar()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
 
-    hrp.Anchored = false
-    if savedCFrame then
-        hrp.CFrame = savedCFrame
-    end
-    savedCFrame = nil
+local function getHRP()
+    local c = getChar()
+    return c and c:FindFirstChild("HumanoidRootPart")
 end
 
 --------------------------------------------------
--- FAKE DESYNC (SEMI-REAL, TEMPORARY)
+-- SPEED
 --------------------------------------------------
-local function startFakeDesync()
-    if desyncConn then return end
-
-    desyncConn = RunService.RenderStepped:Connect(function()
-        if not Desync.FakeDesync then return end
-        local hrp = getHRP()
-        if not hrp then return end
-
-        -- micro jitter (visual desync)
-        local offset = CFrame.new(
-            math.random(-2,2) * 0.05,
-            math.random(-2,2) * 0.03,
-            math.random(-2,2) * 0.05
-        )
-        hrp.CFrame = hrp.CFrame * offset
-        hrp.AssemblyLinearVelocity = Vector3.new(
-            math.random(-3,3),
-            hrp.AssemblyLinearVelocity.Y,
-            math.random(-3,3)
-        )
-    end)
-end
-
-local function stopFakeDesync()
-    if desyncConn then
-        desyncConn:Disconnect()
-        desyncConn = nil
-    end
-end
-
---------------------------------------------------
--- UI : TOGGLES
---------------------------------------------------
-GUI:CreateToggle({
-    parent = miscTab,
-    text = "Void Lock (Hide from Map Area)",
-    default = false,
-    callback = function(state)
-        Desync.VoidLock = state
-        if state then
-            enableVoidLock()
-        else
-            disableVoidLock()
-        end
-    end
-})
-
-GUI:CreateToggle({
-    parent = miscTab,
-    text = "Fake Desync (Visual Glitch)",
-    default = false,
-    callback = function(state)
-        Desync.FakeDesync = state
-        if state then
-            startFakeDesync()
-        else
-            stopFakeDesync()
-        end
+GUI:CreateSlider({
+    parent = playerTab,
+    text = "Walk Speed",
+    min = 16,
+    max = 300,
+    default = 16,
+    callback = function(v)
+        PlayerCfg.Speed = v
+        local hum = getHum()
+        if hum then hum.WalkSpeed = v end
     end
 })
 
 --------------------------------------------------
--- SAFETY : RESET ON RESPAWN
+-- JUMP POWER
 --------------------------------------------------
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.2)
-    Desync.VoidLock = false
-    Desync.FakeDesync = false
-    stopFakeDesync()
-    savedCFrame = nil
+GUI:CreateSlider({
+    parent = playerTab,
+    text = "Jump Power",
+    min = 50,
+    max = 300,
+    default = 50,
+    callback = function(v)
+        PlayerCfg.Jump = v
+        local hum = getHum()
+        if hum then hum.JumpPower = v end
+    end
+})
+
+--------------------------------------------------
+-- NO CLIP
+--------------------------------------------------
+GUI:CreateToggle({
+    parent = playerTab,
+    text = "No Clip",
+    default = false,
+    callback = function(state)
+        PlayerCfg.NoClip = state
+    end
+})
+
+RunService.Stepped:Connect(function()
+    if PlayerCfg.NoClip then
+        local char = getChar()
+        if char then
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
+            end
+        end
+    end
 end)
 
 --------------------------------------------------
--- ANTI LOCK CAMERA DESYNC (REAL, SAFE)
+-- WALK ON WATER (REAL)
 --------------------------------------------------
-local Camera = workspace.CurrentCamera
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local waterPart
 
-local AntiCam = {
-    Enabled = false
-}
-
-local camConn = nil
-
-local function applyCameraFix()
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum then return end
-
-    Camera.CameraType = Enum.CameraType.Custom
-    Camera.CameraSubject = hum
-end
-
-local function enableAntiCam()
-    if camConn then return end
-
-    applyCameraFix()
-
-    camConn = RunService.RenderStepped:Connect(function()
-        if not AntiCam.Enabled then return end
-
-        -- Paksa camera tetap normal
-        if Camera.CameraType ~= Enum.CameraType.Custom then
-            applyCameraFix()
-        end
-
-        if Camera.CameraSubject ~= LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            applyCameraFix()
-        end
-    end)
-end
-
-local function disableAntiCam()
-    if camConn then
-        camConn:Disconnect()
-        camConn = nil
-    end
-end
-
---------------------------------------------------
--- UI TOGGLE
---------------------------------------------------
 GUI:CreateToggle({
-    parent = miscTab,
-    text = "Anti Lock Camera Desync",
+    parent = playerTab,
+    text = "Walk On Water",
     default = false,
     callback = function(state)
-        AntiCam.Enabled = state
-        if state then
-            enableAntiCam()
-        else
-            disableAntiCam()
+        PlayerCfg.WalkOnWater = state
+
+        if not state and waterPart then
+            waterPart:Destroy()
+            waterPart = nil
         end
     end
 })
 
---------------------------------------------------
--- SAFETY RESET
---------------------------------------------------
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.2)
-    if AntiCam.Enabled then
-        applyCameraFix()
+RunService.Heartbeat:Connect(function()
+    if not PlayerCfg.WalkOnWater then return end
+
+    local hrp = getHRP()
+    if not hrp then return end
+
+    if not waterPart then
+        waterPart = Instance.new("Part")
+        waterPart.Size = Vector3.new(20, 1, 20)
+        waterPart.Anchored = true
+        waterPart.CanCollide = true
+        waterPart.Transparency = 1
+        waterPart.Parent = workspace
     end
+
+    waterPart.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
+end)
+
+--------------------------------------------------
+-- FLY (REAL)
+--------------------------------------------------
+local bv, bg
+
+GUI:CreateToggle({
+    parent = playerTab,
+    text = "Fly",
+    default = false,
+    callback = function(state)
+        PlayerCfg.Fly = state
+
+        local hrp = getHRP()
+        if not hrp then return end
+
+        if state then
+            bv = Instance.new("BodyVelocity", hrp)
+            bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+
+            bg = Instance.new("BodyGyro", hrp)
+            bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bg.CFrame = hrp.CFrame
+        else
+            if bv then bv:Destroy() end
+            if bg then bg:Destroy() end
+        end
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if PlayerCfg.Fly and bv and bg then
+        local cam = workspace.CurrentCamera
+        bv.Velocity = cam.CFrame.LookVector * PlayerCfg.FlySpeed
+        bg.CFrame = cam.CFrame
+    end
+end)
+
+--------------------------------------------------
+-- SWIM SPEED
+--------------------------------------------------
+GUI:CreateSlider({
+    parent = playerTab,
+    text = "Swim Speed",
+    min = 16,
+    max = 200,
+    default = 30,
+    callback = function(v)
+        PlayerCfg.SwimValue = v
+    end
+})
+
+GUI:CreateToggle({
+    parent = playerTab,
+    text = "Enable Swim Speed",
+    default = false,
+    callback = function(state)
+        PlayerCfg.SwimSpeed = state
+    end
+})
+
+task.spawn(function()
+    while task.wait(0.2) do
+        if not PlayerCfg.SwimSpeed then continue end
+        local hum = getHum()
+        if hum and hum:GetState() == Enum.HumanoidStateType.Swimming then
+            hum.WalkSpeed = PlayerCfg.SwimValue
+        end
+    end
+end)
+
+--------------------------------------------------
+-- ANTI FALL DAMAGE (AUTO ENABLE)
+--------------------------------------------------
+task.spawn(function()
+    local function applyAntiFall(char)
+        local hum = char:WaitForChild("Humanoid", 5)
+        if not hum then return end
+
+        hum.StateChanged:Connect(function(_, new)
+            if new == Enum.HumanoidStateType.Freefall then
+                task.wait(0.1)
+                hum:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end)
+    end
+
+    if LocalPlayer.Character then
+        applyAntiFall(LocalPlayer.Character)
+    end
+
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(0.2)
+        applyAntiFall(char)
+    end)
 end)
 
