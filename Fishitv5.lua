@@ -200,24 +200,16 @@ local function StartBlatantFishing()
                 local chargeTime = workspace:GetServerTimeNow()
 
                 -- spam charge
-                Remotes.ChargeRod:InvokeServer(chargeTime)
-
+                Remotes.ChargeRod:InvokeServer(100)
+                task.wait(0.001)
                 -- spam start minigame
-                Remotes.StartMini:InvokeServer(
-                    math.random(1, 5),      -- fake water Y
-                    1,                      -- max power
-                    workspace:GetServerTimeNow()
-                )
-
-                -- delay reel (SUPER CEPAT)
-                task.wait(ReelDelay)
-
+                Remotes.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+                
                 -- force complete
+                task.wait(CompleteDelay)
                 Remotes.FinishFish:FireServer()
+                        
             end)
-
-            -- delay antar siklus
-            task.wait(CompleteDelay)
         end
     end)
 end
@@ -239,13 +231,13 @@ local function FarmingLoop()
             for i = 1, 5 do
                 if not AutoFishing then break end
                 FishOnce()
-                task.wait(0.05)
+                task.wait(0.001)
             end
         else
             FishOnce()
         end
 
-        task.wait(0.2)
+        task.wait(0.001)
     end
 
     LoopRunning = false
