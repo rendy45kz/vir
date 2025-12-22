@@ -563,14 +563,35 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- TAB MISC
+-- MISC TAB
 --------------------------------------------------
 local miscTab = GUI:CreateTab("Misc", "settings")
 
 GUI:CreateSection({
     parent = miscTab,
-    text = "Performance & Network"
+    text = "Performance & Utility"
 })
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local Players     = game:GetService("Players")
+local RunService  = game:GetService("RunService")
+local Lighting    = game:GetService("Lighting")
+local Stats       = game:GetService("Stats")
+local VirtualUser = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera      = workspace.CurrentCamera
+
+--------------------------------------------------
+-- ANTI AFK (AUTO ON)
+--------------------------------------------------
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0,0), Camera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0,0), Camera.CFrame)
+end)
 
 --------------------------------------------------
 -- UNLOCK FPS
@@ -581,52 +602,62 @@ GUI:CreateToggle({
     default = true,
     callback = function(state)
         if setfpscap then
-            if state then
-                setfpscap(999)
-            else
-                setfpscap(60)
-            end
+            setfpscap(state and 999 or 60)
         end
     end
 })
 
 --------------------------------------------------
--- FPS BOOSTER (GRAPHIC OPTIMIZATION)
+-- FPS BOOSTER
 --------------------------------------------------
-local Lighting = game:GetService("Lighting")
-
-local original = {
-    GlobalShadows = Lighting.GlobalShadows,
-    FogEnd = Lighting.FogEnd,
-    Brightness = Lighting.Brightness
-}
-
 GUI:CreateToggle({
     parent = miscTab,
     text = "FPS Booster",
     default = false,
     callback = function(state)
-        if state then
-            Lighting.GlobalShadows = false
-            Lighting.FogEnd = 1e9
-            Lighting.Brightness = 1
-            for _, v in ipairs(workspace:GetDescendants()) do
-                if v:IsA("ParticleEmitter")
-                or v:IsA("Trail")
-                or v:IsA("Beam") then
-                    v.Enabled = false
-                elseif v:IsA("BasePart") then
-                    v.Material = Enum.Material.Plastic
-                    v.Reflectance = 0
-                end
+        if not state then return end
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.Material = Enum.Material.Plastic
+                v.Reflectance = 0
+            elseif v:IsA("ParticleEmitter")
+            or v:IsA("Trail")
+            or v:IsA("Beam") then
+                v.Enabled = false
             end
-        else
-            Lighting.GlobalShadows = original.GlobalShadows
-            Lighting.FogEnd = original.FogEnd
-            Lighting.Brightness = original.Brightness
         end
+        Lighting.GlobalShadows = false
     end
 })
+
+--------------------------------------------------
+-- CPU OPTIMIZER
+--------------------------------------------------
+GUI:CreateToggle({
+    parent = miscTab,
+    text = "Optimized CPU Usage",
+    default = false,
+    callback = function(state)
+        RunService:Set3dRenderingEnabled(not state)
+    end
+})
+
+--------------------------------------------------
+-- LIVE PING
+--------------------------------------------------
+GUI:CreateLabel({
+    parent = miscTab,
+    text = "Ping: -- ms"
+})
+
+task.spawn(function()
+    while task.wait(1) do
+        local ping = math.floor(
+            Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+        )
+        miscTab:FindFirstChildWhichIsA("TextLabel").Text = "Ping: "..ping.." ms"
+    end
+end)
 
 --------------------------------------------------
 -- PERFORMANCE PRESET
@@ -636,26 +667,21 @@ GUI:CreateSection({
     text = "Performance Preset"
 })
 
-local Lighting = game:GetService("Lighting")
-
 local function applyPreset(mode)
     if mode == "LOW" then
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level03
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 5000
-        Lighting.Brightness = 1.5
 
     elseif mode == "MEDIUM" then
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level06
         Lighting.GlobalShadows = true
         Lighting.FogEnd = 100000
-        Lighting.Brightness = 2
 
     elseif mode == "EXTREME" then
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 1e9
-        Lighting.Brightness = 1
 
         for _, v in ipairs(workspace:GetDescendants()) do
             if v:IsA("ParticleEmitter")
@@ -670,60 +696,8 @@ local function applyPreset(mode)
     end
 end
 
-GUI:CreateButton({
-    parent = miscTab,
-    text = "Preset: LOW",
-    callback = function()
-        applyPreset("LOW")
-    end
-})
+GUI:CreateButton({ parent = miscTab, text = "Preset: LOW", callback = function() applyPreset("LOW") end })
+GUI:CreateButton({ parent = miscTab, text = "Preset: MEDIUM", callback = function() applyPreset("MEDIUM") end })
+GUI:CreateButton({ parent = miscTab, text = "Preset: EXTREME", callback = function() applyPreset("EXTREME") end })
 
-GUI:CreateButton({
-    parent = miscTab,
-    text = "Preset: MEDIUM",
-    callback = function()
-        applyPreset("MEDIUM")
-    end
-})
-
-GUI:CreateButton({
-    parent = miscTab,
-    text = "Preset: EXTREME",
-    callback = function()
-        applyPreset("EXTREME")
-    end
-})
-
---------------------------------------------------
--- CPU OPTIMIZATION (CLIENT SIDE)
---------------------------------------------------
-GUI:CreateToggle({
-    parent = miscTab,
-    text = "Optimized CPU Usage",
-    default = true,
-    callback = function(state)
-        settings().Rendering.QualityLevel =
-            state and Enum.QualityLevel.Level01
-            or Enum.QualityLevel.Automatic
-    end
-})
-
---------------------------------------------------
--- LIVE PING DISPLAY
---------------------------------------------------
-local Stats = game:GetService("Stats")
-
-local pingLabel = GUI:CreateLabel({
-    parent = miscTab,
-    text = "Ping: -- ms"
-})
-
-task.spawn(function()
-    while task.wait(1) do
-        pcall(function()
-            local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-            pingLabel:Set(string.format("Ping: %d ms", math.floor(ping)))
-        end)
-    end
-end)
 
