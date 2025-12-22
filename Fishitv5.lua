@@ -82,7 +82,7 @@ local function getNPCList()
 end
 
 --------------------------------------------------
--- FARMING TAB (SAFE VERSION)
+-- FARMING TAB (SAFE / ANDROID)
 --------------------------------------------------
 local farmingTab = GUI:CreateTab("Farming", "fish")
 
@@ -96,160 +96,152 @@ GUI:CreateSection({
 --------------------------------------------------
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
--- SAFE REQUIRE
---------------------------------------------------
-local Net, Replion, Constants, RaycastUtility
-local ok
-
-ok, Net = pcall(function()
-    return require(ReplicatedStorage.Packages.Net)
-end)
-
-ok, Replion = pcall(function()
-    return require(ReplicatedStorage.Packages.Replion)
-end)
-
-ok, Constants = pcall(function()
-    return require(ReplicatedStorage.Shared.Constants)
-end)
-
-ok, RaycastUtility = pcall(function()
-    return require(ReplicatedStorage.Shared.RaycastUtility)
-end)
-
---------------------------------------------------
--- REMOTES (SAFE)
---------------------------------------------------
-local ChargeFishingRod
-local RequestFishingMinigame
-local CancelFishing
-local EquipTool
-local FishingCompleted
-
-if Net then
-    ChargeFishingRod = Net:RemoteFunction("ChargeFishingRod")
-    RequestFishingMinigame = Net:RemoteFunction("RequestFishingMinigameStarted")
-    CancelFishing = Net:RemoteFunction("CancelFishingInputs")
-    EquipTool = Net:RemoteEvent("EquipToolFromHotbar")
-    FishingCompleted = Net:RemoteEvent("FishingCompleted")
-end
-
---------------------------------------------------
 -- STATE
 --------------------------------------------------
-local Farming = {
-    Enabled = false,
-    ReelDelay = 0.15,
-    CompleteDelay = 0.35,
-    Busy = false
-}
+local AutoFishing = false
+local ReelDelay = 0.6
+local CompleteDelay = 0.3
+local LoopRunning = false
 
 --------------------------------------------------
--- UTILS (SAFE)
+-- SAFE NET FETCH
+--------------------------------------------------
+local net
+pcall(function()
+    net = ReplicatedStorage
+        :WaitForChild("Packages", 10)
+        :WaitForChild("_Index", 10)
+        :WaitForChild("sleitnick_net@0.2.0", 10)
+        :WaitForChild("net", 10)
+end)
+
+if not net then
+    warn("[FARMING] Net not found, farming disabled")
+end
+
+local EquipTool = net and net:FindFirstChild("RE/EquipToolFromHotbar")
+local ChargeRod = net and net:FindFirstChild("RF/ChargeFishingRod")
+local StartMini = net and net:FindFirstChild("RF/RequestFishingMinigameStarted")
+local FinishFish = net and net:FindFirstChild("RE/FishingCompleted")
+
+--------------------------------------------------
+-- UTIL
 --------------------------------------------------
 local function getHRP()
     local c = LocalPlayer.Character
     return c and c:FindFirstChild("HumanoidRootPart")
 end
 
-local function getRaycast()
-    if not Constants then return nil end
-    local hrp = getHRP()
-    if not hrp then return nil end
-
-    local origin = (hrp.CFrame + hrp.CFrame.LookVector * 12).Position
-    local dir = Vector3.new(0, -Constants.FishingDistance, 0)
-
-    local params = RaycastParams.new()
-    params.IgnoreWater = true
-    params.FilterDescendantsInstances = {LocalPlayer.Character}
-    params.FilterType = Enum.RaycastFilterType.Exclude
-
-    return Workspace:Spherecast(origin, 2, dir, params)
-end
-
 --------------------------------------------------
--- MAIN FISH FUNCTION (SAFE)
+-- CORE FISHING FUNCTION
 --------------------------------------------------
 local function doFishing()
-    if Farming.Busy or not Net then return end
-    Farming.Busy = true
+    if not net then return end
+    if not getHRP() then return end
 
-    local ray = getRaycast()
-    if ray then
+    -- Auto equip rod
+    if EquipTool then
         pcall(function()
-            ChargeFishingRod:InvokeServer(Workspace:GetServerTimeNow())
-            RequestFishingMinigame:InvokeServer(
-                ray.Position.Y,
-                0.97,
-                Workspace:GetServerTimeNow()
-            )
-
-            task.wait(Farming.ReelDelay)
-            FishingCompleted:FireServer()
+            EquipTool:FireServer(1)
         end)
     end
 
-    task.wait(Farming.CompleteDelay)
-    Farming.Busy = false
+    task.wait(ReelDelay)
+
+    -- Charge rod
+    if ChargeRod then
+        pcall(function()
+            ChargeRod:InvokeServer(workspace:GetServerTimeNow())
+        end)
+    end
+
+    task.wait(0.15)
+
+    -- Start minigame
+    if StartMini then
+        pcall(function()
+            StartMini:InvokeServer(
+                getHRP().Position.Y,
+                0.98,
+                workspace:GetServerTimeNow()
+            )
+        end)
+    end
+
+    task.wait(CompleteDelay)
+
+    -- Finish fishing
+    if FinishFish then
+        pcall(function()
+            FinishFish:FireServer()
+        end)
+    end
 end
 
 --------------------------------------------------
--- LOOP (SAFE)
+-- LOOP
 --------------------------------------------------
-task.spawn(function()
-    while task.wait(0.25) do
-        if Farming.Enabled then
-            doFishing()
-        end
+local function farmingLoop()
+    if LoopRunning then return end
+    LoopRunning = true
+
+    while AutoFishing do
+        doFishing()
+        task.wait(0.4)
     end
-end)
+
+    LoopRunning = false
+end
 
 --------------------------------------------------
--- UI
+-- UI CONTROLS
 --------------------------------------------------
 GUI:CreateToggle({
     parent = farmingTab,
     text = "Enable Auto Fishing",
     default = false,
-    callback = function(v)
-        Farming.Enabled = v
+    callback = function(state)
+        AutoFishing = state
+        if state then
+            task.spawn(farmingLoop)
+        end
     end
 })
 
-GUI:CreateBox({
+GUI:CreateSlider({
     parent = farmingTab,
-    text = "Reel Delay (sec)",
-    placeholder = "0.15",
+    text = "Reel Delay",
+    min = 0.1,
+    max = 2,
+    default = ReelDelay,
     callback = function(v)
-        local n = tonumber(v)
-        if n then Farming.ReelDelay = math.clamp(n, 0.01, 2) end
+        ReelDelay = v
     end
 })
 
-GUI:CreateBox({
+GUI:CreateSlider({
     parent = farmingTab,
-    text = "Complete Delay (sec)",
-    placeholder = "0.35",
+    text = "Complete Delay",
+    min = 0.1,
+    max = 2,
+    default = CompleteDelay,
     callback = function(v)
-        local n = tonumber(v)
-        if n then Farming.CompleteDelay = math.clamp(n, 0.05, 3) end
+        CompleteDelay = v
     end
 })
 
---------------------------------------------------
--- STATUS INFO
---------------------------------------------------
-GUI:CreateLabel({
+GUI:CreateButton({
     parent = farmingTab,
-    text = "Status: Ready (Safe Mode)"
+    text = "Manual Fish Once",
+    callback = function()
+        doFishing()
+    end
 })
-
 
 
 --------------------------------------------------
