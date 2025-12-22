@@ -106,8 +106,9 @@ local AutoFishing = false
 local BlatantMode = false
 local InstantMode = false
 
-local ReelDelay = 0.6
-local CompleteDelay = 0.3
+local ReelDelay = 0.05
+local CompleteDelay = 0.05
+local BlatantFishing = false
 
 local LoopRunning = false
 
@@ -185,6 +186,46 @@ local function FishOnce()
     end
 end
 
+local function StartBlatantFishing()
+    if BlatantFishing then return end
+    BlatantFishing = true
+
+    task.spawn(function()
+        while BlatantFishing do
+            pcall(function()
+                -- pastikan rod
+                Remotes.EquipTool:FireServer(1)
+
+                -- waktu server
+                local chargeTime = workspace:GetServerTimeNow()
+
+                -- spam charge
+                Remotes.ChargeRod:InvokeServer(chargeTime)
+
+                -- spam start minigame
+                Remotes.StartMini:InvokeServer(
+                    math.random(1, 5),      -- fake water Y
+                    1,                      -- max power
+                    workspace:GetServerTimeNow()
+                )
+
+                -- delay reel (SUPER CEPAT)
+                task.wait(ReelDelay)
+
+                -- force complete
+                Remotes.FinishFish:FireServer()
+            end)
+
+            -- delay antar siklus
+            task.wait(CompleteDelay)
+        end
+    end)
+end
+
+local function StopBlatantFishing()
+    BlatantFishing = false
+end
+
 --------------------------------------------------
 -- LOOP SYSTEM
 --------------------------------------------------
@@ -236,6 +277,20 @@ GUI:CreateToggle({
         end
     end
 })
+
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Blatant Fishing (x5 Speed)",
+    default = false,
+    callback = function(v)
+        if v then
+            StartBlatantFishing()
+        else
+            StopBlatantFishing()
+        end
+    end
+})
+
 
 GUI:CreateToggle({
     parent = farmingTab,
