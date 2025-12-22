@@ -82,7 +82,7 @@ local function getNPCList()
 end
 
 --------------------------------------------------
--- FARMING TAB (SAFE / ANDROID)
+-- FARMING TAB (UPGRADE / BLATANT READY)
 --------------------------------------------------
 local farmingTab = GUI:CreateTab("Farming", "fish")
 
@@ -96,7 +96,6 @@ GUI:CreateSection({
 --------------------------------------------------
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -104,70 +103,74 @@ local LocalPlayer = Players.LocalPlayer
 -- STATE
 --------------------------------------------------
 local AutoFishing = false
+local BlatantMode = false
+local InstantMode = false
+
 local ReelDelay = 0.6
 local CompleteDelay = 0.3
+
 local LoopRunning = false
 
 --------------------------------------------------
--- SAFE NET FETCH
+-- NET
 --------------------------------------------------
-local net
-pcall(function()
-    net = ReplicatedStorage
-        :WaitForChild("Packages", 10)
-        :WaitForChild("_Index", 10)
-        :WaitForChild("sleitnick_net@0.2.0", 10)
-        :WaitForChild("net", 10)
-end)
+local net = ReplicatedStorage
+    :WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
 
-if not net then
-    warn("[FARMING] Net not found, farming disabled")
-end
-
-local EquipTool = net and net:FindFirstChild("RE/EquipToolFromHotbar")
-local ChargeRod = net and net:FindFirstChild("RF/ChargeFishingRod")
-local StartMini = net and net:FindFirstChild("RF/RequestFishingMinigameStarted")
-local FinishFish = net and net:FindFirstChild("RE/FishingCompleted")
+local EquipTool = net:FindFirstChild("RE/EquipToolFromHotbar")
+local ChargeRod = net:FindFirstChild("RF/ChargeFishingRod")
+local StartMini = net:FindFirstChild("RF/RequestFishingMinigameStarted")
+local FinishFish = net:FindFirstChild("RE/FishingCompleted")
 
 --------------------------------------------------
 -- UTIL
 --------------------------------------------------
-local function getHRP()
+local function HRP()
     local c = LocalPlayer.Character
     return c and c:FindFirstChild("HumanoidRootPart")
 end
 
 --------------------------------------------------
--- CORE FISHING FUNCTION
+-- CORE FISH LOGIC
 --------------------------------------------------
-local function doFishing()
-    if not net then return end
-    if not getHRP() then return end
+local function FishOnce()
+    if not HRP() then return end
 
-    -- Auto equip rod
+    -- Auto Equip
     if EquipTool then
         pcall(function()
             EquipTool:FireServer(1)
         end)
     end
 
+    -- INSTANT MODE (ONLY COMPLETE DELAY)
+    if InstantMode then
+        task.wait(CompleteDelay)
+        if FinishFish then
+            pcall(function()
+                FinishFish:FireServer()
+            end)
+        end
+        return
+    end
+
+    -- NORMAL / BLATANT
     task.wait(ReelDelay)
 
-    -- Charge rod
     if ChargeRod then
         pcall(function()
             ChargeRod:InvokeServer(workspace:GetServerTimeNow())
         end)
     end
 
-    task.wait(0.15)
-
-    -- Start minigame
     if StartMini then
         pcall(function()
             StartMini:InvokeServer(
-                getHRP().Position.Y,
-                0.98,
+                HRP().Position.Y,
+                0.99,
                 workspace:GetServerTimeNow()
             )
         end)
@@ -175,7 +178,6 @@ local function doFishing()
 
     task.wait(CompleteDelay)
 
-    -- Finish fishing
     if FinishFish then
         pcall(function()
             FinishFish:FireServer()
@@ -184,64 +186,104 @@ local function doFishing()
 end
 
 --------------------------------------------------
--- LOOP
+-- LOOP SYSTEM
 --------------------------------------------------
-local function farmingLoop()
+local function FarmingLoop()
     if LoopRunning then return end
     LoopRunning = true
 
     while AutoFishing do
-        doFishing()
-        task.wait(0.4)
+        if BlatantMode then
+            -- BLATANT x5 SPEED
+            for i = 1, 5 do
+                if not AutoFishing then break end
+                FishOnce()
+                task.wait(0.05)
+            end
+        else
+            FishOnce()
+        end
+
+        task.wait(0.2)
     end
 
     LoopRunning = false
 end
 
 --------------------------------------------------
--- UI CONTROLS
+-- UI
 --------------------------------------------------
 GUI:CreateToggle({
     parent = farmingTab,
     text = "Enable Auto Fishing",
     default = false,
-    callback = function(state)
-        AutoFishing = state
-        if state then
-            task.spawn(farmingLoop)
+    callback = function(v)
+        AutoFishing = v
+        if v then
+            task.spawn(FarmingLoop)
         end
     end
 })
 
-GUI:CreateSlider({
+GUI:CreateToggle({
     parent = farmingTab,
-    text = "Reel Delay",
-    min = 0.1,
-    max = 2,
-    default = ReelDelay,
+    text = "Blatant Mode",
+    default = false,
     callback = function(v)
-        ReelDelay = v
+        BlatantMode = v
+        if v then
+            InstantMode = false
+        end
     end
 })
 
-GUI:CreateSlider({
+GUI:CreateToggle({
     parent = farmingTab,
-    text = "Complete Delay",
-    min = 0.1,
-    max = 2,
-    default = CompleteDelay,
+    text = "Instant Mode",
+    default = false,
     callback = function(v)
-        CompleteDelay = v
+        InstantMode = v
+        if v then
+            BlatantMode = false
+        end
     end
 })
+
+GUI:CreateInput({
+    parent = farmingTab,
+    text = "Reel Delay (seconds)",
+    placeholder = "Contoh: 0.5",
+    default = tostring(ReelDelay),
+    callback = function(value)
+        local num = tonumber(value)
+        if num and num >= 0 then
+            ReelDelay = num
+        end
+    end
+})
+
+GUI:CreateInput({
+    parent = farmingTab,
+    text = "Complete Delay (seconds)",
+    placeholder = "Contoh: 0.3",
+    default = tostring(CompleteDelay),
+    callback = function(value)
+        local num = tonumber(value)
+        if num and num >= 0 then
+            CompleteDelay = num
+        end
+    end
+})
+
 
 GUI:CreateButton({
     parent = farmingTab,
     text = "Manual Fish Once",
     callback = function()
-        doFishing()
+        FishOnce()
     end
 })
+
 
 
 --------------------------------------------------
