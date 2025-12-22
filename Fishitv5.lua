@@ -643,61 +643,75 @@ GUI:CreateToggle({
 })
 
 --------------------------------------------------
--- LIVE PING
+-- LIVE PING (FIX)
 --------------------------------------------------
-GUI:CreateLabel({
+local pingLabel = GUI:CreateLabel({
     parent = miscTab,
     text = "Ping: -- ms"
 })
 
 task.spawn(function()
     while task.wait(1) do
-        local ping = math.floor(
-            Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-        )
-        miscTab:FindFirstChildWhichIsA("TextLabel").Text = "Ping: "..ping.." ms"
+        local ok, ping = pcall(function()
+            return math.floor(
+                Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+            )
+        end)
+
+        if ok then
+            pingLabel:Set("Ping: "..ping.." ms")
+        else
+            pingLabel:Set("Ping: -- ms")
+        end
     end
 end)
 
 --------------------------------------------------
--- PERFORMANCE PRESET
+-- PERFORMANCE PRESET (FIX)
 --------------------------------------------------
 GUI:CreateSection({
     parent = miscTab,
     text = "Performance Preset"
 })
 
-local function applyPreset(mode)
-    if mode == "LOW" then
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level03
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 5000
-
-    elseif mode == "MEDIUM" then
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level06
-        Lighting.GlobalShadows = true
-        Lighting.FogEnd = 100000
-
-    elseif mode == "EXTREME" then
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 1e9
-
-        for _, v in ipairs(workspace:GetDescendants()) do
-            if v:IsA("ParticleEmitter")
-            or v:IsA("Trail")
-            or v:IsA("Beam") then
-                v.Enabled = false
-            elseif v:IsA("BasePart") then
-                v.Material = Enum.Material.Plastic
-                v.Reflectance = 0
-            end
+local function clearEffects()
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter")
+        or v:IsA("Trail")
+        or v:IsA("Beam") then
+            v.Enabled = false
+        elseif v:IsA("BasePart") then
+            v.Material = Enum.Material.Plastic
+            v.Reflectance = 0
         end
     end
 end
 
-GUI:CreateButton({ parent = miscTab, text = "Preset: LOW", callback = function() applyPreset("LOW") end })
-GUI:CreateButton({ parent = miscTab, text = "Preset: MEDIUM", callback = function() applyPreset("MEDIUM") end })
-GUI:CreateButton({ parent = miscTab, text = "Preset: EXTREME", callback = function() applyPreset("EXTREME") end })
+GUI:CreateButton({
+    parent = miscTab,
+    text = "Preset: LOW",
+    callback = function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 3000
+        clearEffects()
+    end
+})
 
+GUI:CreateButton({
+    parent = miscTab,
+    text = "Preset: MEDIUM",
+    callback = function()
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 80000
+    end
+})
 
+GUI:CreateButton({
+    parent = miscTab,
+    text = "Preset: EXTREME",
+    callback = function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 1e9
+        clearEffects()
+    end
+})
