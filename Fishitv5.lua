@@ -82,7 +82,7 @@ local function getNPCList()
 end
 
 --------------------------------------------------
--- FARMING TAB
+-- FARMING TAB (AUTO FISHING)
 --------------------------------------------------
 local farmingTab = GUI:CreateTab("Farming", "fish")
 
@@ -101,116 +101,174 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
--- CONFIG (ANDROID FRIENDLY)
---------------------------------------------------
-local FarmConfig = {
-    AutoFishing = false,
-    Method = "Fast", -- Fast / Instant
-    AutoPerfectCast = true,
-    AutoEquipRod = true,
-    InstantDelay = 1.7,
-    DelayPerLoop = 1.2
-}
-
---------------------------------------------------
--- NET REMOTES
+-- NET / MODULE
 --------------------------------------------------
 local Net = require(ReplicatedStorage.Packages.Net)
+local Replion = require(ReplicatedStorage.Packages.Replion)
+local Constants = require(ReplicatedStorage.Shared.Constants)
+local RaycastUtility = require(ReplicatedStorage.Shared.RaycastUtility)
+local PlayerStatsUtility = require(ReplicatedStorage.Shared.PlayerStatsUtility)
+local ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
 
+local DataReplion = Replion.Client:WaitReplion("Data")
+
+--------------------------------------------------
+-- REMOTES
+--------------------------------------------------
 local ChargeFishingRod = Net:RemoteFunction("ChargeFishingRod")
-local RequestFishingMinigameStarted = Net:RemoteFunction("RequestFishingMinigameStarted")
-local CancelFishingInputs = Net:RemoteFunction("CancelFishingInputs")
-local EquipToolFromHotbar = Net:RemoteEvent("EquipToolFromHotbar")
+local RequestFishingMinigame = Net:RemoteFunction("RequestFishingMinigameStarted")
+local CancelFishing = Net:RemoteFunction("CancelFishingInputs")
+local EquipTool = Net:RemoteEvent("EquipToolFromHotbar")
+local FishingCompleted = Net:RemoteEvent("FishingCompleted")
+
+--------------------------------------------------
+-- STATE
+--------------------------------------------------
+local Farming = {
+    Enabled = false,
+    Method = "Fast",       -- Fast / Instant
+    AutoPerfect = true,
+    AutoEquip = true,
+    ReelDelay = 0.15,      -- ⏱ custom
+    CompleteDelay = 0.35,  -- ⏱ custom
+    Busy = false,
+}
 
 --------------------------------------------------
 -- UTILS
 --------------------------------------------------
-local function equipRod()
-    if FarmConfig.AutoEquipRod then
-        EquipToolFromHotbar:FireServer(1)
+local function isRodEquipped()
+    if DataReplion:GetExpect("EquippedType") == "Fishing Rods" then
+        return true
     end
+    if Farming.AutoEquip then
+        EquipTool:FireServer(1)
+        task.wait(0.25)
+        return true
+    end
+    return false
 end
 
+local function getRaycast()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local origin = (hrp.CFrame + hrp.CFrame.LookVector * 12).Position
+    local direction = Vector3.new(0, -Constants.FishingDistance, 0)
+
+    local params = RaycastParams.new()
+    params.IgnoreWater = true
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char}
+
+    return Workspace:Spherecast(origin, 2, direction, params)
+end
+
+--------------------------------------------------
+-- CAST POWER
+--------------------------------------------------
 local function getCastPower()
-    if FarmConfig.AutoPerfectCast then
-        return 0.98
+    if Farming.AutoPerfect then
+        return math.random(95, 99) / 100
     end
-    return math.random(70, 95) / 100
+    return math.random(55, 85) / 100
 end
 
 --------------------------------------------------
--- AUTO FAST FISHING
+-- FAST METHOD
 --------------------------------------------------
-local function autoFastFishing()
-    while FarmConfig.AutoFishing and FarmConfig.Method == "Fast" do
-        pcall(function()
-            equipRod()
+local function fastFishing()
+    if Farming.Busy then return end
+    Farming.Busy = true
 
-            local castPower = getCastPower()
-            local serverTime = Workspace:GetServerTimeNow()
-
-            -- Charge
-            ChargeFishingRod:InvokeServer(serverTime)
-            task.wait(0.12)
-
-            -- Start fishing
-            RequestFishingMinigameStarted:InvokeServer(
-                0,
-                castPower,
-                Workspace:GetServerTimeNow()
-            )
-        end)
-
-        task.wait(FarmConfig.DelayPerLoop)
+    if not isRodEquipped() then
+        Farming.Busy = false
+        return
     end
+
+    local ray = getRaycast()
+    if not ray then
+        Farming.Busy = false
+        return
+    end
+
+    local castPower = getCastPower()
+    local serverTime = Workspace:GetServerTimeNow()
+
+    ChargeFishingRod:InvokeServer(serverTime)
+    task.wait(0.08)
+
+    local success = RequestFishingMinigame:InvokeServer(
+        ray.Position.Y,
+        castPower,
+        Workspace:GetServerTimeNow()
+    )
+
+    if success then
+        task.wait(Farming.ReelDelay)
+        FishingCompleted:FireServer()
+    end
+
+    task.wait(Farming.CompleteDelay)
+    Farming.Busy = false
 end
 
 --------------------------------------------------
--- AUTO INSTANT FISHING
+-- INSTANT METHOD
 --------------------------------------------------
-local function autoInstantFishing()
-    while FarmConfig.AutoFishing and FarmConfig.Method == "Instant" do
-        pcall(function()
-            equipRod()
+local function instantFishing()
+    if Farming.Busy then return end
+    Farming.Busy = true
 
-            CancelFishingInputs:InvokeServer()
-
-            RequestFishingMinigameStarted:InvokeServer(
-                0,
-                getCastPower(),
-                Workspace:GetServerTimeNow()
-            )
-        end)
-
-        task.wait(FarmConfig.InstantDelay)
+    if not isRodEquipped() then
+        Farming.Busy = false
+        return
     end
+
+    CancelFishing:InvokeServer()
+
+    local ray = getRaycast()
+    if ray then
+        ChargeFishingRod:InvokeServer(Workspace:GetServerTimeNow())
+        RequestFishingMinigame:InvokeServer(
+            ray.Position.Y,
+            getCastPower(),
+            Workspace:GetServerTimeNow()
+        )
+
+        task.wait(Farming.ReelDelay)
+        FishingCompleted:FireServer()
+    end
+
+    task.wait(Farming.CompleteDelay)
+    Farming.Busy = false
 end
 
 --------------------------------------------------
--- START FARMING
+-- LOOP
 --------------------------------------------------
-local function startAutoFishing()
-    task.spawn(function()
-        if FarmConfig.Method == "Fast" then
-            autoFastFishing()
+task.spawn(function()
+    while task.wait(0.15) do
+        if not Farming.Enabled then continue end
+
+        if Farming.Method == "Fast" then
+            fastFishing()
         else
-            autoInstantFishing()
+            instantFishing()
         end
-    end)
-end
+    end
+end)
 
 --------------------------------------------------
 -- UI CONTROLS
 --------------------------------------------------
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Auto Fishing",
+    text = "Enable Auto Fishing",
     default = false,
     callback = function(v)
-        FarmConfig.AutoFishing = v
-        if v then
-            startAutoFishing()
-        end
+        Farming.Enabled = v
     end
 })
 
@@ -219,7 +277,7 @@ GUI:CreateDropdown({
     text = "Fishing Method",
     options = {"Fast", "Instant"},
     callback = function(v)
-        FarmConfig.Method = v
+        Farming.Method = v
     end
 })
 
@@ -228,7 +286,7 @@ GUI:CreateToggle({
     text = "Auto Perfect Cast",
     default = true,
     callback = function(v)
-        FarmConfig.AutoPerfectCast = v
+        Farming.AutoPerfect = v
     end
 })
 
@@ -237,31 +295,34 @@ GUI:CreateToggle({
     text = "Auto Equip Fishing Rod",
     default = true,
     callback = function(v)
-        FarmConfig.AutoEquipRod = v
+        Farming.AutoEquip = v
     end
 })
 
-GUI:CreateSlider({
+--------------------------------------------------
+-- CUSTOM DELAY INPUT
+--------------------------------------------------
+GUI:CreateBox({
     parent = farmingTab,
-    text = "Instant Fishing Delay",
-    min = 0.1,
-    max = 3,
-    default = 1.7,
-    precise = 2,
+    text = "Reel Delay (seconds)",
+    placeholder = "0.15",
     callback = function(v)
-        FarmConfig.InstantDelay = v
+        local n = tonumber(v)
+        if n then
+            Farming.ReelDelay = math.clamp(n, 0.01, 2)
+        end
     end
 })
 
-GUI:CreateSlider({
+GUI:CreateBox({
     parent = farmingTab,
-    text = "Fast Method Loop Delay",
-    min = 0.5,
-    max = 3,
-    default = 1.2,
-    precise = 2,
+    text = "Complete Delay (seconds)",
+    placeholder = "0.35",
     callback = function(v)
-        FarmConfig.DelayPerLoop = v
+        local n = tonumber(v)
+        if n then
+            Farming.CompleteDelay = math.clamp(n, 0.05, 3)
+        end
     end
 })
 
