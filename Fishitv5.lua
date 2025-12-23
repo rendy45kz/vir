@@ -81,6 +81,7 @@ local function getNPCList()
     return list
 end
 
+
 ------------------------------------------------------------
 -- TAB FARMING
 ------------------------------------------------------------
@@ -88,7 +89,7 @@ local farmingTab = GUI:CreateTab("Farming", "fish")
 
 GUI:CreateSection({
     parent = farmingTab,
-    text = "Auto Fishing"
+    text = "Blatant Auto Fishing"
 })
 
 ------------------------------------------------------------
@@ -101,7 +102,7 @@ local Workspace         = game:GetService("Workspace")
 local LocalPlayer       = Players.LocalPlayer
 
 ------------------------------------------------------------
--- NET
+-- NET & EVENTS
 ------------------------------------------------------------
 local netIndex = ReplicatedStorage:WaitForChild("Packages")
 	:WaitForChild("_Index")
@@ -117,11 +118,15 @@ local Events = {
     equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
 }
 
+-- Remote AutoFishing bawaan game
+local SetAutoFishing = net:FindFirstChild("RF/UpdateAutoFishingState")
+
 ------------------------------------------------------------
 -- CONFIG
 ------------------------------------------------------------
 local Config = {
 	Enabled       = false,
+	UseGameAuto   = true,
 	ReelDelay     = 0.25,
 	CompleteDelay = 0.25,
 	PerfectCast   = true,
@@ -132,9 +137,7 @@ local loopRunning = false
 ------------------------------------------------------------
 -- HELPERS
 ------------------------------------------------------------
-local function _wait(t)
-	task.wait(t or 0.01)
-end
+local function _wait(t) task.wait(t or 0.01) end
 
 local function getServerTime()
 	local ok, t = pcall(function()
@@ -144,11 +147,7 @@ local function getServerTime()
 end
 
 local function getCastPower()
-	if Config.PerfectCast then
-		return 0.99
-	else
-		return 0.75 + math.random() * 0.2
-	end
+	return Config.PerfectCast and 0.99 or (0.70 + math.random() * 0.25)
 end
 
 local function ensureChar()
@@ -158,32 +157,38 @@ local function ensureChar()
 end
 
 ------------------------------------------------------------
--- SATU SIKLUS FISHING (BLATANT MODE)
+-- AUTO ENABLE GAME AUTO-FISHING
+------------------------------------------------------------
+local function enableGameAutoFishing(on)
+	if not SetAutoFishing then return end
+	pcall(function()
+		SetAutoFishing:InvokeServer(on)
+	end)
+end
+
+------------------------------------------------------------
+-- SATU SIKLUS BLATANT FISHING (SPAM CEPAT)
 ------------------------------------------------------------
 local function doBlatantCycle()
 	local char = ensureChar()
 
-	-- Auto equip hotbar slot 1
-	pcall(function()
-		Events.equipHotbar:FireServer(1)
-	end)
-	_wait(0.01)
-
-	-- SPAM Charge
+	-- SPAM charge rod
 	pcall(function()
 		Events.chargeRod:InvokeServer(100)
 	end)
 
+	-- Reel delay (waktu tarik)
 	_wait(math.max(Config.ReelDelay, 0.02))
 
-	-- Mulai minigame
+	-- SPAM start minigame
 	pcall(function()
 		Events.startMini:InvokeServer(-1, getCastPower())
 	end)
 
+	-- Complete delay (waktu ikan naik)
 	_wait(math.max(Config.CompleteDelay, 0.02))
 
-	-- Spam fishing complete ×5 (x5 speed)
+	-- SPAM fishing completed x5
 	for i = 1, 5 do
 		pcall(function()
 			Events.completeFish:FireServer()
@@ -199,16 +204,27 @@ local function mainLoop()
 	if loopRunning then return end
 	loopRunning = true
 
+	-- Hidupkan AutoFish GAME
+	if Config.UseGameAuto then
+		enableGameAutoFishing(true)
+	end
+
+	-- Loop Blatant
 	while Config.Enabled do
 		doBlatantCycle()
 		task.wait(0.01)
+	end
+
+	-- Matikan AutoFish GAME saat berhenti
+	if Config.UseGameAuto then
+		enableGameAutoFishing(false)
 	end
 
 	loopRunning = false
 end
 
 ------------------------------------------------------------
--- START / STOP
+-- START & STOP
 ------------------------------------------------------------
 local Farming = {}
 
@@ -223,44 +239,46 @@ function Farming:Stop()
 end
 
 ------------------------------------------------------------
--- GUI IMPLEMENTATION
+-- GUI ELEMENTS
 ------------------------------------------------------------
+
 GUI:CreateToggle({
 	parent = farmingTab,
-	text = "Enable Auto Fishing (Blatant)",
+	text = "Enable Blatant Fishing",
 	default = false,
 	callback = function(v)
-		if v then
-			Farming:Start()
-		else
-			Farming:Stop()
-		end
+		if v then Farming:Start() else Farming:Stop() end
+	end
+})
+
+GUI:CreateToggle({
+	parent = farmingTab,
+	text = "Use In-Game AutoFishing",
+	default = true,
+	callback = function(v)
+		Config.UseGameAuto = v
 	end
 })
 
 GUI:CreateInput({
 	parent = farmingTab,
 	text = "Reel Delay (seconds)",
-	placeholder = "Misal: 0.25",
+	placeholder = "ex: 0.25",
 	default = tostring(Config.ReelDelay),
 	callback = function(val)
 		local n = tonumber(val)
-		if n then
-			Config.ReelDelay = math.clamp(n, 0.02, 5.0)
-		end
+		if n then Config.ReelDelay = math.clamp(n, 0.02, 5.0) end
 	end
 })
 
 GUI:CreateInput({
 	parent = farmingTab,
 	text = "Complete Delay (seconds)",
-	placeholder = "Misal: 0.25",
+	placeholder = "ex: 0.25",
 	default = tostring(Config.CompleteDelay),
 	callback = function(val)
 		local n = tonumber(val)
-		if n then
-			Config.CompleteDelay = math.clamp(n, 0.02, 5.0)
-		end
+		if n then Config.CompleteDelay = math.clamp(n, 0.02, 5.0) end
 	end
 })
 
