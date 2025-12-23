@@ -140,48 +140,6 @@ local function getServerTime()
     return ok and t or tick()
 end
 
--- generate random UUID
-local function randomUUID()
-    return string.format(
-        "%08x-%04x-%04x-%04x-%012x",
-        math.random(0, 0xffffffff),
-        math.random(0, 0xffff),
-        math.random(0, 0xffff),
-        math.random(0, 0xffff),
-        math.random(0, 0xfffff)
-    )
-end
-
--- REAL NOTIFICATION (mirip video asli)
-local function DoFishNotification()
-    if not Events.NotifyFish then return end
-
-    local fishId    = math.random(150,250)
-    local weight    = math.random() * 3
-    local uuid      = randomUUID()
-
-    firesignal(
-        Events.NotifyFish.OnClientEvent,
-        fishId,
-        { Weight = weight },
-        {
-            CustomDuration = 3,
-            Type = "Item",
-            ItemType = "Fishes",
-            InventoryItem = {
-                Favorited = false,
-                Id = fishId,
-                UUID = uuid,
-                Metadata = {
-                    Weight = weight
-                }
-            },
-            ItemId = fishId
-        },
-        false
-    )
-end
-
 --------------------------------------------------
 -- BLATANT CYCLE
 --------------------------------------------------
@@ -196,26 +154,23 @@ local function BlatantCycle()
         Events.ChargeRod:InvokeServer(100)
     end)
 
-    -- wait reel delay
-    task.wait(Config.ReelDelay)
+    task.wait(0.001)
 
     -- start minigame
     pcall(function()
-        Events.StartMini:InvokeServer(-1.22, getCastPower())
+        Events.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
     end)
-
-    -- wait complete delay
-    task.wait(Config.CompleteDelay)
+    
+    local catchDel = math.max(tonumber(Config.CompleteDelay) or 0.20, 0.02)    
+    task.wait(catchDel)
 
     -- complete fish 1x
-    pcall(function()
-        Events.Complete:FireServer()
-    end)
-
-    -- show real UI notification
-    DoFishNotification()
-
-    task.wait(0.01)
+    for i = 1, 5 do
+        pcall(function()            
+            Events.completeFish:FireServer()
+        end)
+       task.wait(0.001)
+    end    
 end
 
 --------------------------------------------------
@@ -236,23 +191,10 @@ end)
 
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Enable Blatant Fishing",
+    text = "Instant Fishing",
     default = false,
     callback = function(v)
         Config.Enabled = v
-    end
-})
-
-GUI:CreateInput({
-    parent = farmingTab,
-    text = "Reel Delay (seconds)",
-    placeholder = "Example: 0.25",
-    default = tostring(Config.ReelDelay),
-    callback = function(val)
-        local n = tonumber(val)
-        if n then
-            Config.ReelDelay = math.clamp(n, 0.01, 3)
-        end
     end
 })
 
