@@ -121,6 +121,7 @@ local Events = {
     ChargeRod   = net:WaitForChild("RF/ChargeFishingRod"),
     StartMini   = net:WaitForChild("RF/RequestFishingMinigameStarted"),
     Complete    = net:WaitForChild("RE/FishingCompleted"),
+    FishCaught  = net:WaitForChild("RE/FishCaught"),
     Equip       = net:WaitForChild("RE/EquipToolFromHotbar"),
     NotifyFish  = net:FindFirstChild("RE/ObtainedNewFishNotification"),
 }
@@ -156,33 +157,54 @@ local function InstantFishing()
 
     task.wait(0.001)
 
+    -- real raycast Y
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    local yPos = -1.23
+    if hrp then
+        local result = workspace:Raycast(
+            hrp.Position,
+            hrp.CFrame.LookVector * 15,
+            RaycastParams.new()
+        )
+        if result then
+            yPos = result.Position.Y
+        end
+    end
+
     -- start minigame
     local okStart = pcall(function()
         if typeof(Events.StartMini.InvokeServer) == "function" then
-            return Events.StartMini:InvokeServer(-1.23318481, 0.99450348)
+            return Events.StartMini:InvokeServer(yPos, 0.99)
         else
-            Events.StartMini:FireServer(-1.23318481, 0.99450348)
+            Events.StartMini:FireServer(yPos, 0.99)
             return true
         end
     end)
 
     if not okStart then
-        warn("[InstantFish] Gagal start minigame")
+        warn("[InstantFish] Failed to start minigame")
         return
     end
 
-    -- delay sampai complete
-    local delay = math.max(tonumber(Config.CompleteDelay) or 0.20, 0.02)
+    -- wait minimal delay
+    local delay = math.max(Config.CompleteDelay, 0.12)
     task.wait(delay)
 
-    -- complete spam 5x
+    -- fish complete event
     for i = 1, 5 do
-        pcall(function()
-            Events.Complete:FireServer()
+        pcall(function()            
+            if Events.FishCaught then
+                Events.FishCaught:FireServer()
+            elseif Events.completeFish then
+                Events.completeFish:FireServer()
+            end
         end)
         task.wait(0.001)
     end
 end
+
 
 --------------------------------------------------
 -- MAIN LOOP
