@@ -190,6 +190,17 @@ local function mainFishingLoop()
     
 end
 
+local Fishing = {}
+
+function Fishing:Start()
+    if Config.Enabled then return end
+    Config.Enabled = true
+    task.spawn(mainFishingLoop)
+end
+
+function Fishing:Stop()
+    Config.Enabled = false
+end
 
 --------------------------------------------------
 -- GUI ELEMENTS
@@ -200,7 +211,11 @@ GUI:CreateToggle({
     text = "Instant Fishing",
     default = false,
     callback = function(v)
-        Config.Enabled = v
+            if v then
+                Fishing:Start()
+            else
+                Fishing:Stop()
+            end        
     end
 })
 
