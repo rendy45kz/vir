@@ -124,7 +124,7 @@ local Events = {
     Equip       = net:WaitForChild("RE/EquipToolFromHotbar"),
     NotifyFish  = net:FindFirstChild("RE/ObtainedNewFishNotification"),
 }
-
+local loopRunning  = false
 --------------------------------------------------
 -- HELPERS
 --------------------------------------------------
@@ -184,6 +184,20 @@ task.spawn(function()
         end
     end
 end)
+
+local function mainFishingLoop()
+    if loopRunning then return end
+    loopRunning = true
+    
+    while Config.AutoFish do
+        local ok, err = pcall(BlatantCycle)        
+        
+    end
+
+    loopRunning = false
+    
+end
+
 
 --------------------------------------------------
 -- GUI ELEMENTS
