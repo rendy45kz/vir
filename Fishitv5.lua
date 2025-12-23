@@ -176,20 +176,12 @@ end
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-task.spawn(function()
-    while true do
-        task.wait(0.001)
-        if Config.Enabled then
-            pcall(BlatantCycle)
-        end
-    end
-end)
 
 local function mainFishingLoop()
     if loopRunning then return end
     loopRunning = true
     
-    while Config.AutoFish do
+    while Config.Enabled do
         local ok, err = pcall(BlatantCycle)        
         
     end
