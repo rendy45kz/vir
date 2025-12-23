@@ -81,55 +81,171 @@ local function getNPCList()
     return list
 end
 
+--------------------------------------------------
+-- FARMING TAB - AEGIS HUB
+--------------------------------------------------
+local farmingTab = GUI:CreateTab("Farming", "fish")
 
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Instant Fishing"
+})
 
-    ay)fish complete event
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace         = game:GetService("Workspace")
+
+local LocalPlayer       = Players.LocalPlayer
+
+--------------------------------------------------
+-- LOAD NET EVENTS FISH IT
+--------------------------------------------------
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+local Events = {
+    completeFish = netFolder:WaitForChild("RE/FishingCompleted"),
+    sellAll      = netFolder:WaitForChild("RF/SellAllItems"),
+
+    chargeRod    = netFolder:WaitForChild("RF/ChargeFishingRod"),
+    startMini    = netFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
+    cancelMini   = netFolder:WaitForChild("RF/CancelFishingInputs"),
+
+    equipHotbar  = netFolder:WaitForChild("RE/EquipToolFromHotbar"),
+    unequipTool  = netFolder:WaitForChild("RE/UnequipToolFromHotbar"),
+}
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+local Config = {
+    AutoFish    = false,
+    CatchDelay  = 0.25,
+    PerfectCast = true,
+}
+
+local loopRunning = false
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+local function ensureCharacter()
+    local char = LocalPlayer.Character
+    if not char or not char.Parent then
+        char = LocalPlayer.CharacterAdded:Wait()
+    end
+    return char
+end
+
+local function getCastPower()
+    if Config.PerfectCast then
+        return 0.99
+    else
+        return 0.8 + (0.18 * math.random())
+    end
+end
+
+--------------------------------------------------
+-- SUPER INSTANT FISHING
+--------------------------------------------------
+local function doOneBlatantCycle()
+    -- ensure char
+    local char = ensureCharacter()
+
+    ------------------------------------------------------------
+    -- (1) EQUIP FISHING ROD SLOT 1
+    ------------------------------------------------------------
+    pcall(function()
+        Events.equipHotbar:FireServer(1)
+    end)
+
+    ------------------------------------------------------------
+    -- (2) CHARGE ROD
+    ------------------------------------------------------------
+    pcall(function()
+        Events.chargeRod:InvokeServer(100)
+    end)
+    task.wait(0.001)
+
+    ------------------------------------------------------------
+    -- (3) START MINIGAME
+    ------------------------------------------------------------
+    local yPos = -1.23  -- fallback
+
+    -- ambil raycast water Y
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local result = workspace:Raycast(
+            hrp.Position,
+            hrp.CFrame.LookVector * 20,
+            RaycastParams.new()
+        )
+        if result then
+            yPos = result.Position.Y
+        end
+    end
+
+    local okStart = pcall(function()
+        if typeof(Events.startMini.InvokeServer) == "function" then
+            return Events.startMini:InvokeServer(yPos, getCastPower())
+        else
+            Events.startMini:FireServer(yPos, getCastPower())
+        end
+    end)
+
+    if not okStart then
+        warn("[InstantFishing] Failed startMini")
+        return
+    end
+
+    ------------------------------------------------------------
+    -- (4) WAIT CATCH DELAY
+    ------------------------------------------------------------
+    local delay = math.max(tonumber(Config.CatchDelay) or 0.20, 0.05)
+    task.wait(delay)
+
+    ------------------------------------------------------------
+    -- (5) CATCH FISH (FISHING COMPLETED)
+    ------------------------------------------------------------
     for i = 1, 5 do
-        pcall(function()            
-            if Events.FishCaught then
-                Events.FishCaught:FireServer()
-            elseif Events.completeFish then
-                Events.completeFish:FireServer()
-            end
+        pcall(function()
+            Events.completeFish:FireServer()
         end)
         task.wait(0.001)
     end
 end
 
-
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
-local loopRunning = false
-
-local function mainInstantLoop()
+local function mainFishingLoop()
     if loopRunning then return end
     loopRunning = true
-    
-    while Config.Enabled do
-        pcall(InstantFishing)
+
+    while Config.AutoFish do
+        local ok, err = pcall(doOneBlatantCycle)
         task.wait(0.001)
     end
 
     loopRunning = false
 end
 
-
---------------------------------------------------
--- CONTROLLER
---------------------------------------------------
 local Fishing = {}
 
 function Fishing:Start()
-    if Config.Enabled then return end
-    Config.Enabled = true
-    task.spawn(mainInstantLoop)
+    if Config.AutoFish then return end
+    Config.AutoFish = true
+    task.spawn(mainFishingLoop)
 end
 
 function Fishing:Stop()
-    Config.Enabled = false
+    Config.AutoFish = false
 end
-
 
 --------------------------------------------------
 -- GUI ELEMENTS
@@ -137,7 +253,7 @@ end
 
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Instant Fishing",
+    text = "Enable Auto Fishing",
     default = false,
     callback = function(v)
         if v then
@@ -150,19 +266,19 @@ GUI:CreateToggle({
 
 GUI:CreateInput({
     parent = farmingTab,
-    text = "Complete Delay (seconds)",
+    text = "Catch Delay (seconds)",
     placeholder = "Example: 0.25",
-    default = tostring(Config.CompleteDelay),
-    callback = function(val)
-        local n = tonumber(val)
+    default = tostring(Config.CatchDelay),
+    callback = function(txt)
+        local n = tonumber(txt)
         if n then
-            Config.CompleteDelay = math.clamp(n, 0.01, 3)
+            Config.CatchDelay = math.clamp(n, 0.02, 3.0)
         end
     end
 })
 
 
-
+    
 --------------------------------------------------
 -- TAB : CAMERA
 --------------------------------------------------
