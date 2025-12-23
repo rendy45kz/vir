@@ -157,9 +157,20 @@ local function BlatantCycle()
     task.wait(0.001)
 
     -- start minigame
-    pcall(function()
-        Events.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+    local okStart = pcall(function()
+        if typeof(Events.StartMini.InvokeServer) == "function" then
+            return Events.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+        else
+            Events.StartMini:FireServer(-1.233184814453125, 0.9945034885633273)
+            return true
+        end
     end)
+
+    if not okStart then
+        warn("[BlatantFish] gagal start minigame")
+        return
+    end
+    
     
     local catchDel = math.max(tonumber(Config.CompleteDelay) or 0.20, 0.02)    
     task.wait(catchDel)
@@ -183,7 +194,8 @@ local function mainFishingLoop()
     
     while Config.Enabled do
         local ok, err = pcall(BlatantCycle)        
-        
+        taks.wait(0.001)
+        local ok, err = pcall(BlatantCycle)
     end
 
     loopRunning = false
