@@ -141,9 +141,9 @@ local function getServerTime()
 end
 
 --------------------------------------------------
--- BLATANT CYCLE
+-- FAST INSTANT FISHING
 --------------------------------------------------
-local function BlatantCycle()
+local function InstantFishing()
     -- equip rod slot 1
     pcall(function()
         Events.Equip:FireServer(1)
@@ -159,60 +159,64 @@ local function BlatantCycle()
     -- start minigame
     local okStart = pcall(function()
         if typeof(Events.StartMini.InvokeServer) == "function" then
-            return Events.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+            return Events.StartMini:InvokeServer(-1.23318481, 0.99450348)
         else
-            Events.StartMini:FireServer(-1.233184814453125, 0.9945034885633273)
+            Events.StartMini:FireServer(-1.23318481, 0.99450348)
             return true
         end
     end)
 
     if not okStart then
-        warn("[BlatantFish] gagal start minigame")
+        warn("[InstantFish] Gagal start minigame")
         return
     end
-    
-    
-    local catchDel = math.max(tonumber(Config.CompleteDelay) or 0.20, 0.02)    
-    task.wait(catchDel)
 
-    -- complete fish 1x
+    -- delay sampai complete
+    local delay = math.max(tonumber(Config.CompleteDelay) or 0.20, 0.02)
+    task.wait(delay)
+
+    -- complete spam 5x
     for i = 1, 5 do
-        pcall(function()            
+        pcall(function()
             Events.completeFish:FireServer()
         end)
-       task.wait(0.001)
-    end    
+        task.wait(0.001)
+    end
 end
 
 --------------------------------------------------
 -- MAIN LOOP
 --------------------------------------------------
+local loopRunning = false
 
-local function mainFishingLoop()
+local function mainInstantLoop()
     if loopRunning then return end
     loopRunning = true
     
     while Config.Enabled do
-        local ok, err = pcall(BlatantCycle)        
-        taks.wait(0.001)
-        local ok, err = pcall(BlatantCycle)
+        pcall(InstantFishing)
+        task.wait(0.001)
     end
 
     loopRunning = false
-    
 end
 
+
+--------------------------------------------------
+-- CONTROLLER
+--------------------------------------------------
 local Fishing = {}
 
 function Fishing:Start()
     if Config.Enabled then return end
     Config.Enabled = true
-    task.spawn(mainFishingLoop)
+    task.spawn(mainInstantLoop)
 end
 
 function Fishing:Stop()
     Config.Enabled = false
 end
+
 
 --------------------------------------------------
 -- GUI ELEMENTS
@@ -223,11 +227,11 @@ GUI:CreateToggle({
     text = "Instant Fishing",
     default = false,
     callback = function(v)
-            if v then
-                Fishing:Start()
-            else
-                Fishing:Stop()
-            end        
+        if v then
+            Fishing:Start()
+        else
+            Fishing:Stop()
+        end
     end
 })
 
@@ -243,6 +247,7 @@ GUI:CreateInput({
         end
     end
 })
+
 
 
 --------------------------------------------------
