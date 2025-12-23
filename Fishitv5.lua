@@ -178,7 +178,7 @@ local function InstantFishing()
     -- complete spam 5x
     for i = 1, 5 do
         pcall(function()
-            Events.completeFish:FireServer()
+            Events.Complete:FireServer()
         end)
         task.wait(0.001)
     end
