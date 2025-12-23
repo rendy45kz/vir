@@ -81,9 +81,9 @@ local function getNPCList()
     return list
 end
 
---------------------------------------------------
--- FARMING TAB (UPGRADE / BLATANT READY)
---------------------------------------------------
+------------------------------------------------------------
+-- TAB FARMING
+------------------------------------------------------------
 local farmingTab = GUI:CreateTab("Farming", "fish")
 
 GUI:CreateSection({
@@ -91,244 +91,186 @@ GUI:CreateSection({
     text = "Auto Fishing"
 })
 
---------------------------------------------------
+------------------------------------------------------------
 -- SERVICES
---------------------------------------------------
-local Players = game:GetService("Players")
+------------------------------------------------------------
+local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace         = game:GetService("Workspace")
 
-local LocalPlayer = Players.LocalPlayer
+local LocalPlayer       = Players.LocalPlayer
 
---------------------------------------------------
--- STATE
---------------------------------------------------
-local AutoFishing = false
-local BlatantMode = false
-local InstantMode = false
-
-local ReelDelay = 0.05
-local CompleteDelay = 0.05
-local BlatantFishing = false
-
-local LoopRunning = false
-
---------------------------------------------------
+------------------------------------------------------------
 -- NET
---------------------------------------------------
-local net = ReplicatedStorage
-    :WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
+------------------------------------------------------------
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+	:WaitForChild("_Index")
+	:WaitForChild("sleitnick_net@0.2.0")
 
-local EquipTool = net:FindFirstChild("RE/EquipToolFromHotbar")
-local ChargeRod = net:FindFirstChild("RF/ChargeFishingRod")
-local StartMini = net:FindFirstChild("RF/RequestFishingMinigameStarted")
-local FinishFish = net:FindFirstChild("RE/FishingCompleted")
+local net = netIndex:WaitForChild("net")
 
---------------------------------------------------
--- UTIL
---------------------------------------------------
-local function HRP()
-    local c = LocalPlayer.Character
-    return c and c:FindFirstChild("HumanoidRootPart")
+local Events = {
+    completeFish = net:WaitForChild("RE/FishingCompleted"),
+    chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
+    startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
+    cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
+    equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
+}
+
+------------------------------------------------------------
+-- CONFIG
+------------------------------------------------------------
+local Config = {
+	Enabled       = false,
+	ReelDelay     = 0.25,
+	CompleteDelay = 0.25,
+	PerfectCast   = true,
+}
+
+local loopRunning = false
+
+------------------------------------------------------------
+-- HELPERS
+------------------------------------------------------------
+local function _wait(t)
+	task.wait(t or 0.01)
 end
 
---------------------------------------------------
--- CORE FISH LOGIC
---------------------------------------------------
-local function FishOnce()
-    if not HRP() then return end
-
-    -- Auto Equip
-    if EquipTool then
-        pcall(function()
-            EquipTool:FireServer(1)
-        end)
-    end
-
-    -- INSTANT MODE (ONLY COMPLETE DELAY)
-    if InstantMode then
-        task.wait(CompleteDelay)
-        if FinishFish then
-            pcall(function()
-                FinishFish:FireServer()
-            end)
-        end
-        return
-    end
-
-    -- NORMAL / BLATANT
-    task.wait(ReelDelay)
-
-    if ChargeRod then
-        pcall(function()
-            ChargeRod:InvokeServer(workspace:GetServerTimeNow())
-        end)
-    end
-
-    if StartMini then
-        pcall(function()
-            StartMini:InvokeServer(
-                HRP().Position.Y,
-                0.99,
-                workspace:GetServerTimeNow()
-            )
-        end)
-    end
-
-    task.wait(CompleteDelay)
-
-    if FinishFish then
-        pcall(function()
-            FinishFish:FireServer()
-        end)
-    end
+local function getServerTime()
+	local ok, t = pcall(function()
+		return Workspace:GetServerTimeNow()
+	end)
+	return ok and t or tick()
 end
 
-local function StartBlatantFishing()
-    if BlatantFishing then return end
-    BlatantFishing = true
-
-    task.spawn(function()
-        while BlatantFishing do
-            pcall(function()
-                -- pastikan rod
-                Remotes.EquipTool:FireServer(1)
-
-                -- waktu server
-                local chargeTime = workspace:GetServerTimeNow()
-
-                -- spam charge
-                Remotes.ChargeRod:InvokeServer(100)
-                task.wait(0.001)
-                -- spam start minigame
-                Remotes.StartMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
-                
-                -- force complete
-                task.wait(CompleteDelay)
-                Remotes.FinishFish:FireServer()
-                        
-            end)
-        end
-    end)
+local function getCastPower()
+	if Config.PerfectCast then
+		return 0.99
+	else
+		return 0.75 + math.random() * 0.2
+	end
 end
 
-local function StopBlatantFishing()
-    BlatantFishing = false
+local function ensureChar()
+	local c = LocalPlayer.Character
+	if not c or not c.Parent then c = LocalPlayer.CharacterAdded:Wait() end
+	return c
 end
 
---------------------------------------------------
--- LOOP SYSTEM
---------------------------------------------------
-local function FarmingLoop()
-    if LoopRunning then return end
-    LoopRunning = true
+------------------------------------------------------------
+-- SATU SIKLUS FISHING (BLATANT MODE)
+------------------------------------------------------------
+local function doBlatantCycle()
+	local char = ensureChar()
 
-    while AutoFishing do
-        if BlatantMode then
-            -- BLATANT x5 SPEED
-            for i = 1, 5 do
-                if not AutoFishing then break end
-                FishOnce()
-                task.wait(0.001)
-            end
-        else
-            FishOnce()
-        end
+	-- Auto equip hotbar slot 1
+	pcall(function()
+		Events.equipHotbar:FireServer(1)
+	end)
+	_wait(0.01)
 
-        task.wait(0.001)
-    end
+	-- SPAM Charge
+	pcall(function()
+		Events.chargeRod:InvokeServer(100)
+	end)
 
-    LoopRunning = false
+	_wait(math.max(Config.ReelDelay, 0.02))
+
+	-- Mulai minigame
+	pcall(function()
+		Events.startMini:InvokeServer(-1, getCastPower())
+	end)
+
+	_wait(math.max(Config.CompleteDelay, 0.02))
+
+	-- Spam fishing complete ×5 (x5 speed)
+	for i = 1, 5 do
+		pcall(function()
+			Events.completeFish:FireServer()
+		end)
+		_wait(0.005)
+	end
 end
 
---------------------------------------------------
--- UI
---------------------------------------------------
+------------------------------------------------------------
+-- MAIN LOOP
+------------------------------------------------------------
+local function mainLoop()
+	if loopRunning then return end
+	loopRunning = true
+
+	while Config.Enabled do
+		doBlatantCycle()
+		task.wait(0.01)
+	end
+
+	loopRunning = false
+end
+
+------------------------------------------------------------
+-- START / STOP
+------------------------------------------------------------
+local Farming = {}
+
+function Farming:Start()
+	if Config.Enabled then return end
+	Config.Enabled = true
+	task.spawn(mainLoop)
+end
+
+function Farming:Stop()
+	Config.Enabled = false
+end
+
+------------------------------------------------------------
+-- GUI IMPLEMENTATION
+------------------------------------------------------------
 GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Enable Auto Fishing",
-    default = false,
-    callback = function(v)
-        AutoFishing = v
-        if v then
-            task.spawn(FarmingLoop)
-        end
-    end
-})
-
-GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Blatant Mode",
-    default = false,
-    callback = function(v)
-        BlatantMode = v
-        if v then
-            InstantMode = false
-        end
-    end
-})
-
-GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Blatant Fishing (x5 Speed)",
-    default = false,
-    callback = function(v)
-        if v then
-            StartBlatantFishing()
-        else
-            StopBlatantFishing()
-        end
-    end
-})
-
-
-GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Instant Mode",
-    default = false,
-    callback = function(v)
-        InstantMode = v
-        if v then
-            BlatantMode = false
-        end
-    end
+	parent = farmingTab,
+	text = "Enable Auto Fishing (Blatant)",
+	default = false,
+	callback = function(v)
+		if v then
+			Farming:Start()
+		else
+			Farming:Stop()
+		end
+	end
 })
 
 GUI:CreateInput({
-    parent = farmingTab,
-    text = "Reel Delay (seconds)",
-    placeholder = "Contoh: 0.5",
-    default = tostring(ReelDelay),
-    callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0 then
-            ReelDelay = num
-        end
-    end
+	parent = farmingTab,
+	text = "Reel Delay (seconds)",
+	placeholder = "Misal: 0.25",
+	default = tostring(Config.ReelDelay),
+	callback = function(val)
+		local n = tonumber(val)
+		if n then
+			Config.ReelDelay = math.clamp(n, 0.02, 5.0)
+		end
+	end
 })
 
 GUI:CreateInput({
-    parent = farmingTab,
-    text = "Complete Delay (seconds)",
-    placeholder = "Contoh: 0.3",
-    default = tostring(CompleteDelay),
-    callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0 then
-            CompleteDelay = num
-        end
-    end
+	parent = farmingTab,
+	text = "Complete Delay (seconds)",
+	placeholder = "Misal: 0.25",
+	default = tostring(Config.CompleteDelay),
+	callback = function(val)
+		local n = tonumber(val)
+		if n then
+			Config.CompleteDelay = math.clamp(n, 0.02, 5.0)
+		end
+	end
 })
 
-
-GUI:CreateButton({
-    parent = farmingTab,
-    text = "Manual Fish Once",
-    callback = function()
-        FishOnce()
-    end
+GUI:CreateToggle({
+	parent = farmingTab,
+	text = "Perfect Cast",
+	default = true,
+	callback = function(v)
+		Config.PerfectCast = v
+	end
 })
 
 
