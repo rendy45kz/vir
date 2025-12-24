@@ -247,6 +247,136 @@ function Fishing:Stop()
     Config.AutoFish = false
 end
 
+------------------------------------------------------------
+-- PERFECT CAST HOOK (Toggle-based)
+------------------------------------------------------------
+local PerfectCastEnabled = false
+local PerfectCastHooked = false
+
+local function LoadPerfectCastHook()
+    if PerfectCastHooked then return end
+    PerfectCastHooked = true
+
+    local function safeRef(obj)
+        local ok,res = pcall(cloneref, obj)
+        return ok and res or obj
+    end
+
+    local RS = safeRef(game:GetService("ReplicatedStorage"))
+    local net = RS.Packages._Index["sleitnick_net@0.2.0"].net
+    local RF_RequestFishing = net:FindFirstChild("RF/RequestFishingMinigameStarted")
+
+    if not RF_RequestFishing then 
+        warn("⚠ PerfectCast: RF/RequestFishingMinigameStarted gak ketemu")
+        return 
+    end
+
+    local old
+    old = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        local args = { ... }
+
+        if PerfectCastEnabled 
+        and self == RF_RequestFishing
+        and method == "InvokeServer" then
+            
+            args[2] = 1 -- FORCE POWER 1
+            
+            return old(self, table.unpack(args))
+        end
+
+        return old(self, ...)
+    end)
+
+    print("🔥 Perfect Cast Hook Loaded!")
+end
+
+------------------------------------------------------------
+-- SUPER INSTANT FISHING
+------------------------------------------------------------
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+local net = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+
+local Events2 = {
+    equip     = net["RE/EquipToolFromHotbar"],
+    chargeRod = net["RF/ChargeFishingRod"],
+    startMini = net["RF/RequestFishingMinigameStarted"],
+    complete  = net["RE/FishingCompleted"],
+    cancel    = net["RF/CancelFishingInputs"],
+}
+
+local Config2 = {
+    Enabled = false,
+    ReelDelay = 0.20,     -- waktu sebelum Complete
+    CompleteDelay = 0.20, -- waktu antar spam complete
+    SmallGap = 0.03,      -- jeda antar cast biar stabil
+}
+
+local Running = false
+
+local function SuperInstantOneCast()
+    ----------------------------------------
+    -- 1. EQUIP
+    ----------------------------------------
+    pcall(function()
+        Events2.equip:FireServer(1)
+    end)
+
+    task.wait(Config2.SmallGap)
+
+    ----------------------------------------
+    -- 2. SPAM CHARGE
+    ----------------------------------------
+    for i = 1,3 do
+        pcall(function()
+            Events2.chargeRod:InvokeServer(100)
+        end)
+        task.wait(0.01)
+    end
+
+    ----------------------------------------
+    -- 3. SPAM START MINIGAME
+    ----------------------------------------
+    for i = 1,3 do
+        pcall(function()
+            Events2.startMini:InvokeServer(-1.23, 0.99)
+        end)
+        task.wait(0.01)
+    end
+
+    ----------------------------------------
+    -- 4. REEL DELAY (waktu nunggu ikan “ketarik”)
+    ----------------------------------------
+    task.wait(Config2.ReelDelay)
+
+    ----------------------------------------
+    -- 5. SPAM COMPLETE
+    ----------------------------------------
+    for i = 1,5 do
+        pcall(function()
+            Events2.complete:FireServer()
+        end)
+        task.wait(Config2.CompleteDelay)
+    end
+
+    task.wait(Config2.SmallGap)
+end
+
+local function SuperInstantLoop()
+    if Running then return end
+    Running = true
+
+    while Config.Enabled do
+        SuperInstantOneCast()
+    end
+
+    Running = false
+end
+
 --------------------------------------------------
 -- GUI ELEMENTS
 --------------------------------------------------
@@ -277,8 +407,62 @@ GUI:CreateInput({
     end
 })
 
+-- Auto Perfect Cast
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Auto Perfect Cast",
+    default = false,
+    callback = function(v)
+        PerfectCastEnabled = v
+        if v then LoadPerfectCastHook() end
+    end
+})
 
-    
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Super Instant Fishing"
+})
+
+-- Toggle utama
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Enable Super Instant Fishing",
+    default = false,
+    callback = function(v)
+        Config2.Enabled = v
+        if v then
+            task.spawn(SuperInstantLoop)
+        end
+    end
+})    
+
+-- Reel Delay
+GUI:CreateInput({
+    parent = farmingTab,
+    text = "Reel Delay (seconds)",
+    placeholder = "0.20",
+    default = tostring(Config2.ReelDelay),
+    callback = function(val)
+        local n = tonumber(val)
+        if n then
+            Config2.ReelDelay = math.clamp(n, 0.01, 2)
+        end
+    end
+})
+
+-- Complete Delay
+GUI:CreateInput({
+    parent = farmingTab,
+    text = "Complete Delay (seconds)",
+    placeholder = "0.15",
+    default = tostring(Config2.CompleteDelay),
+    callback = function(val)
+        local n = tonumber(val)
+        if n then
+            Config2.CompleteDelay = math.clamp(n, 0.01, 2)
+        end
+    end
+})
 --------------------------------------------------
 -- TAB : CAMERA
 --------------------------------------------------
