@@ -426,9 +426,10 @@ GUI:CreateInput({
     text = "Reel Delay (seconds)",
     placeholder = "0.20",
     default = tostring(Config.ReelDelay),
-    callback = function(val)        local n = tonumber(val)
+    callback = function(val)      
+        local n = tonumber(val)
         if n then
-            Config2.ReelDelay = math.clamp(n, 0.01, 2)
+            Config.ReelDelay = math.clamp(n, 0.01, 2)
       end
     end
 })
@@ -438,7 +439,7 @@ GUI:CreateInput({
     parent = farmingTab,
     text = "Complete Delay (seconds)",
     placeholder = "0.15",
-    default = tostring(Config2.CompleteDelay),
+    default = tostring(Config.CompleteDelay),
     callback= function(val)
         local n = tonumber(val)
         if n then
