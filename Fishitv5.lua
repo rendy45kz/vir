@@ -127,6 +127,10 @@ local Config = {
     AutoFish    = false,
     CatchDelay  = 0.25,
     PerfectCast = true,
+    Enabled = false,
+    ReelDelay = 0.20,     -- waktu sebelum Complete
+    CompleteDelay = 0.20, -- waktu antar spam complete
+    SmallGap = 0.001,
 }
 
 local loopRunning = false
@@ -294,27 +298,18 @@ end
 ------------------------------------------------------------
 -- SUPER INSTANT FISHING
 ------------------------------------------------------------
+local Events = {
+    completeFish = netFolder:WaitForChild("RE/FishingCompleted"),
+    sellAll      = netFolder:WaitForChild("RF/SellAllItems"),
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
+    chargeRod    = netFolder:WaitForChild("RF/ChargeFishingRod"),
+    startMini    = netFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
+    cancelMini   = netFolder:WaitForChild("RF/CancelFishingInputs"),
 
-local net = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
-
-local Events2 = {
-    equip     = net["RE/EquipToolFromHotbar"],
-    chargeRod = net["RF/ChargeFishingRod"],
-    startMini = net["RF/RequestFishingMinigameStarted"],
-    complete  = net["RE/FishingCompleted"],
-    cancel    = net["RF/CancelFishingInputs"],
+    equipHotbar  = netFolder:WaitForChild("RE/EquipToolFromHotbar"),
+    unequipTool  = netFolder:WaitForChild("RE/UnequipToolFromHotbar"),
 }
 
-local Config2 = {
-    Enabled = false,
-    ReelDelay = 0.20,     -- waktu sebelum Complete
-    CompleteDelay = 0.20, -- waktu antar spam complete
-    SmallGap = 0.03,      -- jeda antar cast biar stabil
-}
 
 local Running = false
 
@@ -323,19 +318,19 @@ local function SuperInstantOneCast()
     -- 1. EQUIP
     ----------------------------------------
     pcall(function()
-        Events2.equip:FireServer(1)
+        Events.equipHotbar:FireServer(1)
     end)
 
-    task.wait(Config2.SmallGap)
+    task.wait(Config.SmallGap)
 
     ----------------------------------------
     -- 2. SPAM CHARGE
     ----------------------------------------
     for i = 1,3 do
         pcall(function()
-            Events2.chargeRod:InvokeServer(100)
+            Events.chargeRod:InvokeServer(100)
         end)
-        task.wait(0.01)
+        task.wait(0.001)
     end
 
     ----------------------------------------
@@ -343,27 +338,27 @@ local function SuperInstantOneCast()
     ----------------------------------------
     for i = 1,3 do
         pcall(function()
-            Events2.startMini:InvokeServer(-1.23, 0.99)
+            Events.startMini:InvokeServer(-1.23, 0.99)
         end)
-        task.wait(0.01)
+        task.wait(0.001)
     end
 
     ----------------------------------------
     -- 4. REEL DELAY (waktu nunggu ikan “ketarik”)
     ----------------------------------------
-    task.wait(Config2.ReelDelay)
+    task.wait(Config.ReelDelay)
 
     ----------------------------------------
     -- 5. SPAM COMPLETE
     ----------------------------------------
     for i = 1,5 do
         pcall(function()
-            Events2.complete:FireServer()
+            Events.completeFish:FireServer()
         end)
-        task.wait(Config2.CompleteDelay)
+        task.wait(Config.CompleteDelay)
     end
 
-    task.wait(Config2.SmallGap)
+    task.wait(Config.SmallGap)
 end
 
 local function SuperInstantLoop()
@@ -431,7 +426,7 @@ GUI:CreateToggle({
     callback = function(v)
         Config2.Enabled = v
         if v then
-            task.spawn(SuperInstantLoop)
+         task.spawn(SuperInstantLoop)
         end
     end
 })    
@@ -442,11 +437,10 @@ GUI:CreateInput({
     text = "Reel Delay (seconds)",
     placeholder = "0.20",
     default = tostring(Config2.ReelDelay),
-    callback = function(val)
-        local n = tonumber(val)
+    callback = function(val)        local n = tonumber(val)
         if n then
             Config2.ReelDelay = math.clamp(n, 0.01, 2)
-        end
+      end
     end
 })
 
@@ -456,10 +450,10 @@ GUI:CreateInput({
     text = "Complete Delay (seconds)",
     placeholder = "0.15",
     default = tostring(Config2.CompleteDelay),
-    callback = function(val)
+    callback= function(val)
         local n = tonumber(val)
         if n then
-            Config2.CompleteDelay = math.clamp(n, 0.01, 2)
+            Config2.CompleteDelay = math.clamp(n 0.01, 2)
         end
     end
 })
