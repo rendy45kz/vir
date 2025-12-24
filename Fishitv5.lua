@@ -202,52 +202,69 @@ local function InstantLoop()
     loopRunning = false
 end
 
-
 --------------------------------------------------
--- SUPER INSTANT FISHING (BLATANT)
--- PAKAI ReelDelay + CompleteDelay
+-- SUPER INSTANT FISHING (UPGRADED - FULL BYPASS)
 --------------------------------------------------
 
-local function SuperInstantOne()
-    pcall(function()
-        Events.equipHotbar:FireServer(1)
-    end)
-
-    -- SPAM CHARGE
+local function SuperInstantBypass()
+    ----------------------------------------------------------------
+    -- 0) EQUIP ROD — SPAM 3X (biar pasti kekunci)
+    ----------------------------------------------------------------
     for i = 1, 3 do
+        pcall(function()
+            Events.equipHotbar:FireServer(1)
+        end)
+    end
+
+    ----------------------------------------------------------------
+    -- 1) SPAM CHARGE ROD (BENAR-BENAR BYPASS DELAY)
+    --    12x dalam <0.07 detik
+    ----------------------------------------------------------------
+    for i = 1, 12 do
         pcall(function()
             Events.chargeRod:InvokeServer(100)
         end)
-        task.wait(0.01)
     end
 
-    -- SPAM START MINIGAME
-    for i = 1, 3 do
+    task.wait(Config.ReelDelay) -- reel delay custom user
+
+
+    ----------------------------------------------------------------
+    -- 2) SPAM START MINIGAME
+    --  8 – 15x → hasil dari video kamu
+    ----------------------------------------------------------------
+    for i = 1, 15 do
         pcall(function()
             Events.startMini:InvokeServer(-1.23, 1)
         end)
-        task.wait(0.01)
     end
 
-    -- Reel Delay (baru melempar)
-    task.wait(Config.ReelDelay)
+    task.wait(0.01)
 
-    -- SPAM COMPLETE (ikan naik)
-    for i = 1, 5 do
+
+    ----------------------------------------------------------------
+    -- 3) COMPLETE FISH SUPER SPAM
+    --     20 – 35 kali → EXACT seperti di video
+    ----------------------------------------------------------------
+    for i = 1, 30 do
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(Config.CompleteDelay)
+        task.wait(Config.CompleteDelay) -- user custom delay
     end
 end
 
 
-local function SuperInstantLoop()
+--------------------------------------------------
+-- SUPER INSTANT FISHING LOOP
+--------------------------------------------------
+
+local function SuperInstantBypassLoop()
     if SIrunning then return end
     SIrunning = true
 
     while Config.Enabled do
-        SuperInstantOne()
+        SuperInstantBypass()
         task.wait(0.001)
     end
 
