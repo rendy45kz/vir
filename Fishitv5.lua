@@ -226,7 +226,7 @@ local function SuperInstantBypass()
         end)
     end
 
-    task.wait(Config.ReelDelay) -- reel delay custom user
+    task.wait(Config.ReelDelay * 0.8 + math.random() * 0.4) -- reel delay custom user
 
 
     ----------------------------------------------------------------
@@ -250,7 +250,7 @@ local function SuperInstantBypass()
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(Config.CompleteDelay) -- user custom delay
+        task.wait(Config.CompleteDelay * 0.8 + math.random() * 0.4) -- user custom delay
     end
 end
 
