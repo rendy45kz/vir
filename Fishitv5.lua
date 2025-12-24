@@ -298,17 +298,6 @@ end
 ------------------------------------------------------------
 -- SUPER INSTANT FISHING
 ------------------------------------------------------------
-local Events = {
-    completeFish = netFolder:WaitForChild("RE/FishingCompleted"),
-    sellAll      = netFolder:WaitForChild("RF/SellAllItems"),
-
-    chargeRod    = netFolder:WaitForChild("RF/ChargeFishingRod"),
-    startMini    = netFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
-    cancelMini   = netFolder:WaitForChild("RF/CancelFishingInputs"),
-
-    equipHotbar  = netFolder:WaitForChild("RE/EquipToolFromHotbar"),
-    unequipTool  = netFolder:WaitForChild("RE/UnequipToolFromHotbar"),
-}
 
 
 local Running = false
@@ -424,7 +413,7 @@ GUI:CreateToggle({
     text = "Enable Super Instant Fishing",
     default = false,
     callback = function(v)
-        Config2.Enabled = v
+        Config.Enabled = v
         if v then
          task.spawn(SuperInstantLoop)
         end
@@ -436,7 +425,7 @@ GUI:CreateInput({
     parent = farmingTab,
     text = "Reel Delay (seconds)",
     placeholder = "0.20",
-    default = tostring(Config2.ReelDelay),
+    default = tostring(Config.ReelDelay),
     callback = function(val)        local n = tonumber(val)
         if n then
             Config2.ReelDelay = math.clamp(n, 0.01, 2)
@@ -453,7 +442,7 @@ GUI:CreateInput({
     callback= function(val)
         local n = tonumber(val)
         if n then
-            Config2.CompleteDelay = math.clamp(n 0.01, 2)
+            Config.CompleteDelay = math.clamp(n 0.01, 2)
         end
     end
 })
