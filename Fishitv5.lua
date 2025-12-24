@@ -323,7 +323,7 @@ GUI:CreateToggle({
     default = false,
     callback = function(v)
         Config.Enabled = v
-        if v then task.spawn(SuperInstantLoop) end
+        if v then task.spawn(SuperInstantBypassLoop) end
     end
 })
 
