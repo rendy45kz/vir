@@ -307,7 +307,7 @@ local function SuperInstantOneCast()
     -- 1. EQUIP
     ----------------------------------------
     pcall(function()
-        Events.equipHotbar:FireServer(1)
+        Events.equip:FireServer(1)
     end)
 
     task.wait(Config.SmallGap)
@@ -319,7 +319,7 @@ local function SuperInstantOneCast()
         pcall(function()
             Events.chargeRod:InvokeServer(100)
         end)
-        task.wait(0.001)
+        task.wait(0.01)
     end
 
     ----------------------------------------
@@ -329,7 +329,7 @@ local function SuperInstantOneCast()
         pcall(function()
             Events.startMini:InvokeServer(-1.23, 0.99)
         end)
-        task.wait(0.001)
+        task.wait(0.01)
     end
 
     ----------------------------------------
@@ -342,7 +342,7 @@ local function SuperInstantOneCast()
     ----------------------------------------
     for i = 1,5 do
         pcall(function()
-            Events.completeFish:FireServer()
+            Events.complete:FireServer()
         end)
         task.wait(Config.CompleteDelay)
     end
