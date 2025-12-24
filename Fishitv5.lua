@@ -415,10 +415,10 @@ GUI:CreateToggle({
     callback = function(v)
         Config.Enabled = v
         if v then
-         task.spawn(SuperInstantLoop)
+            task.spawn(SuperInstantLoop)
         end
     end
-})    
+})
 
 -- Reel Delay
 GUI:CreateInput({
@@ -426,11 +426,11 @@ GUI:CreateInput({
     text = "Reel Delay (seconds)",
     placeholder = "0.20",
     default = tostring(Config.ReelDelay),
-    callback = function(val)      
+    callback = function(val)
         local n = tonumber(val)
         if n then
             Config.ReelDelay = math.clamp(n, 0.01, 2)
-      end
+        end
     end
 })
 
@@ -440,10 +440,10 @@ GUI:CreateInput({
     text = "Complete Delay (seconds)",
     placeholder = "0.15",
     default = tostring(Config.CompleteDelay),
-    callback= function(val)
+    callback = function(val)
         local n = tonumber(val)
         if n then
-            Config.CompleteDelay = math.clamp(n 0.01, 2)
+            Config.CompleteDelay = math.clamp(n, 0.01, 2)
         end
     end
 })
