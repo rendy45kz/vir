@@ -170,9 +170,102 @@ local function InstantLoop()
     loopRunning = false
 end
 
+--------------------------------------------------
+-- MODULE STATE (NO _G)
+--------------------------------------------------
+local Legit = {
+    Enabled = false,
+    MinigameActive = false,
+    ClickSpeed = 0.05,
+}
 
------------
--- GUI
+--------------------------------------------------
+-- SERVICES & MODULES
+--------------------------------------------------
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Controllers     = ReplicatedStorage:WaitForChild("Controllers")
+local FishingController = require(Controllers:WaitForChild("FishingController"))
+local AutoFishingController = require(Controllers:WaitForChild("AutoFishingController"))
+
+local Replion = require(ReplicatedStorage.Packages.Replion)
+local Net     = require(ReplicatedStorage.Packages.Net)
+
+local UpdateAutoFishingRemote = Net:RemoteFunction("UpdateAutoFishingState")
+
+--------------------------------------------------
+-- FORCE SERVER AUTO-FISH TRUE
+--------------------------------------------------
+local function EnsureServerAutoFishing()
+    local data = Replion.Client:WaitReplion("Data")
+    local state = data:GetExpect("AutoFishing")
+
+    if not state then
+        pcall(function()
+            UpdateAutoFishingRemote:InvokeServer(true)
+        end)
+    end
+end
+
+--------------------------------------------------
+-- CLICK ACTION
+--------------------------------------------------
+local function PerformClick()
+    pcall(function()
+        FishingController:RequestFishingMinigameClick()
+    end)
+    task.wait(Legit.ClickSpeed)
+end
+
+--------------------------------------------------
+-- HOOK CONTROLLERS
+--------------------------------------------------
+local OriginalRodStart = FishingController.FishingRodStarted
+local OriginalRodStop  = FishingController.FishingStopped
+local OriginalStateChanged = AutoFishingController.AutoFishingStateChanged
+
+AutoFishingController.AutoFishingStateChanged = function(...)
+    OriginalStateChanged(true)
+end
+
+FishingController.FishingRodStarted = function(self, a, b)
+    OriginalRodStart(self, a, b)
+
+    if Legit.Enabled and not Legit.MinigameActive then
+        Legit.MinigameActive = true
+
+        task.spawn(function()
+            while Legit.Enabled and Legit.MinigameActive do
+                PerformClick()
+            end
+        end)
+    end
+end
+
+FishingController.FishingStopped = function(self, a)
+    OriginalRodStop(self, a)
+
+    if Legit.MinigameActive then
+        Legit.MinigameActive = false
+        task.wait(1)
+        EnsureServerAutoFishing()
+    end
+end
+
+--------------------------------------------------
+-- PUBLIC CONTROL
+--------------------------------------------------
+local function ToggleLegitFishing(state)
+    Legit.Enabled = state
+    if state then
+        EnsureServerAutoFishing()
+    else
+        Legit.MinigameActive = false
+    end
+end
+
+--------------------------------------------------
+-- GUI TAB
 --------------------------------------------------
 
 -- NORMAL INSTANT
@@ -199,7 +292,19 @@ GUI:CreateInput({
     end
 })
 
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Legit Auto Fishing"
+})
 
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Enable Legit Auto Fishing",
+    default = false,
+    callback = function(v)
+        ToggleLegitFishing(v)
+    end
+})
 
 --------------------------------------------------
 -- TAB : CAMERA
