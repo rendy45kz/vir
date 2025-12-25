@@ -202,6 +202,123 @@ local function InstantLoop()
     loopRunning = false
 end
 
+_G.AutoFishingNewMethod = function()
+    if RuntimeState.IsFishingNewMethod then 
+        warn("[AutoFishingNewMethod] Already running")
+        return 
+    end
+
+    task.spawn(function()
+        RuntimeState.IsFishingNewMethod = true
+        print("[AutoFishingNewMethod] Started (LEGIT MODE)")
+
+        ------------------------------------------------------
+        -- EQUIP ROD SLOT 1
+        ------------------------------------------------------
+        local equipped = false
+        for i = 1, 3 do
+            local ok = pcall(function()
+                Events.equipHotbar:FireServer(1)
+            end)
+            if ok then 
+                equipped = true 
+                break 
+            end
+            task.wait(0.1)
+        end
+
+        if not equipped then
+            warn("Failed to equip rod")
+            Config.AutoFishingNewMethod = false
+            RuntimeState.IsFishingNewMethod = false
+            return
+        end
+
+        task.wait(0.3)
+
+        ------------------------------------------------------
+        -- MAIN LOOP
+        ------------------------------------------------------
+        local consecutiveErrors = 0
+        local lastSuccess = tick()
+        local cycles = 0
+
+        while Config.AutoFishingNewMethod and RuntimeState.IsFishingNewMethod do
+            local success = pcall(function()
+
+                -------------------------------
+                -- CHARGE ROD
+                -------------------------------
+                local cOK = pcall(function()
+                    Events.chargeRod:InvokeServer(100)
+                end)
+                if not cOK then return end
+                task.wait(0.05)
+
+                -------------------------------
+                -- START MINIGAME
+                -------------------------------
+                pcall(function()
+                    Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
+                end)
+
+                -------------------------------
+                -- CUSTOM DELAY
+                -------------------------------
+                local delay = math.max(Config.FishingDelay * 0.20, 0.05)
+                task.wait(delay)
+
+                -------------------------------
+                -- COMPLETE FISH
+                -------------------------------
+                local done = pcall(function()
+                    Events.completeFish:FireServer()
+                end)
+
+                if done then
+                    RuntimeState.LastFishTime = tick()
+                    lastSuccess = tick()
+                    consecutiveErrors = 0
+                    cycles += 1
+                end
+
+            end)
+
+            -----------------------------
+            -- ERROR HANDLING
+            -----------------------------
+            if not success then
+                consecutiveErrors += 1
+                if consecutiveErrors >= 15 then
+                    warn("[AutoFishingNewMethod] Recovering…")
+                    Events.equipHotbar:FireServer(1)
+                    task.wait(1)
+                    consecutiveErrors = 0
+                end
+            end
+
+            -----------------------------
+            -- AUTO-RESTART (anti macet)
+            -----------------------------
+            if tick() - lastSuccess > 180 then
+                warn("[AutoFishingNewMethod] Restarting…")
+                RuntimeState.IsFishingNewMethod = false
+                task.wait(1)
+                if Config.AutoFishingNewMethod then
+                    _G.AutoFishingNewMethod()
+                end
+                return
+            end
+
+            task.wait(0.01)
+        end
+
+        RuntimeState.IsFishingNewMethod = false
+        print("[AutoFishingNewMethod] Stopped, cycles:", cycles)
+    end)
+end
+
+
 --------------------------------------------------
 -- GUI
 --------------------------------------------------
@@ -230,14 +347,33 @@ GUI:CreateInput({
     end
 })
 
--- PERFECT CAST
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Legit Auto Fishing"
+})
+
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Auto Perfect Cast",
+    text = "Enable Legit Fishing",
     default = false,
     callback = function(v)
-        Config.PerfectCast = v
-        if v then LoadPerfectCastHook() end
+        Config.AutoFishingNewMethod = v
+        if v then
+            _G.AutoFishingNewMethod()
+        end
+    end
+})
+
+GUI:CreateInput({
+    parent = farmingTab,
+    text = "Fishing Delay (seconds)",
+    placeholder = "Ex: 0.30",
+    default = tostring(Config.FishingDelay),
+    callback = function(val)
+        local num = tonumber(val)
+        if num then
+            Config.FishingDelay = math.clamp(num, 0.05, 3)
+        end
     end
 })
 
