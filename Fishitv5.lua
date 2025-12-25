@@ -12,7 +12,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local Camera = workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
@@ -25,66 +25,9 @@ GUI:CreateMain({
     WindowIcon = "home"
 })
 
-
 --------------------------------------------------
--- UTIL
+-- TAB FARMING
 --------------------------------------------------
-local function getHRP(char)
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
-
-local function smoothTeleport(cf)
-    local char = LocalPlayer.Character
-    local hrp = getHRP(char)
-    if not hrp then return end
-
-    hrp.Anchored = true
-    TweenService:Create(
-        hrp,
-        TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {CFrame = cf}
-    ):Play()
-    task.wait(1.1)
-    hrp.Anchored = false
-end
-
---------------------------------------------------
--- PLAYER LIST (REFRESHABLE)
---------------------------------------------------
-local function getPlayerList()
-    local list = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(list, p.Name)
-        end
-    end
-    table.sort(list)
-    return list
-end
-
---------------------------------------------------
--- NPC LIST (REFRESHABLE)
---------------------------------------------------
-local function getNPCList()
-    local list, added = {}, {}
-    for _, m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model")
-        and m:FindFirstChildOfClass("Humanoid")
-        and not Players:GetPlayerFromCharacter(m) then
-            if not added[m.Name] then
-                table.insert(list, m.Name)
-                added[m.Name] = true
-            end
-        end
-    end
-    table.sort(list)
-    return list
-end
-
---------------------------------------------------
--- TAB FARMING (FINAL FIX)
---------------------------------------------------
-
 local farmingTab = GUI:CreateTab("Farming", "fish")
 
 GUI:CreateSection({
@@ -95,7 +38,7 @@ GUI:CreateSection({
 --------------------------------------------------
 -- NET EVENTS
 --------------------------------------------------
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
+local netFolder = ReplicatedStorage.Packages
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
     :WaitForChild("net")
@@ -106,7 +49,7 @@ local Events = {
     startMini    = netFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
     cancelMini   = netFolder:WaitForChild("RF/CancelFishingInputs"),
     equipHotbar  = netFolder:WaitForChild("RE/EquipToolFromHotbar"),
-    fishCought  = netFolder:WaitForChild("RE/FishCaught"),
+    fishCaught   = netFolder:FindFirstChild("RE/FishCaught"),
 }
 
 --------------------------------------------------
@@ -115,48 +58,42 @@ local Events = {
 local Config = {
     AutoFish = false,
     CatchDelay = 0.25,
-    AutoFishingNewMethod = false,
-    FishingDelay = 0.30,
-}
 
-local RuntimeState = {
-    IsFishingNewMethod = false,
-    LastFishTime = tick(),
+    LegitEnabled = false,
 }
 
 local loopRunning = false
-local SIrunning = false
 
 --------------------------------------------------
--- NORMAL INSTANT (PAKAI CATCH DELAY)
+-- NORMAL INSTANT FISHING
 --------------------------------------------------
 local function doOneInstant()
-    -- equip rod
+    -- Equip rod
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
 
-    -- charge rod
+    -- Charge rod
     pcall(function()
         Events.chargeRod:InvokeServer(100)
     end)
 
     task.wait(0.001)
 
-    -- start minigame
+    -- Start minigame
     local okStart = pcall(function()
         Events.startMini:InvokeServer(-1.23, 1)
     end)
     if not okStart then return end
 
-    -- ⬇️ NORMAL MODE — gunakan CatchDelay!!!
+    -- NORMAL MODE uses CatchDelay
     task.wait(Config.CatchDelay)
 
+    -- Complete fishing
     pcall(function()
         Events.completeFish:FireServer()
     end)
 end
-
 
 local function InstantLoop()
     if loopRunning then return end
@@ -171,45 +108,32 @@ local function InstantLoop()
 end
 
 --------------------------------------------------
--- MODULE STATE (NO _G)
+-- LEGIT AUTO FISHING
 --------------------------------------------------
-local Legit = {
-    Enabled = false,
-    MinigameActive = false,
-    ClickSpeed = 0.05,
-}
 
---------------------------------------------------
--- SERVICES & MODULES
---------------------------------------------------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Controllers     = ReplicatedStorage:WaitForChild("Controllers")
+local Controllers = ReplicatedStorage:WaitForChild("Controllers")
 local FishingController = require(Controllers:WaitForChild("FishingController"))
 local AutoFishingController = require(Controllers:WaitForChild("AutoFishingController"))
 
 local Replion = require(ReplicatedStorage.Packages.Replion)
-local Net     = require(ReplicatedStorage.Packages.Net)
-
+local Net = require(ReplicatedStorage.Packages.Net)
 local UpdateAutoFishingRemote = Net:RemoteFunction("UpdateAutoFishingState")
 
---------------------------------------------------
--- FORCE SERVER AUTO-FISH TRUE
---------------------------------------------------
+local Legit = {
+    Enabled = false,
+    MinigameActive = false,
+    ClickSpeed = 0.05
+}
+
 local function EnsureServerAutoFishing()
     local data = Replion.Client:WaitReplion("Data")
-    local state = data:GetExpect("AutoFishing")
-
-    if not state then
+    if not data:GetExpect("AutoFishing") then
         pcall(function()
             UpdateAutoFishingRemote:InvokeServer(true)
         end)
     end
 end
 
---------------------------------------------------
--- CLICK ACTION
---------------------------------------------------
 local function PerformClick()
     pcall(function()
         FishingController:RequestFishingMinigameClick()
@@ -217,19 +141,16 @@ local function PerformClick()
     task.wait(Legit.ClickSpeed)
 end
 
---------------------------------------------------
--- HOOK CONTROLLERS
---------------------------------------------------
-local OriginalRodStart = FishingController.FishingRodStarted
-local OriginalRodStop  = FishingController.FishingStopped
-local OriginalStateChanged = AutoFishingController.AutoFishingStateChanged
+local OrigRodStart = FishingController.FishingRodStarted
+local OrigRodStop = FishingController.FishingStopped
+local OrigStateChanged = AutoFishingController.AutoFishingStateChanged
 
 AutoFishingController.AutoFishingStateChanged = function(...)
-    OriginalStateChanged(true)
+    OrigStateChanged(true)
 end
 
 FishingController.FishingRodStarted = function(self, a, b)
-    OriginalRodStart(self, a, b)
+    OrigRodStart(self, a, b)
 
     if Legit.Enabled and not Legit.MinigameActive then
         Legit.MinigameActive = true
@@ -243,7 +164,7 @@ FishingController.FishingRodStarted = function(self, a, b)
 end
 
 FishingController.FishingStopped = function(self, a)
-    OriginalRodStop(self, a)
+    OrigRodStop(self, a)
 
     if Legit.MinigameActive then
         Legit.MinigameActive = false
@@ -252,10 +173,7 @@ FishingController.FishingStopped = function(self, a)
     end
 end
 
---------------------------------------------------
--- PUBLIC CONTROL
---------------------------------------------------
-local function ToggleLegitFishing(state)
+local function ToggleLegit(state)
     Legit.Enabled = state
     if state then
         EnsureServerAutoFishing()
@@ -265,7 +183,7 @@ local function ToggleLegitFishing(state)
 end
 
 --------------------------------------------------
--- GUI TAB
+-- GUI CONTROLS
 --------------------------------------------------
 
 -- NORMAL INSTANT
@@ -292,6 +210,7 @@ GUI:CreateInput({
     end
 })
 
+-- LEGIT AUTO
 GUI:CreateSection({
     parent = farmingTab,
     text = "Legit Auto Fishing"
@@ -302,9 +221,10 @@ GUI:CreateToggle({
     text = "Enable Legit Auto Fishing",
     default = false,
     callback = function(v)
-        ToggleLegitFishing(v)
+        ToggleLegit(v)
     end
 })
+
 
 --------------------------------------------------
 -- TAB : CAMERA
