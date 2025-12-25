@@ -206,51 +206,56 @@ end
 -- SUPER INSTANT FISHING (UPGRADED - FULL BYPASS)
 --------------------------------------------------
 
-local function SuperInstantBypass()
-    ----------------------------------------------------------------
-    -- 0) EQUIP ROD — SPAM 3X (biar pasti kekunci)
-    ----------------------------------------------------------------
+local function SuperParallelCycle()
+    local reelDelay     = math.max(Config.ReelDelay or 0.05, 0.01)
+    local completeDelay = math.max(Config.CompleteDelay or 0.05, 0.01)
+
+    --------------------------------------------------------------
+    -- 1) EQUIP ROD SPAM (biar locked)
+    --------------------------------------------------------------
     for i = 1, 3 do
         pcall(function()
             Events.equipHotbar:FireServer(1)
         end)
     end
 
-    ----------------------------------------------------------------
-    -- 1) SPAM CHARGE ROD (BENAR-BENAR BYPASS DELAY)
-    --    12x dalam <0.07 detik
-    ----------------------------------------------------------------
-    for i = 1, 12 do
-        pcall(function()
-            Events.chargeRod:InvokeServer(100)
-        end)
-    end
+    --------------------------------------------------------------
+    -- 2) THREAD 1 → SPAM CHARGE ROD TANPA HENTI
+    --------------------------------------------------------------
+    task.spawn(function()
+        for i = 1, 20 do
+            pcall(function()
+                Events.chargeRod:InvokeServer(100)
+            end)
+            task.wait(reelDelay)
+        end
+    end)
 
-    task.wait(Config.ReelDelay * 0.8 + math.random() * 0.4) -- reel delay custom user
+    --------------------------------------------------------------
+    -- 3) THREAD 2 → SPAM START MINIGAME TANPA HENTI
+    --------------------------------------------------------------
+    task.spawn(function()
+        for i = 1, 20 do
+            pcall(function()
+                Events.startMini:InvokeServer(-1.23318, 1)
+            end)
+            task.wait(reelDelay * 0.5)
+        end
+    end)
 
+    --------------------------------------------------------------
+    -- TUNGGU SEDIKIT (SAMA SEPERTI VIDEO)
+    --------------------------------------------------------------
+    task.wait(reelDelay * 2)
 
-    ----------------------------------------------------------------
-    -- 2) SPAM START MINIGAME
-    --  8 – 15x → hasil dari video kamu
-    ----------------------------------------------------------------
-    for i = 1, 15 do
-        pcall(function()
-            Events.startMini:InvokeServer(-1.23, 1)
-        end)
-    end
-
-    task.wait(0.01)
-
-
-    ----------------------------------------------------------------
-    -- 3) COMPLETE FISH SUPER SPAM
-    --     20 – 35 kali → EXACT seperti di video
-    ----------------------------------------------------------------
-    for i = 1, 30 do
+    --------------------------------------------------------------
+    -- 4) COMPLETE FISH SPAM (REAL BYPASS)
+    --------------------------------------------------------------
+    for i = 1, 35 do
         pcall(function()
             Events.completeFish:FireServer()
         end)
-        task.wait(Config.CompleteDelay * 0.8 + math.random() * 0.4) -- user custom delay
+        task.wait(completeDelay)
     end
 end
 
@@ -259,12 +264,12 @@ end
 -- SUPER INSTANT FISHING LOOP
 --------------------------------------------------
 
-local function SuperInstantBypassLoop()
+local function mainParallelLoop()
     if SIrunning then return end
     SIrunning = true
 
     while Config.Enabled do
-        SuperInstantBypass()
+        SuperParallelCycle()
         task.wait(0.001)
     end
 
