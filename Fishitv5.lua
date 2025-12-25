@@ -199,35 +199,6 @@ GUI:CreateInput({
     end
 })
 
-GUI:CreateSection({
-    parent = farmingTab,
-    text = "Legit Auto Fishing"
-})
-
-GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Enable Legit Fishing",
-    default = false,
-    callback = function(v)
-        Config.AutoFishingNewMethod = v
-        if v then
-            _G.AutoFishingNewMethod()
-        end
-    end
-})
-
-GUI:CreateInput({
-    parent = farmingTab,
-    text = "Fishing Delay (seconds)",
-    placeholder = "Ex: 0.30",
-    default = tostring(Config.FishingDelay),
-    callback = function(val)
-        local num = tonumber(val)
-        if num then
-            Config.FishingDelay = math.clamp(num, 0.05, 3)
-        end
-    end
-})
 
 
 --------------------------------------------------
