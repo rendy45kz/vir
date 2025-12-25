@@ -106,22 +106,22 @@ local Events = {
     startMini    = netFolder:WaitForChild("RF/RequestFishingMinigameStarted"),
     cancelMini   = netFolder:WaitForChild("RF/CancelFishingInputs"),
     equipHotbar  = netFolder:WaitForChild("RE/EquipToolFromHotbar"),
+    fishCought  = netFolder:WaitForChild("RE/FishCaught"),
 }
 
 --------------------------------------------------
 -- CONFIG
 --------------------------------------------------
 local Config = {
-    AutoFish = false,        -- Normal instant
-    PerfectCast = false,
+    AutoFish = false,
+    CatchDelay = 0.25,
+    AutoFishingNewMethod = false,
+    FishingDelay = 0.30,
+}
 
-    -- SUPER INSTANT FISHING
-    Enabled = false,
-    ReelDelay = 0.20,
-    CompleteDelay = 0.15,
-
-    -- NORMAL INSTANT
-    CatchDelay = 0.25,       -- <= INI YANG DIPAKAI NORMAL
+local RuntimeState = {
+    IsFishingNewMethod = false,
+    LastFishTime = tick(),
 }
 
 local loopRunning = false
