@@ -321,26 +321,47 @@ GUI:CreateSection({
     text = "Super Instant Fishing"
 })
 
--- SUPER INSTANT
+--------------------------------------------------
+-- START / STOP
+--------------------------------------------------
+
+local Fishing = {}
+
+function Fishing:Start()
+    if Config.Enabled then return end
+    Config.Enabled = true
+    task.spawn(mainParallelLoop)
+end
+
+function Fishing:Stop()
+    Config.Enabled = false
+end
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Enable Super Instant Fishing",
+    text = "Super Instant (Parallel)",
     default = false,
     callback = function(v)
-        Config.Enabled = v
-        if v then task.spawn(SuperInstantBypassLoop) end
+        if v then
+            Fishing:Start()
+        else
+            Fishing:Stop()
+        end
     end
 })
 
 GUI:CreateInput({
     parent = farmingTab,
     text = "Reel Delay",
-    placeholder = "0.20",
     default = tostring(Config.ReelDelay),
-    callback = function(v)
-        local n = tonumber(v)
-        if n then
-            Config.ReelDelay = math.clamp(n, 0.01, 2)
+    callback = function(val)
+        val = tonumber(val)
+        if val then
+            Config.ReelDelay = math.clamp(val, 0.01, 2.0)
         end
     end
 })
@@ -348,12 +369,11 @@ GUI:CreateInput({
 GUI:CreateInput({
     parent = farmingTab,
     text = "Complete Delay",
-    placeholder = "0.15",
     default = tostring(Config.CompleteDelay),
-    callback = function(v)
-        local n = tonumber(v)
-        if n then
-            Config.CompleteDelay = math.clamp(n, 0.01, 2)
+    callback = function(val)
+        val = tonumber(val)
+        if val then
+            Config.CompleteDelay = math.clamp(val, 0.01, 2.0)
         end
     end
 })
