@@ -1,9 +1,45 @@
 --------------------------------------------------
--- ASH LIBS
+-- ASH LIBS (FIXED LOADER)
 --------------------------------------------------
-local GUI = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/refs/heads/main/source.lua"
-))()
+-- Catatan:
+-- Kalau UI tidak muncul biasanya karena link library berubah / HttpGet gagal.
+-- Loader ini coba beberapa URL dan stop kalau sudah berhasil.
+
+if not game:IsLoaded() then
+    pcall(function() game.Loaded:Wait() end)
+end
+
+local function LoadAshLib()
+    local urls = {
+        "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/main/source.lua",
+        "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/master/source.lua",
+        "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/main/src/source.lua",
+    }
+
+    for _, url in ipairs(urls) do
+        local ok, src = pcall(function()
+            return game:HttpGet(url, true)
+        end)
+
+        if ok and type(src) == "string" and #src > 0 then
+            local fn = loadstring(src)
+            if fn then
+                local ok2, gui = pcall(fn)
+                if ok2 and gui then
+                    return gui
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local GUI = LoadAshLib()
+if not GUI then
+    warn("[Aegis Fish It] Gagal load Ash-Libs. Pastikan executor support HttpGet dan URL tidak diblokir.")
+    return
+end
 
 --------------------------------------------------
 -- SERVICES
