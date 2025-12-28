@@ -12,8 +12,86 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
+local VirtualUser = game:GetService("VirtualUser")
+
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- UTILS (FIXED / ADDED)
+--------------------------------------------------
+local function getChar()
+    return LocalPlayer.Character
+end
+
+local function getHum(char)
+    char = char or getChar()
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+-- Renamed to avoid collision with your later use-cases
+local function getCharHRP(char)
+    char = char or getChar()
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getPlayerList()
+    local list = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(list, plr.Name)
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+-- Generic NPC list finder (best-effort).
+-- Looks for Models with Humanoid that are NOT player characters.
+local function getNPCList()
+    local npcNamesMap = {}
+
+    local playerCharMap = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character then
+            playerCharMap[plr.Character] = true
+        end
+    end
+
+    for _, inst in ipairs(Workspace:GetDescendants()) do
+        if inst:IsA("Model") and inst:FindFirstChildOfClass("Humanoid") then
+            if not playerCharMap[inst] then
+                npcNamesMap[inst.Name] = true
+            end
+        end
+    end
+
+    local list = {}
+    for name in pairs(npcNamesMap) do
+        table.insert(list, name)
+    end
+    table.sort(list)
+    return list
+end
+
+local function smoothTeleport(targetCFrame)
+    local hrp = getCharHRP()
+    if not hrp then return end
+
+    local dist = (hrp.Position - targetCFrame.Position).Magnitude
+    local t = math.clamp(dist / 120, 0.15, 1.25)
+
+    local tween = TweenService:Create(
+        hrp,
+        TweenInfo.new(t, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { CFrame = targetCFrame }
+    )
+    tween:Play()
+end
 
 --------------------------------------------------
 -- WINDOW
@@ -38,7 +116,7 @@ GUI:CreateSection({
 --------------------------------------------------
 -- NET EVENTS
 --------------------------------------------------
-local netFolder = ReplicatedStorage.Packages
+local netFolder = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
     :WaitForChild("sleitnick_net@0.2.0")
     :WaitForChild("net")
@@ -58,8 +136,6 @@ local Events = {
 local Config = {
     AutoFish = false,
     CatchDelay = 0.25,
-
-    LegitEnabled = false,
 }
 
 local loopRunning = false
@@ -86,7 +162,6 @@ local function doOneInstant()
     end)
     if not okStart then return end
 
-    -- NORMAL MODE uses CatchDelay
     task.wait(Config.CatchDelay)
 
     -- Complete fishing
@@ -110,8 +185,6 @@ end
 --------------------------------------------------
 -- GUI CONTROLS
 --------------------------------------------------
-
--- NORMAL INSTANT
 GUI:CreateToggle({
     parent = farmingTab,
     text = "Enable Instant Fishing",
@@ -139,7 +212,6 @@ GUI:CreateInput({
 -- TAB : CAMERA
 --------------------------------------------------
 local cameraTab = GUI:CreateTab("Camera", "camera")
-
 GUI:CreateSection({ parent = cameraTab, text = "Spectate Player" })
 
 local camDropdown
@@ -168,12 +240,19 @@ GUI:CreateToggle({
     default = false,
     callback = function(state)
         if not state then
-            Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            local hum = getHum()
+            if hum then
+                Camera.CameraSubject = hum
+            end
             return
         end
+
         local plr = Players:FindFirstChild(selectedCamPlayer or "")
         if plr and plr.Character then
-            Camera.CameraSubject = plr.Character:FindFirstChildOfClass("Humanoid")
+            local hum = getHum(plr.Character)
+            if hum then
+                Camera.CameraSubject = hum
+            end
         end
     end
 })
@@ -183,9 +262,6 @@ GUI:CreateToggle({
 --------------------------------------------------
 local teleportTab = GUI:CreateTab("Teleport", "map")
 
---------------------------------------------------
--- TELEPORT ISLAND
---------------------------------------------------
 GUI:CreateSection({
     parent = teleportTab,
     text = "Teleport Island"
@@ -269,7 +345,7 @@ GUI:CreateButton({
     callback = function()
         local plr = Players:FindFirstChild(selectedTPPlayer or "")
         if plr and plr.Character then
-            local hrp = getHRP(plr.Character)
+            local hrp = getCharHRP(plr.Character)
             if hrp then
                 smoothTeleport(hrp.CFrame * CFrame.new(0, 0, -3))
             end
@@ -306,6 +382,8 @@ GUI:CreateButton({
     parent = teleportTab,
     text = "Teleport To NPC",
     callback = function()
+        if not selectedNPC then return end
+
         for _, m in ipairs(Workspace:GetDescendants()) do
             if m:IsA("Model") and m.Name == selectedNPC then
                 local hrp = m:FindFirstChild("HumanoidRootPart")
@@ -322,13 +400,9 @@ GUI:CreateButton({
 -- TAB : EVENT
 --------------------------------------------------
 local eventTab = GUI:CreateTab("Event", "gift")
-
 GUI:CreateSection({ parent = eventTab, text = "Christmas Event" })
 
-local EventCfg = {
-    Enabled = false,
-    Cooldown = 3600
-}
+local EventCfg = { Enabled = false, Cooldown = 3600 }
 
 local function getEventRF()
     local pkg = ReplicatedStorage:FindFirstChild("Packages")
@@ -373,21 +447,8 @@ GUI:CreateToggle({
 -- PLAYER TAB
 --------------------------------------------------
 local playerTab = GUI:CreateTab("Player", "user")
+GUI:CreateSection({ parent = playerTab, text = "Player Movement" })
 
-GUI:CreateSection({
-    parent = playerTab,
-    text = "Player Movement"
-})
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-
---------------------------------------------------
--- PLAYER STATE
---------------------------------------------------
 local PlayerCfg = {
     Speed = 16,
     Jump = 50,
@@ -399,26 +460,6 @@ local PlayerCfg = {
     SwimValue = 30
 }
 
---------------------------------------------------
--- CHARACTER UTILS
---------------------------------------------------
-local function getChar()
-    return LocalPlayer.Character
-end
-
-local function getHum()
-    local c = getChar()
-    return c and c:FindFirstChildOfClass("Humanoid")
-end
-
-local function getHRP()
-    local c = getChar()
-    return c and c:FindFirstChild("HumanoidRootPart")
-end
-
---------------------------------------------------
--- SPEED
---------------------------------------------------
 GUI:CreateSlider({
     parent = playerTab,
     text = "Walk Speed",
@@ -432,9 +473,6 @@ GUI:CreateSlider({
     end
 })
 
---------------------------------------------------
--- JUMP POWER
---------------------------------------------------
 GUI:CreateSlider({
     parent = playerTab,
     text = "Jump Power",
@@ -448,9 +486,6 @@ GUI:CreateSlider({
     end
 })
 
---------------------------------------------------
--- NO CLIP
---------------------------------------------------
 GUI:CreateToggle({
     parent = playerTab,
     text = "No Clip",
@@ -473,18 +508,14 @@ RunService.Stepped:Connect(function()
     end
 end)
 
---------------------------------------------------
--- WALK ON WATER (REAL)
---------------------------------------------------
+-- Walk On Water
 local waterPart
-
 GUI:CreateToggle({
     parent = playerTab,
     text = "Walk On Water",
     default = false,
     callback = function(state)
         PlayerCfg.WalkOnWater = state
-
         if not state and waterPart then
             waterPart:Destroy()
             waterPart = nil
@@ -494,8 +525,7 @@ GUI:CreateToggle({
 
 RunService.Heartbeat:Connect(function()
     if not PlayerCfg.WalkOnWater then return end
-
-    local hrp = getHRP()
+    local hrp = getCharHRP()
     if not hrp then return end
 
     if not waterPart then
@@ -504,52 +534,49 @@ RunService.Heartbeat:Connect(function()
         waterPart.Anchored = true
         waterPart.CanCollide = true
         waterPart.Transparency = 1
-        waterPart.Parent = workspace
+        waterPart.Parent = Workspace
     end
 
     waterPart.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
 end)
 
---------------------------------------------------
--- FLY (REAL)
---------------------------------------------------
+-- Fly
 local bv, bg
-
 GUI:CreateToggle({
     parent = playerTab,
     text = "Fly",
     default = false,
     callback = function(state)
         PlayerCfg.Fly = state
-
-        local hrp = getHRP()
+        local hrp = getCharHRP()
         if not hrp then return end
 
         if state then
-            bv = Instance.new("BodyVelocity", hrp)
+            bv = Instance.new("BodyVelocity")
             bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bv.Velocity = Vector3.zero
+            bv.Parent = hrp
 
-            bg = Instance.new("BodyGyro", hrp)
+            bg = Instance.new("BodyGyro")
             bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
             bg.CFrame = hrp.CFrame
+            bg.Parent = hrp
         else
-            if bv then bv:Destroy() end
-            if bg then bg:Destroy() end
+            if bv then bv:Destroy(); bv = nil end
+            if bg then bg:Destroy(); bg = nil end
         end
     end
 })
 
 RunService.RenderStepped:Connect(function()
     if PlayerCfg.Fly and bv and bg then
-        local cam = workspace.CurrentCamera
+        local cam = Workspace.CurrentCamera
         bv.Velocity = cam.CFrame.LookVector * PlayerCfg.FlySpeed
         bg.CFrame = cam.CFrame
     end
 end)
 
---------------------------------------------------
--- SWIM SPEED
---------------------------------------------------
+-- Swim speed
 GUI:CreateSlider({
     parent = playerTab,
     text = "Swim Speed",
@@ -581,18 +608,15 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ANTI AFK (AUTO ON)
+-- ANTI AFK (SINGLE COPY - FIXED)
 --------------------------------------------------
-task.spawn(function()
-    local VirtualUser = game:GetService("VirtualUser")
-    LocalPlayer.Idled:Connect(function()
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
 end)
 
 --------------------------------------------------
--- ANTI FALL DAMAGE (AUTO ENABLE)
+-- ANTI FALL DAMAGE
 --------------------------------------------------
 task.spawn(function()
     local function applyAntiFall(char)
@@ -621,36 +645,8 @@ end)
 -- MISC TAB
 --------------------------------------------------
 local miscTab = GUI:CreateTab("Misc", "settings")
+GUI:CreateSection({ parent = miscTab, text = "Performance & Utility" })
 
-GUI:CreateSection({
-    parent = miscTab,
-    text = "Performance & Utility"
-})
-
---------------------------------------------------
--- SERVICES
---------------------------------------------------
-local Players     = game:GetService("Players")
-local RunService  = game:GetService("RunService")
-local Lighting    = game:GetService("Lighting")
-local Stats       = game:GetService("Stats")
-local VirtualUser = game:GetService("VirtualUser")
-
-local LocalPlayer = Players.LocalPlayer
-local Camera      = workspace.CurrentCamera
-
---------------------------------------------------
--- ANTI AFK (AUTO ON)
---------------------------------------------------
-LocalPlayer.Idled:Connect(function()
-    VirtualUser:Button2Down(Vector2.new(0,0), Camera.CFrame)
-    task.wait(1)
-    VirtualUser:Button2Up(Vector2.new(0,0), Camera.CFrame)
-end)
-
---------------------------------------------------
--- UNLOCK FPS
---------------------------------------------------
 GUI:CreateToggle({
     parent = miscTab,
     text = "Unlock FPS",
@@ -662,22 +658,17 @@ GUI:CreateToggle({
     end
 })
 
---------------------------------------------------
--- FPS BOOSTER
---------------------------------------------------
 GUI:CreateToggle({
     parent = miscTab,
     text = "FPS Booster",
     default = false,
     callback = function(state)
         if not state then return end
-        for _, v in ipairs(workspace:GetDescendants()) do
+        for _, v in ipairs(Workspace:GetDescendants()) do
             if v:IsA("BasePart") then
                 v.Material = Enum.Material.Plastic
                 v.Reflectance = 0
-            elseif v:IsA("ParticleEmitter")
-            or v:IsA("Trail")
-            or v:IsA("Beam") then
+            elseif v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") then
                 v.Enabled = false
             end
         end
@@ -685,9 +676,6 @@ GUI:CreateToggle({
     end
 })
 
---------------------------------------------------
--- CPU OPTIMIZER
---------------------------------------------------
 GUI:CreateToggle({
     parent = miscTab,
     text = "Optimized CPU Usage",
@@ -697,9 +685,7 @@ GUI:CreateToggle({
     end
 })
 
---------------------------------------------------
--- LIVE PING (FIX)
---------------------------------------------------
+-- LIVE PING (more robust)
 local pingLabel = GUI:CreateLabel({
     parent = miscTab,
     text = "Ping: -- ms"
@@ -708,18 +694,17 @@ local pingLabel = GUI:CreateLabel({
 task.spawn(function()
     while task.wait(1) do
         local ok, ping = pcall(function()
-            return math.floor(
-                Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-            )
+            local item = Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
+                or Stats.Network.ServerStatsItem:FindFirstChild("Ping")
+            if not item then return nil end
+            return math.floor(item:GetValue())
         end)
 
-        if ok then
-            pingLabel:Set("Ping: "..ping.." ms")
+        if ok and ping then
+            pingLabel:Set("Ping: " .. ping .. " ms")
         else
             pingLabel:Set("Ping: -- ms")
         end
     end
 end)
-
-
 
