@@ -1,9 +1,65 @@
 --------------------------------------------------
 -- ASH LIBS
 --------------------------------------------------
-local GUI = loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/refs/heads/main/source.lua"
-))()
+-- Wait for game to load (better compatibility on mobile executors)
+pcall(function()
+    if not game:IsLoaded() then
+        repeat task.wait() until game:IsLoaded()
+    end
+end)
+
+-- Robust GUI loader (Codex/Android sometimes blocks certain domains)
+local GUI
+do
+    local urls = {
+        "https://raw.githubusercontent.com/BloodLetters/Ash-Libs/refs/heads/main/source.lua",
+        "https://raw.fastgit.org/BloodLetters/Ash-Libs/refs/heads/main/source.lua",
+        "https://raw.gitmirror.com/BloodLetters/Ash-Libs/refs/heads/main/source.lua",
+    }
+
+    local lastErr
+    for _, url in ipairs(urls) do
+        local ok, src = pcall(function()
+            return game:HttpGet(url)
+        end)
+        if ok and type(src) == "string" and #src > 50 then
+            local ok2, lib = pcall(function()
+                return loadstring(src)()
+            end)
+            if ok2 and lib then
+                GUI = lib
+                break
+            else
+                lastErr = lib
+            end
+        else
+            lastErr = src
+        end
+    end
+
+    if not GUI then
+        warn("[Aegis HUB] Failed to load Ash Libs. Check HttpGet/URL access. Last error:", lastErr)
+
+        -- Minimal fallback so you still SEE something instead of 'nothing appears'
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "AegisHub_Fallback"
+        sg.ResetOnSpawn = false
+        sg.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(0, 520, 0, 90)
+        lbl.Position = UDim2.new(0, 20, 0, 20)
+        lbl.BackgroundTransparency = 0.2
+        lbl.TextScaled = true
+        lbl.Text = "Aegis HUB
+Gagal load Ash Libs (cek koneksi / domain diblokir).
+Coba ganti URL atau host sendiri."
+        lbl.Parent = sg
+
+        return
+    end
+end
+
 
 --------------------------------------------------
 -- SERVICES
@@ -13,6 +69,7 @@ local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local Stats = game:GetService("Stats")
 local VirtualUser = game:GetService("VirtualUser")
@@ -21,7 +78,7 @@ local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
--- UTILS
+-- UTILS (FIXED / ADDED)
 --------------------------------------------------
 local function getChar()
     return LocalPlayer.Character
@@ -32,6 +89,7 @@ local function getHum(char)
     return char and char:FindFirstChildOfClass("Humanoid")
 end
 
+-- Renamed to avoid collision with your later use-cases
 local function getCharHRP(char)
     char = char or getChar()
     return char and char:FindFirstChild("HumanoidRootPart")
@@ -48,6 +106,8 @@ local function getPlayerList()
     return list
 end
 
+-- Generic NPC list finder (best-effort).
+-- Looks for Models with Humanoid that are NOT player characters.
 local function getNPCList()
     local npcNamesMap = {}
 
@@ -89,20 +149,6 @@ local function smoothTeleport(targetCFrame)
     tween:Play()
 end
 
--- Helper kompatibel Ash Libs untuk show/hide
-local function SafeVisible(element, state)
-    if not element then return end
-    -- beberapa versi return object dengan .Element
-    local obj = element.Element or element
-    pcall(function()
-        if typeof(obj) == "Instance" then
-            obj.Visible = state
-        elseif obj.Visible ~= nil then
-            obj.Visible = state
-        end
-    end)
-end
-
 --------------------------------------------------
 -- WINDOW
 --------------------------------------------------
@@ -114,7 +160,17 @@ GUI:CreateMain({
 })
 
 --------------------------------------------------
--- NET EVENTS (Fishing)
+-- TAB FARMING
+--------------------------------------------------
+local farmingTab = GUI:CreateTab("Farming", "fish")
+
+GUI:CreateSection({
+    parent = farmingTab,
+    text = "Instant Fishing"
+})
+
+--------------------------------------------------
+-- NET EVENTS
 --------------------------------------------------
 local netFolder = ReplicatedStorage:WaitForChild("Packages")
     :WaitForChild("_Index")
@@ -131,38 +187,60 @@ local Events = {
 }
 
 --------------------------------------------------
--- TAB: FARMING
+-- CONFIG
 --------------------------------------------------
-local farmingTab = GUI:CreateTab("Farming", "fish")
-GUI:CreateSection({ parent = farmingTab, text = "Instant Fishing" })
+local Config = {
+    AutoFish = false,
+    CatchDelay = 0.25,
+}
 
-local Config = { AutoFish = false, CatchDelay = 0.25 }
 local loopRunning = false
 
+--------------------------------------------------
+-- NORMAL INSTANT FISHING
+--------------------------------------------------
 local function doOneInstant()
-    pcall(function() Events.equipHotbar:FireServer(1) end)
-    pcall(function() Events.chargeRod:InvokeServer(100) end)
+    -- Equip rod
+    pcall(function()
+        Events.equipHotbar:FireServer(1)
+    end)
+
+    -- Charge rod
+    pcall(function()
+        Events.chargeRod:InvokeServer(100)
+    end)
+
     task.wait(0.001)
 
+    -- Start minigame
     local okStart = pcall(function()
         Events.startMini:InvokeServer(-1.23, 1)
     end)
     if not okStart then return end
 
     task.wait(Config.CatchDelay)
-    pcall(function() Events.completeFish:FireServer() end)
+
+    -- Complete fishing
+    pcall(function()
+        Events.completeFish:FireServer()
+    end)
 end
 
 local function InstantLoop()
     if loopRunning then return end
     loopRunning = true
+
     while Config.AutoFish do
         pcall(doOneInstant)
         task.wait(0.001)
     end
+
     loopRunning = false
 end
 
+--------------------------------------------------
+-- GUI CONTROLS
+--------------------------------------------------
 GUI:CreateToggle({
     parent = farmingTab,
     text = "Enable Instant Fishing",
@@ -180,22 +258,28 @@ GUI:CreateInput({
     default = tostring(Config.CatchDelay),
     callback = function(v)
         local n = tonumber(v)
-        if n then Config.CatchDelay = math.clamp(n, 0.01, 3) end
+        if n then
+            Config.CatchDelay = math.clamp(n, 0.01, 3)
+        end
     end
 })
 
 --------------------------------------------------
--- TAB: CAMERA
+-- TAB : CAMERA
 --------------------------------------------------
 local cameraTab = GUI:CreateTab("Camera", "camera")
 GUI:CreateSection({ parent = cameraTab, text = "Spectate Player" })
 
+local camDropdown
 local selectedCamPlayer
-local camDropdown = GUI:CreateDropdown({
+
+camDropdown = GUI:CreateDropdown({
     parent = cameraTab,
     text = "Select Player",
     options = getPlayerList(),
-    callback = function(v) selectedCamPlayer = v end
+    callback = function(v)
+        selectedCamPlayer = v
+    end
 })
 
 GUI:CreateButton({
@@ -213,23 +297,31 @@ GUI:CreateToggle({
     callback = function(state)
         if not state then
             local hum = getHum()
-            if hum then Camera.CameraSubject = hum end
+            if hum then
+                Camera.CameraSubject = hum
+            end
             return
         end
+
         local plr = Players:FindFirstChild(selectedCamPlayer or "")
         if plr and plr.Character then
             local hum = getHum(plr.Character)
-            if hum then Camera.CameraSubject = hum end
+            if hum then
+                Camera.CameraSubject = hum
+            end
         end
     end
 })
 
 --------------------------------------------------
--- TAB: TELEPORT
+-- TAB : TELEPORT
 --------------------------------------------------
 local teleportTab = GUI:CreateTab("Teleport", "map")
 
-GUI:CreateSection({ parent = teleportTab, text = "Teleport Island" })
+GUI:CreateSection({
+    parent = teleportTab,
+    text = "Teleport Island"
+})
 
 local islands = {
     ["Fisherman Island"] = CFrame.new(128.62, 3.53, 2783.18),
@@ -258,11 +350,14 @@ for k in pairs(islands) do table.insert(islandNames, k) end
 table.sort(islandNames)
 
 local selectedIsland
+
 GUI:CreateDropdown({
     parent = teleportTab,
     text = "Select Island",
     options = islandNames,
-    callback = function(name) selectedIsland = name end
+    callback = function(name)
+        selectedIsland = name
+    end
 })
 
 GUI:CreateButton({
@@ -275,14 +370,21 @@ GUI:CreateButton({
     end
 })
 
+--------------------------------------------------
+-- TELEPORT PLAYER
+--------------------------------------------------
 GUI:CreateSection({ parent = teleportTab, text = "Teleport Player" })
 
+local tpPlayerDropdown
 local selectedTPPlayer
-local tpPlayerDropdown = GUI:CreateDropdown({
+
+tpPlayerDropdown = GUI:CreateDropdown({
     parent = teleportTab,
     text = "Select Player",
     options = getPlayerList(),
-    callback = function(v) selectedTPPlayer = v end
+    callback = function(v)
+        selectedTPPlayer = v
+    end
 })
 
 GUI:CreateButton({
@@ -300,19 +402,28 @@ GUI:CreateButton({
         local plr = Players:FindFirstChild(selectedTPPlayer or "")
         if plr and plr.Character then
             local hrp = getCharHRP(plr.Character)
-            if hrp then smoothTeleport(hrp.CFrame * CFrame.new(0, 0, -3)) end
+            if hrp then
+                smoothTeleport(hrp.CFrame * CFrame.new(0, 0, -3))
+            end
         end
     end
 })
 
+--------------------------------------------------
+-- TELEPORT NPC
+--------------------------------------------------
 GUI:CreateSection({ parent = teleportTab, text = "Teleport NPC" })
 
+local npcDropdown
 local selectedNPC
-local npcDropdown = GUI:CreateDropdown({
+
+npcDropdown = GUI:CreateDropdown({
     parent = teleportTab,
     text = "Select NPC",
     options = getNPCList(),
-    callback = function(v) selectedNPC = v end
+    callback = function(v)
+        selectedNPC = v
+    end
 })
 
 GUI:CreateButton({
@@ -328,10 +439,13 @@ GUI:CreateButton({
     text = "Teleport To NPC",
     callback = function()
         if not selectedNPC then return end
+
         for _, m in ipairs(Workspace:GetDescendants()) do
             if m:IsA("Model") and m.Name == selectedNPC then
                 local hrp = m:FindFirstChild("HumanoidRootPart")
-                if hrp then smoothTeleport(hrp.CFrame * CFrame.new(0, 0, -3)) end
+                if hrp then
+                    smoothTeleport(hrp.CFrame * CFrame.new(0, 0, -3))
+                end
                 break
             end
         end
@@ -339,7 +453,7 @@ GUI:CreateButton({
 })
 
 --------------------------------------------------
--- TAB: EVENT
+-- TAB : EVENT
 --------------------------------------------------
 local eventTab = GUI:CreateTab("Event", "gift")
 GUI:CreateSection({ parent = eventTab, text = "Christmas Event" })
@@ -357,6 +471,7 @@ end
 local function runEvent()
     local rf = getEventRF()
     if not rf then return end
+
     for _, npc in ipairs(getNPCList()) do
         pcall(function()
             rf:InvokeServer(npc, "ChristmasPresents")
@@ -385,19 +500,28 @@ GUI:CreateToggle({
 })
 
 --------------------------------------------------
--- TAB: PLAYER
+-- PLAYER TAB
 --------------------------------------------------
 local playerTab = GUI:CreateTab("Player", "user")
 GUI:CreateSection({ parent = playerTab, text = "Player Movement" })
 
 local PlayerCfg = {
-    Speed = 16, Jump = 50, Fly = false, FlySpeed = 60,
-    NoClip = false, WalkOnWater = false, SwimSpeed = false, SwimValue = 30
+    Speed = 16,
+    Jump = 50,
+    Fly = false,
+    FlySpeed = 60,
+    NoClip = false,
+    WalkOnWater = false,
+    SwimSpeed = false,
+    SwimValue = 30
 }
 
 GUI:CreateSlider({
-    parent = playerTab, text = "Walk Speed",
-    min = 16, max = 300, default = 16,
+    parent = playerTab,
+    text = "Walk Speed",
+    min = 16,
+    max = 300,
+    default = 16,
     callback = function(v)
         PlayerCfg.Speed = v
         local hum = getHum()
@@ -406,8 +530,11 @@ GUI:CreateSlider({
 })
 
 GUI:CreateSlider({
-    parent = playerTab, text = "Jump Power",
-    min = 50, max = 300, default = 50,
+    parent = playerTab,
+    text = "Jump Power",
+    min = 50,
+    max = 300,
+    default = 50,
     callback = function(v)
         PlayerCfg.Jump = v
         local hum = getHum()
@@ -419,7 +546,9 @@ GUI:CreateToggle({
     parent = playerTab,
     text = "No Clip",
     default = false,
-    callback = function(state) PlayerCfg.NoClip = state end
+    callback = function(state)
+        PlayerCfg.NoClip = state
+    end
 })
 
 RunService.Stepped:Connect(function()
@@ -427,7 +556,9 @@ RunService.Stepped:Connect(function()
         local char = getChar()
         if char then
             for _, v in ipairs(char:GetDescendants()) do
-                if v:IsA("BasePart") then v.CanCollide = false end
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
             end
         end
     end
@@ -436,11 +567,15 @@ end)
 -- Walk On Water
 local waterPart
 GUI:CreateToggle({
-    parent = playerTab, text = "Walk On Water",
+    parent = playerTab,
+    text = "Walk On Water",
     default = false,
     callback = function(state)
         PlayerCfg.WalkOnWater = state
-        if not state and waterPart then waterPart:Destroy(); waterPart = nil end
+        if not state and waterPart then
+            waterPart:Destroy()
+            waterPart = nil
+        end
     end
 })
 
@@ -457,13 +592,15 @@ RunService.Heartbeat:Connect(function()
         waterPart.Transparency = 1
         waterPart.Parent = Workspace
     end
+
     waterPart.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 3, hrp.Position.Z)
 end)
 
 -- Fly
 local bv, bg
 GUI:CreateToggle({
-    parent = playerTab, text = "Fly",
+    parent = playerTab,
+    text = "Fly",
     default = false,
     callback = function(state)
         PlayerCfg.Fly = state
@@ -473,6 +610,7 @@ GUI:CreateToggle({
         if state then
             bv = Instance.new("BodyVelocity")
             bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            bv.Velocity = Vector3.zero
             bv.Parent = hrp
 
             bg = Instance.new("BodyGyro")
@@ -494,16 +632,25 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- Swim speed
 GUI:CreateSlider({
-    parent = playerTab, text = "Swim Speed",
-    min = 16, max = 200, default = 30,
-    callback = function(v) PlayerCfg.SwimValue = v end
+    parent = playerTab,
+    text = "Swim Speed",
+    min = 16,
+    max = 200,
+    default = 30,
+    callback = function(v)
+        PlayerCfg.SwimValue = v
+    end
 })
 
 GUI:CreateToggle({
-    parent = playerTab, text = "Enable Swim Speed",
+    parent = playerTab,
+    text = "Enable Swim Speed",
     default = false,
-    callback = function(state) PlayerCfg.SwimSpeed = state end
+    callback = function(state)
+        PlayerCfg.SwimSpeed = state
+    end
 })
 
 task.spawn(function()
@@ -517,7 +664,7 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- ANTI AFK (single)
+-- ANTI AFK (SINGLE COPY - FIXED)
 --------------------------------------------------
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
@@ -531,6 +678,7 @@ task.spawn(function()
     local function applyAntiFall(char)
         local hum = char:WaitForChild("Humanoid", 5)
         if not hum then return end
+
         hum.StateChanged:Connect(function(_, new)
             if new == Enum.HumanoidStateType.Freefall then
                 task.wait(0.1)
@@ -539,7 +687,10 @@ task.spawn(function()
         end)
     end
 
-    if LocalPlayer.Character then applyAntiFall(LocalPlayer.Character) end
+    if LocalPlayer.Character then
+        applyAntiFall(LocalPlayer.Character)
+    end
+
     LocalPlayer.CharacterAdded:Connect(function(char)
         task.wait(0.2)
         applyAntiFall(char)
@@ -547,21 +698,25 @@ task.spawn(function()
 end)
 
 --------------------------------------------------
--- TAB: MISC
+-- MISC TAB
 --------------------------------------------------
 local miscTab = GUI:CreateTab("Misc", "settings")
 GUI:CreateSection({ parent = miscTab, text = "Performance & Utility" })
 
 GUI:CreateToggle({
-    parent = miscTab, text = "Unlock FPS",
+    parent = miscTab,
+    text = "Unlock FPS",
     default = true,
     callback = function(state)
-        if setfpscap then setfpscap(state and 999 or 60) end
+        if setfpscap then
+            setfpscap(state and 999 or 60)
+        end
     end
 })
 
 GUI:CreateToggle({
-    parent = miscTab, text = "FPS Booster",
+    parent = miscTab,
+    text = "FPS Booster",
     default = false,
     callback = function(state)
         if not state then return end
@@ -578,119 +733,173 @@ GUI:CreateToggle({
 })
 
 GUI:CreateToggle({
-    parent = miscTab, text = "Optimized CPU Usage",
+    parent = miscTab,
+    text = "Optimized CPU Usage",
     default = false,
     callback = function(state)
         RunService:Set3dRenderingEnabled(not state)
     end
 })
 
-local pingLabel = GUI:CreateLabel({ parent = miscTab, text = "Ping: -- ms" })
-task.spawn(function()
-    while task.wait(1) do
-        local ok, ping = pcall(function()
-            local item = Stats.Network.ServerStatsItem:FindFirstChild("Data Ping")
-                or Stats.Network.ServerStatsItem:FindFirstChild("Ping")
-            if not item then return nil end
-            return math.floor(item:GetValue())
-        end)
-
-        if ok and ping then
-            pingLabel:Set("Ping: " .. ping .. " ms")
-        else
-            pingLabel:Set("Ping: -- ms")
-        end
-    end
-end)
-
 --------------------------------------------------
--- TAB: TRADE (FIXED: ONLY ONCE, no duplicate)
+-- =======[ MASS TRADE TAB - ASH LIBS + FULL FUNCS ]
 --------------------------------------------------
 local tradeTab = GUI:CreateTab("Trade", "repeat")
 GUI:CreateSection({ parent = tradeTab, text = "Mass Trade" })
 
--- Remotes trade (sesuai info kamu: namanya sama)
-local InitiateTrade        = netFolder:WaitForChild("RF/InitiateTrade")
-local RFAwaitTradeResponse = netFolder:WaitForChild("RF/AwaitTradeResponse")
-local RF_AcceptTrade       = netFolder:FindFirstChild("RF/AcceptTrade")
-local RE_TradeIncoming     = netFolder:FindFirstChild("RE/TradeIncoming")
-
-local ItemUtility = _G.ItemUtility
-local ItemStringUtility = _G.ItemStringUtility
-pcall(function() if not ItemUtility then ItemUtility = require(ReplicatedStorage.Shared.ItemUtility) end end)
-pcall(function() if not ItemStringUtility then ItemStringUtility = require(ReplicatedStorage.Modules.ItemStringUtility) end end)
-
-local tradeState = {
-    mode = "V1",
-    selectedPlayerName = nil,
-    selectedPlayerId = nil,
-    selectedItemName = nil,
-    tradeAmount = 0,
-    autoTradeV1 = false,
-    autoTradeV2 = false,
-    filterUnfavorited = false,
-    saveTempMode = false,
-    TempTradeList = {},
-    onTrade = false,
-    busy = false,
-}
-local inventoryCache = {}
-local fullInventoryDropdownList = {}
-
+-- Notify helper (kalau kamu punya sistem notify, ganti ini)
 local function NotifySuccess(t, d) print("[SUCCESS]", t, d) end
 local function NotifyInfo(t, d)    print("[INFO]", t, d) end
 local function NotifyWarning(t, d) warn("[WARN]", t, d) end
 local function NotifyError(t, d)   warn("[ERROR]", t, d) end
 
+--------------------------------------------------
+-- TRADE STATE (seperti contoh)
+--------------------------------------------------
+local tradeState = {
+    mode = "V1",
+    selectedPlayerName = nil,
+    selectedPlayerId = nil,
+
+    selectedItemName = nil,      -- label dropdown V2
+    tradeAmount = 0,
+
+    autoTradeV1 = false,
+    autoTradeV2 = false,
+
+    filterUnfavorited = false,
+    saveTempMode = false,
+    TempTradeList = {},
+
+    onTrade = false,
+    busy = false,
+}
+
+local inventoryCache = {}                 -- [cleanName] = {uuid1, uuid2,...}
+local fullInventoryDropdownList = {}
+
+--------------------------------------------------
+-- NET REMOTES (SAMA seperti contoh kamu)
+--------------------------------------------------
+local netFolder = ReplicatedStorage.Packages
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
+    :WaitForChild("net")
+
+local InitiateTrade        = netFolder:WaitForChild("RF/InitiateTrade")
+local RFAwaitTradeResponse = netFolder:WaitForChild("RF/AwaitTradeResponse")
+
+-- optional (kalau kamu punya)
+local RF_AcceptTrade   = netFolder:FindFirstChild("RF/AcceptTrade")
+local RE_TradeIncoming = netFolder:FindFirstChild("RE/TradeIncoming")
+
+--------------------------------------------------
+-- UTILS
+--------------------------------------------------
+local function getPlayerListV2()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(list, p.Name) end
+    end
+    table.sort(list)
+    return list
+end
+
+local function refreshDropdownV2()
+    if _G.PlayerDropdownTrade and _G.PlayerDropdownTrade.Refresh then
+        _G.PlayerDropdownTrade:Refresh(getPlayerListV2())
+    end
+end
+
 local function parseCleanItemName(label)
     if type(label) ~= "string" then return nil end
     local name = label:match("^(.*) %((%d+)x%)$")
-    return name or label
+    if name and #name > 0 then return name end
+    return label
 end
+
+--------------------------------------------------
+-- INVENTORY: support Replion + ItemUtility + ItemStringUtility (seperti contoh kamu)
+--------------------------------------------------
+local ItemUtility = _G.ItemUtility
+local ItemStringUtility = _G.ItemStringUtility
+
+pcall(function()
+    if not ItemUtility then
+        ItemUtility = require(ReplicatedStorage.Shared.ItemUtility)
+    end
+end)
+pcall(function()
+    if not ItemStringUtility then
+        ItemStringUtility = require(ReplicatedStorage.Modules.ItemStringUtility)
+    end
+end)
 
 local function refreshInventory()
     local DataReplion = _G.Replion and _G.Replion.Client and _G.Replion.Client:WaitReplion("Data")
-    inventoryCache = {}
-    fullInventoryDropdownList = {}
-
     if not DataReplion or not ItemUtility or not ItemStringUtility then
+        NotifyWarning("Inventory", "Replion/ItemUtility missing. (Sesuaikan refreshInventory jika inventori custom)")
         if _G.InventoryDropdown and _G.InventoryDropdown.Refresh then
             _G.InventoryDropdown:Refresh({"- Missing inventory modules -"})
         end
+        refreshDropdownV2()
         return
     end
 
     local inventoryItems = DataReplion:Get({ "Inventory", "Items" })
-    if not inventoryItems then
-        if _G.InventoryDropdown and _G.InventoryDropdown.Refresh then
-            _G.InventoryDropdown:Refresh({"- Inventory Empty -"})
-        end
-        return
-    end
+    inventoryCache = {}
+    fullInventoryDropdownList = {}
+    if not inventoryItems then return end
 
     local groupedItems = {}
+
     for _, itemData in ipairs(inventoryItems) do
         local baseItemData = ItemUtility:GetItemData(itemData.Id)
         if baseItemData and baseItemData.Data then
             local t = baseItemData.Data.Type
             if (t == "Fish" or t == "Enchant Stones") then
                 if not (tradeState.filterUnfavorited and itemData.Favorited) then
-                    local name = ItemStringUtility.GetItemName(itemData, baseItemData)
-                    groupedItems[name] = (groupedItems[name] or 0) + 1
-                    inventoryCache[name] = inventoryCache[name] or {}
-                    table.insert(inventoryCache[name], itemData.UUID)
+                    local dynamicName = ItemStringUtility.GetItemName(itemData, baseItemData)
+
+                    groupedItems[dynamicName] = (groupedItems[dynamicName] or 0) + 1
+                    inventoryCache[dynamicName] = inventoryCache[dynamicName] or {}
+                    table.insert(inventoryCache[dynamicName], itemData.UUID)
                 end
             end
         end
     end
 
     for name, count in pairs(groupedItems) do
-        table.insert(fullInventoryDropdownList, ("%s (%dx)"):format(name, count))
+        table.insert(fullInventoryDropdownList, string.format("%s (%dx)", name, count))
     end
     table.sort(fullInventoryDropdownList)
 
     if _G.InventoryDropdown and _G.InventoryDropdown.Refresh then
         _G.InventoryDropdown:Refresh(#fullInventoryDropdownList > 0 and fullInventoryDropdownList or {"- Empty -"})
+    end
+    refreshDropdownV2()
+end
+
+--------------------------------------------------
+-- MODE V1 LOGIC (Save / Original / Mass Trade)
+--------------------------------------------------
+local function addSaved(uuid, category)
+    table.insert(tradeState.TempTradeList, { UUID = uuid, Category = category })
+    NotifySuccess("Save Mode", ("Saved: %s (%s)"):format(tostring(uuid), tostring(category)))
+end
+
+local function sendOriginalTrade(uuid, category)
+    if not tradeState.selectedPlayerId then
+        NotifyError("Trade", "Target belum dipilih.")
+        return
+    end
+    local ok, res = pcall(function()
+        return InitiateTrade:InvokeServer(tradeState.selectedPlayerId, uuid, category)
+    end)
+    if ok and res then
+        NotifySuccess("Trade Sent", "Sent to: " .. (tradeState.selectedPlayerName or tostring(tradeState.selectedPlayerId)))
+    else
+        NotifyError("Trade", "Failed to send.")
     end
 end
 
@@ -704,6 +913,7 @@ local function TradeAllQuiet()
         tradeState.busy = false
         return
     end
+
     if #tradeState.TempTradeList == 0 then
         NotifyWarning("Mass Trade V1", "No items saved!")
         tradeState.autoTradeV1 = false
@@ -711,21 +921,38 @@ local function TradeAllQuiet()
         return
     end
 
+    NotifyInfo("Mass Trade V1", "Starting V1 trade of " .. #tradeState.TempTradeList .. " items...")
+
     task.spawn(function()
         for i, item in ipairs(tradeState.TempTradeList) do
-            if not tradeState.autoTradeV1 then break end
-            pcall(function()
-                InitiateTrade:InvokeServer(tradeState.selectedPlayerId, item.UUID, item.Category)
+            if not tradeState.autoTradeV1 then
+                NotifyWarning("Mass Trade V1", "Stopped by user.")
+                break
+            end
+
+            local ok, res = pcall(function()
+                return InitiateTrade:InvokeServer(tradeState.selectedPlayerId, item.UUID, item.Category)
             end)
+
+            if ok and res then
+                NotifyInfo("Mass Trade V1", ("Progress %d/%d (OK)"):format(i, #tradeState.TempTradeList))
+            else
+                NotifyWarning("Mass Trade V1", ("Progress %d/%d (FAIL)"):format(i, #tradeState.TempTradeList))
+            end
+
             task.wait(6.5)
         end
+
+        NotifySuccess("Mass Trade V1", "Finished!")
         tradeState.autoTradeV1 = false
         tradeState.TempTradeList = {}
         tradeState.busy = false
-        NotifySuccess("Mass Trade V1", "Finished!")
     end)
 end
 
+--------------------------------------------------
+-- MODE V2 LOGIC (Mass trade berdasarkan dropdown inventory)
+--------------------------------------------------
 local function StartMassTradeV2(statusLabel)
     if tradeState.busy then return end
     tradeState.busy = true
@@ -748,12 +975,20 @@ local function StartMassTradeV2(statusLabel)
 
     local okCount, failCount = 0, 0
     for i = 1, tradeState.tradeAmount do
-        if not tradeState.autoTradeV2 then break end
+        if not tradeState.autoTradeV2 then
+            statusLabel:Set("V2 Status: Stopped by user.")
+            break
+        end
+
         local uuid = uuids[i]
+        statusLabel:Set(("V2 Status: %d/%d | Sending..."):format(i, tradeState.tradeAmount))
+
         local ok, res = pcall(function()
             return InitiateTrade:InvokeServer(tradeState.selectedPlayerId, uuid)
         end)
+
         if ok and res then okCount += 1 else failCount += 1 end
+
         statusLabel:Set(("V2 Status: %d/%d | OK:%d | FAIL:%d"):format(i, tradeState.tradeAmount, okCount, failCount))
         task.wait(5)
     end
@@ -764,26 +999,40 @@ local function StartMassTradeV2(statusLabel)
     refreshInventory()
 end
 
--- Auto Accept (opsional)
+--------------------------------------------------
+-- AUTO ACCEPT (tanpa hook prompt)
+--------------------------------------------------
 _G.AutoAcceptTradeEnabled = _G.AutoAcceptTradeEnabled or false
 if RE_TradeIncoming and RF_AcceptTrade then
-    RE_TradeIncoming.OnClientEvent:Connect(function(_, tradeId)
+    RE_TradeIncoming.OnClientEvent:Connect(function(fromUserId, tradeId)
         if not _G.AutoAcceptTradeEnabled then return end
-        task.delay(1.0, function()
+        task.spawn(function()
+            task.wait(1.5)
             pcall(function() RF_AcceptTrade:InvokeServer(tradeId) end)
+            NotifySuccess("Auto Accept", "Accepted trade: " .. tostring(tradeId))
         end)
     end)
 end
 
--- UI groups show/hide (V1/V2/V3)
-local TradeQuietElements = {}
-local TradeV2Elements = {}
-local TradeV3Elements = {}
-
+--------------------------------------------------
+-- UI VISIBILITY GROUPS
+--------------------------------------------------
+local function setVisible(el, state)
+    local obj = el and (el.Element or el)
+    if not obj then return end
+    pcall(function() obj.Visible = state end)
+end
 local function showGroup(group, on)
-    for _, el in ipairs(group) do SafeVisible(el, on) end
+    for _, el in ipairs(group) do setVisible(el, on) end
 end
 
+_G.TradeQuietElements = {}
+_G.TradeV2Elements = {}
+_G.TradeV3Elements = {}
+
+--------------------------------------------------
+-- UI: MODE SELECTION
+--------------------------------------------------
 GUI:CreateSection({ parent = tradeTab, text = "Trade Mode Selection" })
 
 GUI:CreateDropdown({
@@ -792,31 +1041,36 @@ GUI:CreateDropdown({
     options = {"V1","V2","V3"},
     callback = function(v)
         tradeState.mode = v
-        showGroup(TradeQuietElements, v == "V1")
-        showGroup(TradeV2Elements, v == "V2")
-        showGroup(TradeV3Elements, v == "V3")
+        NotifySuccess("Mode Changed", "Trade mode set to: " .. v)
+        showGroup(_G.TradeQuietElements, v == "V1")
+        showGroup(_G.TradeV2Elements, v == "V2")
+        showGroup(_G.TradeV3Elements, v == "V3")
     end
 })
 
 local playerDropdown = GUI:CreateDropdown({
     parent = tradeTab,
     text = "Select Trade Target",
-    options = getPlayerList(),
+    options = getPlayerListV2(),
     callback = function(selected)
         tradeState.selectedPlayerName = selected
         local plr = Players:FindFirstChild(selected)
         tradeState.selectedPlayerId = plr and plr.UserId or nil
     end
 })
+_G.PlayerDropdownTrade = playerDropdown
 
 GUI:CreateButton({
     parent = tradeTab,
     text = "Refresh Player List",
-    callback = function()
-        playerDropdown:Refresh(getPlayerList())
-    end
+    callback = refreshDropdownV2
 })
+Players.PlayerAdded:Connect(function() task.delay(0.1, refreshDropdownV2) end)
+Players.PlayerRemoving:Connect(function() task.delay(0.1, refreshDropdownV2) end)
 
+--------------------------------------------------
+-- UI: AUTO ACCEPT
+--------------------------------------------------
 GUI:CreateSection({ parent = tradeTab, text = "Auto Accept Trade" })
 local autoAcceptToggle = GUI:CreateToggle({
     parent = tradeTab,
@@ -824,31 +1078,45 @@ local autoAcceptToggle = GUI:CreateToggle({
     default = false,
     callback = function(v)
         _G.AutoAcceptTradeEnabled = v
+        if v then NotifySuccess("Auto Accept", "Enabled") else NotifyWarning("Auto Accept", "Disabled") end
     end
 })
 
+--------------------------------------------------
+-- UI: MODE V1
+--------------------------------------------------
 GUI:CreateSection({ parent = tradeTab, text = "Mode V1" })
 
 local saveModeToggle = GUI:CreateToggle({
     parent = tradeTab,
-    text = "Mode Save Items (Needs your Inventory Click Event)",
+    text = "Mode Save Items (Click Inventory Item)",
     default = false,
     callback = function(state)
         tradeState.saveTempMode = state
-        if state then tradeState.TempTradeList = {} end
+        if state then
+            tradeState.TempTradeList = {}
+            NotifySuccess("Save Mode", "Enabled - klik item inventory untuk save")
+        else
+            NotifyInfo("Save Mode", "Disabled - "..tostring(#tradeState.TempTradeList).." items saved")
+        end
     end
 })
-table.insert(TradeQuietElements, saveModeToggle)
+table.insert(_G.TradeQuietElements, saveModeToggle)
 
 local originalTradeToggle = GUI:CreateToggle({
     parent = tradeTab,
-    text = "Trade (Original Send) (Needs your Inventory Click Event)",
+    text = "Trade (Original Send) (Click Inventory Item)",
     default = false,
     callback = function(state)
         tradeState.onTrade = state
+        if state then
+            NotifySuccess("Trade", "Enabled - klik item inventory untuk kirim")
+        else
+            NotifyWarning("Trade", "Disabled")
+        end
     end
 })
-table.insert(TradeQuietElements, originalTradeToggle)
+table.insert(_G.TradeQuietElements, originalTradeToggle)
 
 local startMassV1 = GUI:CreateToggle({
     parent = tradeTab,
@@ -857,34 +1125,25 @@ local startMassV1 = GUI:CreateToggle({
     callback = function(state)
         tradeState.autoTradeV1 = state
         if tradeState.mode == "V1" and state then
+            if #tradeState.TempTradeList == 0 then
+                NotifyError("Mass Trade V1", "No items saved!")
+                tradeState.autoTradeV1 = false
+                return
+            end
             TradeAllQuiet()
+        else
+            NotifyWarning("Mass Trade V1", "Stopped")
         end
     end
 })
-table.insert(TradeQuietElements, startMassV1)
+table.insert(_G.TradeQuietElements, startMassV1)
 
 local v1Label = GUI:CreateLabel({ parent = tradeTab, text = "V1: Ready" })
-table.insert(TradeQuietElements, v1Label)
+table.insert(_G.TradeQuietElements, v1Label)
 
--- Hook inventory click event (kalau kamu sudah buat BE_InventoryItemClicked)
-local be = ReplicatedStorage:FindFirstChild("BE_InventoryItemClicked")
-if be and be.Event then
-    be.Event:Connect(function(uuid, category)
-        if tradeState.mode == "V1" and tradeState.saveTempMode then
-            table.insert(tradeState.TempTradeList, { UUID = uuid, Category = category })
-            v1Label:Set(("V1: Saved %d items"):format(#tradeState.TempTradeList))
-            return
-        end
-        if tradeState.mode == "V1" and tradeState.onTrade and tradeState.selectedPlayerId then
-            pcall(function()
-                InitiateTrade:InvokeServer(tradeState.selectedPlayerId, uuid, category)
-            end)
-        end
-    end)
-else
-    v1Label:Set("V1: Add BE_InventoryItemClicked for click-to-save/send")
-end
-
+--------------------------------------------------
+-- UI: MODE V2
+--------------------------------------------------
 GUI:CreateSection({ parent = tradeTab, text = "Mode V2" })
 
 local filterToggleV2 = GUI:CreateToggle({
@@ -894,36 +1153,41 @@ local filterToggleV2 = GUI:CreateToggle({
     callback = function(val)
         tradeState.filterUnfavorited = val
         refreshInventory()
+        NotifyInfo("V2", "Inventory refreshed.")
     end
 })
-table.insert(TradeV2Elements, filterToggleV2)
+table.insert(_G.TradeV2Elements, filterToggleV2)
 
 _G.InventoryDropdown = GUI:CreateDropdown({
     parent = tradeTab,
     text = "Select Item from Inventory",
     options = {"- Refresh to load -"},
-    callback = function(val) tradeState.selectedItemName = val end
+    callback = function(val)
+        tradeState.selectedItemName = val
+    end
 })
-table.insert(TradeV2Elements, _G.InventoryDropdown)
+table.insert(_G.TradeV2Elements, _G.InventoryDropdown)
 
 local refreshBtn = GUI:CreateButton({
     parent = tradeTab,
-    text = "Refresh Inventory",
+    text = "Refresh Inventory & Players",
     callback = refreshInventory
 })
-table.insert(TradeV2Elements, refreshBtn)
+table.insert(_G.TradeV2Elements, refreshBtn)
 
 local amountInputV2 = GUI:CreateInput({
     parent = tradeTab,
     text = "Amount to Trade",
     placeholder = "Enter amount...",
     default = "0",
-    callback = function(v) tradeState.tradeAmount = tonumber(v) or 0 end
+    callback = function(v)
+        tradeState.tradeAmount = tonumber(v) or 0
+    end
 })
-table.insert(TradeV2Elements, amountInputV2)
+table.insert(_G.TradeV2Elements, amountInputV2)
 
 local v2Status = GUI:CreateLabel({ parent = tradeTab, text = "V2 Status: Waiting..." })
-table.insert(TradeV2Elements, v2Status)
+table.insert(_G.TradeV2Elements, v2Status)
 
 local startV2 = GUI:CreateToggle({
     parent = tradeTab,
@@ -932,20 +1196,54 @@ local startV2 = GUI:CreateToggle({
     callback = function(on)
         tradeState.autoTradeV2 = on
         if tradeState.mode == "V2" and on then
-            task.spawn(function() StartMassTradeV2(v2Status) end)
+            task.spawn(function()
+                StartMassTradeV2(v2Status)
+            end)
+        else
+            v2Status:Set("V2 Status: Stopped")
         end
     end
 })
-table.insert(TradeV2Elements, startV2)
+table.insert(_G.TradeV2Elements, startV2)
 
+--------------------------------------------------
+-- UI: MODE V3 placeholder
+--------------------------------------------------
 GUI:CreateSection({ parent = tradeTab, text = "Mode V3" })
-local v3Label = GUI:CreateLabel({ parent = tradeTab, text = "V3: placeholder" })
-table.insert(TradeV3Elements, v3Label)
+local v3Label = GUI:CreateLabel({ parent = tradeTab, text = "V3: (add your UI here)" })
+table.insert(_G.TradeV3Elements, v3Label)
 
--- default visibility
-showGroup(TradeQuietElements, true)
-showGroup(TradeV2Elements, false)
-showGroup(TradeV3Elements, false)
+--------------------------------------------------
+-- CONNECT: Inventory click signal -> V1 Save / Original Send
+-- (ini yang menggantikan hook __namecall di contoh kamu)
+--------------------------------------------------
+local be = ReplicatedStorage:FindFirstChild("BE_InventoryItemClicked")
+if be and be.Event then
+    be.Event:Connect(function(uuid, category, displayName)
+        -- Save mode (V1)
+        if tradeState.mode == "V1" and tradeState.saveTempMode then
+            addSaved(uuid, category)
+            v1Label:Set(("V1: Saved %d items"):format(#tradeState.TempTradeList))
+            return
+        end
+
+        -- Original send mode (V1)
+        if tradeState.mode == "V1" and tradeState.onTrade then
+            sendOriginalTrade(uuid, category)
+            return
+        end
+    end)
+else
+    NotifyWarning("Trade V1", "BE_InventoryItemClicked tidak ditemukan. Tambahkan di UI inventory kamu (bagian A).")
+end
+
+--------------------------------------------------
+-- DEFAULT VISIBILITY
+--------------------------------------------------
+showGroup(_G.TradeQuietElements, true)
+showGroup(_G.TradeV2Elements, false)
+showGroup(_G.TradeV3Elements, false)
 
 pcall(refreshInventory)
+
 
