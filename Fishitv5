@@ -240,6 +240,16 @@ GUI:CreateToggle({
     end
 })
 
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Blatant V2",
+    default = false,
+    callback = function(v)
+        Config.AutoFish = v
+        if v then task.spawn(InstantLoop) end
+    end
+})
+
 GUI:CreateInput({
     parent = farmingTab,
     text = "Catch Delay",
