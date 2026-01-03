@@ -177,26 +177,53 @@ end
 ------------------------------------------------------------
 -- SUPER BLATANT FISHING (FASTEST)
 ------------------------------------------------------------
-local function doBlatant()
-    pcall(function() Events.cancelMini:InvokeServer() end)
-    pcall(function() Events.chargeRod:InvokeServer(100) end)
-    pcall(function() Events.startMini:InvokeServer(-1, 0.999) end)
+-- BLATANT FASTEST MODE (FINAL CLEAN VERSION)
 
-    task.wait(Config.ReelDelay)
-    pcall(function() Events.completeFish:FireServer() end)
+function Fastest()
+    task.spawn(function()
+
+        -- Cancel previous minigame
+        pcall(function()
+            Events.cancelMini:InvokeServer()
+        end)
+
+        -- Use server timestamp for best stability
+        local now = workspace:GetServerTimeNow()
+
+        -- Charge rod (using timestamp, smoother & undetected)
+        pcall(function()
+            Events.chargeRod:InvokeServer(now)
+        end)
+
+        -- Start minigame ultra fast
+        pcall(function()
+            Events.startMini:InvokeServer(-1, 0.999)
+        end)
+
+        -- Reel delay (custom from GUI)
+        task.wait(Config.FishingDelay)
+
+        -- Complete fishing
+        pcall(function()
+            Events.completeFish:FireServer()
+        end)
+
+    end)
 end
+
 
 local function BlatantLoop()
     if blatantRunning then return end
     blatantRunning = true
 
     while Config.BlatantFishing do
-        doBlatant()
-        task.wait(Config.FishingDelay)
+        Fastest()
+        task.wait(Config.ReelDelay)
     end
 
     blatantRunning = false
 end
+
 
 ------------------------------------------------------------
 -- GUI: INSTANT
@@ -230,13 +257,16 @@ GUI:CreateSection({ parent = farmingTab, text = "Blatant (Super Fast)" })
 
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Enable Blatant Fishing",
+    text = "Blatant Fishing",
     default = false,
     callback = function(v)
         Config.BlatantFishing = v
-        if v then task.spawn(BlatantLoop) end
+        if v then
+            task.spawn(BlatantLoop)
+        end
     end
 })
+
 
 GUI:CreateInput({
     parent = farmingTab,
