@@ -135,7 +135,7 @@ local Events = {
 local Config = {
     AutoFish = false,
     BlatantFishing = false,
-
+    ExtremeMode = false,
     CatchDelay = 0.25,
     ReelDelay = 1.9,
     FishingDelay = 1.1
@@ -211,18 +211,75 @@ function Fastest()
     end)
 end
 
+function FastestPlus()
+    task.spawn(function()
+
+        local fails = 0
+
+        -- Cancel existing minigame
+        pcall(function()
+            Events.cancelMini:InvokeServer()
+        end)
+
+        task.wait(0.01)
+
+        -- Retry system to prevent stuck
+        while fails < 3 do
+            local now = workspace:GetServerTimeNow()
+
+            -- Charge strongest
+            pcall(function()
+                Events.chargeRod:InvokeServer(now)
+            end)
+
+            task.wait(0.01)
+
+            local ok = pcall(function()
+                return Events.startMini:InvokeServer(-1.0001, 0.99999)
+            end)
+
+            if ok then break end
+
+            fails += 1
+            task.wait(0.05)
+        end
+
+        if fails >= 3 then
+            warn("[FastestPlus] Failed start mini, skip cycle")
+            return
+        end
+
+        -- Smart Reel (lebih cepat tetapi aman)
+        local smartDelay = math.clamp(Config.ReelDelay * 0.85, 0.03, 2)
+
+        task.wait(smartDelay)
+
+        pcall(function()
+            Events.completeFish:FireServer()
+        end)
+    end)
+end
+
+
 
 local function BlatantLoop()
     if blatantRunning then return end
     blatantRunning = true
 
     while Config.BlatantFishing do
-        Fastest()
-        task.wait(Config.ReelDelay)
+        if Config.ExtremeMode then
+            FastestPlus()
+        else
+            Fastest()
+        end
+
+        -- Smart Fishing Delay
+        task.wait(math.clamp(Config.FishingDelay, 0.05, 3))
     end
 
     blatantRunning = false
 end
+
 
 
 ------------------------------------------------------------
@@ -233,16 +290,6 @@ GUI:CreateSection({ parent = farmingTab, text = "Instant Fishing" })
 GUI:CreateToggle({
     parent = farmingTab,
     text = "Enable Instant Fishing",
-    default = false,
-    callback = function(v)
-        Config.AutoFish = v
-        if v then task.spawn(InstantLoop) end
-    end
-})
-
-GUI:CreateToggle({
-    parent = farmingTab,
-    text = "Blatant V2",
     default = false,
     callback = function(v)
         Config.AutoFish = v
@@ -267,7 +314,7 @@ GUI:CreateSection({ parent = farmingTab, text = "Blatant (Super Fast)" })
 
 GUI:CreateToggle({
     parent = farmingTab,
-    text = "Blatant Fishing",
+    text = "Enable Blatant Fishing",
     default = false,
     callback = function(v)
         Config.BlatantFishing = v
@@ -278,13 +325,22 @@ GUI:CreateToggle({
 })
 
 
+GUI:CreateToggle({
+    parent = farmingTab,
+    text = "Blatant V2",
+    default = false,
+    callback = function(v)
+        Config.ExtremeMode = v
+    end
+})
+
 GUI:CreateInput({
     parent = farmingTab,
     text = "Reel Delay",
     default = tostring(Config.ReelDelay),
     callback = function(v)
-        local n = tonumber(v)
-        if n and n > 0 then Config.ReelDelay = n end
+        local num = tonumber(v)
+        if num then Config.ReelDelay = math.clamp(num, 0.03, 3) end
     end
 })
 
@@ -293,10 +349,11 @@ GUI:CreateInput({
     text = "Fishing Delay",
     default = tostring(Config.FishingDelay),
     callback = function(v)
-        local n = tonumber(v)
-        if n and n > 0 then Config.FishingDelay = n end
+        local num = tonumber(v)
+        if num then Config.FishingDelay = math.clamp(num, 0.03, 3) end
     end
 })
+
 
 --------------------------------------------------
 -- TAB : CAMERA
