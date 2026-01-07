@@ -475,7 +475,7 @@ function Sirenx:Window(GuiConfig)
     GuiConfig              = GuiConfig or {}
     GuiConfig.Title        = GuiConfig.Title or "AegisHUB"
     GuiConfig.Footer       = GuiConfig.Footer or "Sirene :3"
-    GuiConfig.Color        = GuiConfig.Color or Color3.fromRGB(0, 13, 255)
+    GuiConfig.Color        = GuiConfig.Color or Color3.fromRGB(4, 5, 15)
     GuiConfig["Tab Width"] = GuiConfig["Tab Width"] or 120
     GuiConfig.Version      = GuiConfig.Version or 1
 
