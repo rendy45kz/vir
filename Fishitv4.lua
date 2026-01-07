@@ -1,3920 +1,1733 @@
---[[ Compatibility helpers (some executors don't expose 'task') ]]--
-local _task  = rawget(_G, "task")
-local _wait  = (_task and _task.wait) or wait
-local _spawn = (_task and _task.spawn) or function(fn, ...)
-    local co = coroutine.create(fn)
-    local ok, err = coroutine.resume(co, ...)
-    if not ok then warn(err) end
-    return co
-end
-local _delay = (_task and _task.delay) or function(t, fn, ...)
-    local args = table.pack(...)
-    return _spawn(function()
-        _wait(t)
-        fn(table.unpack(args, 1, args.n))
-    end)
-end
+local Sirenx = loadstring(game:HttpGet("https://github.com/Soruisme0/SirenX/raw/main/Ui%20Siren.lua"))()
 
+local Window = Sirenx:Window({
+  Title   = "SirenX |",
+  Footer  = "Fish It",
+  Image   = "117346863101172",
+  Color   = Color3.fromRGB(255, 255, 255),
+  Theme   = 129648704071138,
+  Version = 1,
+})
 
-----------------------------------------------------------------
--- AegisHub UI – Neon Card Redesigned
-----------------------------------------------------------------
-if not game:IsLoaded() then game.Loaded:Wait() end
-
-local TweenService     = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local CoreGui          = game:GetService("CoreGui")
-
-local library = {}
-
--- THEME BARU
-local theme = {
-    bg           = Color3.fromRGB(8, 10, 18),
-    bg2          = Color3.fromRGB(14, 18, 30),
-    card         = Color3.fromRGB(18, 22, 36),
-    card2        = Color3.fromRGB(24, 30, 48),
-    borderSoft   = Color3.fromRGB(60, 70, 100),
-    border       = Color3.fromRGB(90, 140, 255),
-    borderAccent = Color3.fromRGB(180, 70, 255),
-    text         = Color3.fromRGB(235, 239, 255),
-    subText      = Color3.fromRGB(160, 170, 200),
-    accent       = Color3.fromRGB(120, 180, 255),
-    accent2      = Color3.fromRGB(255, 180, 90),
-    danger       = Color3.fromRGB(255, 90, 120),
-    success      = Color3.fromRGB(120, 255, 140),
+local svc = {
+  Players     = game:GetService("Players"),
+  RunService  = game:GetService("RunService"),
+  HttpService = game:GetService("HttpService"),
+  RS          = game:GetService("ReplicatedStorage"),
+  VU          = game:GetService("VirtualUser"),
+  VIM         = game:GetService("VirtualInputManager"),
+  PG          = game:GetService("Players").LocalPlayer.PlayerGui,
+  Camera      = workspace.CurrentCamera,
+  GuiService  = game:GetService("GuiService"),
+  CoreGui     = game:GetService("CoreGui"),
+  Stats       = game:GetService("Stats"),
+  TpService   = game:GetService("TeleportService"),
+  Starter     = game:GetService("StarterPlayer"),
+  UIS         = game:GetService("UserInputService"),
 }
 
-local function tween(obj, dur, props)
-    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+_G.httpRequest =
+  (syn and syn.request)
+  or (http and http.request)
+  or http_request
+  or (fluxus and fluxus.request)
+  or request
+if not _G.httpRequest then
+  return
 end
 
-local function applyStroke(frame, color)
-    local s = Instance.new("UIStroke")
-    s.Thickness = 1
-    s.Color = color or theme.borderSoft
-    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Parent = frame
-    return s
+local player = svc.Players.LocalPlayer
+local function getHRP()
+  local char = player.Character or player.CharacterAdded:Wait()
+  return char:WaitForChild("HumanoidRootPart")
+end
+local function getHumanoid()
+  local char = player.Character or player.CharacterAdded:Wait()
+  return char:WaitForChild("Humanoid")
 end
 
-local function applyCard(frame, color, borderColor)
-    frame.BackgroundColor3 = color or theme.card
-    frame.BorderSizePixel = 0
-    local c = Instance.new("UICorner", frame)
-    c.CornerRadius = UDim.new(0, 5)
-    applyStroke(frame, borderColor)
-end
-
-----------------------------------------------------------------
--- MAIN WINDOW
-----------------------------------------------------------------
-function library:CreateWindow(title)
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "AegisHub_Neon"
-    gui.Parent = CoreGui
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-    -- main window
-    local main = Instance.new("Frame")
-    main.Parent = gui
-    main.Size = UDim2.new(0, 520, 0, 340)
-    main.Position = UDim2.new(0.5, -260, 0.5, -170)
-    main.BackgroundColor3 = theme.bg2
-    main.BorderSizePixel = 0
-    local mainCorner = Instance.new("UICorner", main)
-    mainCorner.CornerRadius = UDim.new(0, 8)
-    applyStroke(main, theme.border)
-
-    -- gradient background
-    local grad = Instance.new("UIGradient", main)
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(15, 20, 35)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 8, 20)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 20, 35)),
-    })
-    grad.Rotation = 35
-
-    -- overlay button (mini)
-    local overlayBtn = Instance.new("TextButton")
-    overlayBtn.Parent = gui
-    overlayBtn.Size = UDim2.new(0, 32, 0, 32)
-    overlayBtn.Position = UDim2.new(0, 10, 0.5, -16)
-    overlayBtn.Text = "≡"
-    overlayBtn.Font = Enum.Font.GothamBold
-    overlayBtn.TextSize = 18
-    overlayBtn.TextColor3 = theme.text
-    overlayBtn.BackgroundColor3 = theme.card2
-    overlayBtn.BorderSizePixel = 0
-    overlayBtn.Visible = false
-    local ovCorner = Instance.new("UICorner", overlayBtn)
-    ovCorner.CornerRadius = UDim.new(1, 0)
-    applyStroke(overlayBtn, theme.borderAccent)
-
-    -- drag overlay
-    do
-        local dragging, start, offset
-        overlayBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-               or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                start    = i.Position
-                offset   = overlayBtn.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-                or i.UserInputType == Enum.UserInputType.Touch) then
-                local d = i.Position - start
-                overlayBtn.Position = UDim2.new(
-                    offset.X.Scale, offset.X.Offset + d.X,
-                    offset.Y.Scale, offset.Y.Offset + d.Y
-                )
-            end
-        end)
-    end
-
-    overlayBtn.MouseButton1Click:Connect(function()
-        main.Visible = true
-        overlayBtn.Visible = false
-    end)
-
-    -- top bar
-    local top = Instance.new("Frame")
-    top.Parent = main
-    top.Size = UDim2.new(1, 0, 0, 32)
-    top.BackgroundColor3 = theme.card2
-    top.BorderSizePixel = 0
-    local topCorner = Instance.new("UICorner", top)
-    topCorner.CornerRadius = UDim.new(0, 8)
-
-    local topStroke = applyStroke(top, theme.borderAccent)
-    topStroke.Thickness = 1.3
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Parent = top
-    titleLabel.Size = UDim2.new(1, -100, 1, 0)
-    titleLabel.Position = UDim2.new(0, 12, 0, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Font = Enum.Font.GothamSemibold
-    titleLabel.TextSize = 15
-    titleLabel.TextColor3 = theme.text
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Text = tostring(title)
-
-    local titleSub = Instance.new("TextLabel")
-    titleSub.Parent = top
-    titleSub.Size = UDim2.new(0, 140, 1, 0)
-    titleSub.Position = UDim2.new(1, -150, 0, 0)
-    titleSub.BackgroundTransparency = 1
-    titleSub.Font = Enum.Font.Gotham
-    titleSub.TextSize = 11
-    titleSub.TextColor3 = theme.subText
-    titleSub.TextXAlignment = Enum.TextXAlignment.Right
-    
-
-    -- minimize button
-    local mini = Instance.new("TextButton")
-    mini.Parent = top
-    mini.Size = UDim2.new(0, 22, 1, 0)
-    mini.Position = UDim2.new(1, -60, 0, 0)
-    mini.BackgroundTransparency = 1
-    mini.Font = Enum.Font.GothamBold
-    mini.Text = "–"
-    mini.TextSize = 18
-    mini.TextColor3 = theme.text
-
-    mini.MouseButton1Click:Connect(function()
-        main.Visible = false
-        overlayBtn.Visible = true
-    end)
-
-    -- close button
-    local close = Instance.new("TextButton")
-    close.Parent = top
-    close.Size = UDim2.new(0, 32, 1, 0)
-    close.Position = UDim2.new(1, -32, 0, 0)
-    close.BackgroundTransparency = 1
-    close.Font = Enum.Font.GothamBold
-    close.Text = "X"
-    close.TextSize = 16
-    close.TextColor3 = theme.danger
-
-    close.MouseButton1Click:Connect(function()
-        gui:Destroy()
-    end)
-
-    -- drag main window
-    do
-        local dragging, start, offset
-        top.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-               or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                start    = i.Position
-                offset   = main.Position
-                i.Changed:Connect(function()
-                    if i.UserInputState == Enum.UserInputState.End then
-                        dragging = false
-                    end
-                end)
-            end
-        end)
-        UserInputService.InputChanged:Connect(function(i)
-            if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-                or i.UserInputType == Enum.UserInputType.Touch) then
-                local d = i.Position - start
-                main.Position = UDim2.new(
-                    offset.X.Scale, offset.X.Offset + d.X,
-                    offset.Y.Scale, offset.Y.Offset + d.Y
-                )
-            end
-        end)
-    end
-
-    ----------------------------------------------------------------
-    -- SIDEBAR TABS
-    ----------------------------------------------------------------
-    local sidebar = Instance.new("Frame")
-    sidebar.Parent = main
-    sidebar.Size = UDim2.new(0, 150, 1, -32)
-    sidebar.Position = UDim2.new(0, 0, 0, 32)
-    sidebar.BackgroundColor3 = theme.bg2
-    sidebar.BorderSizePixel = 0
-    local sideCorner = Instance.new("UICorner", sidebar)
-    sideCorner.CornerRadius = UDim.new(0, 8)
-    applyStroke(sidebar, theme.borderSoft)
-
-    local sideList = Instance.new("UIListLayout", sidebar)
-    sideList.SortOrder = Enum.SortOrder.LayoutOrder
-    sideList.Padding = UDim.new(0, 6)
-    sideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    local sidePad = Instance.new("UIPadding", sidebar)
-    sidePad.PaddingTop = UDim.new(0, 8)
-    sidePad.PaddingLeft = UDim.new(0, 6)
-    sidePad.PaddingRight = UDim.new(0, 6)
-
-    ----------------------------------------------------------------
-    -- RIGHT PAGE HOLDER
-    ----------------------------------------------------------------
-    local holder = Instance.new("Frame")
-    holder.Parent = main
-    holder.Size = UDim2.new(1, -150, 1, -32)
-    holder.Position = UDim2.new(0, 150, 0, 32)
-    holder.BackgroundColor3 = theme.bg
-    holder.BorderSizePixel = 0
-    local holderCorner = Instance.new("UICorner", holder)
-    holderCorner.CornerRadius = UDim.new(0, 8)
-    applyStroke(holder, theme.borderSoft)
-
-    ----------------------------------------------------------------
-    -- TAB SYSTEM
-    ----------------------------------------------------------------
-    local win = {}
-
-    function win:CreateTab(name)
-        --------------------------------------------
-        -- TAB BUTTON
-        --------------------------------------------
-        local tabBtn = Instance.new("TextButton")
-        tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1, 0, 0, 28)
-        tabBtn.BackgroundColor3 = theme.bg
-        tabBtn.BorderSizePixel = 0
-        tabBtn.Font = Enum.Font.GothamSemibold
-        tabBtn.TextSize = 13
-        tabBtn.TextColor3 = theme.subText
-        tabBtn.Text = name
-        local tabCorner = Instance.new("UICorner", tabBtn)
-        tabCorner.CornerRadius = UDim.new(0, 6)
-        applyStroke(tabBtn, theme.borderSoft)
-
-        local active = false
-
-        local function setActive(state)
-            active = state
-            if active then
-                tween(tabBtn, 0.15, {BackgroundColor3 = theme.card2})
-                tabBtn.TextColor3 = theme.text
-            else
-                tween(tabBtn, 0.15, {BackgroundColor3 = theme.bg})
-                tabBtn.TextColor3 = theme.subText
-            end
-        end
-
-        --------------------------------------------
-        -- PAGE (SCROLLINGFRAME)
-        --------------------------------------------
-        local page = Instance.new("ScrollingFrame")
-        page.Parent = holder
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 3
-        page.CanvasSize = UDim2.new(0, 0, 0, 0)
-        page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        page.Visible = false
-
-        local layout = Instance.new("UIListLayout", page)
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Padding = UDim.new(0, 6)
-
-        local pad = Instance.new("UIPadding", page)
-        pad.PaddingTop = UDim.new(0, 8)
-        pad.PaddingLeft = UDim.new(0, 8)
-        pad.PaddingRight = UDim.new(0, 8)
-
-        -- tab click
-        tabBtn.MouseButton1Click:Connect(function()
-            for _, pg in ipairs(holder:GetChildren()) do
-                if pg:IsA("ScrollingFrame") then
-                    pg.Visible = false
-                end
-            end
-            for _, b in ipairs(sidebar:GetChildren()) do
-                if b:IsA("TextButton") then
-                    b.BackgroundColor3 = theme.bg
-                    b.TextColor3 = theme.subText
-                end
-            end
-            page.Visible = true
-            setActive(true)
-        end)
-
-        -- first tab auto-active
-        local count = 0
-        for _, pg in ipairs(holder:GetChildren()) do
-            if pg:IsA("ScrollingFrame") then count += 1 end
-        end
-        if count == 1 then
-            page.Visible = true
-            setActive(true)
-        end
-
-        ------------------------------------------------------------
-        -- COMPONENT API
-        ------------------------------------------------------------
-        local api = {}
-
-        ------------------------------------------------
-        -- Label
-        ------------------------------------------------
-        function api:Label(text, opts)
-            opts = opts or {}
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = page
-            lbl.Size = UDim2.new(1, -4, 0, 20)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = opts.bold and Enum.Font.GothamBold or Enum.Font.GothamSemibold
-            lbl.TextSize = opts.size or 13
-            lbl.TextColor3 = opts.color or theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text or ""
-            return { Object = lbl }
-        end
-
-        ------------------------------------------------
-        -- TextBox
-        ------------------------------------------------
-        function api:Box(placeholder, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 32)
-            applyCard(fr, theme.card, opts.borderColor)
-
-            local box = Instance.new("TextBox")
-            box.Parent = fr
-            box.Size = UDim2.new(1, -12, 1, -8)
-            box.Position = UDim2.new(0, 6, 0, 4)
-            box.BackgroundColor3 = theme.bg
-            box.BorderSizePixel = 0
-            local c = Instance.new("UICorner", box)
-            c.CornerRadius = UDim.new(0, 4)
-            box.PlaceholderText = placeholder or ""
-            box.Font = Enum.Font.Gotham
-            box.TextSize = 13
-            box.TextColor3 = theme.text
-            box.PlaceholderColor3 = theme.subText
-            box.Text = ""
-
-            box.FocusLost:Connect(function()
-                callback(box.Text)
-            end)
-
-            return {
-                Set = function(_, v) box.Text = v end,
-                Get = function() return box.Text end,
-                Object = fr,
-            }
-        end
-
-        ------------------------------------------------
-        -- Toggle
-        ------------------------------------------------
-        ------------------------------------------------
--- Toggle (dengan indikator ON / OFF yang jelas)
-------------------------------------------------
-function api:Toggle(text, callback, opts)
-    callback = callback or function() end
-    opts = opts or {}
-
-    local fr = Instance.new("Frame")
-    fr.Parent = page
-    fr.Size = UDim2.new(1, -4, 0, 30)
-    applyCard(fr, theme.card, opts.borderColor)
-
-    -- label kiri
-    local lbl = Instance.new("TextLabel")
-    lbl.Parent = fr
-    lbl.Size = UDim2.new(1, -80, 1, 0)
-    lbl.Position = UDim2.new(0, 8, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
-    lbl.TextColor3 = theme.text
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Text = text or ""
-
-    -- container switch kanan
-    local btn = Instance.new("Frame")
-    btn.Parent = fr
-    btn.Size = UDim2.new(0, 60, 0, 18)
-    btn.Position = UDim2.new(1, -70, 0.5, -9)
-    btn.BackgroundColor3 = theme.bg
-    btn.BorderSizePixel = 0
-    local btnCorner = Instance.new("UICorner", btn)
-    btnCorner.CornerRadius = UDim.new(1, 0)
-    applyStroke(btn, theme.borderSoft)
-
-    -- "slider" kecil di dalam pill
-    local fill = Instance.new("Frame")
-    fill.Parent = btn
-    fill.Size = UDim2.new(0.45, 0, 1, 0)
-    fill.Position = UDim2.new(0, 0, 0, 0)
-    fill.BackgroundColor3 = theme.borderSoft
-    fill.BorderSizePixel = 0
-    local fillCorner = Instance.new("UICorner", fill)
-    fillCorner.CornerRadius = UDim.new(1, 0)
-
-    -- teks ON / OFF di pill
-    local stateLabel = Instance.new("TextLabel")
-    stateLabel.Parent = btn
-    stateLabel.Size = UDim2.new(1, 0, 1, 0)
-    stateLabel.BackgroundTransparency = 1
-    stateLabel.Font = Enum.Font.GothamBold
-    stateLabel.TextSize = 11
-    stateLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-    -- area klik full baris
-    local click = Instance.new("TextButton")
-    click.Parent = fr
-    click.Size = UDim2.new(1, 0, 1, 0)
-    click.BackgroundTransparency = 1
-    click.Text = ""
-
-    local state = false
-
-    local function apply()
-        if state then
-            -- ON
-            tween(btn, 0.12, {BackgroundColor3 = theme.accent})
-            tween(fill, 0.12, {
-                Position = UDim2.new(0.55, 0, 0, 0),
-                BackgroundColor3 = theme.success,
-            })
-            stateLabel.Text = ""
-            stateLabel.TextColor3 = theme.bg
-        else
-            -- OFF
-            tween(btn, 0.12, {BackgroundColor3 = theme.bg})
-            tween(fill, 0.12, {
-                Position = UDim2.new(0, 0, 0, 0),
-                BackgroundColor3 = theme.borderSoft,
-            })
-            stateLabel.Text = ""
-            stateLabel.TextColor3 = theme.subText
-        end
-
-        -- callback ke user
-        callback(state)
-    end
-
-    click.MouseButton1Click:Connect(function()
-        state = not state
-        apply()
-    end)
-
-    -- API ke luar
-    return {
-        Set = function(_, v)
-            state = v and true or false
-            apply()
-        end,
-        Object = fr,
-    }
-end
-
-
-        ------------------------------------------------
-        -- Slider
-        ------------------------------------------------
-        function api:Slider(text, min, max, default, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-            min = min or 0
-            max = max or 100
-            default = default or min
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 40)
-            applyCard(fr, theme.card, opts.borderColor)
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = fr
-            lbl.Size = UDim2.new(0.6, 0, 0, 18)
-            lbl.Position = UDim2.new(0, 8, 0, 3)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text or ""
-
-            local valueLabel = Instance.new("TextLabel")
-            valueLabel.Parent = fr
-            valueLabel.Size = UDim2.new(0.4, -8, 0, 18)
-            valueLabel.Position = UDim2.new(0.6, 0, 0, 3)
-            valueLabel.BackgroundTransparency = 1
-            valueLabel.Font = Enum.Font.Gotham
-            valueLabel.TextSize = 12
-            valueLabel.TextColor3 = theme.accent2
-            valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-            valueLabel.Text = tostring(default)
-
-            local bar = Instance.new("Frame")
-            bar.Parent = fr
-            bar.Size = UDim2.new(1, -16, 0, 5)
-            bar.Position = UDim2.new(0, 8, 0, 26)
-            bar.BackgroundColor3 = theme.bg
-            bar.BorderSizePixel = 0
-            local bc = Instance.new("UICorner", bar)
-            bc.CornerRadius = UDim.new(0, 3)
-
-            local fill = Instance.new("Frame")
-            fill.Parent = bar
-            fill.Size = UDim2.new(0, 0, 1, 0)
-            fill.BackgroundColor3 = theme.accent
-            fill.BorderSizePixel = 0
-            local fc2 = Instance.new("UICorner", fill)
-            fc2.CornerRadius = UDim.new(0, 3)
-
-            local dragging = false
-            local value = default
-
-            local function setValFromPct(p)
-                p = math.clamp(p, 0, 1)
-                value = math.floor(min + p * (max - min))
-                fill.Size = UDim2.new(p, 0, 1, 0)
-                valueLabel.Text = tostring(value)
-                callback(value)
-            end
-
-            local function updateFromX(x)
-                local p = (x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
-                setValFromPct(p)
-            end
-
-            bar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true
-                    updateFromX(i.Position.X)
-                end
-            end)
-            bar.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then
-                    dragging = false
-                end
-            end)
-
-            UserInputService.InputChanged:Connect(function(i)
-                if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
-                    or i.UserInputType == Enum.UserInputType.Touch) then
-                    updateFromX(i.Position.X)
-                end
-            end)
-
-            setValFromPct((default - min) / (max - min))
-
-            return {
-                Set = function(_, v)
-                    v = math.clamp(v or value, min, max)
-                    setValFromPct((v - min) / (max - min))
-                end,
-                Object = fr,
-            }
-        end
-
-        ------------------------------------------------
-        -- Button
-        ------------------------------------------------
-        function api:Button(text, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-
-            local btn = Instance.new("TextButton")
-            btn.Parent = page
-            btn.Size = UDim2.new(1, -4, 0, 28)
-            btn.BackgroundColor3 = theme.card2
-            btn.BorderSizePixel = 0
-            btn.Font = Enum.Font.GothamSemibold
-            btn.TextSize = 13
-            btn.TextColor3 = theme.text
-            btn.Text = text or ""
-            local bc = Instance.new("UICorner", btn)
-            bc.CornerRadius = UDim.new(0, 5)
-            applyStroke(btn, opts.borderColor or theme.border)
-
-            btn.MouseButton1Click:Connect(function()
-                tween(btn, 0.08, {BackgroundColor3 = theme.accent2})
-                _delay(0.08, function()
-                    tween(btn, 0.12, {BackgroundColor3 = theme.card2})
-                end)
-                callback()
-            end)
-
-            return {
-                Set = function(_, v) btn.Text = tostring(v) end,
-                Object = btn,
-            }
-        end
-
-        ------------------------------------------------
-        -- Dropdown (Single)
-        ------------------------------------------------
-        function api:Dropdown(text, list, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-            list = list or {}
-
-            local selected = nil
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 32)
-            fr.AutomaticSize = Enum.AutomaticSize.Y
-            applyCard(fr, theme.card, opts.borderColor)
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = fr
-            lbl.Size = UDim2.new(1, -30, 0, 32)
-            lbl.Position = UDim2.new(0, 8, 0, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text
-
-            local arrow = Instance.new("TextLabel")
-            arrow.Parent = fr
-            arrow.Size = UDim2.new(0, 18, 0, 32)
-            arrow.Position = UDim2.new(1, -18, 0, 0)
-            arrow.BackgroundTransparency = 1
-            arrow.Font = Enum.Font.GothamBold
-            arrow.TextSize = 16
-            arrow.TextColor3 = theme.accent
-            arrow.Text = "▼"
-
-            local holderDD = Instance.new("Frame")
-            holderDD.Parent = fr
-            holderDD.Position = UDim2.new(0, 0, 0, 32)
-            holderDD.Size = UDim2.new(1, 0, 0, 0)
-            holderDD.BackgroundColor3 = theme.bg
-            holderDD.Visible = false
-            holderDD.BorderSizePixel = 0
-            holderDD.AutomaticSize = Enum.AutomaticSize.Y
-            local hc = Instance.new("UICorner", holderDD)
-            hc.CornerRadius = UDim.new(0, 4)
-            applyStroke(holderDD, theme.borderSoft)
-
-            local hlist = Instance.new("UIListLayout", holderDD)
-            hlist.Padding = UDim.new(0, 2)
-
-            local headBtn = Instance.new("TextButton")
-            headBtn.Parent = fr
-            headBtn.Size = UDim2.new(1, 0, 0, 32)
-            headBtn.BackgroundTransparency = 1
-            headBtn.Text = ""
-
-            local open = false
-            local function setOpen(b)
-                open = b
-                holderDD.Visible = open
-                arrow.Text = open and "▲" or "▼"
-            end
-
-            headBtn.MouseButton1Click:Connect(function()
-                setOpen(not open)
-            end)
-
-            local function rebuild(optsList)
-                for _, c in ipairs(holderDD:GetChildren()) do
-                    if c:IsA("TextButton") then c:Destroy() end
-                end
-                for _, opt in ipairs(optsList) do
-                    local b = Instance.new("TextButton")
-                    b.Parent = holderDD
-                    b.Size = UDim2.new(1, 0, 0, 24)
-                    b.BackgroundColor3 = theme.card
-                    b.BorderSizePixel = 0
-                    b.Font = Enum.Font.Gotham
-                    b.TextSize = 12
-                    b.TextColor3 = theme.text
-                    b.Text = opt
-                    local bc2 = Instance.new("UICorner", b)
-                    bc2.CornerRadius = UDim.new(0, 4)
-
-                    b.MouseButton1Click:Connect(function()
-                        selected = opt
-                        lbl.Text = text .. " : " .. opt
-                        setOpen(false)
-                        callback(opt)
-                    end)
-                end
-            end
-
-            rebuild(list)
-
-            return {
-                Set = function(_, opt)
-                    selected = opt
-                    lbl.Text = text .. " : " .. (opt or "")
-                end,
-                SetOptions = function(_, opts)
-                    list = opts or {}
-                    rebuild(list)
-                end,
-                Object = fr,
-            }
-        end
-
-        ------------------------------------------------
-        -- Multi Dropdown
-        ------------------------------------------------
-        function api:MultiDropdown(text, list, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-            list = list or {}
-
-            local selected = {}
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 32)
-            fr.AutomaticSize = Enum.AutomaticSize.Y
-            applyCard(fr, theme.card, opts.borderColor)
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = fr
-            lbl.Size = UDim2.new(1, -30, 0, 32)
-            lbl.Position = UDim2.new(0, 8, 0, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text .. " : None"
-
-            local arrow = Instance.new("TextLabel")
-            arrow.Parent = fr
-            arrow.Size = UDim2.new(0, 18, 0, 32)
-            arrow.Position = UDim2.new(1, -18, 0, 0)
-            arrow.BackgroundTransparency = 1
-            arrow.Font = Enum.Font.GothamBold
-            arrow.TextSize = 16
-            arrow.TextColor3 = theme.accent
-            arrow.Text = "▼"
-
-            local holderDD = Instance.new("Frame")
-            holderDD.Parent = fr
-            holderDD.Position = UDim2.new(0, 0, 0, 32)
-            holderDD.Size = UDim2.new(1, 0, 0, 0)
-            holderDD.BackgroundColor3 = theme.bg
-            holderDD.Visible = false
-            holderDD.BorderSizePixel = 0
-            holderDD.AutomaticSize = Enum.AutomaticSize.Y
-            local hc = Instance.new("UICorner", holderDD)
-            hc.CornerRadius = UDim.new(0, 4)
-            applyStroke(holderDD, theme.borderSoft)
-
-            local hlist = Instance.new("UIListLayout", holderDD)
-            hlist.Padding = UDim.new(0, 2)
-
-            local headBtn = Instance.new("TextButton")
-            headBtn.Parent = fr
-            headBtn.Size = UDim2.new(1, 0, 0, 32)
-            headBtn.BackgroundTransparency = 1
-            headBtn.Text = ""
-
-            local open = false
-            local function setOpen(b)
-                open = b
-                holderDD.Visible = open
-                arrow.Text = open and "▲" or "▼"
-            end
-
-            headBtn.MouseButton1Click:Connect(function()
-                setOpen(not open)
-            end)
-
-            local function updateText()
-                local arr = {}
-                for k, v in pairs(selected) do
-                    if v then table.insert(arr, k) end
-                end
-                table.sort(arr)
-                if #arr == 0 then
-                    lbl.Text = text .. " : None"
-                else
-                    lbl.Text = text .. " : " .. table.concat(arr, ", ")
-                end
-            end
-
-            local function rebuild(optsList)
-                for _, c in ipairs(holderDD:GetChildren()) do
-                    if c:IsA("TextButton") then c:Destroy() end
-                end
-                for _, opt in ipairs(optsList) do
-                    local b = Instance.new("TextButton")
-                    b.Parent = holderDD
-                    b.Size = UDim2.new(1, 0, 0, 24)
-                    b.BackgroundColor3 = theme.card
-                    b.BorderSizePixel = 0
-                    b.Font = Enum.Font.Gotham
-                    b.TextSize = 12
-                    b.TextColor3 = theme.text
-                    b.Text = opt
-                    local bc2 = Instance.new("UICorner", b)
-                    bc2.CornerRadius = UDim.new(0, 4)
-
-                    b.MouseButton1Click:Connect(function()
-                        selected[opt] = not selected[opt]
-                        callback(opt, selected[opt])
-                        updateText()
-                    end)
-                end
-                updateText()
-            end
-
-            rebuild(list)
-
-            return {
-                Set = function(_, opt, state)
-                    selected[opt] = state and true or false
-                    updateText()
-                end,
-                List = function()
-                    local t = {}
-                    for k, v in pairs(selected) do if v then table.insert(t, k) end end
-                    return t
-                end,
-                SetOptions = function(_, opts)
-                    list = opts or {}
-                    rebuild(list)
-                end,
-                Object = fr,
-            }
-        end
-
-        ------------------------------------------------
-        -- LiveLabel (support Collapse)
-        ------------------------------------------------
-        function api:LiveLabel(getTextFn, refreshDelay)
-            refreshDelay = refreshDelay or 0.5
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = page
-            lbl.Size = UDim2.new(1, -4, 0, 40)
-            lbl.AutomaticSize = Enum.AutomaticSize.Y
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.TextYAlignment = Enum.TextYAlignment.Top
-            lbl.TextWrapped = true
-            lbl.Text = ""
-
-            _spawn(function()
-                while lbl.Parent do
-                    local ok, txt = pcall(getTextFn)
-                    if ok and txt ~= nil then
-                        lbl.Text = tostring(txt)
-                    end
-                    _wait(refreshDelay)
-                end
-            end)
-
-            return { Object = lbl }
-        end
-
-        ------------------------------------------------
-        -- Collapse Group (All components support)
-        ------------------------------------------------
-        function api:CreateCollapseGroup(title, buildFn, opts)
-            opts = opts or {}
-            local group = {}
-            group.IsOpen = false
-            group.Items = {}
-
-            local header = Instance.new("Frame")
-            header.Parent = page
-            header.Size = UDim2.new(1, -4, 0, 28)
-            header.BackgroundColor3 = theme.card2
-            header.BorderSizePixel = 0
-            applyCard(header, theme.card2, opts.borderColor or theme.border)
-
-            local titleLabel = Instance.new("TextLabel")
-            titleLabel.Parent = header
-            titleLabel.Size = UDim2.new(1, -30, 1, 0)
-            titleLabel.Position = UDim2.new(0, 8, 0, 0)
-            titleLabel.BackgroundTransparency = 1
-            titleLabel.Font = Enum.Font.GothamSemibold
-            titleLabel.TextSize = 13
-            titleLabel.TextColor3 = theme.text
-            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            titleLabel.Text = title
-
-            local iconLabel = Instance.new("TextLabel")
-            iconLabel.Parent = header
-            iconLabel.Size = UDim2.new(0, 22, 1, 0)
-            iconLabel.Position = UDim2.new(1, -22, 0, 0)
-            iconLabel.BackgroundTransparency = 1
-            iconLabel.Font = Enum.Font.GothamBold
-            iconLabel.TextSize = 18
-            iconLabel.TextColor3 = theme.accent
-            iconLabel.TextXAlignment = Enum.TextXAlignment.Center
-            iconLabel.Text = "▼"
-
-            local click = Instance.new("TextButton")
-            click.Parent = header
-            click.Size = UDim2.new(1, 0, 1, 0)
-            click.BackgroundTransparency = 1
-            click.Text = ""
-
-            function group:SetOpen(open)
-                self.IsOpen = open and true or false
-                iconLabel.Text = self.IsOpen and "▲" or "▼"
-                for _, ctrl in ipairs(self.Items) do
-                    if ctrl then
-                        local obj = ctrl.Object or ctrl
-                        if obj and obj.Visible ~= nil then
-                            obj.Visible = self.IsOpen
-                        end
-                    end
-                end
-            end
-
-            function group:Toggle()
-                self:SetOpen(not self.IsOpen)
-            end
-
-            click.MouseButton1Click:Connect(function()
-                group:Toggle()
-            end)
-
-            group.Header = {
-                Object = header,
-                Set = function(_, txt) titleLabel.Text = txt end,
-            }
-
-            local function add(ctrl)
-                if ctrl then
-                    local obj = ctrl.Object or ctrl
-                    if obj then
-                        obj.Visible = false
-                    end
-                    table.insert(group.Items, ctrl)
-                end
-                return ctrl
-            end
-
-            if typeof(buildFn) == "function" then
-                buildFn(add, group)
-            end
-
-            group:SetOpen(false)
-            return group
-        end
-
-        return api
-    end
-
-    return win
-end
-
-
-----------------------------------------------------------------
--- BUAT WINDOW
-----------------------------------------------------------------
-local win = library:CreateWindow("Rend - Fish It")
-
-
-------------------------------------------------------------
--- SERVICES & BASE
-------------------------------------------------------------
-local Players           = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-
-local LocalPlayer       = Players.LocalPlayer
-
-------------------------------------------------------------
--- NET EVENTS (PASTIKAN SAMA PERSIS DENGAN GAME)
-------------------------------------------------------------
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
-
-local Events = {
-    completeFish = net:WaitForChild("RE/FishingCompleted"),
-    sellAll      = net:WaitForChild("RF/SellAllItems"),
-
-    chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
-    startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
-    cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
-
-    equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
-    unequipTool  = net:WaitForChild("RE/UnequipToolFromHotbar"),
-
-    gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"), -- kalau ada
+local BaseFolder           = "Siren X/FishIt"
+local PositionFile         = BaseFolder .. "/Position.json"
+
+local gui = {
+  Merchant        = svc.PG.Merchant,
+  MerchantRoot    = svc.PG.Merchant.Main.Background,
+  ItemsFrame      = svc.PG.Merchant.Main.Background.Items.ScrollingFrame,
+  RefreshMerchant = svc.PG.Merchant.Main.Background.RefreshLabel,
 }
 
-local ArrayUpdate = net:FindFirstChild("ArrayUpdate")
-    or ReplicatedStorage:FindFirstChild("ArrayUpdate", true)
-
-------------------------------------------------------------
--- CONFIG
-------------------------------------------------------------
-local Config = {
-    AutoFish    = false,   -- toggle utama
-    BlatantFish = false,
-    CatchDelay  = 0.2,    
-    SpamDelay   = 0.9,
-    PerfectCast = true,    -- optional
+local mods = {
+  Net                     = svc.RS.Packages._Index["sleitnick_net@0.2.0"].net,
+  Replion                 = require(svc.RS.Packages.Replion),
+  FishingController       = require(svc.RS.Controllers.FishingController),
+  NotificationController  = require(svc.RS.Controllers.NotificationController),
+  AnimationController     = require(svc.RS.Controllers.AnimationController),
+  CutsceneController      = require(svc.RS.Controllers.CutsceneController),
+  TradingController       = require(svc.RS.Controllers.ItemTradingController),
+  ItemUtility             = require(svc.RS.Shared.ItemUtility),
+  VendorUtility           = require(svc.RS.Shared.VendorUtility),
+  CutsceneUtility         = require(svc.RS.Shared.CutsceneUtility),
+  PlayerStatsUtility      = require(svc.RS.Shared.PlayerStatsUtility),
+  Effects                 = require(svc.RS.Shared.Effects),
+  NotifierFish            = require(svc.RS.Controllers.TextNotificationController),
+  InputControl            = require(svc.RS.Modules.InputControl),
+  VFX                     = require(svc.RS.Controllers.VFXController)
 }
--- internal state
-local loopRunning  = false
 
-------------------------------------------------------------
--- HELPER
-------------------------------------------------------------
+local api = {
+  Events = {
+    RECutscene                    = mods.Net["RE/ReplicateCutscene"],
+    REStop                        = mods.Net["RE/StopCutscene"],
+    REFav                         = mods.Net["RE/FavoriteItem"],
+    REFavChg                      = mods.Net["RE/FavoriteStateChanged"],
+    REFishDone                    = mods.Net["RE/FishingCompleted"],
+    REFishGot                     = mods.Net["RE/FishCaught"],
+    RENotify                      = mods.Net["RE/TextNotification"],
+    REEquip                       = mods.Net["RE/EquipToolFromHotbar"],
+    REEquipItem                   = mods.Net["RE/EquipItem"],
+    REAltar                       = mods.Net["RE/ActivateEnchantingAltar"],
+    REAltar2                      = mods.Net["RE/ActivateSecondEnchantingAltar"],
+    UpdateOxygen                  = mods.Net["URE/UpdateOxygen"],
+    REPlayFishEffect              = mods.Net["RE/PlayFishingEffect"],
+    RETextEffect                  = mods.Net["RE/ReplicateTextEffect"],
+    REEvReward                    = mods.Net["RE/ClaimEventReward"],
+    Totem                         = mods.Net["RE/SpawnTotem"],
+    REObtainedNewFishNotification = mods.Net["RE/ObtainedNewFishNotification"],
+    FishingMinigameChanged        = mods.Net["RE/FishingMinigameChanged"],
+    FishingStopped                = mods.Net["RE/FishingStopped"],
+  },
+  Functions = {
+    Trade       = mods.Net["RF/InitiateTrade"],
+    BuyRod      = mods.Net["RF/PurchaseFishingRod"],
+    BuyBait     = mods.Net["RF/PurchaseBait"],
+    BuyWeather  = mods.Net["RF/PurchaseWeatherEvent"],
+    ChargeRod   = mods.Net["RF/ChargeFishingRod"],
+    StartMini   = mods.Net["RF/RequestFishingMinigameStarted"],
+    UpdateRadar = mods.Net["RF/UpdateFishingRadar"],
+    Cancel      = mods.Net["RF/CancelFishingInputs"],
+    Dialogue    = mods.Net["RF/SpecialDialogueEvent"],
+    SellItem    = mods.Net["RF/SellItem"],
+    SellAllItem = mods.Net["RF/SellAllItems"],
+    AutoEnabled = mods.Net["RF/UpdateAutoFishingState"]
+  }
+}
 
-local function getServerTime()
-    local ok, t = pcall(function()
-        return Workspace:GetServerTimeNow()
-    end)
-    return ok and t or tick()
-end
+local st                   = {
+  player           = player,
+  walk             = false,
+  walkSpeed        = 16,
+  infiniteJump     = false,
+  hideIdentity     = false,
+  hideNames        = "SirenX",
+  hideLevels       = "discord.gg/KxjMYW7QKs",
+  char             = player.Character or player.CharacterAdded:Wait(),
+  menuRings        = workspace:WaitForChild("!!! MENU RINGS"),
+  zones            = workspace:WaitForChild("Zones"),
+  vim              = svc.VIM,
+  cam              = svc.Camera,
+  fishingLegit     = false,
+  minigameDelay    = 0.1,
+  autoFishing      = false,
+  completeDelay    = 0.5,
+  instantFishing   = false,
+  teleport = {
+    island = nil,
+    event  = nil,
+    player = nil,
+  },
+  shop = {
+    weather       = {},
+    autoWeather   = false,
+  },
+  market = {
+    autoSellThreshold = "Legendary",
+    sellAtAmount      = 500,
+    autoSell          = false,
+    enchSellAt        = 100,
+    enchSell          = false,
+  },
+  favorite = {
+    auto             = false,
+    names            = {},
+    rarities         = {},
+    mutations        = {},
+  },
+  hide = {
+    notifications   = false,
+    cutscenes       = false,
+    animations      = false,
+    vfx             = false,
+  },
+  quest = {
+    autoDeepSea      = false,
+    autoElement      = false,
+    autoQuestFlow    = false,
+    triggerRuin      = false,
+    autoClassicEvent = false,
+  }
+}
 
-local function ensureCharacter()
-    local char = LocalPlayer.Character
-    if not char or not char.Parent then
-        char = LocalPlayer.CharacterAdded:Wait()
+st.player.CharacterAdded:Connect(function(char)
+  st.char = char
+end)
+
+local repl = {
+  Data = mods.Replion.Client:WaitReplion("Data"),
+  Items = svc.RS:WaitForChild("Items"),
+  Variants = svc.RS:WaitForChild("Variants"),
+  PlayerStat = require(svc.RS.Packages._Index:FindFirstChild("ytrev_replion@2.0.0-rc.3").replion)
+}
+
+player.Idled:Connect(function()
+	svc.VU:CaptureController()
+	svc.VU:ClickButton2(Vector2.zero)
+	st.vim:SendKeyEvent(true, Enum.KeyCode.RightMeta, false, game)
+	st.vim:SendKeyEvent(false, Enum.KeyCode.RightMeta, false, game)
+end)
+
+local Tabs = {
+  Info = Window:AddTab({ Name = "Info", Icon = "player" }),
+  Player = Window:AddTab({ Name = "Player", Icon = "user" }),
+  Fishing = Window:AddTab({ Name = "Fishing", Icon = "fish" }),
+  Automation = Window:AddTab({ Name = "Automation", Icon = "next" }),
+  Teleport = Window:AddTab({ Name = "Teleport", Icon = "gps" }),
+  Quest = Window:AddTab({ Name = "Auto Quests", Icon = "scroll" }),
+  Special = Window:AddTab({ Name = "Kaitun", Icon = "idea" }),
+}
+
+InfoSection = Tabs.Info:AddSection("Information", true)
+
+InfoSection:AddParagraph({
+  Title = "Join Our Discord",
+  Content = "Join Us!",
+  Icon = "discord",
+  ButtonText = "Copy Discord Link",
+  ButtonCallback = function()
+    local link = "https://discord.gg/KxjMYW7QKs"
+    if setclipboard then
+      setclipboard(link)
+      sirenx("Successfully Copied!")
     end
-    return char
-end
+  end
+})
 
--- hitung cast power (kalau PerfectCast false, dia agak random)
-local function getCastPower()
-    if Config.PerfectCast then
-        return 0.99
-    else
-        local min = 0.75
-        local max = 0.97
-        return min + (max - min) * math.random()
-    end
-end
+ServerSection = Tabs.Info:AddSection("Server")
 
-------------------------------------------------------------
--- SATU SIKLUS BLATANT (x5 SPEED)
-------------------------------------------------------------
-local function doOneBlatantCycle()
-    local char = ensureCharacter()
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    -- if not hrp then
-        -- warn("[BlatantFish] HRP not found")
-        -- _wait(0.01)
-        -- return
-    -- end
+local CurrentServer = ServerSection:AddParagraph({
+  Title = "Current Server",
+  Content = [[
+Ping: 0 ms | FPS: 0/s | Players: 0/0
+  ]],
+  Icon = "stat",
+})
 
-    -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
-    local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
+task.spawn(function()
+  while task.wait(1) do
+    CurrentServer:SetContent(
+      string.format([[
+Ping: %d ms | FPS: %d/s | Players: %d/%d
+      ]],
+        math.floor(svc.Stats.PerformanceStats.Ping:GetValue() + 0.5),
+        math.floor(1 / svc.RunService.RenderStepped:Wait() + 0.5),
+        #svc.Players:GetPlayers(),
+        svc.Players.MaxPlayers
+      )
+    )
+  end
+end)
 
-    ----------------------------------------------------------------
-    -- 1) EQUIP ROD SLOT 1
-    ----------------------------------------------------------------
-    pcall(function()
-        Events.equipHotbar:FireServer(1)
-    end)
-    ----------------------------------------------------------------
-    -- 2) CHARGE ROD + START MINIGAME
-    ----------------------------------------------------------------
-    local castPower = Config.PerfectCast and 0.99 or getCastPower()
-    local now       = getServerTime()
+ServerSection:AddButton({
+  Title = "Rejoin Server",
+  Content = "Rejoins the current server",
+  Callback = function()
+    sirenx("Rejoining Server...")
+    svc.TpService:Teleport(game.PlaceId, Player)
+  end
+})
 
-    -- charge
-    pcall(function()
-        Events.chargeRod:InvokeServer(100)
-    end)
-    _wait(0.001)
+Plyrs = Tabs.Player:AddSection("Player")
 
-    -- start minigame
-    local okStart = pcall(function()
-        if typeof(Events.startMini.InvokeServer) == "function" then
-            return Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
-        else
-            Events.startMini:FireServer(-1.233184814453125, 0.9945034885633273)
-            return true
-        end
-    end)
+Plyrs:AddToggle({
+  Title = "Enable",
+  Content = "Enable Walk Speed Changer",
+  Default = false,
+  Callback = function(state)
+    st.walk = state
 
-    if not okStart then
-        warn("[BlatantFish] gagal start minigame")
-        return
+    if ConnectionWalkSpeed then
+      ConnectionWalkSpeed:Disconnect()
+      ConnectionWalkSpeed = nil
     end
 
-    ----------------------------------------------------------------
-    -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
-    ----------------------------------------------------------------
-    _wait(catchDel)
-
-    ----------------------------------------------------------------
-    -- 4) SPAM FISHING COMPLETED (ikan naik)
-    ----------------------------------------------------------------
-    for i = 1, 5 do
-        pcall(function()            
-            Events.completeFish:FireServer()
-        end)
-       _wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
-    end
-end
-
-------------------------------------------------------------
--- LOOP UTAMA
-------------------------------------------------------------
-local function mainFishingLoop()
-    if loopRunning then return end
-    loopRunning = true
-    
-    while Config.AutoFish do
-        local ok, err = pcall(doOneBlatantCycle)        
-        --_wait(0.001)
-    end
-
-    loopRunning = false
-    
-end
-
-local Fishing = {}
-
-function Fishing:Start()
-    if Config.AutoFish then return end
-    Config.AutoFish = true
-    _spawn(mainFishingLoop)
-end
-
-function Fishing:Stop()
-    Config.AutoFish = false
-end
-
-
-------------------------------------------------------------
--- UI AEGISHUB – TAB AUTO
-------------------------------------------------------------
-local TabAuto = win:CreateTab("Farm")
-
-TabAuto:Label("Instant Fishing")
-
--- Toggle utama
-TabAuto:Toggle("Enable Auto Fishing", function(state)
     if state then
-        Fishing:Start()
+      local hum = getHumanoid()
+      hum.WalkSpeed = st.walkSpeed
+      ConnectionWalkSpeed = hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if st.walk and hum.WalkSpeed ~= st.walkSpeed then
+          hum.WalkSpeed = st.walkSpeed
+        end
+      end)
     else
-        Fishing:Stop()
+      getHumanoid().WalkSpeed = svc.Starter.CharacterWalkSpeed
     end
-end)
+  end
+})
 
-TabAuto:Box("Catch Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
+Plyrs:AddSlider({
+  Title = "Walk Speed",
+  Content = "Change your walk speed",
+  Min = 16,
+  Max = 500,
+  Increment = 1,
+  Default = st.walkSpeed,
+  Callback = function(value)
+    st.walkSpeed = value
+    if st.walk then
+      getHumanoid().WalkSpeed = value
     end
-end)
+  end
+})
 
--- Toggle utama
-TabAuto:Toggle("Enable Bltant Mode", function(state)
+Plyrs:AddToggle({
+  Title = "Infinite Jump",
+  Content = "Allows you to jump infinitely",
+  Default = false,
+  Callback = function(state)
+    st.infiniteJump = state
     if state then
-        
-    end
-end)
-
-TabAuto:Box("Reel Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
-end)
-
-TabAuto:Box("Complate Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
-end)
-
-----------------------------------------------------------------
--- TAB SHOP – BUY OLD ROD (VULN)
-----------------------------------------------------------------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- net remotes (pakai path yang sama dengan script lain)
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
-
-local RF_PurchaseFishingRod = netFolder:WaitForChild("RF/PurchaseFishingRod")
-
--- folder items
-local RodItemsPath = ReplicatedStorage:WaitForChild("Items")
-
--- buat tab shop (kalau sudah ada TabShop, tinggal pakai yang lama)
-local TabShop = win:CreateTab("Shop")
-
-TabShop:Label("Rods Shop")
-
--- build list rod lama (module name diawali "!!!")
-local oldRodOptions = {}   -- label yang tampil di dropdown
-local oldRodIdMap   = {}   -- [displayName] = id
-
-do
-    for _, item in ipairs(RodItemsPath:GetChildren()) do
-        if item:IsA("ModuleScript") and item.Name:sub(1, 3) == "!!!" then
-            local ok, data = pcall(require, item)
-            if ok and data and data.Data then
-                local rodId   = data.Data.Id
-                local rodName = data.Data.Name or item.Name:gsub("^!!!", "")
-                local price   = data.Data.Price or data.Price
-
-                if rodId and rodName then
-                    local label = rodName
-                    if price then
-                        label = string.format("%s | Price: %s", rodName, tostring(price))
-                    end
-
-                    table.insert(oldRodOptions, label)
-                    -- map pakai nama bersih tanpa harga
-                    oldRodIdMap[rodName] = rodId
-                end
-            end
+      svc.UIS.JumpRequest:Connect(function()
+        if st.infiniteJump then
+          humanoid:ChangeState("Jumping")
         end
+      end)
     end
+  end
+}, "InfiniteJump")
 
-    table.sort(oldRodOptions, function(a,b)
-        return a:lower() < b:lower()
-    end)
+local Connections = {}
+local OriginalText = {}
+local DescendantAddedConnection = nil
+
+local function HandleUsernameChange(Object)
+	if not st.hideIdentity or not (Object:IsA("TextLabel") or Object:IsA("TextBox") or Object:IsA("TextButton")) then
+		return
+	end
+
+	if not Connections[Object] then
+		Connections[Object] = Object:GetPropertyChangedSignal("Text"):Connect(function()
+			HandleUsernameChange(Object)
+		end)
+	end
+
+	local text = Object.Text
+	if text:find(st.player.Name) or text:find(st.player.DisplayName) then
+		OriginalText[Object] = text
+		Object.Text = text:gsub(st.player.Name, st.hideNames):gsub(st.player.DisplayName, st.hideNames)
+	end
 end
 
--- kalau tidak ada rod lama, kasih info saja
-if #oldRodOptions == 0 then
-    TabShop:Label("Tidak ada old rod (!!!) di ReplicatedStorage.Items")
-else
-    -- dropdown pakai UI kamu sendiri
-    TabShop:Dropdown("Buy Rods", oldRodOptions, function(option)
-        if not option or option == "" then return end
+Plyrs:AddInput({
+  Title = "Set Name",
+  Content = "Sets the name to replace your username with",
+  Default = st.hideNames,
+  Placeholder = st.hideNames,
+  Callback = function(value)
+    st.hideNames = value
+  end
+})
 
-        -- ambil nama rod tanpa bagian " | Price: xxx"
-        local pureName = option:split(" |")[1]
-        local rodId    = oldRodIdMap[pureName]
+Plyrs:AddInput({
+  Title = "Set Level Text",
+  Content = "Sets the text to replace your level with",
+  Default = st.hideLevels,
+  Placeholder = st.hideLevels,
+  Callback = function(value)
+    st.hideLevels = value
+  end
+})
 
-        if not rodId then
-            warn("[OldRodShop] RodId tidak ditemukan untuk:", tostring(pureName))
-            return
-        end
+Plyrs:AddToggle({
+	Title = "Hide Identity",
+	Content = "Hides your player identity locally",
+	Default = false,
+	Callback = function(state)
+		st.hideIdentity = state
 
-        -- invoke server (vuln: bisa beli rod yang sudah tidak ada di shop)
-        local ok, err = pcall(function()
-            RF_PurchaseFishingRod:InvokeServer(rodId)
-        end)
+		if state then 
+			if DescendantAddedConnection then
+				DescendantAddedConnection:Disconnect()
+			end
 
-        if ok then
-            print("[OldRodShop] Berhasil beli rod:", pureName, " | Id:", rodId)
-        else
-            warn("[OldRodShop] Gagal beli rod:", pureName, "Error:", err)
-        end
-    end)
-end
+			for i,v in pairs(game:GetDescendants()) do
+				pcall(function()
+					HandleUsernameChange(v)
+				end)
+			end
 
-----------------------------------------------------------------
--- TAB SHOP – BUY BAIT (VULN)
-----------------------------------------------------------------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+			pcall(function()
+				local label = st.char.HumanoidRootPart.Overhead.LevelContainer.Label
+				if label and not OriginalText[label] then
+					OriginalText[label] = label.Text
+				end
+				label.Text = st.hideLevels
+			end)
 
--- net remotes (path sama seperti script lain)
-local netFolder = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-    :WaitForChild("net")
+			DescendantAddedConnection = game.DescendantAdded:Connect(function(v)
+				pcall(function()
+					HandleUsernameChange(v)
+				end)
+			end)
+		else
+			if DescendantAddedConnection then
+				DescendantAddedConnection:Disconnect()
+				DescendantAddedConnection = nil
+			end
 
--- GANTI nama remote ini kalau di game beda (cek hasil spy / scan)
-local RF_PurchaseBait = netFolder:WaitForChild("RF/PurchaseBait")
+			for Object, Connection in pairs(Connections) do
+				if Connection then
+					Connection:Disconnect()
+				end
+			end
+			Connections = {}
 
--- folder baits (dari screenshot: ReplicatedStorage.Baits)
-local BaitsFolder = ReplicatedStorage:WaitForChild("Baits")
+			if OriginalText then
+				for Object, Text in pairs(OriginalText) do
+					if Object and Object.Parent then
+						pcall(function()
+							Object.Text = Text
+						end)
+					end
+				end
+				OriginalText = {}
+			end
+		end
+	end
+})
 
--- kalau sudah ada TabShop sebelumnya (rod shop), pakai yang lama
-local TabShop = TabShop or win:CreateTab("Shop")
+Camera = Tabs.Player:AddSection("Camera")
 
-TabShop:Label("Bait Shop")
+Camera:AddToggle({
+  Title = "Max Zoom",
+  Content = "Allows you to zoom out the furthest",
+  Default = false,
+  Callback = function(state)
+    ConnectionZoom = ConnectionZoom or nil
 
--- build list bait dari ReplicatedStorage.Baits (ModuleScript)
-local baitOptions = {}   -- label di dropdown
-local baitIdMap   = {}   -- [displayName] = id
-
-do
-    for _, item in ipairs(BaitsFolder:GetChildren()) do
-        if item:IsA("ModuleScript") then
-            local ok, data = pcall(require, item)
-            if ok and data and data.Data then
-                local baitId   = data.Data.Id
-                local baitName = data.Data.Name or item.Name
-                local price    = data.Data.Price or data.Price
-
-                if baitId and baitName then
-                    local label = baitName
-                    if price then
-                        label = string.format("%s | Price: %s", baitName, tostring(price))
-                    end
-
-                    table.insert(baitOptions, label)
-                    -- map pakai nama bersih (tanpa info price)
-                    baitIdMap[baitName] = baitId
-                end
-            end
-        end
+    if ConnectionZoom then
+      ConnectionZoom:Disconnect()
+      ConnectionZoom = nil
     end
 
-    table.sort(baitOptions, function(a, b)
-        return a:lower() < b:lower()
-    end)
-end
-
-if #baitOptions == 0 then
-    TabShop:Label("Tidak ada bait ModuleScript di ReplicatedStorage.Baits")
-else
-    -- dropdown pakai UI compact kamu
-    TabShop:Dropdown("Buy Baits", baitOptions, function(option)
-        if not option or option == "" then return end
-
-        -- ambil nama bait tanpa bagian " | Price: ..."
-        local pureName = option:split(" |")[1]
-        local baitId   = baitIdMap[pureName]
-
-        if not baitId then
-            warn("[BaitShop] baitId tidak ditemukan untuk:", tostring(pureName))
-            return
+    if state then
+      st.player.CameraMaxZoomDistance = 50000
+      ConnectionZoom = Player:GetPropertyChangedSignal("CameraMaxZoomDistance"):Connect(function()
+        if st.player.CameraMaxZoomDistance ~= 50000 then
+          st.player.CameraMaxZoomDistance = 50000
         end
-
-        -- invoke server (vuln: bisa beli bait yang sudah tidak ada di shop)
-        local ok, err = pcall(function()
-            RF_PurchaseBait:InvokeServer(baitId)
-        end)
-
-        if ok then
-            print("[BaitShop] Berhasil beli bait:", pureName, " | Id:", baitId)
-        else
-            warn("[BaitShop] Gagal beli bait:", pureName, "Error:", err)
-        end
-    end)
-end
-
-
-
-
--- sleitnick/net
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
-
--- FARM REMOTES
-local RE_ObtainedNewFish  = net:WaitForChild("RE/ObtainedNewFishNotification")
-local RE_FavoriteItem     = net:WaitForChild("RE/FavoriteItem")
-local RF_SellAllItems     = net:WaitForChild("RF/SellAllItems")
-local RF_PurchaseWeather  = net:WaitForChild("RF/PurchaseWeatherEvent")
-local RE_ActivateEnchant  = net:WaitForChild("RE/ActivateEnchantingAltar")
-local RE_EquipHotbar      = net:WaitForChild("RE/EquipToolFromHotbar")
-local RF_SellItem         = net:WaitForChild("RF/SellItem")  -- <== penting
-
-----------------------------------------------------------------
--- TAB FARM (MAIN)
-----------------------------------------------------------------
-local TabFarm  = win:CreateTab("Auto")
-
-
-----------------------------------------------------------------
--- STATE FARM
-----------------------------------------------------------------
-local Farm = {
-    AutoFavoriteRarityEnabled   = false,
-    AutoFavoriteMutationEnabled = false,
-
-    FavoriteRarity = {
-        COMMON=true, UNCOMMON=false, RARE=false, EPIC=false,
-        LEGENDARY=false, MYTHIC=false, SECRET=false,
-    },
-
-    FavoriteMutations = {
-        ["Galaxy"]       = false,
-        ["Fairy Dust"]   = false,
-        ["Gemstone"]     = false,
-        ["1x1x1x1"]      = false,
-        ["Stone"]        = false,
-        ["Gold"]         = false,
-        ["Albino"]       = false,
-        ["Frozen"]       = false,
-        ["Sandy"]        = false,
-        ["Ghost"]        = false,
-        ["Radioactive"]  = false,
-        ["Holographic"]  = false,
-        ["Noob"]         = false,
-        ["Corrupt"]      = false,
-        ["Lightning"]    = false,
-        ["Midnight"]     = false,
-        ["Shiny"]        = false,
-    },
-
-    AutoSellEnabled  = false,
-    AutoSellThreshold = 30,
-    AutoSellDelay     = 1.0,
-
-    AutoSellStone = false,
-    StoneThreshold = 30,
-    AutoSellStoneDelay = 1.0,
-
-    AutoWeatherEnabled = false,
-    AutoWeatherList = {
-        ["Storm"]=false, ["Cloudy"]=false, ["Snow"]=false,
-        ["Wind"]=false, ["Radiant"]=false, ["Shark Hunt"]=false,
-    },
-
-    AutoEnchant_LastRun = 0,
-
-    -- COUNTER FISH + AUTORESPAWN
-    FishStats = {
-        Total          = 0,       -- total semua ikan yg sudah ditangkap semenjak execute
-        Session        = 0,       -- hitungan sesi sejak terakhir respawn
-        RespawnEnabled = false,   -- toggle ON/OFF auto respawn
-        RespawnThreshold = 500,   -- batas ikan sebelum respawn (bisa diubah lewat input)
-        OriginCFrame   = nil,     -- posisi awal tempat mancing
-    },
-
-}
-
-----------------------------------------------------------------
--- BUILD RARITY MAP (FishId → Rarity)
-----------------------------------------------------------------
-local FishIdToRarity = {}
-local tierToRarity = {
-    [1]="COMMON",[2]="UNCOMMON",[3]="RARE",
-    [4]="EPIC",[5]="LEGENDARY",[6]="MYTHIC",[7]="SECRET"
-}
-
-local itemsFolder = ReplicatedStorage:FindFirstChild("Items")
-if itemsFolder then
-    for _,module in ipairs(itemsFolder:GetChildren()) do
-        if module:IsA("ModuleScript") then
-            local ok,data = pcall(require,module)
-            if ok and data and data.Data and data.Data.Type=="Fish" then
-                local id   = data.Data.Id
-                local tier = tonumber(data.Data.Tier) or 0
-                local rar  = data.Data.Rarity or tierToRarity[tier]
-                if id then
-                    FishIdToRarity[id] = string.upper(rar or "COMMON")
-                end
-            end
-        end
-    end
-end
-
-------------------------------------------------------------
--- DOUBLE EQUIP ROD (dibuat terpisah dari Auto Fishing)
-------------------------------------------------------------
-local function equipRodAfterRespawn()
-    pcall(function()
-        Events.equipHotbar:FireServer(1)
-    end)
-end
-
-------------------------------------------------------------
--- RESPawn + TELEPORT KEMBALI KE POSISI ASAL + EQUIP ROD
-------------------------------------------------------------
-local respawnBusy = false
-
-local function RespawnAndReturnToOrigin()
-    if respawnBusy then return end
-    respawnBusy = true
-
-    local origin = Farm.FishStats and Farm.FishStats.OriginCFrame
-    if not origin then
-        warn("[AutoRespawnFish] OriginCFrame belum diset, batal respawn.")
-        respawnBusy = false
-        return
-    end
-
-    local plr = LocalPlayer
-    local char = plr.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-    -- bunuh karakter untuk respawn
-    if hum then
-        hum.Health = 0
-    elseif char then
-        char:BreakJoints()
-    end
-
-    -- tunggu karakter baru
-    local newChar = plr.CharacterAdded:Wait()
-    local hrp = newChar:WaitForChild("HumanoidRootPart")
-
-    -- kasih jeda dikit biar load
-    _wait(0.6)
-
-    -- teleport ke posisi asal + offset atas dikit
-    hrp.CFrame = origin + Vector3.new(0, 5, 0)
-
-    -- langsung equip rod (double equip)
-    equipRodAfterRespawn()
-
-    -- reset counter sesi
-    Farm.FishStats.Session = 0
-    print("[AutoRespawnFish] Respawn & balik ke posisi asal. Session counter reset.")
-
-    _delay(1, function()
-        respawnBusy = false
-    end)
-end
-
-
-----------------------------------------------------------------
--- AUTO FAVORITE + AUTO SELL HANDLER
-----------------------------------------------------------------
-local autoSellCount     = 0
-local autoSellCooldown  = false
-
-
-RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
-    if not info or not info.InventoryItem then return end
-    local uuid = info.InventoryItem.UUID
-    if not uuid then return end
-
-    ------------------------------------------------------------
-    -- COUNTER FISH (SELALU JALAN, MAUPUN TOGGLE ON / OFF)
-    ------------------------------------------------------------
-    if Farm.FishStats then
-        Farm.FishStats.Total   = (Farm.FishStats.Total or 0) + 1
-        Farm.FishStats.Session = (Farm.FishStats.Session or 0) + 1
-
-        -- cek apakah perlu respawn
-        if Farm.FishStats.RespawnEnabled
-            and not respawnBusy
-            and Farm.FishStats.OriginCFrame
-        then
-            local limit = Farm.FishStats.RespawnThreshold or 500
-            if Farm.FishStats.Session >= limit then
-                print(string.format(
-                    "[AutoRespawnFish] Batas %d ikan tercapai (Session=%d). Respawn...",
-                    limit, Farm.FishStats.Session
-                ))
-                RespawnAndReturnToOrigin()
-            end
-        end
-    end
-
-    ------------------------------------------------------------
-    -- AUTO FAVORITE: BY RARITY & BY MUTATION (VariantId)
-    ------------------------------------------------------------
-    local shouldFavorite = false
-
-    --------------------------------------------------------
-    -- 1) BY RARITY
-    --------------------------------------------------------
-    if Farm.AutoFavoriteRarityEnabled and itemId then
-        local rarity = FishIdToRarity[itemId] or "COMMON"
-        if Farm.FavoriteRarity[rarity] then
-            shouldFavorite = true
-        end
-    end
-
-    --------------------------------------------------------
-    -- 2) BY MUTATION (VariantId) – contoh di spy:
-    --    VariantId = "Gold"
-    --------------------------------------------------------
-    if not shouldFavorite and Farm.AutoFavoriteMutationEnabled then
-        local inv  = info.InventoryItem
-        local meta = inv and inv.Metadata
-        local mutationName
-
-        -- kemungkinan letak VariantId
-        if inv then
-            mutationName = inv.VariantId or inv.Variant
-        end
-        if not mutationName and meta then
-            mutationName = meta.VariantId or meta.Variant
-        end
-        if not mutationName then
-            mutationName = info.VariantId or info.Variant
-        end
-
-        if mutationName and Farm.FavoriteMutations[mutationName] then
-            shouldFavorite = true
-        end
-    end
-
-    --------------------------------------------------------
-    -- 3) Kirim favorite sekali saja
-    --------------------------------------------------------
-    if shouldFavorite then
-        pcall(function()
-            RE_FavoriteItem:FireServer(uuid)
-        end)
-    end
-
-
-
-    -- AUTO SELL ALL
-    if Farm.AutoSellEnabled then
-        autoSellCount += 1
-        if autoSellCount >= Farm.AutoSellThreshold and not autoSellCooldown then
-            autoSellCooldown = true
-            _spawn(function()
-                pcall(function()
-                    RF_SellAllItems:InvokeServer()
-                end)
-                _wait(Farm.AutoSellDelay)
-                autoSellCount    = 0
-                autoSellCooldown = false
-            end)
-        end
-    end
-
-    
-end)
-
-----------------------------------------------------------------
--- WEATHER LOOP
-----------------------------------------------------------------
-local WeatherThreads = {}
-
-local function randomDelay(min,max)
-    return math.random(min*100,max*100)/100
-end
-
-local function StartWeatherLoop(weather)
-    if WeatherThreads[weather] then return end
-
-    WeatherThreads[weather] = _spawn(function()
-        while Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather] do
-            pcall(function()
-                RF_PurchaseWeather:InvokeServer(weather)
-            end)
-
-            local dur = 900 + randomDelay(2,6)
-            local t0 = tick()
-            while tick() - t0 < dur do
-                if not (Farm.AutoWeatherEnabled and Farm.AutoWeatherList[weather]) then
-                    break
-                end
-                _wait(1)
-            end
-        end
-        WeatherThreads[weather] = nil
-    end)
-end
-
-----------------------------------------------------------------
--- AUTO ENCHANT FUNCTION
-----------------------------------------------------------------
-
-local Players           = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-
-local LocalPlayer       = Players.LocalPlayer
-
--- net / remotes
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
-
-local RE_EquipHotbar     = net:WaitForChild("RE/EquipToolFromHotbar")
-local RE_ActivateEnchant = net:WaitForChild("RE/ActivateEnchantingAltar")
-local RE_EquipItem       = net:FindFirstChild("RE/EquipItem")
-local RE_UnequipItem     = net:FindFirstChild("RE/UnequipItem")
-
-
-
-------------------------------------------------------------
--- IMPORT MODULES (Replion, PlayerStatsUtility, ItemUtility,
---                 TierUtility, Enchants)
-------------------------------------------------------------
-local Replion, DataReplion
-local PlayerStatsUtility, ItemUtility, TierUtility
-local EnchantDefs
-
-do
-    local okR, modR = pcall(function()
-        return require(ReplicatedStorage:WaitForChild("Packages"):WaitForChild("Replion"))
-    end)
-    if okR and modR then
-        Replion = modR
-        local okD, rep = pcall(function()
-            return Replion.Client:WaitReplion("Data")
-        end)
-        if okD then DataReplion = rep end
-    end
-
-    local shared = ReplicatedStorage:FindFirstChild("Shared")
-    if shared then
-        pcall(function() PlayerStatsUtility = require(shared:WaitForChild("PlayerStatsUtility")) end)
-        pcall(function() ItemUtility        = require(shared:WaitForChild("ItemUtility")) end)
-        pcall(function() TierUtility        = require(shared:WaitForChild("TierUtility")) end)
-    end
-
-    pcall(function()
-        EnchantDefs = require(ReplicatedStorage:WaitForChild("Enchants"))
-    end)
-end
-
-------------------------------------------------------------
--- KONFIGURASI / STATE AUTO ENCHANT (mirip module PC)
-------------------------------------------------------------
-local EnchantConfig = {
-    AutoEnchant1 = false,
-    AutoEnchant2 = false,
-    Delay1 = 2,  -- detik antar enchant slot 1
-    Delay2 = 2,  -- detik antar enchant slot 2
-    TargetEnchant1 = {}, -- isinya [namaEnchant] = true
-    TargetEnchant2 = "", -- single string    
-}
-
-local Enchant = {}
-local loop1Running = false
-local loop2Running = false
-
-
-local ENCHANT_ALTAR_CFRAME = CFrame.new(
-    3234.55444, -1302.85486, 1400.52197,
-    0.354458153, -3.30675043e-08, -0.935071886,
-    -2.43329872e-08, 1, -4.45875159e-08,
-    0.935071886, 3.85574985e-08, 0.354458153
-)
-
-local ENCHANT_ALTAR_CFRAME2 = CFrame.new(
-    127.5, 1480.4, -600.6
-)
-
-local function ensureCharacter()
-    local char = LocalPlayer.Character
-    if not char or not char.Parent then
-        char = LocalPlayer.CharacterAdded:Wait()
-    end
-    return char
-end
-
-------------------------------------------------------------
--- LIST INVENTORY ENCHANT STONES
-------------------------------------------------------------
-function Enchant:ListInventoryEnchantStones()
-    local enchantStones = {}
-    if not (DataReplion and ItemUtility) then return enchantStones end
-
-    local inventory = DataReplion:Get({ "Inventory" })
-    local items = inventory and inventory["Items"] or {}
-    if not items then return enchantStones end
-
-    for _, item in pairs(items) do
-        local ok, itemData = pcall(function()
-            return ItemUtility.GetItemDataFromItemType("EnchantStones", item.Id)
-        end)
-        if ok and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-            local meta = item.Metadata or {}
-            local fav  = (meta.Favorite or meta.IsFavorite or meta.IsFavorited) == true
-
-            table.insert(enchantStones, {
-                UUID     = item.UUID,
-                Id       = item.Id,
-                Name     = itemData.Data.Name or "Unknown",
-                Type     = itemData.Data.Type or "Unknown",
-                Favorite = fav,
-            })
-        end
-    end
-
-    return enchantStones
-end
-
-------------------------------------------------------------
--- EQUIP ENCHANT STONE PERTAMA DI INVENTORY
-------------------------------------------------------------
-function Enchant:EquipEnchantStone(unequipUUID)
-    local stones = self:ListInventoryEnchantStones()
-    if #stones == 0 then
-        warn("[AutoEnchant] Tidak ada EnchantStones di inventory.")
-        return
-    end
-
-    local first = stones[1]
-
-    if RE_UnequipItem and unequipUUID then
-        pcall(function()
-            RE_UnequipItem:FireServer(unequipUUID)
-        end)
-        _wait(0.15)
-    end
-
-    if RE_EquipItem then
-        pcall(function()
-            RE_EquipItem:FireServer(first.UUID, first.Type or "EnchantStones")
-        end)
+      end)
     else
-        warn("[AutoEnchant] RE/EquipItem tidak ditemukan, tidak bisa equip enchant stone otomatis.")
+      st.player.CameraMaxZoomDistance = svc.Starter.CameraMaxZoomDistance
     end
+  end
+})
+
+local LegitFishing = Tabs.Fishing:AddSection("Legit Fishing")
+
+LegitFishing:AddToggle({
+  Title = "Legit Fishing",
+  Content = "Automatically fishes for you",
+  Default = false,
+  Callback = function(state)
+    st.fishingLegit = state
+
+    task.spawn(function()
+      while st.fishingLegit do
+        local GUID = mods.FishingController:GetCurrentGUID()
+
+        if GUID then
+          task.wait(st.MinigameDelay)
+          api.Events.REFishDone:FireServer()
+        elseif not mods.FishingController:OnCooldown() then
+          api.Functions.Cancel:InvokeServer()
+          mods.FishingController:RequestChargeFishingRod(nil, true)
+        end
+        task.wait(0.1)
+      end
+    end)
+  end
+})
+
+local MD = LegitFishing:AddInput({
+  Title = "Minigame Delay",
+  Content = "Delay for finish the minigame",
+  Default = tostring(st.minigameDelay),
+  Placeholder = "0.1",
+  Callback = function(value)
+    local num = tonumber(value)
+    if not num or num < 0 or num > 5 then
+      task.spawn(function()
+        task.wait()
+        MD:Set(tostring(st.minigameDelay))
+        sirenx("Invalid number! Must be between 0 and 5.")
+      end)
+    end
+    st.MinigameDelay = num
+  end
+})
+
+local AutoFishing = Tabs.Fishing:AddSection("Auto Fishing")
+
+api.Events.RETextEffect.OnClientEvent:Connect(function(data)
+  if not (data and data.TextData and data.TextData.EffectType == "Exclaim") then return end
+  if not (st.char and data.Container == st.char:FindFirstChild("Head")) then return end
+
+  if st.autoFishing then
+    task.delay(st.completeDelay, function()
+      pcall(api.Events.REFishDone.FireServer, api.Events.REFishDone)
+    end)
+  end
+end)
+
+AutoFishing:AddToggle({
+  Title = "Auto Fishing",
+  Content = "Automatically fishes for you",
+  Default = false,
+  Callback = function(state)
+    st.autoFishing = state
+
+    task.spawn(function()
+      api.Functions.AutoEnabled:InvokeServer(state)
+      while st.autoFishing do
+        api.Functions.ChargeRod:InvokeServer()
+        api.Functions.StartMini:InvokeServer(-1, 0.999, workspace:GetServerTimeNow())
+        task.wait(0.5)
+      end
+    end)
+  end
+})
+
+local CD = AutoFishing:AddInput({
+  Title = "Complete Delay",
+  Content = "Delay for complete fishing",
+  Default = tostring(st.completeDelay),
+  Callback = function(value)
+    local num = tonumber(value)
+    if not num or num < 0 or num > 5 then
+      task.spawn(function()
+        task.wait()
+        CD:Set(tostring(st.completeDelay))
+        sirenx("Invalid number! Must be between 0 and 5.")
+      end)
+    end
+    st.completeDelay = num
+  end
+})
+
+local Fish2 = Tabs.Fishing:AddSection("Instant Fishing")
+
+function Fastest()
+  task.spawn(function()
+    pcall(function() api.Functions.Cancel:InvokeServer() end)
+    local now = workspace:GetServerTimeNow()
+    pcall(function() api.Functions.ChargeRod:InvokeServer(now) end)
+    pcall(function() api.Functions.StartMini:InvokeServer(-1, 0.999) end)
+    task.wait(_G.FishingDelay)
+    pcall(function() api.Events.REFishDone:FireServer() end)
+  end)
 end
 
-------------------------------------------------------------
--- INFO ROD SEKARANG (Nama, tier, enchant1, enchant2)
-------------------------------------------------------------
-function Enchant:GetCurrentRodDetails()
-    if not (DataReplion and PlayerStatsUtility and ItemUtility and TierUtility) then
-        return {
-            UUID = nil,
-            Id = nil,
-            Name = "Unknown",
-            Tier = "Unknown",
-            TierIndex = 100,
-            Power = 0,
-            MaxWeight = 0,
-            Resilience = 0,
-            Luck = 0,
-            Enchant1 = "None",
-            Enchant2 = "None",
-        }
-    end
+Fish2:AddInput({
+  Title = "Delay Reel",
+  Value = tostring(_G.Reel),
+  Default = "1.9",
+  Callback = function(v)
+    local n = tonumber(v)
+    if n and n > 0 then _G.Reel = n end
+    SaveConfig()
+  end
+})
 
-    local equippedItem = DataReplion:Get("EquippedItems")
-    if not (equippedItem and equippedItem[1]) then
-        return {
-            Name = "None", Enchant1 = "None", Enchant2 = "None"
-        }
-    end
+Fish2:AddInput({
+  Title = "Delay Fishing",
+  Value = tostring(_G.FishingDelay),
+  Default = "1.1",
+  Callback = function(v)
+    local n = tonumber(v)
+    if n and n > 0 then _G.FishingDelay = n end
+    SaveConfig()
+  end
+})
 
-    local slotUUID = equippedItem[1]
-    local inventoryItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(item)
-        return item.UUID == slotUUID
+Fish2:AddToggle({
+  Title = "Instant Fishing",
+  Default = _G.FBlatant,
+  Callback = function(s)
+    _G.FBlatant = s
+    api.Functions.AutoEnabled:InvokeServer(s)
+    if s then
+      st.player:SetAttribute("Loading", nil)
+      task.spawn(function()
+        while _G.FBlatant do
+          Fastest()
+          task.wait(_G.Reel)
+        end
+      end)
+    else
+      st.player:SetAttribute("Loading", false)
+    end
+  end
+})
+
+Fish2:AddButton({
+  Title = "Recovery Fishing",
+  Callback = function()
+    task.spawn(function()
+      pcall(function()
+        api.Functions.Cancel:InvokeServer()
+      end)
+      local lp = game:GetService("Players").LocalPlayer
+      lp:SetAttribute("Loading", nil)
+      task.wait(0.05)
+      lp:SetAttribute("Loading", false)
+      sirenx("Recovery Successfully!")
     end)
+  end
+})
 
-    if not inventoryItem then
-        return {
-            Name = "None", Enchant1 = "None", Enchant2 = "None"
-        }
+local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
+
+SellGroup:AddDropdown({
+  Options = { "Delay", "Count" },
+  Default = "Delay",
+  Title = "Select Sell Mode",
+  Callback = function(o)
+    st.sellMode = o
+    SaveConfig()
+  end
+})
+
+SellGroup:AddInput({
+  Default = "1",
+  Title = "Set Value",
+  Content = "Delay = Minutes | Count = Backpack Count",
+  Placeholder = "Input Here",
+  Callback = function(v)
+    local n = tonumber(v) or 1
+    if st.sellMode == "Delay" then
+      st.sellDelay = n * 60
+    else
+      st.inputSellCount = n
+    end
+    SaveConfig()
+  end
+})
+
+SellGroup:AddToggle({
+  Title = "Start Selling",
+  Default = false,
+  Callback = function(s)
+    st.autoSellEnabled = s
+    if s then
+      task.spawn(function()
+        local RFSellAllItems = mods.Net["RF/SellAllItems"]
+        while st.autoSellEnabled do
+          local bagLabel = player:WaitForChild("PlayerGui")
+            :WaitForChild("Inventory")
+            .Main.Top.Options.Fish.Label:FindFirstChild("BagSize")
+
+          local cur, max = 0, 0
+          if bagLabel and bagLabel:IsA("TextLabel") then
+            local txt = bagLabel.Text or ""
+            local c, m = txt:match("(%d+)%s*/%s*(%d+)")
+            cur, max = tonumber(c) or 0, tonumber(m) or 0
+          end
+
+          if st.sellMode == "Delay" then
+            task.wait(st.sellDelay)
+            RFSellAllItems:InvokeServer()
+
+          elseif st.sellMode == "Count" then
+            local target = tonumber(st.inputSellCount) or max
+            if cur >= target then
+              RFSellAllItems:InvokeServer()
+            end
+            task.wait()
+          end
+        end
+      end)
+    end
+  end
+})
+
+SellGroup:AddSubSection("Auto Sell Enchant Stone")
+
+local function GetEnchantStoneCount()
+  if not (repl.Data and repl.Data.Data and repl.Data.Data.Inventory) then return 0 end
+  local Count = 0
+  for _, Item in pairs(repl.Data.Data.Inventory.Items) do
+    if Item.Id == 10 then Count = Count + 1 end
+  end
+  return Count
+end
+
+local EnchantStock = SellGroup:AddParagraph({
+  Title = "Enchant Stone Count",
+  Content = "0 Enchant Stones"
+})
+
+task.spawn(function()
+  while task.wait(3) do
+    EnchantStock:SetContent(string.format("%d Enchant Stones", GetEnchantStoneCount()))
+  end
+end)
+
+local TAL = SellGroup:AddInput({
+  Title = "Target Amount Left",
+  Content = "Amount of enchant stones to keep",
+  Default = tostring(st.market.enchSellAt),
+  Callback = function(value)
+    local num = tonumber(value)
+    if not num or num < 1 then
+      task.spawn(function()
+        task.wait()
+        TAL:Set(tostring(st.market.enchSellAt))
+        sirenx("Invalid number! Must be greater than 0.")
+      end)
+      return
+    end
+    st.market.enchSellAt = num
+  end
+})
+
+SellGroup:AddToggle({
+  Title = "Auto Sell Enchant Stones",
+  Content = "Automatically sells enchant stones for you",
+  Default = false,
+  Callback = function(state)
+    st.market.enchSell = state
+
+    task.spawn(function()
+      while st.market.enchSell do
+        if GetEnchantStoneCount() > tonumber(st.market.enchSellAt) then
+          for _, Item in pairs(repl.Data.Data.Inventory.Items) do
+            if Item.Id == 10 then
+              st.Functions.SellItem:InvokeServer(Item.UUID)
+              break
+            end
+          end
+        end
+        task.wait(1)
+      end
+    end)
+  end
+})
+
+local Favorites = Tabs.Fishing:AddSection("Favorites")
+
+local function IsFavorited(UUID, items)
+  for _, Item in pairs(items) do
+    if Item.UUID == UUID then return Item.Favorited == true end
+  end
+  return false
+end
+
+local RarityOrder = {Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythical = 6, Secret = 7}
+
+local function AutoFavorite(names, rarities, mutations)
+  local items = repl.Data.Data.Inventory.Items
+  if not items or #items == 0 then return end
+
+  local rarityTiers, namesList, mutationList = {}, {}, {}
+  
+  if rarities then
+    for _, rarity in ipairs(rarities) do
+      if RarityOrder[rarity] then 
+        rarityTiers[RarityOrder[rarity]] = true
+      end
+    end
+  end
+
+  if names then for _, name in ipairs(names) do namesList[name] = true end end
+  if mutations then for _, mutation in ipairs(mutations) do mutationList[mutation] = true end end
+
+  local toFavorite = {}
+  
+  for _, Item in pairs(items) do
+    if not Item.Favorited then
+      local FishData = mods.ItemUtility:GetItemData(Item.Id)
+      
+      if FishData and FishData.Data then
+        local data = FishData.Data
+        if namesList[data.Name] or rarityTiers[data.Tier] or (Item.Metadata and Item.Metadata.VariantId and mutationList[Item.Metadata.VariantId]) then
+          table.insert(toFavorite, Item.UUID)
+        end
+      end
+    end
+  end
+
+  for i, uuid in ipairs(toFavorite) do
+    task.spawn(function()
+      task.wait(i * 0.05)
+      api.Events.REFav:FireServer(uuid)
+    end)
+  end
+end
+
+local function UnAutoFavoriteAll()
+  local Items = repl.Data.Data.Inventory.Items
+  if not Items or #Items == 0 then return end
+
+  for _, Item in pairs(Items) do
+    if IsFavorited(Item.UUID) then
+      pcall(api.Events.REFav.FireServer, api.Events.REFav, Item.UUID)
+    end
+  end
+end
+
+Favorites:AddDropdown({
+  Title = "Auto Favorite by Rarity",
+  Content = "Favorite by Fish Rarity",
+  Multi = true,
+  Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret"},
+  Default = st.favorite.rarities,
+  Callback = function(value)
+    st.favorite.rarities = value
+  end
+})
+
+local cachedFishNames = nil
+local function GetFishNames()
+  if cachedFishNames then return cachedFishNames end
+  
+  local Names = {}
+  for _, Item in pairs(repl.Items:GetChildren()) do
+    local FishData = mods.ItemUtility:GetItemData(Item.Name)
+    if FishData and FishData.Data and FishData.Data.Type == "Fish" then
+      table.insert(Names, FishData.Data.Name)
+    end
+  end
+  cachedFishNames = Names
+  return Names
+end
+
+Favorites:AddDropdown({
+  Title = "Auto Favorite by Name",
+  Content = "Favorite by Fish Name",
+  Multi = true,
+  Options = GetFishNames(),
+  Default = st.favorite.names,
+  Callback = function(value)
+    st.favorite.names = value
+  end
+})
+
+local cachedMutations = nil
+local function GetFishMutation()
+  if cachedMutations then return cachedMutations end
+  
+  local Names = {}
+  for _, Item in pairs(repl.Variants:GetChildren()) do
+    table.insert(Names, Item.Name)
+  end
+  cachedMutations = Names
+  return Names
+end
+
+Favorites:AddDropdown({
+  Title = "Auto Favorite by Mutation",
+  Content = "Favorite by Fish Mutation",
+  Multi = true,
+  Options = GetFishMutation(),
+  Default = st.favorite.mutations,
+  Callback = function(value)
+    st.favorite.mutations = value
+  end
+})
+
+Favorites:AddToggle({
+  Title = "Auto Favorite",
+  Content = "Automatically favorites fish for you",
+  Default = false,
+  Callback = function(state)
+    st.favorite.auto = state
+
+    task.spawn(function()
+      while st.favorite.auto do
+        AutoFavorite(st.favorite.names, st.favorite.rarities, st.favorite.mutations)
+        task.wait(2)
+      end
+    end)
+  end
+})
+
+Favorites:AddButton({
+  Title = "Unfavorite All",
+  Content = "Unfavorites all favorited fish",
+  Callback = UnAutoFavoriteAll
+})
+
+local HideFeature = Tabs.Fishing:AddSection("Hide Features")
+
+pcall(function()
+  local OriginalNotif = mods.NotificationController.PlaySmallItemObtained
+  mods.NotificationController.PlaySmallItemObtained = function(self, ...)
+    if st.hide.notifications then return end
+    return OriginalNotif(self, ...)
+  end
+end)
+
+HideFeature:AddToggle({
+  Title = "Hide Notification",
+  Content = "Hides get fishing notifications",
+  Default = false,
+  Callback = function(state)
+    st.hide.notifications = state
+  end
+}, "HideNotification")
+
+pcall(function()
+  local OriginalInit = mods.CutsceneController.Init
+  mods.CutsceneController.Init = function(self, ...)
+    if st.hide.cutscenes then return end
+    return OriginalInit(self, ...)
+  end
+end)
+
+HideFeature:AddToggle({
+  Title = "Skip Cutscenes",
+  Content = "Automatically skips fishing cutscenes",
+  Default = false,
+  Callback = function(state)
+    st.hide.cutscenes = state
+  end
+}, "HideCutscenes")
+
+pcall(function()
+  local OriginalAnim = mods.AnimationController.PlayAnimation
+  mods.AnimationController.PlayAnimation = function(self, ...)
+    if st.hide.animations then return end
+    return OriginalAnim(self, ...)
+  end
+end)
+
+HideFeature:AddToggle({
+  Title = "Disable Animations",
+  Content = "Disables fishing animations",
+  Default = false,
+  Callback = function(state)
+    st.hide.animations = state
+  end
+}, "HideAnimations")
+
+pcall(function()
+  local OriginalRenderAP = mods.VFX.RenderAtPoint
+  mods.VFX.RenderAtPoint = function(self, ...)
+    if st.hide.vfx then return end
+    return OriginalRenderAP(self, ...)
+  end
+
+  local OriginalRenderI = mods.VFX.RenderInstance
+  mods.VFX.RenderInstance = function(self, ...)
+    if st.hide.vfx then return end
+    return OriginalRenderI(self, ...)
+  end
+end)
+
+HideFeature:AddToggle({
+  Title = "Disable Rod Effect",
+  Content = "Hides the fishing rod bobber effect",
+  Default = false,
+  Callback = function(state)
+    st.hide.vfx = state
+  end
+}, "HideVFX")
+
+local Shop = Tabs.Automation:AddSection("Shop")
+
+local ShopMerchant = Shop:AddParagraph({
+  Title = "Merchant Stock Panel",
+  Content = [[
+- N/A
+- N/A
+- N/A
+
+Next Refresh: 00H, 00M, 00S
+  ]]
+})
+
+local function GetPanelItem(Panel)
+  local Items = {}
+  for _, Obj in ipairs(Panel:GetChildren()) do
+    if Obj.Name == "Template" then
+      local ItemName = Obj:FindFirstChild("Frame")
+      if ItemName and ItemName:FindFirstChild("ItemName") then
+        table.insert(Items, ItemName.ItemName.Text)
+      end
+    end
+  end
+  return Items
+end
+
+task.spawn(function()
+  while task.wait(3) do
+    local items = GetPanelItem(gui.ItemsFrame)
+    ShopMerchant:SetContent(
+      string.format([[
+- %s
+- %s
+- %s
+
+%s
+      ]],
+        items[1] or "N/A",
+        items[2] or "N/A",
+        items[3] or "N/A",
+        gui.RefreshMerchant.Text
+      ))
+  end
+end)
+
+Shop:AddButton({
+  Title = "Open / Close Merchant",
+  Content = "Opens or closes the merchant shop panel",
+  Callback = function()
+    gui.Merchant.Enabled = not gui.Merchant.Enabled
+  end
+})
+
+Shop:AddSubSection("Weather")
+
+Shop:AddDropdown({
+  Title = "Select Weather",
+  Content = "Select a weather to change to",
+  Multi = true,
+  Options = {
+    "Wind (10,000)",
+    "Cloudy (20,000)",
+    "Snow (15,000)",
+    "Storm (35,000)",
+    "Radiant (50,000)",
+    "Shark Hunt (300,000)"
+  },
+  Default = {},
+  Callback = function(value)
+    st.shop.weather = value
+  end
+})
+
+Shop:AddToggle({
+  Title = "Auto Buy Weather",
+  Content = "Automatically buys selected weather effects",
+  Default = false,
+  Callback = function(state)
+    st.shop.autoWeather = state
+
+    task.spawn(function()
+      while st.shop.autoWeather and st.shop.weather do
+        for _, weather in ipairs(st.shop.weather) do
+          api.Functions.BuyWeather:InvokeServer(weather:match("^(.-) %("))
+        end
+        task.wait(5)
+      end
+    end)
+  end
+})
+
+local Save = Tabs.Automation:AddSection("Save position Features")
+
+function SavePosition(cf)
+  local data = { cf:GetComponents() }
+  writefile(PositionFile, svc.HttpService:JSONEncode(data))
+end
+
+function LoadPosition()
+  if isfile(PositionFile) then
+    local success, data = pcall(function()
+      return svc.HttpService:JSONDecode(readfile(PositionFile))
+    end)
+    if success and typeof(data) == "table" then
+      return CFrame.new(unpack(data))
+    end
+  end
+  return nil
+end
+
+function TeleportLastPos(char)
+  task.spawn(function()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local last = LoadPosition()
+
+    if last then
+      task.wait(2)
+      hrp.CFrame = last
+    end
+  end)
+end
+
+player.CharacterAdded:Connect(TeleportLastPos)
+if player.Character then
+  TeleportLastPos(player.Character)
+end
+
+Save:AddButton({
+  Title = "Save Position",
+  Callback = function()
+      local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      SavePosition(hrp.CFrame)
+      sirenx("Position saved successfully!")
+    end
+  end,
+  SubTitle = "Reset Position",
+  SubCallback = function()
+    if isfile(PositionFile) then
+      delfile(PositionFile)
+    end
+    sirenx("Last position has been reset.")
+  end
+})
+
+local Islands= Tabs.Teleport:AddSection("Islands")
+
+local TeleportLocations = {
+  ["Fisherman Island"] = CFrame.new(92, 9, 2768),
+  ["Arrow Lever"] = CFrame.new(898, 8, -363),
+  ["Sisyphus Statue"] = CFrame.new(-3740, -136, -1013),
+  ["Ancient Jungle"] = CFrame.new(1481, 11, -302),
+  ["Weather Machine"] = CFrame.new(-1519, 2, 1908),
+  ["Coral Refs"] = CFrame.new(-3105, 6, 2218),
+  ["Tropical Island"] = CFrame.new(-2110, 53, 3649),
+  ["Kohana"] = CFrame.new(-662, 3, 714),
+  ["Esoteric Island"] = CFrame.new(2035, 27, 1386),
+  ["Diamond Lever"] = CFrame.new(1818, 8, -285),
+  ["Underground Cellar"] = CFrame.new(2098, -92, -703),
+  ["Volcano"] = CFrame.new(-631, 54, 194),
+  ["Enchant Room"] = CFrame.new(3255, -1302, 1371),
+  ["Lost Isle"] = CFrame.new(-3717, 5, -1079),
+  ["Sacred Temple"] = CFrame.new(1475, -22, -630),
+  ["Creater Island"] = CFrame.new(981, 41, 5080),
+  ["Double Enchant Room"] = CFrame.new(1480, 127, -590),
+  ["Treasure Room"] = CFrame.new(-3599, -276, -1642),
+  ["Crescent Lever"] = CFrame.new(1419, 31, 78),
+  ["Hourglass Diamond Lever"] = CFrame.new(1484, 8, -862),
+  ["Snow Island"] = CFrame.new(1627, 4, 3288),
+  ["Ancient Ruin"] = CFrame.new(6087, -584, 4633),
+  ["Classic Island"] = CFrame.new(1251, 11, 2803),
+  ["Iron Cavern"] = CFrame.new(-8913, -580, 156),
+  ["Iron Cafe"] = CFrame.new(-8642, -546, 149),
+}
+
+local function GetNameTeleport()
+  local Names = {}
+  for Key,_ in pairs(TeleportLocations) do table.insert(Names, Key) end
+  return Names
+end
+
+Islands:AddDropdown({
+  Title = "Select Island",
+  Content = "Select an island to teleport to",
+  Options = GetNameTeleport(),
+  Default = nil,
+  Callback = function(value)
+    st.teleport.island = value
+  end
+})
+
+Islands:AddButton({
+  Title = "Teleport",
+  Content = "Teleports you to the selected island",
+  Callback = function()
+    local loc = TeleportLocations[st.teleport.island]
+    if not loc then return end
+
+    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = loc
+      sirenx("Teleported to " .. st.teleport.island)
+    end
+  end
+})
+
+local Events = Tabs.Teleport:AddSection("Events")
+
+local function GetEventLocations()
+  local List = {}
+  for _, Obj in ipairs(st.menuRings:GetChildren()) do
+    if Obj:IsA("Model") and Obj.Name == "Props" then
+      for _, Prop in ipairs(Obj:GetChildren()) do
+        if Prop:IsA("Model") then
+          if Prop.Name == "Model" then
+            table.insert(List, "Worm Hunt")
+          else
+            table.insert(List, Prop.Name)
+          end
+        end
+      end
+    end
+  end
+  return List
+end
+
+local EventList = Events:AddDropdown({
+  Title = "Select Event",
+  Content = "Select an event to teleport to",
+  Options = GetEventLocations(),
+  Default = nil,
+  Callback = function(value)
+    st.teleport.event = value
+  end
+})
+
+Events:AddButton({
+  Title = "Teleport",
+  Content = "Teleports you to the selected event",
+  Callback = function()
+    if not st.teleport.event then return end
+
+    local Target = nil
+    for _, Obj in ipairs(st.menuRings:GetChildren()) do
+      if Obj:IsA("Model") and Obj.Name == "Props" then
+        for _, Prop in ipairs(Obj:GetChildren()) do
+          if Prop:IsA("Model") then
+            if st.teleport.event == "Worm Hunt" and Prop.Name == "Model" then
+              Target = Prop
+              break
+            elseif Prop.Name == st.teleport.event then
+              Target = Prop
+              break
+            end
+          end
+        end
+        if Target then break end
+      end
     end
 
-    local inventory = DataReplion:Get({ "Inventory" })
-    local rods = inventory and inventory["Fishing Rods"] or {}
-    local metadata
-    for _, it in pairs(rods) do
-        if it.UUID == inventoryItem.UUID then
-            metadata = it.Metadata
+    if Target then
+      st.char:PivotTo(Target:GetPivot())
+      task.wait(.5)
+
+      local Ocean = st.zones:FindFirstChild("Ocean")
+      for _, obj in ipairs(Ocean:GetDescendants()) do
+        if obj:IsA("Texture") then
+          obj.Parent.CanCollide = true
+        end
+      end
+    end
+  end
+})
+
+task.spawn(function()
+	while task.wait(5) do
+		EventList:SetValues(GetEventLocations(), st.teleport.event)
+	end
+end)
+
+local Plyr = Tabs.Teleport:AddSection("Player")
+
+local function GetPlayerNames()
+  local Names = {}
+  for _, Plr in pairs(svc.Players:GetPlayers()) do
+    if Plr ~= player then
+      table.insert(Names, Plr.Name)
+    end
+  end
+  return Names
+end
+
+local PlayerList = Plyr:AddDropdown({
+  Title = "Select Player",
+  Content = "Select a player to teleport to",
+  Options = GetPlayerNames(),
+  Default = nil,
+  Callback = function(value)
+    st.teleport.player = value
+  end
+})
+
+Plyr:AddButton({
+  Title = "Refresh Player List",
+  Callback = function()
+    PlayerList:SetValues(GetPlayerNames(), st.teleport.player)
+    sirenx("Player list refreshed.")
+  end,
+  SubTitle = "Go to Player",
+  SubCallback = function()
+    TargetPlayer = svc.Players:FindFirstChild(st.teleport.player)
+    if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+      st.char:PivotTo(TargetPlayer.Character:GetPivot())
+      sirenx("Teleported to " .. TargetPlayer.Name)
+    end
+  end
+})
+
+local LVR = Tabs.Quest:AddSection("Artifact Lever Location")
+
+local Jungle = workspace:WaitForChild("JUNGLE INTERACTIONS")
+local LOOP_DELAY, running, waitingArtifact = 1, false, nil
+local ACTIVE_COLOR, DISABLE_COLOR = "0,255,0", "255,0,0"
+
+_G.artifactPositions = {
+  ["Arrow Artifact"] = CFrame.new(875, 3, -368) * CFrame.Angles(0, math.rad(90), 0),
+  ["Crescent Artifact"] = CFrame.new(1403, 3, 123) * CFrame.Angles(0, math.rad(180), 0),
+  ["Hourglass Diamond Artifact"] = CFrame.new(1487, 3, -842) * CFrame.Angles(0, math.rad(180), 0),
+  ["Diamond Artifact"] = CFrame.new(1844, 3, -287) * CFrame.Angles(0, math.rad(-90), 0)
+}
+
+local orderList = { "Arrow Artifact", "Crescent Artifact", "Hourglass Diamond Artifact", "Diamond Artifact" }
+
+local function getStatus()
+  local s = {}
+  for _, o in ipairs(Jungle:GetDescendants()) do
+    if o:IsA("Model") and o.Name == "TempleLever" then
+      s[o:GetAttribute("Type")] = not (o:FindFirstChild("RootPart") and o.RootPart:FindFirstChildWhichIsA("ProximityPrompt"))
+    end
+  end
+  return s
+end
+
+local function setStatusUI(st)
+  local function seg(k, v)
+    local n = (k == "Hourglass Diamond Artifact" and "Hourglass Diamond") or (k == "Arrow Artifact" and "Arrow") or
+      (k == "Crescent Artifact" and "Crescent") or "Diamond"
+    local c = v and ACTIVE_COLOR or DISABLE_COLOR
+    return ('%s : <b><font color="rgb(%s)">%s</font></b>'):format(n, c, v and "ACTIVE" or "DISABLE")
+  end
+  ArtifactParagraph:SetContent(table.concat({
+    seg("Arrow Artifact", st["Arrow Artifact"]),
+    seg("Crescent Artifact", st["Crescent Artifact"]),
+    seg("Hourglass Diamond Artifact", st["Hourglass Diamond Artifact"]),
+    seg("Diamond Artifact", st["Diamond Artifact"])
+  }, "\n"))
+end
+
+local function firePromptFor(name)
+  for _, o in ipairs(Jungle:GetDescendants()) do
+    if o:IsA("Model") and o.Name == "TempleLever" and o:GetAttribute("Type") == name then
+      local p = o:FindFirstChild("RootPart") and o.RootPart:FindFirstChildWhichIsA("ProximityPrompt")
+      if p then fireproximityprompt(p) end
+      break
+    end
+  end
+end
+
+ArtifactParagraph = LVR:AddParagraph({
+  Title = "Panel Progress Artifact",
+  Content = [[
+Arrow : <b><font color="rgb(255,0,0)">DISABLE</font></b>
+Crescent : <b><font color="rgb(255,0,0)">DISABLE</font></b>
+Hourglass Diamond : <b><font color="rgb(255,0,0)">DISABLE</font></b>
+Diamond : <b><font color="rgb(255,0,0)">DISABLE</font></b>
+]]
+})
+
+api.Events.REFishGot.OnClientEvent:Connect(function(fish)
+  if not running or not waitingArtifact then return end
+  local head = string.split(waitingArtifact, " ")[1]
+  if head and string.find(fish, head, 1, true) then
+    task.wait(0)
+    firePromptFor(waitingArtifact)
+    waitingArtifact = nil
+  end
+end)
+
+LVR:AddToggle({
+  Title = "Artifact Progress",
+  Default = false,
+  Callback = function(state)
+    running = state
+    if state then
+      task.spawn(function()
+        while running do
+          local status, all = getStatus(), true
+          for _, v in pairs(status) do
+            if not v then
+              all = false
+              break
+            end
+          end
+          setStatusUI(status)
+          if all then
+            running = false
             break
-        end
-    end
+          end
 
-    local enchant1, enchant2 = "None", "None"
-    for k, v in pairs(inventoryItem.Metadata or {}) do
-        local ok, enchantData = pcall(function()
-            return ItemUtility:GetEnchantData(v)
-        end)
-        if ok and enchantData and enchantData.Data then
-            if k == "EnchantId" then
-                enchant1 = enchantData.Data.Name or "Unknown"
-            elseif k == "EnchantId2" then
-                enchant2 = enchantData.Data.Name or "Unknown"
+          for _, n in ipairs(orderList) do
+            if not status[n] then
+              waitingArtifact = n
+
+              local hrp = getHRP()
+              if hrp and _G.artifactPositions[n] then
+                  hrp.CFrame = _G.artifactPositions[n]
+              end
+
+              repeat
+                task.wait(LOOP_DELAY)
+              until not waitingArtifact or not running
+              break
             end
+          end
+
+          task.wait(2)
         end
+      end)
     end
+  end
+})
 
-    local okItemData, equippedItemData = pcall(function()
-        return ItemUtility.GetItemDataFromItemType("Fishing Rods", inventoryItem.Id)
-    end)
-
-    if not (okItemData and equippedItemData and equippedItemData.Data) then
-        return {
-            UUID = inventoryItem.UUID,
-            Id   = inventoryItem.Id,
-            Name = "Unknown",
-            Tier = "Unknown",
-            TierIndex = 100,
-            Power = 0,
-            MaxWeight = 0,
-            Resilience = 0,
-            Luck = 0,
-            Enchant1 = enchant1,
-            Enchant2 = enchant2,
-        }
+task.spawn(function()
+  while task.wait(3) do
+    if not running then
+      setStatusUI(getStatus())
     end
-
-    local tierIndex = equippedItemData.Data.Tier or 100
-    local tierName  = "Unknown"
-    local okTier, tierDetail = pcall(function()
-        return TierUtility:GetTier(tierIndex)
-    end)
-    if okTier and tierDetail and tierDetail.Name then
-        tierName = tierDetail.Name
-    end
-
-    return {
-        UUID       = inventoryItem.UUID,
-        Id         = inventoryItem.Id,
-        Name       = equippedItemData.Data.Name or "Unknown",
-        Tier       = tierName,
-        TierIndex  = tierIndex,
-        Power      = equippedItemData.ClickPower or 0,
-        MaxWeight  = equippedItemData.MaxWeight or 0,
-        Resilience = equippedItemData.Resilience or 0,
-        Luck       = equippedItemData.Data.BaseLuck or 0,
-        Enchant1   = enchant1,
-        Enchant2   = enchant2,
-    }
-end
-
-------------------------------------------------------------
--- LIST SEMUA ENCHANT NAME
-------------------------------------------------------------
-function Enchant:GetListEnchant()
-    local list = {}
-    if not EnchantDefs then return list end
-
-    for _, v in pairs(EnchantDefs) do
-        if v and v.Data and v.Data.Name then
-            table.insert(list, v.Data.Name)
-        end
-    end
-    table.sort(list)
-    return list
-end
-
-------------------------------------------------------------
--- TELEPORT KE ALTAR + EQUIP BATU & AKTIFKAN (fungsi umum)
-------------------------------------------------------------
-local function doEnchantCast()
-    -- kalau dua-duanya OFF, langsung nggak usah jalan
-    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-        return
-    end
-
-    local char = ensureCharacter()
-    if not char then return end
-
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local curPos   = hrp.Position
-    local flatCur  = Vector3.new(curPos.X, 0, curPos.Z)
-    local flatAltr = Vector3.new(ENCHANT_ALTAR_CFRAME.X, 0, ENCHANT_ALTAR_CFRAME.Z)
-
-    -- TELEPORT KE ALTAR JIKA JAUH
-    if (flatCur - flatAltr).Magnitude > 5 then
-        hrp.CFrame = ENCHANT_ALTAR_CFRAME + Vector3.new(0, 5, 0)
-
-        -- dulu: _wait(1)
-        -- sekarang: wait pendek + cek toggle biar bisa batal
-        local t = 0
-        local maxDelay = 0.8
-        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            _wait(0.1)
-            t += 0.1
-        end
-        -- kalau di tengah² user matiin toggle → stop di sini
-        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-            return
-        end
-    end
-
-    -- CARI ENCHANT STONE DI HOTBAR
-    local hotBarIndex = nil
-    if DataReplion and PlayerStatsUtility and ItemUtility then
-        local equipped = DataReplion:Get("EquippedItems") or {}
-
-        for k, v in pairs(equipped) do
-            local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
-                return it.UUID == v
-            end)
-            if invItem then
-                local okI, itemData = pcall(function()
-                    return ItemUtility:GetItemData(invItem.Id)
-                end)
-                if okI and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-                    hotBarIndex = k
-                    break
-                end
-            end
-        end
-
-        -- kalau belum ada yang ke-equip, equip 1 batu enchant dulu
-        if not hotBarIndex then
-            local equippedList = DataReplion:Get("EquippedItems") or {}
-            if #equippedList > 0 then
-                Enchant:EquipEnchantStone(equippedList[#equippedList])
-                hotBarIndex = #equippedList
-            end
-        end
-    end
-
-    if not hotBarIndex then
-        hotBarIndex = 2 -- fallback
-    end
-
-    -- EQUIP STONE
-    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-        return
-    end
-
-    pcall(function()
-        RE_EquipHotbar:FireServer(hotBarIndex)
-    end)
-
-    -- tunggu pendek tapi bisa dibatalkan
-    do
-        local t = 0
-        local maxDelay = 0.2
-        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            _wait(0.05)
-            t += 0.05
-        end
-        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-            return
-        end
-    end
-
-    -- AKTIVASI ALTAR
-    pcall(function()
-        RE_ActivateEnchant:FireServer()
-    end)
-end
-
-
-local function doEnchantCast2()
-    -- kalau dua-duanya OFF, langsung nggak usah jalan
-    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-        return
-    end
-
-    local char = ensureCharacter()
-    if not char then return end
-
-    local hrp  = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local curPos   = hrp.Position
-    local flatCur  = Vector3.new(curPos.X, 0, curPos.Z)
-    local flatAltr = Vector3.new(ENCHANT_ALTAR_CFRAME2.X, 0, ENCHANT_ALTAR_CFRAME2.Z)
-
-    -- TELEPORT KE ALTAR JIKA JAUH
-    if (flatCur - flatAltr).Magnitude > 5 then
-        hrp.CFrame = ENCHANT_ALTAR_CFRAME2 + Vector3.new(0, 5, 0)
-
-        -- dulu: _wait(1)
-        -- sekarang: wait pendek + cek toggle biar bisa batal
-        local t = 0
-        local maxDelay = 0.8
-        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            _wait(0.1)
-            t += 0.1
-        end
-        -- kalau di tengah² user matiin toggle → stop di sini
-        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-            return
-        end
-    end
-
-    -- CARI ENCHANT STONE DI HOTBAR
-    local hotBarIndex = nil
-    if DataReplion and PlayerStatsUtility and ItemUtility then
-        local equipped = DataReplion:Get("EquippedItems") or {}
-
-        for k, v in pairs(equipped) do
-            local invItem = PlayerStatsUtility:GetItemFromInventory(DataReplion, function(it)
-                return it.UUID == v
-            end)
-            if invItem then
-                local okI, itemData = pcall(function()
-                    return ItemUtility:GetItemData(invItem.Id)
-                end)
-                if okI and itemData and itemData.Data and itemData.Data.Type == "EnchantStones" then
-                    hotBarIndex = k
-                    break
-                end
-            end
-        end
-
-        -- kalau belum ada yang ke-equip, equip 1 batu enchant dulu
-        if not hotBarIndex then
-            local equippedList = DataReplion:Get("EquippedItems") or {}
-            if #equippedList > 0 then
-                Enchant:EquipEnchantStone(equippedList[#equippedList])
-                hotBarIndex = #equippedList
-            end
-        end
-    end
-
-    if not hotBarIndex then
-        hotBarIndex = 2 -- fallback
-    end
-
-    -- EQUIP STONE
-    if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-        return
-    end
-
-    pcall(function()
-        RE_EquipHotbar:FireServer(hotBarIndex)
-    end)
-
-    -- tunggu pendek tapi bisa dibatalkan
-    do
-        local t = 0
-        local maxDelay = 0.2
-        while t < maxDelay and (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) do
-            _wait(0.05)
-            t += 0.05
-        end
-        if not (EnchantConfig.AutoEnchant1 or EnchantConfig.AutoEnchant2) then
-            return
-        end
-    end
-
-    -- AKTIVASI ALTAR
-    pcall(function()
-        RE_ActivateEnchant:FireServer()
-    end)
-end
-
-
-------------------------------------------------------------
--- START AUTO ENCHANT SLOT 1 (SATU KALI PROSES)
-------------------------------------------------------------
-function Enchant:StartAutoEnchant1()
-    if not EnchantConfig.AutoEnchant1 then return end
-
-    local targetNames = {}
-    for name, state in pairs(EnchantConfig.TargetEnchant1) do
-        if state then table.insert(targetNames, name) end
-    end
-    if #targetNames == 0 then
-        warn("[AutoEnchant] TargetEnchant1 kosong.")
-        return
-    end
-
-    local currentRod = self:GetCurrentRodDetails()
-    if not currentRod or not currentRod.Name then
-        warn("[AutoEnchant] Tidak ada fishing rod equipped.")
-        return
-    end
-
-    if table.find(targetNames, currentRod.Enchant1) then
-        print("[AutoEnchant] Enchant1 sudah salah satu target:", currentRod.Enchant1)
-        return
-    end
-
-    -- di sini dia bener2 coba enchant sekali
-    doEnchantCast()
-    print("[AutoEnchant] Proses enchant SLOT 1 dijalankan → target:", table.concat(targetNames, ", "))
-end
-
-------------------------------------------------------------
--- START AUTO ENCHANT SLOT 2 (SATU KALI PROSES)
-------------------------------------------------------------
-function Enchant:StartAutoEnchant2()
-    if not EnchantConfig.AutoEnchant2 then return end
-    local target2 = EnchantConfig.TargetEnchant2
-    if not target2 or target2 == "" then
-        warn("[AutoEnchant] TargetEnchant2 belum dipilih.")
-        return
-    end
-
-    local currentRod = self:GetCurrentRodDetails()
-    if not currentRod or not currentRod.Name then
-        warn("[AutoEnchant] Tidak ada fishing rod equipped.")
-        return
-    end
-
-    if currentRod.Enchant2 == target2 then
-        print("[AutoEnchant] Enchant2 sudah sesuai target:", target2)
-        return
-    end
-
-    doEnchantCast2()
-    print("[AutoEnchant] Proses enchant SLOT 2 dijalankan → target:", target2)
-end
-
-------------------------------------------------------------
--- LOOP AUTO ENCHANT 1
-------------------------------------------------------------
-local function AutoEnchantLoop1()
-    if loop1Running then return end
-    loop1Running = true
-    print("[AutoEnchant] Loop1 START")
-
-    while EnchantConfig.AutoEnchant1 do
-        -- satu kali attempt enchant slot 1
-        local ok, err = pcall(function()
-            Enchant:StartAutoEnchant1()
-        end)
-        if not ok then
-            warn("[AutoEnchant] Error slot1:", err)
-        end
-
-        -- delay yang bisa “diputus” saat toggle off
-        local total = EnchantConfig.Delay1 or 2
-        local t = 0
-        while t < total and EnchantConfig.AutoEnchant1 do
-            _wait(0.1)
-            t += 0.1
-        end
-    end
-
-    loop1Running = false
-    print("[AutoEnchant] Loop1 STOP")
-end
-
-------------------------------------------------------------
--- LOOP AUTO ENCHANT 2
-------------------------------------------------------------
-local function AutoEnchantLoop2()
-    if loop2Running then return end
-    loop2Running = true
-    print("[AutoEnchant] Loop2 START")
-
-    while EnchantConfig.AutoEnchant2 do
-        local ok, err = pcall(function()
-            Enchant:StartAutoEnchant2()
-        end)
-        if not ok then
-            warn("[AutoEnchant] Error slot2:", err)
-        end
-
-        local total = EnchantConfig.Delay2 or 2
-        local t = 0
-        while t < total and EnchantConfig.AutoEnchant2 do
-            _wait(0.1)
-            t += 0.1
-        end
-    end
-
-    loop2Running = false
-    print("[AutoEnchant] Loop2 STOP")
-end
-
-
-----------------------------------------------------------------
--- UI – FARM MENU
-----------------------------------------------------------------
-local farmUI = TabFarm
-
-----------------------------------------------------------------
--- AUTO RESPAWN BY FISH COUNT (FARM TAB)
-----------------------------------------------------------------
--- AUTO RESPAWN / TELEPORT BY FISH COUNT (COLLAPSE GROUP)
-local respawnGroup = TabFarm:CreateCollapseGroup("Auto Respawn / Teleport by Fish Count", function(add, group)
-
-    ------------------------------------------------
-    -- LIVE INFO COUNTER
-    ------------------------------------------------
-    add(TabFarm:LiveLabel(function()
-        local fs      = Farm.FishStats or {}
-        local total   = fs.Total   or 0
-        local session = fs.Session or 0
-        local limit   = fs.RespawnThreshold or 500
-        local onoff   = fs.RespawnEnabled and "ON" or "OFF"
-
-        return string.format(
-            "Auto Respawn: %s\nSession Fish: %d\nTotal Fish: %d\nThreshold: %d",
-            onoff, session, total, limit
-        )
-    end, 0.5))
-
-    ------------------------------------------------
-    -- INPUT JUMLAH IKAN SEBELUM RESPAWN
-    ------------------------------------------------
-    add(TabFarm:Box("Fish count to respawn", function(txt)
-        local n = tonumber(txt)
-        if not n or n <= 0 then return end
-        n = math.floor(n)
-        Farm.FishStats.RespawnThreshold = n
-        print("[AutoRespawnFish] Threshold di-set ke:", n)
-    end))
-
-    ------------------------------------------------
-    -- TOGGLE ON/OFF RESPawn + TELEPORT
-    ------------------------------------------------
-    add(TabFarm:Toggle("Enable Auto Respawn + Teleport", function(state)
-        Farm.FishStats.RespawnEnabled = state and true or false
-
-        if state then
-            -- simpan posisi awal sebagai "tempat semula"
-            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                Farm.FishStats.OriginCFrame = hrp.CFrame
-                Farm.FishStats.Session = 0
-                print("[AutoRespawnFish] ON. Origin diset di posisi sekarang.")
-            else
-                warn("[AutoRespawnFish] Gagal set OriginCFrame (HRP tidak ditemukan).")
-            end
-        else
-            print("[AutoRespawnFish] OFF. Hanya menghitung ikan, tanpa respawn.")
-        end
-    end))
-
+  end
 end)
 
-
-
-local favoriteGroup = farmUI:CreateCollapseGroup("Auto Favorite", function(add, group)
-
-    ------------------------------------------------
-    -- TITLE
-    ------------------------------------------------
-    add(farmUI:Label("Auto Favorite System"))
-
-    ------------------------------------------------
-    -- FAVORITE BY RARITY
-    ------------------------------------------------
-    add(farmUI:Toggle("Enable Auto Favorite by Rarity", function(v)
-        Farm.AutoFavoriteRarityEnabled = v
-    end))
-
-    local rarityList = {
-        "COMMON","UNCOMMON","RARE","EPIC","LEGENDARY","MYTHIC","SECRET"
-    }
-
-    add(farmUI:MultiDropdown("Favorite Rarity", rarityList, function(r, state)
-        Farm.FavoriteRarity[r] = state
-    end))
-
-    ------------------------------------------------
-    -- FAVORITE BY MUTATION (VARIANT)
-    ------------------------------------------------
-    add(farmUI:Toggle("Enable Auto Favorite by Mutation", function(v)
-        Farm.AutoFavoriteMutationEnabled = v
-    end))
-
-    local mutationList = {
-        "Galaxy",
-        "Fairy Dust",
-        "Gemstone",
-        "1x1x1x1",
-        "Stone",
-        "Gold",
-        "Albino",
-        "Frozen",
-        "Sandy",
-        "Ghost",
-        "Radioactive",
-        "Holographic",
-        "Noob",
-        "Corrupt",
-        "Lightning",
-        "Midnight",
-        "Shiny",
-    }
-
-    add(farmUI:MultiDropdown("Mutation Favorite List", mutationList, function(name, state)
-        Farm.FavoriteMutations[name] = state
-    end))
-
-end)
-
-----------------------------------------------------------------
-local autoSellGroup = farmUI:CreateCollapseGroup("Auto Sell", function(add, group)
-
-    -- Label
-    add(farmUI:Label("Pengaturan Auto Sell"))
-
-    -- Dropdown Sell Mode
-    add(farmUI:Dropdown("Sell Mode", {
-        "Off","10 Fish","20 Fish","30 Fish","50 Fish"
-    }, function(opt)
-        if opt == "Off" then
-            Farm.AutoSellEnabled = false
-            autoSellCount = 0
-        else
-            Farm.AutoSellEnabled = true
-            local n = tonumber(opt:match("(%d+)"))
-            Farm.AutoSellThreshold = n or 30
-        end
-    end))
-
-    -- Input Sell Delay
-    add(farmUI:Box("Sell Delay (seconds)", function(txt)
-        local n = tonumber(txt)
-        if n then Farm.AutoSellDelay = n end
-    end))
-
-end)
-
-Farm.AutoWeatherList    = Farm.AutoWeatherList    or {}
-Farm.AutoWeatherEnabled = Farm.AutoWeatherEnabled or false
-
-local weatherList = {"Storm","Cloudy","Snow","Wind","Radiant","Shark Hunt"}
-
-local weatherGroup = TabShop:CreateCollapseGroup("Auto Buy Weather", function(add, group)
-
-    -- Toggle Enable Auto Weather
-    add(TabShop:Toggle("Enable Auto Weather", function(v)
-        Farm.AutoWeatherEnabled = v
-        if v and typeof(StartWeatherLoop) == "function" then
-            for name, flag in pairs(Farm.AutoWeatherList) do
-                if flag then
-                    StartWeatherLoop(name)
-                end
-            end
-        end
-    end))
-
-    -- MultiDropdown Weather List
-    add(TabShop:MultiDropdown("Weather List", weatherList, function(opt, state)
-        Farm.AutoWeatherList[opt] = state
-        if state and Farm.AutoWeatherEnabled and typeof(StartWeatherLoop) == "function" then
-            StartWeatherLoop(opt)
-        end
-    end))
-
-end)
-
-
-
-------------------------------------------------------------
---  AUTO SELL ENCHANT STONE (WITH FAVORITE PROTECTION)
-------------------------------------------------------------
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
--- ambil net (sama seperti remotes lain di script kamu)
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
-
--- di Sigma Spy: "RF/SellItem"
-local RF_SellItem = net:FindFirstChild("RF/SellItem")
-if not RF_SellItem then
-    warn("[AutoSellEnchant] RF/SellItem tidak ditemukan di net, cek lagi nama remote-nya")
-end
-
-Enchant = Enchant or {}
-
-------------------------------------------------------------
--- STATE COUNTER
-------------------------------------------------------------
-local EnchantSell = {
-    Enabled   = false,
-    Delay     = 1,
-    Status    = "idle",
-    Success   = 0,
-    Failed    = 0,
-    LastInfo  = "-",   -- <-- untuk teks di "Last"
-    Running   = false,
-}
-
-------------------------------------------------------------
--- Helper: cek apakah metadata item = favorite
-------------------------------------------------------------
-local function IsFavorite(meta)
-    if not meta then return false end
-    if meta.Favorite == true then return true end
-    if meta.IsFavorite == true then return true end
-    if meta.IsFavorited == true then return true end
-    return false
-end
-
-------------------------------------------------------------
--- LIST INVENTORY ENCHANT STONES
---  * Mengambil info Favorite
---  * Tidak bikin error kalau Replion / Inventory belum siap
-------------------------------------------------------------
-function Enchant:ListInventoryEnchantStones()
-    local list = {}
-
-    if not DataReplion or type(DataReplion.Get) ~= "function" or not ItemUtility then
-        return list
-    end
-
-    local inventory
-    local ok, res = pcall(function()
-        return DataReplion:Get({ "Inventory" }) or DataReplion:Get("Inventory")
-    end)
-    if not ok or not res then
-        return list
-    end
-    inventory = res
-
-    local items = inventory.Items or inventory["Items"] or {}
-    if type(items) ~= "table" then
-        return list
-    end
-
-    for _, item in pairs(items) do
-        if item and item.Id then
-            local ok2, itemData = pcall(function()
-                return ItemUtility.GetItemDataFromItemType("Items", item.Id)
-            end)
-
-            if ok2 and itemData and itemData.Data then
-                local nm = string.lower(itemData.Data.Name or "")
-                local isEnchantStone = (nm:find("enchant") and nm:find("stone"))
-
-                if isEnchantStone then
-                    local meta = item.Metadata or {}
-                    table.insert(list, {
-                        UUID     = item.UUID,
-                        Id       = item.Id,
-                        Name     = itemData.Data.Name or "Unknown",
-                        Favorite = IsFavorite(meta),
-                    })
-                end
-            end
-        end
-    end
-
-    return list
-end
-
-------------------------------------------------------------
--- AUTO SELL LOOP
-------------------------------------------------------------
-local function StartAutoSellEnchantLoop()
-    if EnchantSell.Running then return end
-    EnchantSell.Running = true
-
-    _spawn(function()
-        while EnchantSell.Enabled do
-
-            if not RF_SellItem then
-                EnchantSell.Status   = "remote not found"
-                EnchantSell.LastInfo = "RF_SellItem nil"
-                break
-            end
-
-            local stones = Enchant:ListInventoryEnchantStones()
-
-            if #stones == 0 then
-                EnchantSell.Status = "idle (no stones)"
-                _wait(EnchantSell.Delay)
-            else
-                for _, stone in ipairs(stones) do
-                    if not EnchantSell.Enabled then break end
-
-                    local name = stone.Name or stone.Id or "?"
-
-                    -- JIKA FAVORITE → SKIP, jangan dijual
-                    if stone.Favorite then
-                        EnchantSell.Status   = "skip (favorite)"
-                        EnchantSell.LastInfo = "Skip favorite: " .. name
-                        -- tidak menambah Success / Failed
-                    else
-                        EnchantSell.Status = "selling " .. name
-
-                        if stone.UUID then
-                            local ok, res = pcall(function()
-                                return RF_SellItem:InvokeServer(stone.UUID)
-                            end)
-
-                            if ok then
-                                EnchantSell.Success += 1
-                                EnchantSell.LastInfo = "Sold: " .. name
-                            else
-                                EnchantSell.Failed  += 1
-                                EnchantSell.LastInfo = "Error: " .. tostring(res)
-                                warn("[AutoSellEnchant] error:", res)
-                            end
-                        else
-                            EnchantSell.Failed  += 1
-                            EnchantSell.LastInfo = "UUID nil for " .. name
-                            warn("[AutoSellEnchant] UUID enchant stone nil")
-                        end
-                    end
-
-                    _wait(EnchantSell.Delay)
-                end
-            end
-        end
-
-        EnchantSell.Status  = "idle"
-        EnchantSell.Running = false
-    end)
-end
-
-------------------------------------------------------------
--- GUI: CollapseGroup + LiveLabel
-------------------------------------------------------------
-local sellStoneGroup = farmUI:CreateCollapseGroup("Auto Sell Enchant Stone", function(add, group)
-
-    -- status live
-    add(farmUI:LiveLabel(function()
-        return string.format(
-            "Status : %s\nSuccess: %d\nFailed : %d\nLast  : %s",
-            EnchantSell.Status,
-            EnchantSell.Success,
-            EnchantSell.Failed,
-            EnchantSell.LastInfo
-        )
-    end, 0.3))
-
-    -- toggle ON / OFF
-    add(farmUI:Toggle("Enable Auto Sell Enchant Stone", function(v)
-        EnchantSell.Enabled = v and true or false
-
-        if v then
-            -- saat dinyalakan, biarkan counter tetap (biar kelihatan total)
-            StartAutoSellEnchantLoop()
-        else
-            -- SAAT DIMATIKAN:
-            -- loop akan berhenti (Enabled = false),
-            -- dan Success/Failed TIDAK akan bertambah lagi.
-            EnchantSell.Status   = "idle (stopped)"
-            EnchantSell.LastInfo = "Stopped by user"
-            -- kalau mau reset counter tiap stop, uncomment 3 baris bawah:
-            -- EnchantSell.Success = 0
-            -- EnchantSell.Failed  = 0
-            -- EnchantSell.LastInfo = "-"
-        end
-    end))
-
-    -- delay
-    add(farmUI:Box("Sell Delay (seconds)", function(txt)
-        local n = tonumber(txt)
-        if n then
-            EnchantSell.Delay = math.clamp(n, 0.1, 10)
-        end
-    end))
-end)
-
-
-----------------------------------------------------------------
--- TOTEM TOOLS (ONCE SPAWN 9x + AUTO 1 JAM)
-----------------------------------------------------------------
-
--- folder definisi totem
-local TotemFolder  = ReplicatedStorage:WaitForChild("Totems")
--- remote spawn totem
-local SpawnTotemRE = net:WaitForChild("RE/SpawnTotem")
-
--- definisi dasar totem
-local TotemDefs = {
-    Luck     = { Name = "Luck Totem",     Id = nil },
-    Mutation = { Name = "Mutation Totem", Id = nil },
-    Shiny    = { Name = "Shiny Totem",    Id = nil },
-}
-
--- map Id → key ("Luck","Mutation","Shiny")
-local TotemIdToKey = {}
-
-do
-    for _, mod in ipairs(TotemFolder:GetChildren()) do
-        if mod:IsA("ModuleScript") then
-            local ok, data = pcall(require, mod)
-            if ok and data and data.Data then
-                local id    = data.Data.Id
-                local name  = data.Data.Name or mod.Name
-                local lname = string.lower(name)
-
-                local key
-                if lname:find("luck") then
-                    key = "Luck"
-                elseif lname:find("mutation") then
-                    key = "Mutation"
-                elseif lname:find("shiny") then
-                    key = "Shiny"
-                end
-
-                if key and id then
-                    TotemDefs[key].Id   = id
-                    TotemDefs[key].Name = name
-                    TotemIdToKey[id]    = key
-                end
-            end
-        end
-    end
-end
-
-----------------------------------------------------------------
--- SCAN INVENTORY PLAYER → HITUNG TOTEM
-----------------------------------------------------------------
-local function ScanInventoryTotems()
-    local byType = {
-        Luck     = {},
-        Mutation = {},
-        Shiny    = {},
-    }
-
-    if not DataReplion or type(DataReplion.Get) ~= "function" then
-        return byType
-    end
-
-    local ok, invRoot = pcall(function()
-        return DataReplion:Get({ "Inventory" })
-            or DataReplion:Get("Inventory")
-            or DataReplion:Get()
-    end)
-    if not ok or type(invRoot) ~= "table" then
-        return byType
-    end
-
-    local function handleItem(item)
-        if type(item) ~= "table" then return end
-
-        local id = item.Id or item.ItemId or item.ItemID
-        if not id then return end
-
-        local key = TotemIdToKey[id]
-
-        -- fallback pakai nama di item kalau Id belum ter-map
-        if not key then
-            local nm = item.Name
-                or (item.Metadata and (item.Metadata.Name or item.Metadata.DisplayName))
-            if nm then
-                local low = string.lower(tostring(nm))
-                if low:find("luck") then
-                    key = "Luck"
-                elseif low:find("mutation") then
-                    key = "Mutation"
-                elseif low:find("shiny") then
-                    key = "Shiny"
-                end
-            end
-        end
-
-        if key and byType[key] then
-            table.insert(byType[key], item)
-        end
-    end
-
-    -- loop semua bucket di Inventory (Items / Potions / dll)
-    for _, bucket in pairs(invRoot) do
-        if type(bucket) == "table" then
-            for _, it in pairs(bucket) do
-                handleItem(it)
-            end
-        end
-    end
-
-    return byType
-end
-
--- hitung total stok (pakai Amount/Quantity kalau ada)
-local function GetTotemCount()
-    local byType = ScanInventoryTotems()
-
-    local count = {
-        Luck     = 0,
-        Mutation = 0,
-        Shiny    = 0,
-    }
-
-    local function addCount(key, list)
-        for _, item in ipairs(list) do
-            local amt = item.Amount or item.Quantity or item.Count or 1
-            count[key] += amt
-        end
-    end
-
-    addCount("Luck",     byType.Luck)
-    addCount("Mutation", byType.Mutation)
-    addCount("Shiny",    byType.Shiny)
-
-    return count, byType
-end
-
-
-----------------------------------------------------------------
--- SPAWN 1x TOTEM DARI STOK PLAYER (versi stabil: sama seperti yang 9x, tapi 1x)
-----------------------------------------------------------------
-local function SpawnTotem9xType(totemKey)
-    local counts, byType = GetTotemCount()
-    local def = TotemDefs[totemKey]
-    local needName = def and def.Name or totemKey
-
-    local total = counts[totemKey] or 0
-    if total < 1 then
-        warn(string.format("[Totem] %s kurang! Punya %d, butuh ≥ 1.", needName, total))
-        return
-    end
-
-    -- spawn cuma 1x
-    local remaining = 1
-    for _, item in ipairs(byType[totemKey] or {}) do
-        if remaining <= 0 then break end
-
-        local uuid = item.UUID
-        if uuid then
-            pcall(function()
-                SpawnTotemRE:FireServer(uuid)
-            end)
-            _wait(1)
-
-            -- setelah spawn, equip slot 1
-            pcall(function()
-                if Events and Events.equipHotbar then
-                    Events.equipHotbar:FireServer(1)
-                end
-            end)
-
-            remaining -= 1
-        end
-    end
-end
-
-
-----------------------------------------------------------------
--- CONFIG AUTO TOTEM (PER 1 JAM)
-----------------------------------------------------------------
-local TotemConfig = {
-    SelectedKey = "Luck",
-    AutoSpawn   = false,
-    Interval    = 3600, -- 1 jam (detik)
-}
-
-local autoTotemLoopRunning = false
-
-local function AutoTotemLoop()
-    if autoTotemLoopRunning then return end
-    autoTotemLoopRunning = true
-
-    while TotemConfig.AutoSpawn do
-        -- spawn 1x dari jenis yang dipilih
-        SpawnTotem9xType(TotemConfig.SelectedKey)
-
-        -- tunggu 1 jam (bisa di-off dari toggle)
-        local t = 0
-        local interval = TotemConfig.Interval or 3600
-        while TotemConfig.AutoSpawn and t < interval do
-            _wait(1)
-            t += 1
-        end
-    end
-
-    autoTotemLoopRunning = false
-end
-
-
-----------------------------------------------------------------
--- UI: FARM TAB – COLLAPSE GROUP TOTEM TOOLS
-----------------------------------------------------------------
-local totemGroup = farmUI:CreateCollapseGroup("Totem Tools (Once Spawn 9x)", function(add, group)
-
-    -- live label stok
-    add(farmUI:LiveLabel(function()
-        local counts = select(1, GetTotemCount())
-        local l = counts.Luck     or 0
-        local m = counts.Mutation or 0
-        local s = counts.Shiny    or 0
-
-        return string.format(
-            "Totem owned:\n" ..
-            "Luck Totem     : %d\n" ..
-            "Mutation Totem : %d\n" ..
-            "Shiny Totem    : %d",
-            l, m, s
-        )
-    end, 1.0))
-
-    -- dropdown pilih jenis totem
-    local keyByLabel = {
-        ["Luck Totem"]     = "Luck",
-        ["Mutation Totem"] = "Mutation",
-        ["Shiny Totem"]    = "Shiny",
-    }
-
-    add(farmUI:Dropdown("Totem Type", {
-        "Luck Totem",
-        "Mutation Totem",
-        "Shiny Totem",
-    }, function(label)
-        local key = keyByLabel[label]
-        if key then
-            TotemConfig.SelectedKey = key
-        end
-    end))
-
-    -- tombol spawn manual sekali (9x)
-    add(farmUI:Button("Spawn Totem Manual, function()
-        SpawnTotem9xType(TotemConfig.SelectedKey)
-    end))
-
-    -- toggle auto spawn 9x per 1 jam
-    add(farmUI:Toggle("Auto Spawn Totem", function(state)
-        TotemConfig.AutoSpawn = state and true or false
-        if state then
-            _spawn(AutoTotemLoop)
-        end
-    end))
-end)
-
-------------------------------------------------
--- AUTO ENCHANT (Collapse Group)
-------------------------------------------------
-local enchantGroup = farmUI:CreateCollapseGroup("Auto Enchant", function(add, group)
-
-    ------------------------------------------------
-    -- LIVE INFO ROD
-    ------------------------------------------------
-    add(farmUI:LiveLabel(function()
-        local r =
-            (Enchant_GetCurrentRodDetails and Enchant_GetCurrentRodDetails())
-            or (Enchant and Enchant.GetCurrentRodDetails and Enchant:GetCurrentRodDetails())
-            or nil
-
-        if not r then
-            return "Current Rod: N/A\nEnchant 1: None\nEnchant 2: None"
-        end
-
-        return string.format(
-            "Current Rod: %s\nEnchant 1: %s\nEnchant 2: %s",
-            r.Name or "N/A",
-            r.Enchant1 or "None",
-            r.Enchant2 or "None"
-        )
-    end, 0.5))
-
-    ------------------------------------------------
-    -- GET LIST ENCHANT
-    ------------------------------------------------
-    local enchantNames = {}
-    if Enchant and typeof(Enchant.GetListEnchant) == "function" then
-        local ok, list = pcall(function()
-            return Enchant:GetListEnchant()
-        end)
-        if ok and type(list) == "table" then
-            enchantNames = list
-        end
-    end
-
-    ------------------------------------------------
-    -- SLOT 1 (MULTI TARGET)
-    ------------------------------------------------
-    add(farmUI:Label("Enchant Slot 1 (Multiple Target)"))
-
-    add(farmUI:MultiDropdown("Select Target Enchant 1", enchantNames, function(name, state)
-        EnchantConfig.TargetEnchant1[name] = state and true or false
-    end))
-
-    add(farmUI:Toggle("Enable Auto Enchant Slot 1", function(state)
-        EnchantConfig.AutoEnchant1 = state
-        if state and typeof(AutoEnchantLoop1) == "function" then
-            _spawn(AutoEnchantLoop1)
-        end
-    end))
-
-    ------------------------------------------------
-    -- SLOT 2 (SINGLE TARGET)
-    ------------------------------------------------
-    add(farmUI:Label("Enchant Slot 2 (Single Target)"))
-
-    add(farmUI:Dropdown("Select Target Enchant 2", enchantNames, function(name)
-        EnchantConfig.TargetEnchant2 = name
-        print("[AutoEnchant] TargetEnchant2 =", name)
-    end))
-
-    add(farmUI:Toggle("Enable Auto Enchant Slot 2", function(state)
-        EnchantConfig.AutoEnchant2 = state
-        if state and typeof(AutoEnchantLoop2) == "function" then
-            _spawn(AutoEnchantLoop2)
-        end
-    end))
-
-end)
-
-
-
--- expose ke global kalau mau dipakai modul lain
-_G.AegisEnchant       = Enchant
-_G.AegisEnchantConfig = EnchantConfig
-
-----------------------------------------------------------------
-
-------------------------------------------------------------
--- TAB EVENT – AUTO TELEPORT EVENT (SCAN WORKSPACE)
-------------------------------------------------------------
-local Players           = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-
-local LocalPlayer       = Players.LocalPlayer
-local EventsFolder      = ReplicatedStorage:FindFirstChild("Events")
-
-local EventConfig = {
-    AutoEvent     = false,
-    SelectedEvent = nil,
-}
-
-local originalCFrame    = nil
-local isAtEvent         = false
-local eventLoopRunning  = false
-
-
-
-------------------------------------------------------------
--- TELEPORT HELPER (pakai tpTo kalau sudah ada)
-------------------------------------------------------------
-local function safeTpTo(cfOrPos)
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    if typeof(cfOrPos) == "CFrame" then
-        hrp.CFrame = cfOrPos + Vector3.new(0, 5, 0)
-    elseif typeof(cfOrPos) == "Vector3" then
-        hrp.CFrame = CFrame.new(cfOrPos + Vector3.new(0, 5, 0))
-    end
-end
-
-------------------------------------------------------------
--- CEK ACTIVE DARI ReplicatedStorage.Events (kalau ada)
-------------------------------------------------------------
-local function isEventActiveInRep(ev)
-    if not ev then return false end
-
-    local activeAttr = ev:GetAttribute("Active")
-                    or ev:GetAttribute("IsActive")
-                    or ev:GetAttribute("Enabled")
-
-    if type(activeAttr) == "boolean" then
-        return activeAttr
-    end
-
-    for _,v in ipairs(ev:GetChildren()) do
-        if v:IsA("BoolValue")
-           and (v.Name == "Active" or v.Name == "IsActive" or v.Name == "Enabled") then
-            return v.Value == true
-        end
-    end
-
-    return false
-end
-
-------------------------------------------------------------
--- CARI POSISI EVENT DI WORKSPACE DARI NAMA EVENT
-------------------------------------------------------------
-local function findEventCFrameByName(eventName)
-    if not eventName or eventName == "" then return nil end
-
-    local lname = string.lower(eventName)
-    local char = LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    local origin = hrp and hrp.Position or Vector3.new()
-
-    local bestPart, bestDist
-
-    for _, inst in ipairs(Workspace:GetDescendants()) do
-        if inst:IsA("BasePart") then
-            local iname = string.lower(inst.Name or "")
-            -- cocok nama event di mana saja (Contains)
-            if iname:find(lname, 1, true) then
-                local d = (inst.Position - origin).Magnitude
-                if not bestDist or d < bestDist then
-                    bestDist = d
-                    bestPart = inst
-                end
-            end
-        elseif inst:IsA("Model") then
-            local iname = string.lower(inst.Name or "")
-            if iname:find(lname, 1, true) then
-                local p = inst:FindFirstChild("HumanoidRootPart")
-                    or inst.PrimaryPart
-                    or inst:FindFirstChildWhichIsA("BasePart")
-                if p then
-                    local d = (p.Position - origin).Magnitude
-                    if not bestDist or d < bestDist then
-                        bestDist = d
-                        bestPart = p
-                    end
-                end
-            end
-        end
-    end
-
-    if bestPart then
-        print(string.format("[Event] Found workspace target for '%s' at %s (dist=%.1f)",
-            eventName, tostring(bestPart.Position), bestDist or 0))
-        return bestPart.CFrame
-    else
-        print("[Event] No workspace match for event:", eventName)
-    end
-
-    return nil
-end
-
-------------------------------------------------------------
--- BUILD LIST EVENT DARI ReplicatedStorage.Events
-------------------------------------------------------------
-local function getEventNames()
-    local list = {}
-    if not EventsFolder then
-        warn("[Event] ReplicatedStorage.Events tidak ditemukan")
-        return list
-    end
-
-    for _,ev in ipairs(EventsFolder:GetChildren()) do
-        table.insert(list, ev.Name)
-    end
-    table.sort(list)
-    return list
-end
-
-------------------------------------------------------------
--- LOOP AUTO EVENT
-------------------------------------------------------------
-local function EventAutoLoop()
-    if eventLoopRunning then return end
-    eventLoopRunning = true
-    print("[AegisHub Event] loop start")
-
-    while EventConfig.AutoEvent do
-        local evName = EventConfig.SelectedEvent
-
-        if evName and evName ~= "" then
-            local evDef = EventsFolder and EventsFolder:FindFirstChild(evName) or nil
-            local activeRep = evDef and isEventActiveInRep(evDef) or false
-
-            -- cari posisi event di workspace
-            local cf = findEventCFrameByName(evName)
-
-            local active = activeRep or (cf ~= nil)
-
-            print(string.format(
-                "[Event] Check '%s' | activeRep=%s | foundPos=%s",
-                evName, tostring(activeRep), tostring(cf ~= nil)
-            ))
-
-            if active and cf then
-                if not isAtEvent then
-                    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        originalCFrame = hrp.CFrame
-                    end
-
-                    safeTpTo(cf)
-                    isAtEvent = true
-                    print("[Event] Teleport to event:", evName)
-                end
-            else
-                if isAtEvent and originalCFrame then
-                    safeTpTo(originalCFrame)
-                    print("[Event] Event ended / not found, return to original.")
-                end
-                isAtEvent = false
-            end
-        end
-
-        _wait(1.5)
-    end
-
-    -- toggle OFF → balikin posisi
-    if isAtEvent and originalCFrame then
-        safeTpTo(originalCFrame)
-        print("[Event] AutoEvent OFF, return to original pos.")
-    end
-
-    isAtEvent        = false
-    originalCFrame   = nil
-    eventLoopRunning = false
-    print("[AegisHub Event] loop end")
-end
-
-------------------------------------------------------------
--- UI TAB EVENT (Dropdown + Toggle + Refresh)
-------------------------------------------------------------
-local TabEvent = win:CreateTab("Event")
-
-TabEvent:Label("Auto Teleport Event")
-
-local eventNames = getEventNames()
-local ddEvent = TabEvent:Dropdown("Select Event", eventNames, function(opt)
-    EventConfig.SelectedEvent = opt
-    print("[AegisHub Event] SelectedEvent =", tostring(opt))
-end)
-
-TabEvent:Button("Refresh Event List", function()
-    local list = getEventNames()
-    if ddEvent and ddEvent.SetOptions then
-        ddEvent:SetOptions(list)
-    end
-    print("[AegisHub Event] Event list refreshed.")
-end)
-
-TabEvent:Toggle("Auto Teleport Selected Event", function(state)
-    EventConfig.AutoEvent = state
-    print("[AegisHub Event] AutoEvent =", state)
-    if state then
-        _spawn(EventAutoLoop)
-    end
-end)
-
-----------------------------------------------------------------
--- PART 3 — TELEPORT + MISC + FPS / PING OVERLAY
-----------------------------------------------------------------
-
-local Lighting     = game:GetService("Lighting")
-local VirtualUser  = game:GetService("VirtualUser")
-local RunService   = game:GetService("RunService")
-local Stats        = game:GetService("Stats")
-
-------------------------------------------------------------
--- TELEPORT
-------------------------------------------------------------
-local function tpTo(pos)
-    if not pos then return end
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+LVR:AddButton({
+  Title = "Arrow",
+  Callback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if hrp then
-        hrp.CFrame = CFrame.new(pos + Vector3.new(0,5,0))
+      hrp.CFrame = _G.artifactPositions["Arrow Artifact"]
     end
-end
-
-local TabTP = win:CreateTab("Teleport")
-
-TabTP:Label("Teleport to Your Spot Fishing")
-
-------------------------------------------------------------
--- LIVE COORDINATE + SAVE ISLAND
-------------------------------------------------------------
-local RunService     = game:GetService("RunService")
-local HttpService    = game:GetService("HttpService")
-local Players        = game:GetService("Players")
-local LocalPlayer    = Players.LocalPlayer
-
--- label live posisi & nama island
-local coordText = "Pos: 0, 0, 0"
-local islandText = "Island: Unknown"
-
-local coordLabel = TabTP:LiveLabel(function()
-    return coordText
-end)
-
-local islandLiveLabel = TabTP:LiveLabel(function()
-    return islandText
-end)
-
-RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local p = hrp.Position
-    coordText = string.format("Pos: %.1f, %.1f, %.1f", p.X, p.Y, p.Z)
-
-    local islandName = "Unknown"
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if pg then
-        local ok, guiLoc = pcall(function()
-            return pg.Events.Frame.Location.Label
-        end)
-        if ok and guiLoc and guiLoc.Text ~= "" then
-            islandName = guiLoc.Text
-        end
+  end,
+  SubTitle = "Hourglass Diamond",
+  SubCallback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = _G.artifactPositions["Hourglass Diamond Artifact"]
     end
-    islandText = "Island: "..islandName
-end)
+  end
+})
 
-
-------------------------------------------------------------
--- SAVE / LOAD ISLAND COORDS
-------------------------------------------------------------
-local SavedIslands = {}   -- [name] = Vector3
-local SAVE_FILE    = "AegisHub_FishIt_Islands.json"
-
-local function encodeVec(v) return {x = v.X, y = v.Y, z = v.Z} end
-local function decodeVec(t) return Vector3.new(t.x, t.y, t.z) end
-
-local function LoadIslands()
-    if not readfile then return end
-    local ok, data = pcall(readfile, SAVE_FILE)
-    if not ok or not data then return end
-
-    local ok2, decoded = pcall(function()
-        return HttpService:JSONDecode(data)
-    end)
-    if not ok2 or type(decoded) ~= "table" then return end
-
-    for name, vec in pairs(decoded) do
-        if vec.x and vec.y and vec.z then
-            SavedIslands[name] = decodeVec(vec)
-        end
+LVR:AddButton({
+  Title = "Crescent",
+  Callback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = _G.artifactPositions["Crescent Artifact"]
     end
-end
-
-local function SaveIslands()
-    if not writefile then return end
-    local serial = {}
-    for name, v in pairs(SavedIslands) do
-        serial[name] = encodeVec(v)
+  end,
+  SubTitle = "Diamond",
+  SubCallback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = _G.artifactPositions["Diamond Artifact"]
     end
-    local ok, json = pcall(function()
-        return HttpService:JSONEncode(serial)
-    end)
-    if not ok then return end
-    pcall(writefile, SAVE_FILE, json)
-end
+  end
+})
 
-LoadIslands()
+local DeepSeaQuest = Tabs.Quest:AddSection("Sisyphus Statue Quest")
+local DeepSeaPara = DeepSeaQuest:AddParagraph({
+  Title = "Deep Sea Panel",
+  Content = ""
+})
 
-------------------------------------------------------------
--- UI: INPUT NAMA, SAVE, LIST, TELEPORT
-------------------------------------------------------------
-local currentIslandName = ""
-local lastSelectedIsland = nil
-local islandDropdown
+DeepSeaQuest:AddDivider()
 
--- input nama island
-local nameBox = TabTP:Box("Nama island (kosong = pakai nama lokasi GUI)", function(text)
-    currentIslandName = text or ""
-end)
+DeepSeaQuest:AddToggle({
+  Title = "Auto Deep Sea Quest",
+  Content = "Automatically complete Deep Sea Quest!",
+  Default = false,
+  Callback = function(state)
+    st.quest.autoDeepSea = state
 
--- tombol save posisi sekarang
-TabTP:Button("Save current position as Island", function()
-    local char = LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local name = currentIslandName
-
-    -- kalau kosong, pakai nama dari GUI lokasi / fallback ke koordinat
-    if name == "" then
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        local islandName = nil
-        if pg then
-            local ok, guiLoc = pcall(function()
-                return pg.Events.Frame.Location.Label
-            end)
-            if ok and guiLoc and guiLoc.Text ~= "" then
-                islandName = guiLoc.Text
+    task.spawn(function()
+      while st.quest.autoDeepSea do
+        local tracker = workspace:FindFirstChild("!!! MENU RINGS") and workspace["!!! MENU RINGS"]:FindFirstChild("Deep Sea Tracker")
+        if tracker then
+          local content = tracker:FindFirstChild("Board") and tracker.Board:FindFirstChild("Gui") and tracker.Board.Gui:FindFirstChild("Content")
+          if content then
+            local firstLabel
+            for _, child in ipairs(content:GetChildren()) do
+              if child:IsA("TextLabel") and child.Name ~= "Header" then
+                firstLabel = child
+                break
+              end
             end
-        end
-        name = islandName or string.format("Island (%.0f, %.0f, %.0f)", hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
-    end
 
-    SavedIslands[name] = hrp.Position
-    SaveIslands()
-    if islandDropdown and islandDropdown.SetOptions then
-        -- refresh list
-        local list = {}
-        for k in pairs(SavedIslands) do table.insert(list, k) end
-        table.sort(list)
-        islandDropdown:SetOptions(list)
-    end
-end)
-
--- helper buat build list dropdown
-local function buildIslandList()
-    local t = {}
-    for name in pairs(SavedIslands) do
-        table.insert(t, name)
-    end
-    table.sort(t)
-    return t
-end
-
--- dropdown island tersimpan
-islandDropdown = TabTP:Dropdown("Saved Islands", buildIslandList(), function(opt)
-    lastSelectedIsland = opt
-    local pos = SavedIslands[opt]
-    if pos then
-        tpTo(pos)
-    end
-end)
-
--- tombol hapus island yang dipilih
-TabTP:Button("Delete Selected Island", function()
-    if not lastSelectedIsland then return end
-    SavedIslands[lastSelectedIsland] = nil
-    SaveIslands()
-    lastSelectedIsland = nil
-    if islandDropdown and islandDropdown.SetOptions then
-        islandDropdown:SetOptions(buildIslandList())
-    end
-end)
-
-TabTP:Label("")
-
-TabTP:Label("Teleport to Island")
-
-local islands = {
-    ["Fisherman Island"] = Vector3.new(128.62, 3.53, 2783.18),
-    ["Kohana"] = Vector3.new(-663.904236, 3.04580712, 718.796875),
-    ["Kohana Volcano"] = Vector3.new(-572.879456, 22.4521465, 148.355331),
-    ["Lost Isle"] = Vector3.new(-3618.15698, 240.836655, -1317.45801), 
-    ["Sisyphus Statue"] = Vector3.new(-3727.16, -135.07, -1014.40),
-    ["Treasure Room"] = Vector3.new(-3606.34985, -266.57373, -1580.97339),    
-    ["Esoteric Depths"] = Vector3.new(3248.37109, -1301.53027, 1403.82727),    
-    ["Coral Reefs"] = Vector3.new(-3114.78198, 1.32066584, 2237.52295), 
-    ["Crater Island"] = Vector3.new(987.96, 3.30, 5148.49), 
-    ["Tropical Grove"] = Vector3.new(-2095.34106, 197.199997, 3718.08008), 
-    ["Weather Machine"] = Vector3.new(-1488.51196, 83.1732635, 1876.30298),
-    ["Underground Cellar"] = Vector3.new(2135.89, -91.20, -698.50),     
-    ["Ancient Jungle"] = Vector3.new(1483.11, 11.14, -300.08), 
-    ["Sacred Temple"] = Vector3.new(1506.53, -22.13, -640.17), 
-    ["Ancient Ruin"] = Vector3.new(6040.64, -578.44, 4715.02), 
-    ["Crystalline Passage"] = Vector3.new(6049.71, -538.90, 4385.69), 
-    ["Arrow Artifact"] = Vector3.new(881.40, 6.34, -346.27),     
-    ["Crescent Artifact"] = Vector3.new(1404.67, 5.08, 120.55),     
-    ["Diamond Artifact"] = Vector3.new(1841.52, 2.76, -300.38),  
-    ["Hourglass Diamond Artifact"] = Vector3.new(1466.40, 3.19, -846.62),  
-    ["Classic Island"] = Vector3.new(1246.1,13.7,2852.7),     
-    ["Iron Cavern"] = Vector3.new(-8795.1,-580.0,91.6),  
-    ["Iron Cafe"] = Vector3.new(-8641.5,-542.8,161.3), 
-}
-
-local islandList = {}
-for name in pairs(islands) do table.insert(islandList,name) end
-table.sort(islandList)
-
-local ddIsland = TabTP:Dropdown("Select Island", islandList, function(opt)
-    tpTo(islands[opt])
-end)
-
-------------------------------------------------------------
--- TELEPORT NPC  (scan workspace, pilih NPC terdekat)
-------------------------------------------------------------
-TabTP:Label("Teleport to NPC")
-
--- Scan semua Model yang:
---  - BUKAN karakter player
---  - Punya Humanoid ATAU punya ProximityPrompt di dalamnya
-local function scanNPC_Models()
-    local found = {}
-    for _, m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and #m.Name >= 3 then
-            -- abaikan karakter player
-            if Players:GetPlayerFromCharacter(m) == nil then
-                local hasHumanoid = m:FindFirstChildOfClass("Humanoid") ~= nil
-                local hasPrompt = false
-
-                if not hasHumanoid then
-                    for _, d in ipairs(m:GetDescendants()) do
-                        if d:IsA("ProximityPrompt") then
-                            hasPrompt = true
-                            break
-                        end
-                    end
+            if firstLabel then
+              local text = string.lower(firstLabel.Text)
+              local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+              if hrp then
+                if string.find(text, "100%%") then
+                  hrp.CFrame = CFrame.new(-3763, -135, -995) * CFrame.Angles(0, math.rad(180), 0)
+                else
+                  hrp.CFrame = CFrame.new(-3599, -276, -1641)
                 end
+              end
+            end
+          end
+        end
+        task.wait(2)
+      end
+    end)
+  end
+})
 
-                if hasHumanoid or hasPrompt then
-                    found[m.Name] = true
+DeepSeaQuest:AddButton({
+  Title = "Treasure Room",
+  Callback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(-3601, -283, -1611)
+    end
+  end,
+  SubTitle = "Sisyphus Statue",
+  SubCallback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(-3698, -135, -1008)
+    end
+  end
+})
+
+local ElementQuest = Tabs.Quest:AddSection("Element Quest")
+local ElementPara = ElementQuest:AddParagraph({
+    Title = "Element Panel",
+    Content = ""
+})
+
+ElementQuest:AddDivider()
+
+ElementQuest:AddToggle({
+  Title = "Auto Element Quest",
+  Content = "Automatically teleport through Element quest stages.",
+  Default = false,
+  Callback = function(state)
+    st.quest.autoElement = state
+
+    task.spawn(function()
+      while st.quest.autoElement do
+        local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        local tracker = workspace:FindFirstChild("!!! MENU RINGS") and workspace["!!! MENU RINGS"]:FindFirstChild("Element Tracker")
+
+        if hrp and tracker then
+          local content = tracker:FindFirstChild("Board") and tracker.Board:FindFirstChild("Gui") and tracker.Board.Gui:FindFirstChild("Content")
+
+          if content then
+            local labels = {}
+            for _, c in ipairs(content:GetChildren()) do
+              if c:IsA("TextLabel") and c.Name ~= "Header" then
+                table.insert(labels, string.lower(c.Text))
+              end
+            end
+
+            if #labels >= 4 then
+              local label2, label4 = labels[2], labels[4]
+
+              if not string.find(label4, "100%%") then
+                local targetCF = CFrame.new(1484, 3, -336) * CFrame.Angles(0, math.rad(180), 0)
+                hrp.CFrame = targetCF
+                autoReturn(hrp, targetCF, 100)
+
+              elseif string.find(label4, "100%%") and not string.find(label2, "100%%") then
+                local targetCF = CFrame.new(1453, -22, -636)
+                hrp.CFrame = targetCF
+                autoReturn(hrp, targetCF, 100)
+
+              elseif string.find(label2, "100%%") then
+                local targetCF = CFrame.new(1480, 128, -593)
+                hrp.CFrame = targetCF
+                autoReturn(hrp, targetCF, 100)
+
+                st.quest.autoElement = false
+                ElementPara:SetContent("Element Quest Completed!")
+                break
+              end
+            end
+          end
+        end
+        task.wait(2)
+      end
+    end)
+  end
+})
+
+ElementQuest:AddButton({
+  Title = "Secred Temple",
+  Callback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(1453, -22, -636)
+    end
+  end,
+  SubTitle = "Underground Cellar",
+  SubCallback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(2136, -91, -701)
+    end
+  end
+})
+
+ElementQuest:AddButton({
+  Title = "Transcended Stones",
+  Callback = function()
+    local char = st.player.Character or st.player.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      hrp.CFrame = CFrame.new(1480, 128, -593)
+    end
+  end
+})
+
+local function readTracker(name)
+  local path = workspace["!!! MENU RINGS"]:FindFirstChild(name)
+  if not path then return "" end
+  local content = path:FindFirstChild("Board") and path.Board:FindFirstChild("Gui") and
+    path.Board.Gui:FindFirstChild("Content")
+  if not content then return "" end
+  local lines = {}
+  local index = 1
+  for _, child in ipairs(content:GetChildren()) do
+    if child:IsA("TextLabel") and child.Name ~= "Header" then
+      table.insert(lines, index .. ". " .. child.Text)
+      index += 1
+    end
+  end
+  return table.concat(lines, "\n")
+end
+
+task.spawn(function()
+  while task.wait(5) do
+    ElementPara:SetContent(readTracker("Element Tracker"))
+    DeepSeaPara:SetContent(readTracker("Deep Sea Tracker"))
+  end
+end)
+
+QuestSec = Tabs.Quest:AddSection("Auto Progress Quest Features")
+
+QuestProgress = QuestSec:AddParagraph({
+  Title = "Progress Quest Panel",
+  Content = "Waiting for start..."
+})
+
+QuestSec:AddToggle({
+  Title = "Auto Teleport Quest",
+  Default = false,
+  Callback = function(state)
+    st.quest.autoQuestFlow = state
+    task.spawn(function()
+      local finishedDeep = false
+      local finishedLever = false
+      local finishedElem = false
+      local teleported = { Deep = false, Lever = false, Element = false }
+
+      function updateParagraph(content)
+          if QuestProgress and QuestProgress.SetContent then
+              QuestProgress:SetContent(content)
+          end
+      end
+
+      while st.quest.autoQuestFlow and not (finishedDeep and finishedLever and finishedElem) do
+        if not finishedDeep then
+          local dsFolder = workspace:FindFirstChild("!!! MENU RINGS")
+          local tracker = dsFolder and dsFolder:FindFirstChild("Deep Sea Tracker")
+          local dsContent = tracker and tracker:FindFirstChild("Board") and tracker.Board:FindFirstChild("Gui") and
+              tracker.Board.Gui:FindFirstChild("Content")
+
+          local allComplete, completed, total = true, 0, 0
+          if dsContent then
+            for _, lbl in ipairs(dsContent:GetChildren()) do
+              if lbl:IsA("TextLabel") and lbl.Name ~= "Header" then
+                total += 1
+                if string.find(lbl.Text, "100%%") then
+                  completed += 1
+                else
+                  allComplete = false
                 end
+              end
             end
-        end
-    end
+          end
 
-    local list = {}
-    for name in pairs(found) do
-        table.insert(list, name)
-    end
-    table.sort(list)
-    return list
-end
+          local percent = total > 0 and math.floor((completed / total) * 100) or 0
+          updateParagraph(string.format("Doing objective on Deep Sea Quest...\nProgress now %d%%.", percent))
 
-local npcList    = scanNPC_Models()
-local currentNPC = npcList[1]
-
--- Dropdown pakai UI AegisHub Compact (Single select)
-local ddNPC = TabTP:Dropdown("NPC List", npcList, function(nm)
-    currentNPC = nm
-    if not nm or nm == "" then return end
-
-    local me   = Players.LocalPlayer
-    local ch   = me and (me.Character or me.CharacterAdded:Wait())
-    local hrp  = ch and ch:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    -- cari instance NPC terdekat yang namanya mengandung teks yg dipilih
-    local best, dist
-    local targetLower = string.lower(nm)
-    for _, m in ipairs(Workspace:GetDescendants()) do
-        if m:IsA("Model") and Players:GetPlayerFromCharacter(m) == nil then
-            if string.find(string.lower(m.Name), targetLower, 1, true) then
-                local p = m:FindFirstChild("HumanoidRootPart") 
-                       or m.PrimaryPart 
-                       or m:FindFirstChildWhichIsA("BasePart")
-                if p then
-                    local d = (p.Position - hrp.Position).Magnitude
-                    if not dist or d < dist then
-                        best  = p
-                        dist  = d
-                    end
-                end
+          if not allComplete and not teleported.Deep then
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+              hrp.CFrame = CFrame.new(-3599, -276, -1641)
+              teleported.Deep = true
             end
-        end
-    end
-
-    if best then
-        tpTo(best.Position)
-    end
-end)
-
--- set default value di dropdown kalau ada NPC
-if currentNPC and ddNPC and ddNPC.Set then
-    ddNPC:Set(currentNPC)
-end
-
--- OPTIONAL: auto-refresh daftar NPC setiap beberapa detik TANPA bikin dropdown baru
-_spawn(function()
-    while true do
-        _wait(8)
-        if ddNPC and ddNPC.SetOptions then
-            local newList = scanNPC_Models()
-            ddNPC:SetOptions(newList)
-        end
-    end
-end)
-
-
-------------------------------------------------------------
--- TELEPORT PLAYER
-------------------------------------------------------------
-TabTP:Label("Teleport to Player")
-
-local function playerList()
-    local t={}
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then table.insert(t,p.Name) end
-    end
-    table.sort(t)
-    return t
-end
-
-local ddPlayer = TabTP:Dropdown("Choose Player", playerList(), function(name)
-    local pl = Players:FindFirstChild(name)
-    if pl and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
-        tpTo(pl.Character.HumanoidRootPart.Position)
-    end
-end)
-
-------------------------------------------------------------
--- AUTO REFRESH NPC & PLAYER LIST (TANPA BUAT DROPDOWN BARU)
-------------------------------------------------------------
-_spawn(function()
-    while true do
-        _wait(8)
-
-        local newNPC = scanNPC_Models()
-        if ddNPC and ddNPC.SetOptions and newNPC then
-            ddNPC:SetOptions(newNPC)
+          elseif allComplete then
+            finishedDeep = true
+            updateParagraph("Deep Sea Quest Completed!\nProceeding to Artifact Lever...")
+          end
+          task.wait(1)
         end
 
-        local newPL = playerList()
-        if ddPlayer and ddPlayer.SetOptions and newPL then
-            ddPlayer:SetOptions(newPL)
-        end
-    end
-end)
-
-
-Players.PlayerAdded:Connect(function()
-    ddPlayer:SetOptions(playerList())
-end)
-Players.PlayerRemoving:Connect(function()
-    ddPlayer:SetOptions(playerList())
-end)
-
-
-
-
-               
-------------------------------------------------------------
--- MISC TAB
-------------------------------------------------------------
-local TabMisc = win:CreateTab("Misc")
-
-TabMisc:Label("Anti AFK")
-local AntiAFKConn
-
-TabMisc:Toggle("Enable Anti AFK", function(state)
-    if state then
-        if AntiAFKConn then AntiAFKConn:Disconnect() end
-        AntiAFKConn = LocalPlayer.Idled:Connect(function()
-            VirtualUser:Button2Down(Vector2.new(), Workspace.CurrentCamera.CFrame)
-            _wait(0.6)
-            VirtualUser:Button2Up(Vector2.new(), Workspace.CurrentCamera.CFrame)
-        end)
-    else
-        if AntiAFKConn then AntiAFKConn:Disconnect() AntiAFKConn=nil end
-    end
-end)
-
-------------------------------------------------------------
--- FPS BOOST
-------------------------------------------------------------
-TabMisc:Label("FPS Boost System")
-
-local Misc = {
-    HideTextures = false,
-    SmoothParts  = false,
-    NoLighting   = false,
-    NoEffects    = false,
-    FPSCap       = 120,
-
-    -- fitur baru
-    NoRodVFX     = false, -- hilangin efek rod (splash, trail, dsb)
-    NoFishNotif  = false, -- sembunyiin notifikasi fish caught
-    NoCutscene   = false, -- paksa kamera balik ke mode biasa
-    NoPlayerAnim = false, -- matikan animasi player
-}
-
--- =========================
--- HELPER FPS LAMA
--- =========================
-local function HideAllTextures()
-    for _,v in ipairs(game:GetDescendants()) do
-        if v:IsA("Decal") or v:IsA("Texture") then
-            v.Transparency = 1
-        end
-    end
-end
-
-local function ApplySmoothPlastic()
-    for _,v in ipairs(game:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Material = Enum.Material.SmoothPlastic
-        end
-    end
-end
-
-local function ApplyNoLighting()
-    Lighting.GlobalShadows = false
-    Lighting.FogEnd        = 1e10
-    Lighting.Brightness    = 1
-end
-
-local function RemoveEffects()
-    for _,v in ipairs(game:GetDescendants()) do
-        if v:IsA("ParticleEmitter")
-        or v:IsA("Beam")
-        or v:IsA("Trail")
-        or v:IsA("Smoke")
-        or v:IsA("Fire")
-        or v:IsA("Sparkles") then
-            v.Enabled = false
-        end
-    end
-end
-
--- =========================
--- HELPER BARU – ROD VFX
--- =========================
-local rodConn
-
-local function isRodVFX(obj: Instance)
-    if not obj then return false end
-
-    if not (obj:IsA("ParticleEmitter")
-        or obj:IsA("Beam")
-        or obj:IsA("Trail")
-        or obj:IsA("Smoke")
-        or obj:IsA("Fire")
-        or obj:IsA("Sparkles")) then
-        return false
-    end
-
-    local function low(s)
-        return string.lower(s or "")
-    end
-
-    local name  = low(obj.Name)
-    local parent = obj.Parent
-    local pname  = parent and low(parent.Name) or ""
-
-    -- cek nama sendiri / parent
-    if name:find("rod") or name:find("fish") or name:find("cast") or name:find("splash") or name:find("dive") then
-        return true
-    end
-    if pname:find("rod") or pname:find("fishing") or pname:find("vfx") then
-        return true
-    end
-
-    -- cek tool / ancestor
-    local current = parent
-    while current do
-        local cname = low(current.Name)
-        if current:IsA("Tool") and cname:find("rod") then
-            return true
-        end
-        if cname:find("vfx") and (cname:find("rod") or cname:find("fish")) then
-            return true
-        end
-        current = current.Parent
-    end
-
-    return false
-end
-
-local function applyRodVFXToInstance(obj)
-    if isRodVFX(obj) then
-        obj.Enabled = false
-    end
-end
-
-local function EnableRodOnlyEffects()
-    -- matikan semua efek rod yang sudah ada
-    for _, v in ipairs(game:GetDescendants()) do
-        applyRodVFXToInstance(v)
-    end
-
-    -- monitor efek baru (misal saat mancing mulai)
-    if rodConn then rodConn:Disconnect() rodConn = nil end
-    rodConn = game.DescendantAdded:Connect(function(o)
-        if Misc.NoRodVFX then
-            pcall(applyRodVFXToInstance, o)
-        end
-    end)
-end
-
-local function DisableRodOnlyEffects()
-    if rodConn then
-        rodConn:Disconnect()
-        rodConn = nil
-    end
-end
-
-
--- =========================
--- HELPER BARU – GUI / KAMERA / ANIMASI
--- =========================
-local function SembunyikanNotifikasiIkan()
-    _spawn(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local notifPath = ReplicatedStorage:FindFirstChild("Packages")        
-        local NetFolder = notifPath:FindFirstChild("_Index") 
-        local sleitnickNet = NetFolder:FindFirstChild("sleitnick_net@0.2.0")
-        local net = sleitnickNet:FindFirstChild("net")
-        local REObtainedNewFishNotification = net:FindFirstChild("RE/ObtainedNewFishNotification")
-         
-        for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
-            connection:Disable()
-        end
- 
-    end)
-end
-
-local function TampilkanNotifikasiIkan()
-    _spawn(function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local REObtainedNewFishNotification = ReplicatedStorage
-            .Packages._Index["sleitnick_net@0.2.0"].net["RE/ObtainedNewFishNotification"]
- 
-        if REObtainedNewFishNotification then
-            for _, connection in pairs(getconnections(REObtainedNewFishNotification.OnClientEvent)) do
-                connection:Enable()
+        if finishedDeep and not finishedLever and st.quest.autoQuestFlow then
+          local Jungle = workspace:FindFirstChild("JUNGLE INTERACTIONS")
+          local s, all = getStatus(), true
+          for _, v in pairs(s) do
+            if not v then
+              all = false
+              break
             end
-            
-        else
-            warn("⚠️ Tidak dapat menemukan event notifikasi ikan.")
+          end
+
+          if not all and not teleported.Lever then
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and _G.artifactPositions["Arrow Artifact"] then
+              hrp.CFrame = _G.artifactPositions["Arrow Artifact"]
+              teleported.Lever = true
+            end
+            updateParagraph("Doing objective on Artifact Lever...\nProgress now 75%.")
+          elseif all then
+            finishedLever = true
+            updateParagraph("Artifact Lever Completed!\nProceeding to Element Quest...")
+          end
+          task.wait(1)
         end
+
+        if finishedDeep and finishedLever and not finishedElem and st.quest.autoQuestFlow then
+          local elFolder = workspace:FindFirstChild("!!! MENU RINGS")
+          local elTracker = elFolder and elFolder:FindFirstChild("Element Tracker")
+          local elContent = elTracker and elTracker:FindFirstChild("Board") and
+            elTracker.Board:FindFirstChild("Gui") and elTracker.Board.Gui:FindFirstChild("Content")
+
+          if elContent then
+            local lines = {}
+            for _, child in ipairs(elContent:GetChildren()) do
+              if child:IsA("TextLabel") and child.Name ~= "Header" then
+                table.insert(lines, child.Text)
+              end
+            end
+
+            local label2 = lines[2] and string.lower(lines[2]) or ""
+            local label4 = lines[4] and string.lower(lines[4]) or ""
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+            if not (string.find(label2, "100%%") and string.find(label4, "100%%")) then
+              if not teleported.Element and hrp then
+                hrp.CFrame = CFrame.new(1484, 3, -336) * CFrame.Angles(0, math.rad(180), 0)
+                teleported.Element = true
+              end
+
+              if not string.find(label4, "100%%") then
+                updateParagraph("Doing objective on Element Quest...\nProgress now 50%.")
+              elseif string.find(label4, "100%%") and not string.find(label2, "100%%") then
+                hrp.CFrame = CFrame.new(1453, -22, -636)
+                updateParagraph("Doing objective on Element Quest...\nProgress now 75%.")
+              end
+            else
+              finishedElem = true
+              updateParagraph("All Quest Completed Successfully! :3")
+              st.quest.autoQuestFlow = false
+            end
+          end
+          task.wait(1)
+        end
+      end
     end)
-end
-
-
-
--- =========================
--- TOGGLE DI TAB MISC
--- =========================
-TabMisc:Toggle("Hide Textures", function(v)
-    Misc.HideTextures = v
-    if v then HideAllTextures() end
-end)
-
-TabMisc:Toggle("Smooth Plastic", function(v)
-    Misc.SmoothParts = v
-    if v then ApplySmoothPlastic() end
-end)
-
-TabMisc:Toggle("No Lighting", function(v)
-    Misc.NoLighting = v
-    if v then ApplyNoLighting() end
-end)
-
-TabMisc:Toggle("Disable Rod VFX", function(v)
-    Misc.NoRodVFX = v
-    if v then
-        EnableRodOnlyEffects()
-    else
-        DisableRodOnlyEffects()
-    end
-end)
-
-
-TabMisc:Toggle("Hide Fish Caught Notification", function(v)
-    Misc.NoFishNotif = v
-    if v then
-        SembunyikanNotifikasiIkan()
-    else
-        TampilkanNotifikasiIkan()
-    end
-end)
-
-
-------------------------------------------------------------
--- FPS CAP
-------------------------------------------------------------
-TabMisc:Label("FPS Cap")
-TabMisc:Slider("Set FPS Cap", 30, 300, 120, function(v)
-    Misc.FPSCap = v
-    if setfpscap then
-        setfpscap(v)
-    end
-end)
-
-------------------------------------------------------------
--- FPS / PING OVERLAY (TOP SCREEN)
-------------------------------------------------------------
-TabMisc:Label("Stats Overlay")
-
-local function CreateOverlay()
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "StatsOverlay_Aegis"
-    gui.Parent = CoreGui
-
-    local label = Instance.new("TextLabel")
-    label.Parent = gui
-    label.BackgroundTransparency = 1
-    label.Position = UDim2.new(0,8,0,6)
-    label.Size = UDim2.new(0,260,0,20)
-    label.Font = Enum.Font.Code
-    label.TextSize = 14
-    label.TextColor3 = Color3.new(1,1,1)
-    label.TextXAlignment = Enum.TextXAlignment.Left
-
-    local fpsAvg = 0
-    local alpha = 0.18
-
-    RunService.RenderStepped:Connect(function(dt)
-        local fps = 1/math.max(dt,1/1000)
-        fpsAvg = fpsAvg + (fps - fpsAvg)*alpha
-
-        local ping = 0
-        pcall(function()
-            local s = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
-            ping = tonumber(string.match(s,"(%d+)")) or 0
-        end)
-
-        label.Text = string.format("FPS: %d | Ping: %dms", fpsAvg, ping)
-    end)
-
-    return gui
-end
-
-local OverlayObj = nil
-
-TabMisc:Toggle("Enable Stats Overlay", function(v)
-    if v then
-        if not OverlayObj then
-            OverlayObj = CreateOverlay()
-        end
-    else
-        if OverlayObj then
-            OverlayObj:Destroy()
-            OverlayObj = nil
-        end
-    end
-end)
+  end
+})
