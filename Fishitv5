@@ -2144,6 +2144,8 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+
 -- =================================================================
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
@@ -2173,10 +2175,9 @@ local RE_UnequipItem = GetRemote(RPath, "RE/UnequipItem")
 -- =================================================================
 -- STATUS DISPLAY
 -- =================================================================
-local TOTEM_STATUS_PARAGRAPH = AutoTotem:Paragraph({ 
-    Title = "Status: Inactive", 
-    Content = "Select totem type and enable", 
-    Icon = "clock" 
+local TOTEM_STATUS_PARAGRAPH = AutoTotem:AddParagraph({
+    Title = "Status: Inactive",
+    Content = "Select totem type and enable",
 })
  
 -- =================================================================
@@ -2623,11 +2624,6 @@ local function RunAutoTotemLoop()
         TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
     end)
 end
- 
--- =================================================================
--- UI CONTROLS (SIRENX GUI)
--- =================================================================
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
 
 -- ================================================================
 -- DROPDOWN : SELECT TOTEM TYPE
