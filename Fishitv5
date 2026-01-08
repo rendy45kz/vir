@@ -2625,93 +2625,108 @@ local function RunAutoTotemLoop()
 end
  
 -- =================================================================
--- UI CONTROLS
+-- UI CONTROLS (SIRENX GUI)
 -- =================================================================
- local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
--- Dropdown pilih jenis totem
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+
+-- ================================================================
+-- DROPDOWN : SELECT TOTEM TYPE
+-- ================================================================
 AutoTotem:AddDropdown({ 
     Title = "Select Totem Type", 
+    Content = "Choose which totem will be used",
     Values = TOTEM_NAMES, 
-    Value = selectedTotemName, 
-    Multi = false, 
+    Default = selectedTotemName, 
     Callback = function(n) 
         selectedTotemName = n
         currentTotemExpiry = 0
- 
+
         TOTEM_STATUS_PARAGRAPH:SetTitle("Status: " .. n)
         TOTEM_STATUS_PARAGRAPH:SetDesc("Selected")
+
+        sirenx("Selected Totem: " .. n)
     end 
 })
- 
--- Toggle untuk Auto Totem Single
+
+-- ================================================================
+-- TOGGLE : AUTO TOTEM SINGLE
+-- ================================================================
 AutoTotem:AddToggle({ 
     Title = "Enable Auto Totem (Single)", 
     Content = "Normal Mode - Spawn single totem when expired", 
     Default = false,
-    Callback = function(s) 
-        AUTO_TOTEM_ACTIVE = s
- 
-        if s then 
-            RunAutoTotemLoop() 
+    Callback = function(state) 
+        AUTO_TOTEM_ACTIVE = state
+
+        if state then 
+            RunAutoTotemLoop()
+            sirenx("Auto Totem (Single) enabled.")
         else 
             if AUTO_TOTEM_THREAD then 
                 task.cancel(AUTO_TOTEM_THREAD) 
                 AUTO_TOTEM_THREAD = nil 
             end
- 
-            TOTEM_STATUS_PARAGRAPH:SetDesc("Inactive")
+
             TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
+            TOTEM_STATUS_PARAGRAPH:SetDesc("Inactive")
 
             local lp = game:GetService("Players").LocalPlayer
             lp:SetAttribute("Loading", nil)
             task.wait(0.05)
             lp:SetAttribute("Loading", false)
+
             sirenx("Auto Totem stopped.")
         end 
     end 
 })
- 
--- Toggle untuk Auto Spawn 9 Totem
+
+-- ================================================================
+-- TOGGLE : AUTO SPAWN X9 TOTEM
+-- ================================================================
 AutoTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
-    Content = "Mode Ultimate - Spawn x9 totem",
+    Content = "Ultimate Mode - Spawn 9 totems in formation",
     Default = false,
-    Callback = function(s)
-        AUTO_9_TOTEM_ACTIVE = s
- 
-        if s then
+    Callback = function(state)
+        AUTO_9_TOTEM_ACTIVE = state
+
+        if state then
             Run9TotemLoop()
+            sirenx("Auto x9 Totem started.")
         else
             if AUTO_9_TOTEM_THREAD then 
                 task.cancel(AUTO_9_TOTEM_THREAD) 
                 AUTO_9_TOTEM_THREAD = nil 
             end
- 
+
             DisableV3Physics()
- 
-            TOTEM_STATUS_PARAGRAPH:SetDesc("Stopped")
+
             TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
+            TOTEM_STATUS_PARAGRAPH:SetDesc("Stopped")
+
             local lp = game:GetService("Players").LocalPlayer
             lp:SetAttribute("Loading", nil)
             task.wait(0.05)
             lp:SetAttribute("Loading", false)
-            sirenx("Auto x9 Totem stopped.")
 
+            sirenx("Auto x9 Totem stopped.")
         end
     end
 })
- 
--- Tombol spawn manual (opsional)
+
+-- ================================================================
+-- BUTTON : MANUAL SPAWN
+-- ================================================================
 AutoTotem:AddButton({
     Title = "Spawn Totem Now",
-    Default = "false",
+    Content = "Manually spawn selected totem",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotemName)
         if uuid then
             pcall(function() 
                 RE_SpawnTotem:FireServer(uuid) 
             end)
- 
+
             -- Re-equip rod
             task.spawn(function() 
                 for i = 1, 3 do 
@@ -2721,11 +2736,14 @@ AutoTotem:AddButton({
                     end) 
                 end 
             end)
+
+            sirenx("Totem spawned: " .. selectedTotemName)
         else
             local lp = game:GetService("Players").LocalPlayer
             lp:SetAttribute("Loading", nil)
             task.wait(0.05)
             lp:SetAttribute("Loading", false)
+
             sirenx("Not have totem in inventory!")
         end
     end
