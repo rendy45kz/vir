@@ -2144,8 +2144,6 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
-
 -- =================================================================
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
@@ -2171,15 +2169,7 @@ local RF_UnequipOxygenTank = GetRemote(RPath, "RF/UnequipOxygenTank") -- Lepas o
 -- Remote tambahan yang mungkin digunakan:
 local RE_EquipItem = GetRemote(RPath, "RE/EquipItem")
 local RE_UnequipItem = GetRemote(RPath, "RE/UnequipItem")
- 
--- =================================================================
--- STATUS DISPLAY
--- =================================================================
-local TOTEM_STATUS_PARAGRAPH = AutoTotem:AddParagraph({
-    Title = "Status: Inactive",
-    Content = "Select totem type and enable",
-})
- 
+
 -- =================================================================
 -- TOTEM DATA & VARIABLES
 -- =================================================================
@@ -2626,6 +2616,11 @@ local function RunAutoTotemLoop()
 end
 
 -- ================================================================
+-- UI CONTROLS (SIRENX FIX - SINGLE INSTANCE)
+-- ================================================================
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+
+-- ================================================================
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
 AutoTotem:AddDropdown({ 
@@ -2723,7 +2718,6 @@ AutoTotem:AddButton({
                 RE_SpawnTotem:FireServer(uuid) 
             end)
 
-            -- Re-equip rod
             task.spawn(function() 
                 for i = 1, 3 do 
                     task.wait(0.2) 
