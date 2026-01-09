@@ -2148,9 +2148,7 @@ end)
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
 
-local AutoSpawnTotem = Tabs.Automation:AddSection({
-    Title = "Auto Spawn Totem"
-})
+local AutoSpawnTotem = Tabs.Automation:AddSection("Auto Totem")
 
 
 local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
