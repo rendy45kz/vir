@@ -2690,28 +2690,28 @@ AutoSpawnTotem:AddDropdown({
     end
 })
 
-AutoSpawnTotem:AddToggle({
-    Title = "Enable Auto Totem (Single)",
+AutoSpawnTotem:AddToggle({ 
+    Title = "Enable Auto Totem (Single)", 
+    Content = "Normal Mode - Spawn single totem when expired", 
     Default = false,
-    Callback = function(state)
+    Callback = function(state) 
         AUTO_TOTEM_ACTIVE = state
-        if state then
+        if state then 
             RunAutoTotemLoop()
             sirenx("Auto Totem (Single) enabled.")
-        else
-            if AUTO_TOTEM_THREAD then
-                task.cancel(AUTO_TOTEM_THREAD)
-                AUTO_TOTEM_THREAD = nil
+        else 
+            if AUTO_TOTEM_THREAD then 
+                task.cancel(AUTO_TOTEM_THREAD) 
+                AUTO_TOTEM_THREAD = nil 
             end
-            TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
-            TOTEM_STATUS_PARAGRAPH:SetDesc("Inactive")
             sirenx("Auto Totem stopped.")
-        end
-    end
+        end 
+    end 
 })
 
 AutoSpawnTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
+    Content = "Ultimate Mode - Spawn 9 totems in formation",
     Default = false,
     Callback = function(state)
         AUTO_9_TOTEM_ACTIVE = state
@@ -2719,26 +2719,38 @@ AutoSpawnTotem:AddToggle({
             Run9TotemLoop()
             sirenx("Auto x9 Totem started.")
         else
-            if AUTO_9_TOTEM_THREAD then
-                task.cancel(AUTO_9_TOTEM_THREAD)
-                AUTO_9_TOTEM_THREAD = nil
+            if AUTO_9_TOTEM_THREAD then 
+                task.cancel(AUTO_9_TOTEM_THREAD) 
+                AUTO_9_TOTEM_THREAD = nil 
             end
             DisableV3Physics()
-            TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
-            TOTEM_STATUS_PARAGRAPH:SetDesc("Stopped")
             sirenx("Auto x9 Totem stopped.")
         end
     end
 })
 
+-- ================================================================
+-- BUTTON : MANUAL SPAWN
+-- ================================================================
 AutoSpawnTotem:AddButton({
     Title = "Spawn Totem Now",
+    Content = "Manually spawn selected totem",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotemName)
         if uuid then
-            pcall(function()
-                RE_SpawnTotem:FireServer(uuid)
+            pcall(function() 
+                RE_SpawnTotem:FireServer(uuid) 
             end)
+
+            task.spawn(function() 
+                for i = 1, 3 do 
+                    task.wait(0.2) 
+                    pcall(function() 
+                        RE_EquipToolFromHotbar:FireServer(1) 
+                    end) 
+                end 
+            end)
+
             sirenx("Totem spawned: " .. selectedTotemName)
         else
             sirenx("Not have totem in inventory!")
