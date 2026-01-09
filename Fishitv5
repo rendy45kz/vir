@@ -2148,11 +2148,11 @@ end)
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
 
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+local AutoSpawnTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
 
 local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
 local RepStorage = game:GetService("ReplicatedStorage")
- 
+
 -- Fungsi helper untuk mendapatkan remote
 local function GetRemote(remotePath, name, timeout)
     local currentInstance = RepStorage
@@ -2485,7 +2485,7 @@ local function Run9TotemLoop()
             local uuid = GetTotemUUID(selectedTotemName)
             if not uuid then
                 sirenx("No Stock of " .. selectedTotemName .. "!")
-                local t = AutoTotem:GetElementByTitle("Auto Spawn x9 Totem")
+                local t = AutoSpawnTotem:GetElementByTitle("Auto Spawn x9 Totem")
                 if t then t:Set(false) end
                 return
             end
@@ -2582,7 +2582,7 @@ local function Run9TotemLoop()
 
         AUTO_9_TOTEM_ACTIVE = false
 
-        local t = AutoTotem:GetElementByTitle("Auto Spawn x9 Totem")
+        local t = AutoSpawnTotem:GetElementByTitle("Auto Spawn x9 Totem")
         if t then t:Set(false) end
 
         TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
@@ -2650,7 +2650,7 @@ local function RunAutoTotemLoop()
                     sirenx("Not have totem in inventory!")
 
                     AUTO_TOTEM_ACTIVE = false
-                    local t = AutoTotem:GetElementByTitle("Enable Auto Totem (Single)")
+                    local t = AutoSpawnTotem:GetElementByTitle("Enable Auto Totem (Single)")
                     if t then t:Set(false) end
                     break
                 end
@@ -2670,7 +2670,7 @@ end
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
 
-AutoTotem:AddDropdown({
+AutoSpawnTotem:AddDropdown({
     Title = "Select Totem Type",
     Content = "Choose which totem will be used",
     Options = {
@@ -2689,7 +2689,7 @@ AutoTotem:AddDropdown({
     end
 })
 
-AutoTotem:AddToggle({
+AutoSpawnTotem:AddToggle({
     Title = "Enable Auto Totem (Single)",
     Content = "Normal Mode - Spawn single totem when expired",
     Default = false,
@@ -2710,7 +2710,7 @@ AutoTotem:AddToggle({
     end
 })
 
-AutoTotem:AddToggle({
+AutoSpawnTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
     Content = "Ultimate Mode - Spawn 9 totems in formation",
     Default = false,
@@ -2732,7 +2732,7 @@ AutoTotem:AddToggle({
     end
 })
 
-AutoTotem:AddButton({
+AutoSpawnTotem:AddButton({
     Title = "Spawn Totem Now",
     Content = "Manually spawn selected totem",
     Callback = function()
