@@ -2670,7 +2670,7 @@ end
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
 
-AutoSpawnTotem:AddDropdown({
+Tabs.Automation:AddDropdown({
     Title = "Select Totem Type",
     Content = "Choose which totem will be used",
     Options = {
@@ -2689,7 +2689,7 @@ AutoSpawnTotem:AddDropdown({
     end
 })
 
-AutoSpawnTotem:AddToggle({
+Tabs.Automation:AddToggle({
     Title = "Enable Auto Totem (Single)",
     Content = "Normal Mode - Spawn single totem when expired",
     Default = false,
@@ -2710,7 +2710,7 @@ AutoSpawnTotem:AddToggle({
     end
 })
 
-AutoSpawnTotem:AddToggle({
+Tabs.Automation:AddToggle({
     Title = "Auto Spawn x9 Totem",
     Content = "Ultimate Mode - Spawn 9 totems in formation",
     Default = false,
@@ -2732,7 +2732,7 @@ AutoSpawnTotem:AddToggle({
     end
 })
 
-AutoSpawnTotem:AddButton({
+Tabs.Automation:AddButton({
     Title = "Spawn Totem Now",
     Content = "Manually spawn selected totem",
     Callback = function()
