@@ -2147,46 +2147,110 @@ end)
 -- =================================================================
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
-local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
-local RepStorage = game:GetService("ReplicatedStorage")
- 
--- Fungsi helper untuk mendapatkan remote
-local function GetRemote(remotePath, name, timeout)
-    local currentInstance = RepStorage
-    for _, childName in ipairs(remotePath) do
-        currentInstance = currentInstance:WaitForChild(childName, timeout or 0.5)
-        if not currentInstance then return nil end
-    end
-    return currentInstance:FindFirstChild(name)
-end
- 
--- REMOTE YANG DIGUNAKAN OLEH AUTO TOTEM:
-local RE_SpawnTotem = GetRemote(RPath, "RE/SpawnTotem") -- Untuk spawn totem
-local RE_EquipToolFromHotbar = GetRemote(RPath, "RE/EquipToolFromHotbar") -- Equip rod setelah spawn
-local RF_EquipOxygenTank = GetRemote(RPath, "RF/EquipOxygenTank") -- Anti-drown (ID 105)
-local RF_UnequipOxygenTank = GetRemote(RPath, "RF/UnequipOxygenTank") -- Lepas oxygen tank
- 
--- Remote tambahan yang mungkin digunakan:
-local RE_EquipItem = GetRemote(RPath, "RE/EquipItem")
-local RE_UnequipItem = GetRemote(RPath, "RE/UnequipItem")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- =================================================================
--- TOTEM DATA & VARIABLES
--- =================================================================
+local lp = Players.LocalPlayer
+
+-- -------------------------
+-- Notify helper (anti error)
+-- -------------------------
+local function Sirenx(msg)
+	if typeof(sirenx) == "function" then
+		return sirenx(msg)
+	end
+	warn("[AutoTotem]", msg)
+end
+
+-- -------------------------
+-- Guard: Tabs.Automation
+-- -------------------------
+if not Tabs or not Tabs.Automation then
+	warn("[AutoTotem] Tabs.Automation not found; UI cannot be created.")
+	return
+end
+
+-- -------------------------
+-- Net remote access (correct way)
+-- -------------------------
+local Net
+do
+	-- Sesuaikan kalau kamu pakai svc.RS seperti script lain
+	local ok, res = pcall(function()
+		-- opsi A: pakai svc kalau ada
+		if svc and svc.RS and svc.RS.Packages then
+			return svc.RS.Packages._Index["sleitnick_net@0.2.0"].net
+		end
+		-- opsi B: fallback ke ReplicatedStorage
+		return ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+	end)
+	if ok then Net = res end
+end
+
+if not Net then
+	warn("[AutoTotem] Net module not found. Check path to sleitnick_net.")
+	return
+end
+
+-- Ambil remote (pakai net indexer)
+local RE_SpawnTotem            = Net["RE/SpawnTotem"]
+local RE_EquipToolFromHotbar   = Net["RE/EquipToolFromHotbar"]
+local RF_EquipOxygenTank       = Net["RF/EquipOxygenTank"]
+local RF_UnequipOxygenTank     = Net["RF/UnequipOxygenTank"]
+local RE_EquipItem             = Net["RE/EquipItem"]
+local RE_UnequipItem           = Net["RE/UnequipItem"]
+
+-- Validasi minimal supaya gak nil-call
+local function AssertRemote(r, name)
+	if not r then
+		warn(("[AutoTotem] Remote missing: %s"):format(name))
+		return false
+	end
+	return true
+end
+
+AssertRemote(RE_SpawnTotem, "RE/SpawnTotem")
+AssertRemote(RE_EquipToolFromHotbar, "RE/EquipToolFromHotbar")
+local RunService = game:GetService("RunService")
+
+--========================================================
+-- TOTEM DATA & STATE
+--========================================================
 local TOTEM_DATA = {
-    ["Luck Totem"] = {Id = 1, Duration = 3601},     -- 1 jam 1 detik
-    ["Mutation Totem"] = {Id = 2, Duration = 3601}, -- 1 jam 1 detik
-    ["Shiny Totem"] = {Id = 3, Duration = 3601}     -- 1 jam 1 detik
+	["Luck Totem"]     = { Id = 1, Duration = 3601 },
+	["Mutation Totem"] = { Id = 2, Duration = 3601 },
+	["Shiny Totem"]    = { Id = 3, Duration = 3601 },
 }
- 
-local TOTEM_NAMES = {"Luck Totem", "Mutation Totem", "Shiny Totem"}
+local TOTEM_NAMES = { "Luck Totem", "Mutation Totem", "Shiny Totem" }
+
 local selectedTotemName = "Luck Totem"
 local currentTotemExpiry = 0
+
 local AUTO_TOTEM_ACTIVE = false
-local AUTO_TOTEM_THREAD = nil
- 
-local RunService = game:GetService("RunService")
- 
+local AUTO_9_TOTEM_ACTIVE = false
+
+local AUTO_TOTEM_THREAD
+local AUTO_9_TOTEM_THREAD
+
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+
+-- IMPORTANT: ini yang bikin UI kamu sebelumnya sering “hilang”
+local TOTEM_STATUS_PARAGRAPH = AutoTotem:AddParagraph({
+	Title = "Status: Inactive",
+	Content = "Waiting..."
+})
+
+local function SetStatus(title, desc)
+	if TOTEM_STATUS_PARAGRAPH and TOTEM_STATUS_PARAGRAPH.SetTitle then
+		TOTEM_STATUS_PARAGRAPH:SetTitle(title)
+	end
+	if TOTEM_STATUS_PARAGRAPH and TOTEM_STATUS_PARAGRAPH.SetDesc then
+		TOTEM_STATUS_PARAGRAPH:SetDesc(desc)
+	elseif TOTEM_STATUS_PARAGRAPH and TOTEM_STATUS_PARAGRAPH.SetContent then
+		TOTEM_STATUS_PARAGRAPH:SetContent(desc)
+	end
+end
+
 -- =================================================================
 -- 9 TOTEM FORMATION POSITIONS
 -- =================================================================
@@ -2616,27 +2680,19 @@ local function RunAutoTotemLoop()
 end
 
 -- ================================================================
--- UI CONTROLS (SIRENX FIX - SINGLE INSTANCE)
--- ================================================================
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
-
--- ================================================================
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
-AutoTotem:AddDropdown({ 
-    Title = "Select Totem Type", 
-    Content = "Choose which totem will be used",
-    Values = TOTEM_NAMES, 
-    Default = selectedTotemName, 
-    Callback = function(n) 
-        selectedTotemName = n
-        currentTotemExpiry = 0
-
-        TOTEM_STATUS_PARAGRAPH:SetTitle("Status: " .. n)
-        TOTEM_STATUS_PARAGRAPH:SetDesc("Selected")
-
-        sirenx("Selected Totem: " .. n)
-    end 
+AutoTotem:AddDropdown({
+	Title = "Select Totem Type",
+	Content = "Choose which totem will be used",
+	Values = TOTEM_NAMES,
+	Default = selectedTotemName,
+	Callback = function(n)
+		selectedTotemName = n
+		currentTotemExpiry = 0
+		SetStatus("Status: " .. n, "Selected")
+		Sirenx("Selected Totem: " .. n)
+	end
 })
 
 -- ================================================================
@@ -2661,12 +2717,7 @@ AutoTotem:AddToggle({
             TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
             TOTEM_STATUS_PARAGRAPH:SetDesc("Inactive")
 
-            local lp = game:GetService("Players").LocalPlayer
-            lp:SetAttribute("Loading", nil)
-            task.wait(0.05)
-            lp:SetAttribute("Loading", false)
-
-            sirenx("Auto Totem stopped.")
+            Sirenx("Auto Totem stopped.")
         end 
     end 
 })
@@ -2683,7 +2734,7 @@ AutoTotem:AddToggle({
 
         if state then
             Run9TotemLoop()
-            sirenx("Auto x9 Totem started.")
+            Sirenx("Auto x9 Totem started.")
         else
             if AUTO_9_TOTEM_THREAD then 
                 task.cancel(AUTO_9_TOTEM_THREAD) 
@@ -2695,12 +2746,7 @@ AutoTotem:AddToggle({
             TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
             TOTEM_STATUS_PARAGRAPH:SetDesc("Stopped")
 
-            local lp = game:GetService("Players").LocalPlayer
-            lp:SetAttribute("Loading", nil)
-            task.wait(0.05)
-            lp:SetAttribute("Loading", false)
-
-            sirenx("Auto x9 Totem stopped.")
+            Sirenx("Auto x9 Totem stopped.")
         end
     end
 })
@@ -2727,14 +2773,9 @@ AutoTotem:AddButton({
                 end 
             end)
 
-            sirenx("Totem spawned: " .. selectedTotemName)
+            Sirenx("Totem spawned: " .. selectedTotemName)
         else
-            local lp = game:GetService("Players").LocalPlayer
-            lp:SetAttribute("Loading", nil)
-            task.wait(0.05)
-            lp:SetAttribute("Loading", false)
-
-            sirenx("Not have totem in inventory!")
+            Sirenx("Not have totem in inventory!")
         end
     end
 })
