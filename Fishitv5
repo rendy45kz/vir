@@ -811,100 +811,51 @@ FishFeature:AddButton({
 
 local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
 
--- ======================================================
--- GET CURRENT FISH COUNT
--- ======================================================
-local function GetCaughtCount()
-    local pg = player:FindFirstChild("PlayerGui")
-    if not pg then return 0 end
+----------------------------------------------------------------
+-- AUTO FAVORITE + AUTO SELL HANDLER (EVENT-DRIVEN)
+----------------------------------------------------------------
+local autoSellCount    = 0
+local autoSellCooldown = false
 
-    local inv = pg:FindFirstChild("Inventory")
-    if not inv then return 0 end
+api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, _, info)
+    if not info or not info.InventoryItem then return end
+    local uuid = info.InventoryItem.UUID
+    if not uuid then return end
 
-    local label = inv.Main.Top.Options.Fish.Label:FindFirstChild("BagSize")
-    if not (label and label:IsA("TextLabel")) then return 0 end
+    ------------------------------------------------------------
+    -- COUNTER FISH (SELALU JALAN)
+    ------------------------------------------------------------
+    autoSellCount += 1
 
-    local cur = label.Text:match("(%d+)%s*/")
-    return tonumber(cur) or 0
-end
+    ------------------------------------------------------------
+    -- AUTO SELL (BERDASARKAN JUMLAH IKAN DIDAPAT)
+    ------------------------------------------------------------
+    if not st.sell.enabled then return end
+    if autoSellCooldown then return end
 
--- ======================================================
--- MANUAL SELL
--- ======================================================
-SellGroup:AddButton({
-    Title = "Sell All",
-    Content = "Sell all fish in bag",
-    Callback = function()
-        pcall(function()
-            api.Functions.SellAllItem:InvokeServer()
-        end)
-        sirenx("Sold all fish.")
-    end
-})
+    local target = tonumber(st.sell.caughtTarget) or 0
+    if target <= 0 then return end
 
--- ======================================================
--- INPUT TARGET
--- ======================================================
-SellGroup:AddInput({
-    Title = "Sell When Caught ≥",
-    Placeholder = "ex: 100",
-    Numeric = true,
-    Callback = function(v)
-        local num = tonumber(v)
-        if not num or num < 1 then
-            sirenx("Target must be ≥ 1")
-            return
-        end
-        st.sell.caughtTarget = math.floor(num)
-    end
-})
+    if autoSellCount >= target then
+        autoSellCooldown = true
 
--- ======================================================
--- AUTO SELL TOGGLE (FIXED)
--- ======================================================
-SellGroup:AddToggle({
-    Title = "Auto Sell by Caught",
-    Content = "Auto sell when bag reaches target",
-    Default = false,
-    Callback = function(state)
-        st.sell.enabled = state
+        task.spawn(function()
+            pcall(function()
+                api.Functions.SellAllItem:InvokeServer()
+            end)
 
-        -- KILL OLD THREAD (FIXED)
-        if st.sell._sellThread then
-            task.cancel(st.sell._sellThread)
-            st.sell._sellThread = nil
-        end
+            sirenx(("Auto Sell: %d fish sold"):format(autoSellCount))
 
-        if not state then
-            sirenx("Auto Sell stopped.")
-            return
-        end
+            -- RESET COUNTER
+            autoSellCount = 0
 
-        if not st.sell.caughtTarget or st.sell.caughtTarget < 1 then
-            sirenx("Set sell target first!")
-            return
-        end
-
-        sirenx("Auto Sell enabled.")
-
-        st.sell._sellThread = task.spawn(function()
-            while st.sell.enabled do
-                local current = GetCaughtCount()
-
-                if current >= st.sell.caughtTarget then
-                    pcall(function()
-                        api.Functions.SellAllItem:InvokeServer()
-                    end)
-
-                    sirenx("Auto sold at " .. current .. " fish.")
-                    task.wait(1.5) -- tunggu update UI
-                else
-                    task.wait(0.5)
-                end
-            end
+            -- COOLDOWN (ANTI SPAM)
+            task.wait(1.5)
+            autoSellCooldown = false
         end)
     end
-})
+end)
+
 
 SellGroup:AddSubSection("Auto Sell Enchant Stone")
 
