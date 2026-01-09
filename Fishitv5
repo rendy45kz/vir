@@ -1,4 +1,96 @@
 -- ============================================================
+-- AUTO TOTEM FULL MOBILE (CODEX / ANDROID)
+-- PART 1 : CORE + GUI + PHYSICS + DATA
+-- ============================================================
+
+local Players = game:GetService("Players")
+local RepStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+
+-- ===================== TOTEM DATA ===========================
+local TOTEM_DATA = {
+    ["Luck Totem"]     = {Id = 1, Duration = 3600},
+    ["Mutation Totem"] = {Id = 2, Duration = 3600},
+    ["Shiny Totem"]    = {Id = 3, Duration = 3600}
+}
+
+local selectedTotemName = "Luck Totem"
+local AUTO_TOTEM_ACTIVE = false
+local AUTO_TOTEM_THREAD = nil
+local currentTotemExpiry = 0
+
+local AUTO_9_TOTEM_ACTIVE = false
+local AUTO_9_TOTEM_THREAD = nil
+local stateConnection
+
+-- ===================== REMOTES ==============================
+local net = RepStorage.Packages._Index["sleitnick_net@0.2.0"].net
+local RE_SpawnTotem = net["RE/SpawnTotem"]
+local RE_EquipToolFromHotbar = net["RE/EquipToolFromHotbar"]
+local RF_EquipOxygenTank = net:FindFirstChild("RF/EquipOxygenTank")
+local RF_UnequipOxygenTank = net:FindFirstChild("RF/UnequipOxygenTank")
+
+-- ===================== GUI =================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "AutoTotemMobile"
+gui.Parent = player.PlayerGui
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.fromScale(0.9, 0.48)
+frame.Position = UDim2.fromScale(0.05, 0.25)
+frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+frame.Active = true
+frame.Draggable = true
+
+local function makeButton(text, y)
+    local b = Instance.new("TextButton", frame)
+    b.Size = UDim2.fromScale(0.9, 0.11)
+    b.Position = UDim2.fromScale(0.05, y)
+    b.Text = text
+    b.TextScaled = true
+    b.BackgroundColor3 = Color3.fromRGB(45,45,45)
+    b.TextColor3 = Color3.new(1,1,1)
+    return b
+end
+
+local status = Instance.new("TextLabel", frame)
+status.Size = UDim2.fromScale(0.9, 0.11)
+status.Position = UDim2.fromScale(0.05, 0.03)
+status.Text = "Status: Inactive"
+status.TextScaled = true
+status.BackgroundTransparency = 1
+status.TextColor3 = Color3.new(1,1,1)
+
+local btnTotem  = makeButton("Totem: Luck", 0.18)
+local btnSingle = makeButton("Auto Single: OFF", 0.32)
+local btn9      = makeButton("Auto x9: OFF", 0.46)
+local btnSpawn  = makeButton("Spawn Now", 0.60)
+
+-- ===================== FORMATION DATA =======================
+local REF_CENTER = Vector3.new(93.932, 9.532, 2684.134)
+local REF_SPOTS = {
+    Vector3.new(45.046, 9.516, 2730.190),
+    Vector3.new(145.644,9.516, 2721.907),
+    Vector3.new(84.640, 10.217,2636.057),
+    Vector3.new(45.046,110.516,2730.190),
+    Vector3.new(145.644,110.516,2721.907),
+    Vector3.new(84.640,111.217,2636.057),
+    Vector3.new(45.046,-92.483,2730.190),
+    Vector3.new(145.644,-92.483,2721.907),
+    Vector3.new(84.640,-93.782,2636.057),
+}
+
+-- ===================== PHYSICS ENGINE ======================
+local function GetFlyPart()
+    local char = player.Character
+    return char and (char:FindFirstChild("HumanoidRootPart")
+        or char:FindFirstChild("UpperTorso")
+        or char:FindFirstChild("Torso"))
+end
+
+
+-- ============================================================
 -- PART 2 : REPLION + HELPER + AUTO TOTEM LOGIC
 -- ============================================================
 
