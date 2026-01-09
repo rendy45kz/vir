@@ -2032,6 +2032,7 @@ player.CharacterAdded:Connect(function()
     end
 end)
 
+local AutoTotem = Tabs.Automation:AddSection("Auto Totem")
 -- =================================================================
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
@@ -2059,6 +2060,11 @@ local RF_UnequipOxygenTank = GetRemote(RPath, "RF/UnequipOxygenTank") -- Lepas o
 -- Remote tambahan yang mungkin digunakan:
 local RE_EquipItem = GetRemote(RPath, "RE/EquipItem")
 local RE_UnequipItem = GetRemote(RPath, "RE/UnequipItem")
+
+local TOTEM_STATUS_PARAGRAPH = AutoTotem:AddParagraph({ 
+    Title = "Status: Inactive", 
+    Content = "Select totem type and enable"
+})
 
 -- =================================================================
 -- TOTEM DATA & VARIABLES
@@ -2371,7 +2377,7 @@ local function Run9TotemLoop()
             local uuid = GetTotemUUID(selectedTotemName)
             if not uuid then
                 sirenx("No Stock of " .. selectedTotemName .. "!")
-                local t = AutoSpawnTotem:GetElementByTitle("Auto Spawn x9 Totem")
+                local t = AutoTotem:GetElementByTitle("Auto Spawn x9 Totem")
                 if t then t:Set(false) end
                 return
             end
@@ -2468,7 +2474,7 @@ local function Run9TotemLoop()
 
         AUTO_9_TOTEM_ACTIVE = false
 
-        local t = AutoSpawnTotem:GetElementByTitle("Auto Spawn x9 Totem")
+        local t = AutoTotem:GetElementByTitle("Auto Spawn x9 Totem")
         if t then t:Set(false) end
 
         TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
@@ -2536,7 +2542,7 @@ local function RunAutoTotemLoop()
                     sirenx("Not have totem in inventory!")
 
                     AUTO_TOTEM_ACTIVE = false
-                    local t = AutoSpawnTotem:GetElementByTitle("Enable Auto Totem (Single)")
+                    local t = AutoTotem:GetElementByTitle("Enable Auto Totem (Single)")
                     if t then t:Set(false) end
                     break
                 end
@@ -2556,10 +2562,8 @@ end
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
 
-local AutoSpawnTotem = Tabs.Automation:AddSection("Auto Totem")
 
-
-AutoSpawnTotem:AddDropdown({
+AutoTotem:AddDropdown({
     Title = "Select Totem Type",
     Content = "Choose which totem will be used",
     Options = {
@@ -2578,7 +2582,7 @@ AutoSpawnTotem:AddDropdown({
     end
 })
 
-AutoSpawnTotem:AddToggle({
+AutoTotem:AddToggle({
     Title = "Enable Auto Totem (Single)",
     Content = "Automatically spawn totem when expired",
     Default = false,
@@ -2599,7 +2603,7 @@ AutoSpawnTotem:AddToggle({
     end
 })
 
-AutoSpawnTotem:AddToggle({
+AutoTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
     Content = "Automatically spawn 9 totems in formation",
     Default = false,
@@ -2621,7 +2625,7 @@ AutoSpawnTotem:AddToggle({
     end
 })
 
-AutoSpawnTotem:AddButton({
+AutoTotem:AddButton({
     Title = "Spawn Totem Now",
     Content = "Spawn selected totem immediately",
     Callback = function()
