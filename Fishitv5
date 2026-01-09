@@ -856,115 +856,6 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
     end
 end)
 
-
-SellGroup:AddSubSection("Auto Sell Enchant Stone")
-
-local function GetEnchantStoneCount()
-    if not (repl and repl.Data and repl.Data.Data and repl.Data.Data.Inventory) then
-        return 0
-    end
-
-    local total = 0
-
-    for _, item in pairs(repl.Data.Data.Inventory.Items) do
-        if item.Id == 10 then
-            -- PRIORITAS STACK
-            if typeof(item.Stack) == "number" then
-                total += item.Stack
-            elseif typeof(item.Amount) == "number" then
-                total += item.Amount
-            elseif typeof(item.Quantity) == "number" then
-                total += item.Quantity
-            elseif typeof(item.Count) == "number" then
-                total += item.Count
-            else
-                total += 1 -- fallback
-            end
-        end
-    end
-
-    return total
-end
-
-local function GetEnchantStackCount()
-    local stacks = 0
-    for _, item in pairs(repl.Data.Data.Inventory.Items) do
-        if item.Id == 10 then
-            stacks += 1
-        end
-    end
-    return stacks
-end
-
-
-local EnchantStock = SellGroup:AddParagraph({
-  Title = "Enchant Stone Count",
-  Content = "0 Enchant Stones"
-})
-
-task.spawn(function()
-  while task.wait(3) do
-    EnchantStock:SetContent(
-        string.format("x%d Enchant Stones", GetEnchantStoneCount())
-    )
-  end
-end)
-
-local TAL = SellGroup:AddInput({
-    Title = "Target Stack Left",
-    Content = "How many enchant stone stacks to keep",
-    Default = tostring(st.market.enchSellAt),
-    Callback = function(value)
-        local num = tonumber(value)
-        if not num or num < 0 then
-            task.spawn(function()
-                task.wait()
-                TAL:Set(tostring(st.market.enchSellAt))
-                sirenx("Invalid number! Must be 0 or higher.")
-            end)
-            return
-        end
-        st.market.enchSellAt = math.floor(num)
-    end
-})
-
-SellGroup:AddToggle({
-    Title = "Auto Sell Enchant Stone",
-    Default = false,
-    Callback = function(state)
-        st.sell.enchantEnabled = state
-        if not state then return end
-
-        task.spawn(function()
-            while st.sell.enchantEnabled do
-                local stacks = GetEnchantStackCount()
-                local keep = st.market.enchSellAt or 0
-
-                -- STOP JIKA STACK SUDAH SESUAI
-                if stacks <= keep then
-                    task.wait(1)
-                    continue
-                end
-
-                -- JUAL 1 STACK
-                for _, item in pairs(repl.Data.Data.Inventory.Items) do
-                    if item.Id == 10 and item.UUID then
-                        pcall(function()
-                            api.Functions.SellItem:InvokeServer(item.UUID)
-                        end)
-                        break
-                    end
-                end
-
-                -- tunggu inventory update
-                task.wait(1.2)
-            end
-        end)
-    end
-})
-
-
-
 local Favorites = Tabs.Fishing:AddSection("Favorites")
 
 local function IsFavorited(UUID, items)
@@ -1031,7 +922,7 @@ Favorites:AddDropdown({
   Title = "Auto Favorite by Rarity",
   Content = "Favorite by Fish Rarity",
   Multi = true,
-  Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythical", "Secret"},
+  Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
   Default = st.favorite.rarities,
   Callback = function(value)
     st.favorite.rarities = value
