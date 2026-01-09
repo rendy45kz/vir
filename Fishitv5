@@ -2691,7 +2691,6 @@ Tabs.Automation:AddDropdown({
 
 Tabs.Automation:AddToggle({
     Title = "Enable Auto Totem (Single)",
-    Content = "Normal Mode - Spawn single totem when expired",
     Default = false,
     Callback = function(state)
         AUTO_TOTEM_ACTIVE = state
@@ -2712,7 +2711,6 @@ Tabs.Automation:AddToggle({
 
 Tabs.Automation:AddToggle({
     Title = "Auto Spawn x9 Totem",
-    Content = "Ultimate Mode - Spawn 9 totems in formation",
     Default = false,
     Callback = function(state)
         AUTO_9_TOTEM_ACTIVE = state
@@ -2734,7 +2732,6 @@ Tabs.Automation:AddToggle({
 
 Tabs.Automation:AddButton({
     Title = "Spawn Totem Now",
-    Content = "Manually spawn selected totem",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotemName)
         if uuid then
