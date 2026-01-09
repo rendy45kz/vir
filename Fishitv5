@@ -2148,10 +2148,7 @@ end)
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
 
-local AutoTotemSection = Tabs.Automation:AddSection("Auto Spawn Totem")
-local AutoTotem = AutoTotemSection:AddGroup({
-    Title = "Controls"
-})
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
 
 local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
 local RepStorage = game:GetService("ReplicatedStorage")
