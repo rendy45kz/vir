@@ -2148,7 +2148,10 @@ end)
 -- REMOTE DEFINITIONS UNTUK AUTO TOTEM
 -- =================================================================
 
-local AutoSpawnTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+local AutoSpawnTotem = Tabs.Automation:AddSection({
+    Title = "Auto Spawn Totem"
+})
+
 
 local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
 local RepStorage = game:GetService("ReplicatedStorage")
@@ -2670,7 +2673,7 @@ end
 -- DROPDOWN : SELECT TOTEM TYPE
 -- ================================================================
 
-Tabs.Automation:AddDropdown({
+AutoSpawnTotem:AddDropdown({
     Title = "Select Totem Type",
     Content = "Choose which totem will be used",
     Options = {
@@ -2689,7 +2692,7 @@ Tabs.Automation:AddDropdown({
     end
 })
 
-Tabs.Automation:AddToggle({
+AutoSpawnTotem:AddToggle({
     Title = "Enable Auto Totem (Single)",
     Default = false,
     Callback = function(state)
@@ -2709,7 +2712,7 @@ Tabs.Automation:AddToggle({
     end
 })
 
-Tabs.Automation:AddToggle({
+AutoSpawnTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
     Default = false,
     Callback = function(state)
@@ -2730,7 +2733,7 @@ Tabs.Automation:AddToggle({
     end
 })
 
-Tabs.Automation:AddButton({
+AutoSpawnTotem:AddButton({
     Title = "Spawn Totem Now",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotemName)
