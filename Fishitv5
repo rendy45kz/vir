@@ -856,6 +856,33 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
     end
 end)
 
+SellGroup:AddInput({
+    Title = "Sell When Caught ≥",
+    Content = "Auto sell after catching X fish",
+    Default = tostring(st.sell.caughtTarget),
+    Numeric = true,
+    Callback = function(v)
+        st.sell.caughtTarget = tonumber(v) or 0
+        sirenx("Auto Sell target set to " .. st.sell.caughtTarget)
+    end
+})
+
+SellGroup:AddToggle({
+    Title = "Auto Sell by Fish Caught",
+    Content = "Sell all fish after reaching target count",
+    Default = false,
+    Callback = function(state)
+        st.sell.enabled = state
+
+        if state then
+            autoSellCount = 0 -- reset saat ON
+            sirenx("Auto Sell by Fish Caught enabled")
+        else
+            sirenx("Auto Sell disabled")
+        end
+    end
+})
+
 local Favorites = Tabs.Fishing:AddSection("Favorites")
 
 local function IsFavorited(UUID, items)
