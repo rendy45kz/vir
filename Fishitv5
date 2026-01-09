@@ -459,7 +459,7 @@ Plyrs:AddToggle({
 	end
 })
 
-Camera = Tabs.Player:AddSection("Camera")
+local Camera = Tabs.Player:AddSection("Camera")
 
 Camera:AddToggle({
   Title = "Max Zoom",
@@ -512,7 +512,7 @@ LegitFishing:AddToggle({
   end
 })
 
-local MD = LegitFishing:AddInput({
+LegitFishing:AddInput({
   Title = "Minigame Delay",
   Content = "Delay for finish the minigame",
   Default = tostring(st.minigameDelay),
@@ -560,7 +560,7 @@ AutoFishing:AddToggle({
   end
 })
 
-local CD = AutoFishing:AddInput({
+AutoFishing:AddInput({
   Title = "Complete Delay",
   Content = "Delay for complete fishing",
   Default = tostring(st.completeDelay),
@@ -579,25 +579,6 @@ local CD = AutoFishing:AddInput({
 
 local Fish2 = Tabs.Fishing:AddSection("Blatant Fishing")
 
-Fish2:AddToggle({
-    Title = "Perfection Support",
-    Content = "Enable perfection & block rod charging",
-    Default = false,
-    Callback = function(state)
-        st.perfection.activated = state
-
-        if state then
-            EnablePerfection()
-        else
-            -- jangan matikan jika Instant Fishing aktif
-            if not st.perfection.autoByInstant then
-                DisablePerfection()
-            end
-        end
-    end
-})
-
-
 function Fastest()
   task.spawn(function()
     pcall(function() api.Functions.Cancel:InvokeServer() end)
@@ -608,28 +589,6 @@ function Fastest()
     pcall(function() api.Events.REFishDone:FireServer() end)
   end)
 end
-
-Fish2:AddInput({
-  Title = "Delay Reel",
-  Value = tostring(_G.Reel),
-  Default = "1.9",
-  Callback = function(v)
-    local n = tonumber(v)
-    if n and n > 0 then _G.Reel = n end
-    SaveConfig()
-  end
-})
-
-Fish2:AddInput({
-  Title = "Delay Fishing",
-  Value = tostring(_G.FishingDelay),
-  Default = "1.1",
-  Callback = function(v)
-    local n = tonumber(v)
-    if n and n > 0 then _G.FishingDelay = n end
-    SaveConfig()
-  end
-})
 
 Fish2:AddToggle({
   Title = "Blatant Fishing",
@@ -663,19 +622,25 @@ Fish2:AddToggle({
   end
 })
 
-Fish2:AddButton({
-  Title = "Recovery Fishing",
-  Callback = function()
-    task.spawn(function()
-      pcall(function()
-        api.Functions.Cancel:InvokeServer()
-      end)
-      local lp = game:GetService("Players").LocalPlayer
-      lp:SetAttribute("Loading", nil)
-      task.wait(0.05)
-      lp:SetAttribute("Loading", false)
-      sirenx("Recovery Successfully!")
-    end)
+Fish2:AddInput({
+  Title = "Delay Reel",
+  Value = tostring(_G.Reel),
+  Default = "1.9",
+  Callback = function(v)
+    local n = tonumber(v)
+    if n and n > 0 then _G.Reel = n end
+    SaveConfig()
+  end
+})
+
+Fish2:AddInput({
+  Title = "Delay Fishing",
+  Value = tostring(_G.FishingDelay),
+  Default = "1.1",
+  Callback = function(v)
+    local n = tonumber(v)
+    if n and n > 0 then _G.FishingDelay = n end
+    SaveConfig()
   end
 })
 
@@ -746,7 +711,7 @@ end
 -- GUI SECTION
 --======================================================
 
-local UltraSection = Tabs.Fishing:AddSection("Blatant Fishing BETA")
+local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
 
 UltraSection:AddToggle({
     Title = "Ultra Blatant Fishing",
@@ -808,10 +773,47 @@ UltraSection:AddInput({
         end
     end
 })
+local FishFeature = Tabs.Fishing:AddSection("Fishing Features")
 
+FishFeature:AddToggle({
+    Title = "Perfection Support",
+    Content = "Enable perfection & block rod charging",
+    Default = false,
+    Callback = function(state)
+        st.perfection.activated = state
+
+        if state then
+            EnablePerfection()
+        else
+            -- jangan matikan jika Instant Fishing aktif
+            if not st.perfection.autoByInstant then
+                DisablePerfection()
+            end
+        end
+    end
+})
+
+FishFeature:AddButton({
+  Title = "Recovery Fishing",
+  Callback = function()
+    task.spawn(function()
+      pcall(function()
+        api.Functions.Cancel:InvokeServer()
+      end)
+      local lp = game:GetService("Players").LocalPlayer
+      lp:SetAttribute("Loading", nil)
+      task.wait(0.05)
+      lp:SetAttribute("Loading", false)
+      sirenx("Recovery Successfully!")
+    end)
+  end
+})
 
 local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
 
+-- ======================================================
+-- GET CURRENT FISH COUNT
+-- ======================================================
 local function GetCaughtCount()
     local pg = player:FindFirstChild("PlayerGui")
     if not pg then return 0 end
@@ -826,57 +828,76 @@ local function GetCaughtCount()
     return tonumber(cur) or 0
 end
 
+-- ======================================================
+-- MANUAL SELL
+-- ======================================================
 SellGroup:AddButton({
     Title = "Sell All",
+    Content = "Sell all fish in bag",
     Callback = function()
         pcall(function()
             api.Functions.SellAllItem:InvokeServer()
         end)
+        sirenx("Sold all fish.")
     end
 })
 
+-- ======================================================
+-- INPUT TARGET
+-- ======================================================
 SellGroup:AddInput({
     Title = "Sell When Caught ≥",
     Placeholder = "ex: 100",
     Numeric = true,
     Callback = function(v)
-        st.sell.caughtTarget = tonumber(v) or 0
+        local num = tonumber(v)
+        if not num or num < 1 then
+            sirenx("Target must be ≥ 1")
+            return
+        end
+        st.sell.caughtTarget = math.floor(num)
     end
 })
 
+-- ======================================================
+-- AUTO SELL TOGGLE (FIXED)
+-- ======================================================
 SellGroup:AddToggle({
     Title = "Auto Sell by Caught",
+    Content = "Auto sell when bag reaches target",
     Default = false,
     Callback = function(state)
         st.sell.enabled = state
 
+        -- KILL OLD THREAD (FIXED)
         if st.sell._sellThread then
-            task.cancel(st._sellThread)
-            st._sellThread = nil
+            task.cancel(st.sell._sellThread)
+            st.sell._sellThread = nil
         end
 
         if not state then
-            st.sell.caughtStart = nil
+            sirenx("Auto Sell stopped.")
             return
         end
 
-        -- SIMPAN JUMLAH SAAT TOGGLE ON
-        st.sell.caughtStart = GetCaughtCount()
+        if not st.sell.caughtTarget or st.sell.caughtTarget < 1 then
+            sirenx("Set sell target first!")
+            return
+        end
 
-        st._sellThread = task.spawn(function()
+        sirenx("Auto Sell enabled.")
+
+        st.sell._sellThread = task.spawn(function()
             while st.sell.enabled do
-
                 local current = GetCaughtCount()
-                local gained = current - st.sell.caughtStart
 
-                if gained >= st.sell.caughtTarget then
+                if current >= st.sell.caughtTarget then
                     pcall(function()
                         api.Functions.SellAllItem:InvokeServer()
                     end)
 
-                    -- RESET HITUNGAN SETELAH SELL
-                    st.sell.caughtStart = GetCaughtCount()
-                    task.wait(1.5)
+                    sirenx("Auto sold at " .. current .. " fish.")
+                    task.wait(1.5) -- tunggu update UI
                 else
                     task.wait(0.5)
                 end
@@ -884,7 +905,6 @@ SellGroup:AddToggle({
         end)
     end
 })
-
 
 SellGroup:AddSubSection("Auto Sell Enchant Stone")
 
@@ -939,7 +959,6 @@ task.spawn(function()
   end
 end)
 
-
 local TAL = SellGroup:AddInput({
     Title = "Target Stack Left",
     Content = "How many enchant stone stacks to keep",
@@ -958,7 +977,6 @@ local TAL = SellGroup:AddInput({
     end
 })
 
-
 SellGroup:AddToggle({
     Title = "Auto Sell Enchant Stone",
     Default = false,
@@ -968,22 +986,22 @@ SellGroup:AddToggle({
 
         task.spawn(function()
             while st.sell.enchantEnabled do
-                local current = GetEnchantStoneCount()
+                local stacks = GetEnchantStackCount()
                 local keep = st.market.enchSellAt or 0
 
-                -- JANGAN JUAL JIKA SUDAH SESUAI
-                if current <= keep then
+                -- STOP JIKA STACK SUDAH SESUAI
+                if stacks <= keep then
                     task.wait(1)
                     continue
                 end
 
-                -- CARI 1 STACK ENCHANT STONE
+                -- JUAL 1 STACK
                 for _, item in pairs(repl.Data.Data.Inventory.Items) do
-                    if item.Id == 10 then
+                    if item.Id == 10 and item.UUID then
                         pcall(function()
                             api.Functions.SellItem:InvokeServer(item.UUID)
                         end)
-                        break -- JUAL 1 STACK SAJA
+                        break
                     end
                 end
 
@@ -995,6 +1013,7 @@ SellGroup:AddToggle({
 })
 
 
+
 local Favorites = Tabs.Fishing:AddSection("Favorites")
 
 local function IsFavorited(UUID, items)
@@ -1004,7 +1023,7 @@ local function IsFavorited(UUID, items)
   return false
 end
 
-local RarityOrder = {Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythical = 6, Secret = 7}
+local RarityOrder = {Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Secret = 7}
 
 local function AutoFavorite(names, rarities, mutations)
   local items = repl.Data.Data.Inventory.Items
@@ -2182,8 +2201,7 @@ local TOTEM_DATA = {
     ["Mutation Totem"] = {Id = 2, Duration = 3601}, -- 1 jam 1 detik
     ["Shiny Totem"] = {Id = 3, Duration = 3601}     -- 1 jam 1 detik
 }
- 
-local TOTEM_NAMES = {"Luck Totem", "Mutation Totem", "Shiny Totem"}
+
 local selectedTotemName = "Luck Totem"
 local currentTotemExpiry = 0
 local AUTO_TOTEM_ACTIVE = false
@@ -2690,28 +2708,30 @@ AutoSpawnTotem:AddDropdown({
     end
 })
 
-AutoSpawnTotem:AddToggle({ 
-    Title = "Enable Auto Totem (Single)", 
-    Content = "Normal Mode - Spawn single totem when expired", 
+AutoSpawnTotem:AddToggle({
+    Title = "Enable Auto Totem (Single)",
+    Content = "Automatically spawn totem when expired",
     Default = false,
-    Callback = function(state) 
+    Callback = function(state)
         AUTO_TOTEM_ACTIVE = state
-        if state then 
+        if state then
             RunAutoTotemLoop()
             sirenx("Auto Totem (Single) enabled.")
-        else 
-            if AUTO_TOTEM_THREAD then 
-                task.cancel(AUTO_TOTEM_THREAD) 
-                AUTO_TOTEM_THREAD = nil 
+        else
+            if AUTO_TOTEM_THREAD then
+                task.cancel(AUTO_TOTEM_THREAD)
+                AUTO_TOTEM_THREAD = nil
             end
+            TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
+            TOTEM_STATUS_PARAGRAPH:SetDesc("Inactive")
             sirenx("Auto Totem stopped.")
-        end 
-    end 
+        end
+    end
 })
 
 AutoSpawnTotem:AddToggle({
     Title = "Auto Spawn x9 Totem",
-    Content = "Ultimate Mode - Spawn 9 totems in formation",
+    Content = "Automatically spawn 9 totems in formation",
     Default = false,
     Callback = function(state)
         AUTO_9_TOTEM_ACTIVE = state
@@ -2719,38 +2739,27 @@ AutoSpawnTotem:AddToggle({
             Run9TotemLoop()
             sirenx("Auto x9 Totem started.")
         else
-            if AUTO_9_TOTEM_THREAD then 
-                task.cancel(AUTO_9_TOTEM_THREAD) 
-                AUTO_9_TOTEM_THREAD = nil 
+            if AUTO_9_TOTEM_THREAD then
+                task.cancel(AUTO_9_TOTEM_THREAD)
+                AUTO_9_TOTEM_THREAD = nil
             end
             DisableV3Physics()
+            TOTEM_STATUS_PARAGRAPH:SetTitle("Status: Inactive")
+            TOTEM_STATUS_PARAGRAPH:SetDesc("Stopped")
             sirenx("Auto x9 Totem stopped.")
         end
     end
 })
 
--- ================================================================
--- BUTTON : MANUAL SPAWN
--- ================================================================
 AutoSpawnTotem:AddButton({
     Title = "Spawn Totem Now",
-    Content = "Manually spawn selected totem",
+    Content = "Spawn selected totem immediately",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotemName)
         if uuid then
-            pcall(function() 
-                RE_SpawnTotem:FireServer(uuid) 
+            pcall(function()
+                RE_SpawnTotem:FireServer(uuid)
             end)
-
-            task.spawn(function() 
-                for i = 1, 3 do 
-                    task.wait(0.2) 
-                    pcall(function() 
-                        RE_EquipToolFromHotbar:FireServer(1) 
-                    end) 
-                end 
-            end)
-
             sirenx("Totem spawned: " .. selectedTotemName)
         else
             sirenx("Not have totem in inventory!")
