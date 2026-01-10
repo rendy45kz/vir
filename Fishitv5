@@ -534,47 +534,56 @@ AutoFishing:AddInput({
   end
 })
 
+--//======================================================
+--// BLATANT FISHING (IMPROVED SPEED - SAME LOGIC)
+--//======================================================
+
 local Fish2 = Tabs.Fishing:AddSection("Blatant Fishing")
 
--- CACHE API (LEBIH CEPAT)
-local Func = api.Functions
-local Ev   = api.Events
-local GetNow = workspace.GetServerTimeNow
+_G.FBlatant = _G.FBlatant or false
+_G.Reel = _G.Reel or 1.9
+_G.FishingDelay = _G.FishingDelay or 1.1
 
--- =====================================================
--- FASTEST (OPTIMIZED)
--- =====================================================
-local function Fastest()
-    -- 1 THREAD SAJA (NO SPAWN STACKING)
-    local now = GetNow(workspace)
+-- FASTEST FUNCTION (IMPROVED, LOGIC SAMA)
+function Fastest()
+    task.spawn(function()
+        local now = workspace:GetServerTimeNow()
 
-    pcall(Func.Cancel.InvokeServer, Func.Cancel)
-    pcall(Func.ChargeRod.InvokeServer, Func.ChargeRod, now)
-    pcall(Func.StartMini.InvokeServer, Func.StartMini, -1, 0.999)
+        pcall(function()
+            api.Functions.Cancel:InvokeServer()
+        end)
 
-    task.wait(_G.FishingDelay)
+        pcall(function()
+            api.Functions.ChargeRod:InvokeServer(now)
+        end)
 
-    pcall(Ev.REFishDone.FireServer, Ev.REFishDone)
+        pcall(function()
+            api.Functions.StartMini:InvokeServer(-1, 0.999)
+        end)
+
+        task.wait(_G.FishingDelay)
+
+        pcall(function()
+            api.Events.REFishDone:FireServer()
+        end)
+    end)
 end
 
--- =====================================================
--- BLATANT TOGGLE
--- =====================================================
+-- TOGGLE BLATANT
 Fish2:AddToggle({
     Title = "Blatant Fishing",
     Default = _G.FBlatant,
     Callback = function(s)
         _G.FBlatant = s
-        Func.AutoEnabled:InvokeServer(s)
+        api.Functions.AutoEnabled:InvokeServer(s)
 
         if s then
-            -- AUTO PERFECTION
+            -- AUTO ENABLE PERFECTION
             st.perfection.autoByInstant = true
             EnablePerfection()
 
             st.player:SetAttribute("Loading", nil)
 
-            -- MAIN LOOP (STABLE)
             task.spawn(function()
                 while _G.FBlatant do
                     Fastest()
@@ -584,6 +593,7 @@ Fish2:AddToggle({
         else
             st.player:SetAttribute("Loading", false)
 
+            -- AUTO DISABLE PERFECTION (AMAN)
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
                 DisablePerfection()
@@ -592,9 +602,7 @@ Fish2:AddToggle({
     end
 })
 
--- =====================================================
--- INPUTS
--- =====================================================
+-- INPUT REEL DELAY
 Fish2:AddInput({
     Title = "Delay Reel",
     Value = tostring(_G.Reel),
@@ -608,6 +616,7 @@ Fish2:AddInput({
     end
 })
 
+-- INPUT FISHING DELAY
 Fish2:AddInput({
     Title = "Delay Fishing",
     Value = tostring(_G.FishingDelay),
@@ -622,7 +631,7 @@ Fish2:AddInput({
 })
 
 --//======================================================
---// ULTRA BLATANT FISHING (OPTIMIZED)
+--// ULTRA BLATANT FISHING (IMPROVED & STABLE)
 --//======================================================
 
 local UltraBlatant = {
@@ -632,41 +641,55 @@ local UltraBlatant = {
     Thread = nil
 }
 
--- SAFE CALL (NO SPAWN STACK)
-local function SafeCall(fn, ...)
-    local ok = pcall(fn, ...)
-    return ok
+-- SAFE CALL (ANDROID FRIENDLY)
+local function SafeCall(fn)
+    task.spawn(function()
+        pcall(fn)
+    end)
 end
 
--- ULTRA CAST (FASTER)
+-- ULTRA CAST (FASTER, SAME FLOW)
 local function UltraCast()
-    local now = GetNow(workspace)
+    local t = workspace:GetServerTimeNow()
 
-    SafeCall(Func.ChargeRod.InvokeServer, Func.ChargeRod, now)
-    task.wait() -- yield 1 frame
-    SafeCall(Func.StartMini.InvokeServer, Func.StartMini, -1, 0.999)
+    SafeCall(function()
+        api.Functions.ChargeRod:InvokeServer(t)
+    end)
+
+    task.wait() -- 1 frame yield (lebih stabil dari 0.01)
+
+    SafeCall(function()
+        api.Functions.StartMini:InvokeServer(-1, 0.999)
+    end)
 end
 
--- ULTRA LOOP (HIGH SPEED)
+-- ULTRA LOOP
 local function UltraLoop()
     while UltraBlatant.Active do
         UltraCast()
 
         task.wait(UltraBlatant.CompleteDelay)
 
-        if not UltraBlatant.Active then break end
-        SafeCall(Ev.REFishDone.FireServer, Ev.REFishDone)
+        if UltraBlatant.Active then
+            SafeCall(function()
+                api.Events.REFishDone:FireServer()
+            end)
+        end
 
         task.wait(UltraBlatant.CancelDelay)
 
-        if not UltraBlatant.Active then break end
-        SafeCall(Func.Cancel.InvokeServer, Func.Cancel)
+        if UltraBlatant.Active then
+            SafeCall(function()
+                api.Functions.Cancel:InvokeServer()
+            end)
+        end
     end
 end
 
--- =====================================================
--- GUI SECTION
--- =====================================================
+--======================================================
+-- GUI ULTRA SECTION
+--======================================================
+
 local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
 
 UltraSection:AddToggle({
@@ -677,10 +700,14 @@ UltraSection:AddToggle({
         UltraBlatant.Active = state
 
         if state then
+            -- AUTO ENABLE PERFECTION
             st.perfection.autoByInstant = true
             EnablePerfection()
 
-            SafeCall(Ev.REEquip.FireServer, Ev.REEquip, 1)
+            -- EQUIP ROD
+            SafeCall(function()
+                api.Events.REEquip:FireServer(1)
+            end)
 
             task.wait(0.15)
 
@@ -688,7 +715,9 @@ UltraSection:AddToggle({
         else
             UltraBlatant.Active = false
 
-            SafeCall(Func.Cancel.InvokeServer, Func.Cancel)
+            SafeCall(function()
+                api.Functions.Cancel:InvokeServer()
+            end)
 
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
@@ -831,6 +860,18 @@ SellGroup:AddToggle({
         end
     end
 })
+
+SellGroup:AddButton({
+    Title = "Sell All Now",
+    Content = "Immediately sell all fish in inventory",
+    Callback = function()
+        pcall(function()
+            api.Functions.SellAllItem:InvokeServer()
+        end)
+        sirenx("Manual Sell executed")
+    end
+})
+
 
 local Favorites = Tabs.Fishing:AddSection("Favorites")
 
