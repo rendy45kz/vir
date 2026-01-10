@@ -766,7 +766,7 @@ local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
 local autoSellCount    = 0
 local autoSellCooldown = false
 
-api.Events.REObtainedNewFishNotification.OnClientEventfunction(itemId, _, info)
+RE_ObtainedNewFish.OnClientEvent:Connect(function(itemId, _, info)
     if not info or not info.InventoryItem then return end
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
@@ -803,7 +803,7 @@ api.Events.REObtainedNewFishNotification.OnClientEventfunction(itemId, _, info)
             autoSellCooldown = false
         end)
     end
-endConnect(:)
+end)
 
 SellGroup:AddInput({
     Title = "Sell When Caught ≥",
