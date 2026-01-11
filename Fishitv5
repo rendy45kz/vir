@@ -144,8 +144,7 @@ local st                   = {
   sell = {
     enabled = false,
     caughtTarget = 100,
-    enchantEnabled = false,
-    _sellThread = nil,
+    sellThread = nil,
 },
   market = {
     autoSellThreshold = "Legendary",
@@ -183,6 +182,11 @@ local st                   = {
 local ConnectionWalkSpeed = nil
 local antiAfkConnection = nil
 local oldRequestCharge = nil
+local autoSellCount = 0
+local autoSellCooldown = false
+
+-- TRACK UUID YANG SUDAH DIHITUNG
+local countedFishUUID = {}
 
 local function EnablePerfection()
     if st.perfection.enabled then return end
@@ -790,38 +794,25 @@ FishFeature:AddButton({
 local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
 
 ----------------------------------------------------------------
--- AUTO FAVORITE + AUTO SELL HANDLER (EVENT-DRIVEN)
-----------------------------------------------------------------
-local autoSellCount    = 0
-local autoSellCooldown = false
-
--- ENSURE STATE TABLE EXISTS
-st.sell = st.sell or {}
-st.sell.enabled = st.sell.enabled or false
-st.sell.caughtTarget = st.sell.caughtTarget or 0
-
-----------------------------------------------------------------
 -- EVENT LISTENER
 ----------------------------------------------------------------
 api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, _, info)
+    if not st.sell.enabled then return end
+    if autoSellCooldown then return end
     if not info or not info.InventoryItem then return end
 
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
 
-    ------------------------------------------------------------
-    -- COUNTER (ALWAYS RUN)
-    ------------------------------------------------------------
-    autoSellCount = autoSellCount + 1
+    -- ❌ JANGAN HITUNG 2x UUID YANG SAMA
+    if countedFishUUID[uuid] then return end
+    countedFishUUID[uuid] = true
 
-    ------------------------------------------------------------
-    -- AUTO SELL LOGIC
-    ------------------------------------------------------------
-    if not st.sell.enabled then return end
-    if autoSellCooldown then return end
+    -- ✅ HITUNG 1 IKAN VALID
+    autoSellCount += 1
 
-    local target = tonumber(st.sell.caughtTarget)
-    if not target or target <= 0 then return end
+    local target = tonumber(st.sell.caughtTarget) or 0
+    if target <= 0 then return end
 
     if autoSellCount >= target then
         autoSellCooldown = true
@@ -831,17 +822,21 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
                 api.Functions.SellAllItem:InvokeServer()
             end)
 
-            sirenx(("Auto Sell: %d fish sold"):format(autoSellCount))
+            sirenx(
+                ("Auto Sell: %d fish sold (target %d)")
+                :format(autoSellCount, target)
+            )
 
-            -- RESET COUNTER
+            -- RESET SETELAH SELL
             autoSellCount = 0
+            table.clear(countedFishUUID)
 
-            -- COOLDOWN (ANTI SPAM / ANTI DOUBLE CALL)
             task.wait(1.5)
             autoSellCooldown = false
         end)
     end
 end)
+
 
 ----------------------------------------------------------------
 -- GUI INPUT
@@ -863,19 +858,23 @@ SellGroup:AddInput({
 ----------------------------------------------------------------
 SellGroup:AddToggle({
     Title = "Auto Sell by Fish Caught",
-    Content = "Sell all fish after reaching target count",
-    Default = st.sell.enabled,
+    Content = "Sell after catching X fish",
+    Default = false,
     Callback = function(state)
         st.sell.enabled = state
 
+        autoSellCount = 0
+        table.clear(countedFishUUID)
+        autoSellCooldown = false
+
         if state then
-            autoSellCount = 0 -- reset saat ON
-            sirenx("Auto Sell by Fish Caught enabled")
+            sirenx("Auto Sell enabled (event-based, UUID safe)")
         else
             sirenx("Auto Sell disabled")
         end
     end
 })
+
 
 ----------------------------------------------------------------
 -- MANUAL BUTTON
