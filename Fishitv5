@@ -795,24 +795,33 @@ local SellGroup = Tabs.Fishing:AddSection("Auto Selling")
 local autoSellCount    = 0
 local autoSellCooldown = false
 
+-- ENSURE STATE TABLE EXISTS
+st.sell = st.sell or {}
+st.sell.enabled = st.sell.enabled or false
+st.sell.caughtTarget = st.sell.caughtTarget or 0
+
+----------------------------------------------------------------
+-- EVENT LISTENER
+----------------------------------------------------------------
 api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, _, info)
     if not info or not info.InventoryItem then return end
+
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
 
     ------------------------------------------------------------
-    -- COUNTER FISH (SELALU JALAN)
+    -- COUNTER (ALWAYS RUN)
     ------------------------------------------------------------
-    autoSellCount += 1
+    autoSellCount = autoSellCount + 1
 
     ------------------------------------------------------------
-    -- AUTO SELL (BERDASARKAN JUMLAH IKAN DIDAPAT)
+    -- AUTO SELL LOGIC
     ------------------------------------------------------------
     if not st.sell.enabled then return end
     if autoSellCooldown then return end
 
-    local target = tonumber(st.sell.caughtTarget) or 0
-    if target <= 0 then return end
+    local target = tonumber(st.sell.caughtTarget)
+    if not target or target <= 0 then return end
 
     if autoSellCount >= target then
         autoSellCooldown = true
@@ -827,28 +836,35 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
             -- RESET COUNTER
             autoSellCount = 0
 
-            -- COOLDOWN (ANTI SPAM)
+            -- COOLDOWN (ANTI SPAM / ANTI DOUBLE CALL)
             task.wait(1.5)
             autoSellCooldown = false
         end)
     end
 end)
 
+----------------------------------------------------------------
+-- GUI INPUT
+----------------------------------------------------------------
 SellGroup:AddInput({
     Title = "Sell When Caught ≥",
     Content = "Auto sell after catching X fish",
     Default = tostring(st.sell.caughtTarget),
     Numeric = true,
     Callback = function(v)
-        st.sell.caughtTarget = tonumber(v) or 0
+        local n = tonumber(v)
+        st.sell.caughtTarget = n or 0
         sirenx("Auto Sell target set to " .. st.sell.caughtTarget)
     end
 })
 
+----------------------------------------------------------------
+-- TOGGLE
+----------------------------------------------------------------
 SellGroup:AddToggle({
     Title = "Auto Sell by Fish Caught",
     Content = "Sell all fish after reaching target count",
-    Default = false,
+    Default = st.sell.enabled,
     Callback = function(state)
         st.sell.enabled = state
 
@@ -861,6 +877,9 @@ SellGroup:AddToggle({
     end
 })
 
+----------------------------------------------------------------
+-- MANUAL BUTTON
+----------------------------------------------------------------
 SellGroup:AddButton({
     Title = "Sell All Now",
     Content = "Immediately sell all fish in inventory",
@@ -1705,7 +1724,7 @@ Events:AddDropdown({
         lastEventPosition = nil
         if autoEventTeleportState and value then
             FindAndTeleportToTargetEvent()
-            RestartAutoTeleportLoop()
+            --RestartAutoTeleportLoop()
         end
     end
 })
@@ -1729,7 +1748,7 @@ Events:AddToggle({
             -- Langsung teleport ke event
             FindAndTeleportToTargetEvent()
             -- Mulai loop auto follow
-            RestartAutoTeleportLoop()
+            --RestartAutoTeleportLoop()
         else
             DisableWalkOnWater()
  
