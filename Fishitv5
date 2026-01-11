@@ -1124,6 +1124,7 @@ HideFeature:AddToggle({
 --//======================================================
 --// FPS BOOST (REDUCE MAP / INVISIBLE)
 --//======================================================
+local MiscSection = Tabs.Misc:AddSection("Performance")
 
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
