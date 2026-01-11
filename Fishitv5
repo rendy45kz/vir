@@ -1121,163 +1121,163 @@ HideFeature:AddToggle({
   end
 }, "HideVFX")
 
---======================================================
--- FPS BOOST SYSTEM (STABLE & CLEAN)
---======================================================
+--//======================================================
+--// FPS BOOST (REDUCE MAP / INVISIBLE)
+--//======================================================
 
-local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local Terrain = workspace:FindFirstChildOfClass("Terrain")
 
-local player = Players.LocalPlayer
+local FPS_BOOST_ACTIVE = false
 
-local fpsRunning = false
-local fpsConnections = {}
+-- CACHE ORIGINAL PROPERTIES (AGAR BISA RESTORE)
+local CachedParts = {}
+local CachedLighting = {}
+local CachedTerrain = {}
 
--- PROTECTED OBJECTS
-local function IsProtected(obj)
-    if obj:IsDescendantOf(player:WaitForChild("PlayerGui")) then return true end
-    if obj:IsDescendantOf(game:GetService("StarterGui")) then return true end
-    if obj:IsDescendantOf(game:GetService("ReplicatedStorage")) then return true end
-    return false
+--------------------------------------------------------
+-- SAVE ORIGINAL STATE
+--------------------------------------------------------
+local function CachePart(part)
+    if CachedParts[part] then return end
+
+    CachedParts[part] = {
+        Transparency = part.Transparency,
+        Material = part.Material,
+        CastShadow = part.CastShadow,
+        CanCollide = part.CanCollide
+    }
 end
 
--- NUKER
-local function Nuke(obj)
-    if not fpsRunning or IsProtected(obj) then return end
-
-    if obj:IsA("ParticleEmitter")
-    or obj:IsA("Trail")
-    or obj:IsA("Beam")
-    or obj:IsA("Fire")
-    or obj:IsA("Smoke")
-    or obj:IsA("Sparkles")
-    or obj:IsA("Highlight") then
-        obj:Destroy()
-        return
-    end
-
-    if obj:IsA("Decal")
-    or obj:IsA("Texture")
-    or obj:IsA("SurfaceAppearance") then
-        obj:Destroy()
-        return
-    end
-
-    if obj:IsA("PointLight")
-    or obj:IsA("SpotLight")
-    or obj:IsA("SurfaceLight") then
-        obj:Destroy()
-        return
-    end
-
-    if obj:IsA("MeshPart") then
-        obj.TextureID = ""
-        obj.Material = Enum.Material.SmoothPlastic
-        obj.Reflectance = 0
-        obj.CastShadow = false
-    end
-
-    if obj:IsA("BasePart") then
-        obj.Material = Enum.Material.SmoothPlastic
-        obj.Color = Color3.fromRGB(170,170,170)
-        obj.Reflectance = 0
-        obj.CastShadow = false
-    end
-end
-
--- APPLY BOOST
+--------------------------------------------------------
+-- APPLY FPS BOOST
+--------------------------------------------------------
 local function EnableFPSBoost()
-    if fpsRunning then return end
-    fpsRunning = true
+    if FPS_BOOST_ACTIVE then return end
+    FPS_BOOST_ACTIVE = true
 
-    -- Lighting optimize
+    -- LIGHTING
+    CachedLighting = {
+        GlobalShadows = Lighting.GlobalShadows,
+        FogEnd = Lighting.FogEnd,
+        Brightness = Lighting.Brightness
+    }
+
     Lighting.GlobalShadows = false
-    Lighting.FogEnd = 1e6
+    Lighting.FogEnd = 9e9
     Lighting.Brightness = 1
-    Lighting.ClockTime = 14
 
-    for _, v in ipairs(Lighting:GetChildren()) do
-        if v:IsA("PostEffect") then
-            v:Destroy()
+    -- TERRAIN
+    if Terrain then
+        CachedTerrain = {
+            WaterWaveSize = Terrain.WaterWaveSize,
+            WaterWaveSpeed = Terrain.WaterWaveSpeed,
+            WaterTransparency = Terrain.WaterTransparency,
+            WaterReflectance = Terrain.WaterReflectance
+        }
+
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterTransparency = 1
+        Terrain.WaterReflectance = 0
+    end
+
+    -- MAP OBJECTS
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if not FPS_BOOST_ACTIVE then break end
+
+        -- BASEPART
+        if obj:IsA("BasePart") then
+            CachePart(obj)
+
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.CastShadow = false
+
+            -- Part besar → invisible
+            if obj.Size.Magnitude > 20 then
+                obj.Transparency = 1
+                obj.CanCollide = false
+            end
+
+        -- DECAL / TEXTURE
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            obj:Destroy()
+
+        -- PARTICLE / EFFECT
+        elseif obj:IsA("ParticleEmitter")
+            or obj:IsA("Trail")
+            or obj:IsA("Beam")
+            or obj:IsA("Fire")
+            or obj:IsA("Smoke")
+            or obj:IsA("Sparkles")
+        then
+            obj.Enabled = false
+
+        -- MESH DETAIL
+        elseif obj:IsA("SpecialMesh") then
+            obj:Destroy()
         end
     end
-
-    -- Water optimize
-    local terrain = Workspace:FindFirstChildOfClass("Terrain")
-    if terrain then
-        terrain.WaterWaveSize = 0
-        terrain.WaterWaveSpeed = 0
-        terrain.WaterReflectance = 0
-        terrain.WaterTransparency = 1
-    end
-
-    -- Initial nuke
-    for _, v in ipairs(game:GetDescendants()) do
-        Nuke(v)
-    end
-
-    -- Connections
-    table.insert(fpsConnections, game.DescendantAdded:Connect(function(obj)
-        task.wait()
-        Nuke(obj)
-    end))
-
-    local function OnChar(char)
-        for _, v in ipairs(char:GetDescendants()) do
-            Nuke(v)
-        end
-        table.insert(fpsConnections, char.DescendantAdded:Connect(Nuke))
-    end
-
-    if player.Character then
-        OnChar(player.Character)
-    end
-
-    table.insert(fpsConnections, player.CharacterAdded:Connect(OnChar))
-
-    table.insert(fpsConnections, RunService.RenderStepped:Connect(function()
-        if fpsRunning then
-            settings().Rendering.QualityLevel = 1
-        end
-    end))
 end
 
--- DISABLE BOOST
+--------------------------------------------------------
+-- DISABLE FPS BOOST (RESTORE)
+--------------------------------------------------------
 local function DisableFPSBoost()
-    fpsRunning = false
-    for _, c in ipairs(fpsConnections) do
-        pcall(function() c:Disconnect() end)
+    FPS_BOOST_ACTIVE = false
+
+    -- RESTORE PARTS
+    for part, data in pairs(CachedParts) do
+        if part and part.Parent then
+            part.Transparency = data.Transparency
+            part.Material = data.Material
+            part.CastShadow = data.CastShadow
+            part.CanCollide = data.CanCollide
+        end
     end
-    fpsConnections = {}
+    CachedParts = {}
+
+    -- RESTORE LIGHTING
+    for k, v in pairs(CachedLighting) do
+        Lighting[k] = v
+    end
+    CachedLighting = {}
+
+    -- RESTORE TERRAIN
+    if Terrain and CachedTerrain then
+        for k, v in pairs(CachedTerrain) do
+            Terrain[k] = v
+        end
+    end
+    CachedTerrain = {}
 end
 
---======================================================
--- GUI : FPS BOOST
---======================================================
-
-local MiscSection = Tabs.Misc:AddSection("Performance")
-
+--------------------------------------------------------
+-- GUI TOGGLE
+--------------------------------------------------------
 MiscSection:AddToggle({
-    Title = "Boost FPS",
-    Content = "Reduces graphics and effects to increase performance",
+    Title = "FPS Boost (Reduce Map)",
+    Content = "Hide map & effects to increase FPS",
     Default = false,
     Callback = function(state)
         if state then
             EnableFPSBoost()
+            sirenx("FPS Boost ENABLED")
         else
             DisableFPSBoost()
+            sirenx("FPS Boost DISABLED")
         end
     end
 })
+
 
 MiscSection:AddToggle({
     Title = "Disable 3D Rendering",
     Content = "Disables 3D rendering to reduce GPU usage",
     Default = false,
     Callback = function(state)
-        setfpscap(60)
+        setfpscap(240)
         if RunService.Set3dRenderingEnabled then
             RunService:Set3dRenderingEnabled(not state)
         end
@@ -1895,130 +1895,209 @@ task.spawn(function()
 end)
 
 --//======================================================
---// AUTO CHRISTMAS CAVE (WIB)
+--// AUTO CHRISTMAS CAVE (WIB) - FULL FIX
 --//======================================================
 
-AdminEventSection:AddDivider()
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
+local player = Players.LocalPlayer
+
+--======================================================
+-- CONFIG
+--======================================================
+
+-- POSISI CHRISTMAS CAVE
 local CHRISTMAS_CAVE_POS =
     CFrame.new(541.647, -580.581, 8902.609)
     * CFrame.Angles(0, -1.728958, 0)
 
+-- JADWAL:
+-- MULAI 03:00 WIB
+-- TIAP 3 JAM
+-- DURASI 90 MENIT
 local ChristmasSchedule = {
-    "01:00","02:30","04:00","05:30","07:00","08:30",
-    "10:00","11:30","13:00","14:30","16:00","17:30",
-    "19:00","20:30","22:00","23:30"
+    "03:00","04:30",
+    "06:00","07:30",
+    "09:00","10:30",
+    "12:00","13:30",
+    "15:00","16:30",
+    "18:00","19:30",
+    "21:00","22:30",
+    "00:00","01:30"
 }
 
+--======================================================
+-- STATE
+--======================================================
+
 local autoChristmas = false
-local lastPos = nil
-local inCave = false
 local loopThread = nil
+local lastCFrame = nil
+local inCave = false
+
+--======================================================
+-- UI
+--======================================================
 
 local statusParagraph = AdminEventSection:AddParagraph({
     Title = "Christmas Cave Status",
-    Content = "Waiting for schedule..."
+    Content = "Inactive"
 })
 
--- TIME HELPERS
+--======================================================
+-- TIME HELPERS (WIB)
+--======================================================
+
 local function getWIB()
-    local t = os.date("!*t")
-    return (t.hour + 7) % 24, t.min, t.sec
+    local t = os.date("!*t") -- UTC
+    local h = (t.hour + 7) % 24
+    return h, t.min, t.sec
 end
 
-local function timeToSec(t)
-    local h, m = t:match("(%d+):(%d+)")
-    return h * 3600 + m * 60
+local function timeToSec(str)
+    local h, m = str:match("(%d+):(%d+)")
+    return tonumber(h) * 3600 + tonumber(m) * 60
 end
 
--- TELEPORT
+--======================================================
+-- TELEPORT FUNCTIONS
+--======================================================
+
+local function getHRP()
+    local char = player.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
 local function goCave()
-    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        if not inCave then lastPos = hrp.CFrame end
-        hrp.CFrame = CHRISTMAS_CAVE_POS
-        inCave = true
+    local hrp = getHRP()
+    if not hrp then return end
+
+    if not inCave then
+        lastCFrame = hrp.CFrame
     end
+
+    hrp.CFrame = CHRISTMAS_CAVE_POS
+    inCave = true
 end
 
 local function returnBack()
-    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp and lastPos then
-        hrp.CFrame = lastPos
-        inCave = false
-    end
+    local hrp = getHRP()
+    if not hrp or not lastCFrame then return end
+
+    hrp.CFrame = lastCFrame
+    inCave = false
 end
 
+--======================================================
 -- MAIN LOOP
-local function caveLoop()
+--======================================================
+
+local function ChristmasLoop()
     while autoChristmas do
         local h, m, s = getWIB()
         local nowSec = h * 3600 + m * 60 + s
 
-        for i = 1, #ChristmasSchedule, 2 do
-            local startS = timeToSec(ChristmasSchedule[i])
-            local endS = timeToSec(ChristmasSchedule[i+1])
+        local insideSchedule = false
 
-            if nowSec >= startS and nowSec <= endS then
-                if not inCave then goCave() end
-                break
+        for i = 1, #ChristmasSchedule, 2 do
+            local startSec = timeToSec(ChristmasSchedule[i])
+            local endSec   = timeToSec(ChristmasSchedule[i + 1])
+
+            -- HANDLE LEWAT TENGAH MALAM
+            if startSec > endSec then
+                if nowSec >= startSec or nowSec <= endSec then
+                    insideSchedule = true
+                    break
+                end
             else
-                if inCave then returnBack() end
+                if nowSec >= startSec and nowSec <= endSec then
+                    insideSchedule = true
+                    break
+                end
             end
         end
 
-        statusParagraph:SetContent(
-            string.format("WIB Time: %02d:%02d:%02d", h, m, s)
-        )
+        if insideSchedule then
+            if not inCave then
+                goCave()
+            end
+            statusParagraph:SetContent(
+                string.format("ACTIVE | WIB %02d:%02d:%02d", h, m, s)
+            )
+        else
+            if inCave then
+                returnBack()
+            end
+            statusParagraph:SetContent(
+                string.format("Waiting | WIB %02d:%02d:%02d", h, m, s)
+            )
+        end
 
         task.wait(1)
     end
 
-    if inCave then returnBack() end
+    -- SAFETY CLEANUP
+    if inCave then
+        returnBack()
+    end
+
+    statusParagraph:SetContent("Inactive")
 end
 
+--======================================================
 -- TOGGLE
+--======================================================
+
 AdminEventSection:AddToggle({
     Title = "Auto Christmas Cave (WIB)",
+    Content = "Automatically teleports to Christmas Cave based on WIB schedule",
     Default = false,
     Callback = function(state)
         autoChristmas = state
 
+        if loopThread then
+            task.cancel(loopThread)
+            loopThread = nil
+        end
+
         if state then
-            loopThread = task.spawn(caveLoop)
+            loopThread = task.spawn(ChristmasLoop)
         else
-            if loopThread then
-                task.cancel(loopThread)
-                loopThread = nil
+            if inCave then
+                returnBack()
             end
         end
     end
 })
 
+--======================================================
 -- BUTTONS
+--======================================================
+
 AdminEventSection:AddButton({
     Title = "Teleport Now",
-    Callback = goCave
+    Content = "Force teleport to Christmas Cave",
+    Callback = function()
+        goCave()
+    end
 })
 
 AdminEventSection:AddButton({
     Title = "Return to Position",
-    Callback = returnBack
+    Content = "Return to last position before cave",
+    Callback = function()
+        returnBack()
+    end
 })
 
--- Cleanup
-player.CharacterRemoving:Connect(function()
-    autoChristmasCave = false
-    if checkThread then
-        task.cancel(checkThread)
-        checkThread = nil
-    end
-end)
- 
--- Auto reconnect jika character mati
+--======================================================
+-- CHARACTER RESPAWN SAFETY
+--======================================================
+
 player.CharacterAdded:Connect(function()
     task.wait(2)
-    if autoChristmasCave then
-        checkThread = task.spawn(startCheckLoop)
+    if autoChristmas then
+        inCave = false
     end
 end)
