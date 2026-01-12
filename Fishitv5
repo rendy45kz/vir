@@ -184,8 +184,15 @@ local antiAfkConnection = nil
 local oldRequestCharge = nil
 local autoSellCount = 0
 local autoSellCooldown = false
-local SavedTeleportCFrame = nil
-local PLACE_ID = game.PlaceId
+
+local TeleportConfig = {
+    PlaceId = game.PlaceId,
+    RejoinDelay = 5,
+    HopDelay = 5,
+    AutoRejoin = false,
+    AutoHop = false
+}
+
 
 -- TRACK UUID YANG SUDAH DIHITUNG
 local countedFishUUID = {}
@@ -1273,92 +1280,6 @@ local function DisableFPSBoost()
     CachedTerrain = {}
 end
 
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
-
-local player = Players.LocalPlayer
-
--- SETTINGS
-local AutoRejoin = {
-    Enabled = false,
-    Delay = 5
-}
-
-local AutoHop = {
-    Enabled = false,
-    Delay = 5,
-    MinPlayers = 1
-}
-
-------------------------------------------------
--- AUTO REJOIN (SAME SERVER)
-------------------------------------------------
-local function DoRejoin()
-    task.wait(AutoRejoin.Delay)
-    pcall(function()
-        TeleportService:Teleport(PLACE_ID, player)
-    end)
-end
-
-------------------------------------------------
--- SERVER HOP (NEW SERVER)
-------------------------------------------------
-local function GetNewServer()
-    local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(PLACE_ID)
-    local data = HttpService:JSONDecode(game:HttpGet(url))
-
-    if data and data.data then
-        for _, server in ipairs(data.data) do
-            if server.playing < server.maxPlayers
-                and server.playing >= AutoHop.MinPlayers
-                and server.id ~= game.JobId
-            then
-                return server.id
-            end
-        end
-    end
-end
-
-local function DoServerHop()
-    task.wait(AutoHop.Delay)
-
-    local serverId = GetNewServer()
-    if serverId then
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(
-                PLACE_ID,
-                serverId,
-                player
-            )
-        end)
-    else
-        -- fallback → rejoin
-        DoRejoin()
-    end
-end
-
-------------------------------------------------
--- DISCONNECT DETECTOR
-------------------------------------------------
-player.OnTeleport:Connect(function(state)
-    if state == Enum.TeleportState.Failed then
-        if AutoHop.Enabled then
-            DoServerHop()
-        elseif AutoRejoin.Enabled then
-            DoRejoin()
-        end
-    end
-end)
-
-game:GetService("GuiService").ErrorMessageChanged:Connect(function()
-    if AutoHop.Enabled then
-        DoServerHop()
-    elseif AutoRejoin.Enabled then
-        DoRejoin()
-    end
-end)
-
 --------------------------------------------------------
 -- GUI TOGGLE
 --------------------------------------------------------
@@ -1393,47 +1314,187 @@ MiscSection:AddToggle({
     end
 })
 
-local ServerHop = Tabs.Misc:AddSection("Server Hop")
-ServerHop:AddToggle({
-    Title = "Auto Rejoin",
-    Content = "Automatically rejoins the same server on disconnect",
-    Default = false,
-    Callback = function(state)
-        AutoRejoin.Enabled = state
-    end
-})
-ServerHop:AddInput({
-    Title = "Rejoin Delay",
-    Content = "Delay time before rejoining (in seconds)",
-    Default = tostring(AutoRejoin.Delay),
+--==================================================
+-- AUTO REJOIN & AUTO SERVER HOP (FULL FIX)
+--==================================================
+
+local Players         = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService     = game:GetService("HttpService")
+local GuiService      = game:GetService("GuiService")
+
+local player = Players.LocalPlayer
+
+--------------------------------------------------
+-- CONFIG
+--------------------------------------------------
+local TeleportConfig = {
+    PlaceId     = game.PlaceId,
+    AutoRejoin  = false,
+    AutoHop     = false,
+    RejoinDelay = 5,
+    HopDelay    = 5,
+    Busy        = false
+}
+
+--------------------------------------------------
+-- GUI (SESUIKAN DENGAN TAB KAMU)
+--------------------------------------------------
+
+local RejoinSection = Tabs.Misc:AddSection("Auto Rejoin / Server Hop")
+
+RejoinSection:AddInput({
+    Title = "Place Id",
+    Content = "Target PlaceId",
+    Default = tostring(TeleportConfig.PlaceId),
     Numeric = true,
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0 then
-            AutoRejoin.Delay = num
+    Callback = function(v)
+        local n = tonumber(v)
+        if n then
+            TeleportConfig.PlaceId = n
+            sirenx("PlaceId set to " .. n)
         end
     end
 })
-ServerHop:AddToggle({
+
+RejoinSection:AddToggle({
+    Title = "Auto Rejoin (Same Server)",
+    Content = "Reconnect to the SAME server",
+    Default = false,
+    Callback = function(state)
+        TeleportConfig.AutoRejoin = state
+        sirenx("Auto Rejoin: " .. (state and "ON" or "OFF"))
+    end
+})
+
+RejoinSection:AddToggle({
     Title = "Auto Server Hop",
-    Content = "Automatically hops to a new server on disconnect",
+    Content = "Join a different server",
     Default = false,
     Callback = function(state)
-        AutoHop.Enabled = state
+        TeleportConfig.AutoHop = state
+        sirenx("Auto Server Hop: " .. (state and "ON" or "OFF"))
     end
 })
-ServerHop:AddInput({
-    Title = "Server Hop Delay",
-    Content = "Delay time before hopping (in seconds)",
-    Default = tostring(AutoHop.Delay),
-    Numeric = true,
-    Callback = function(value)
-        local num = tonumber(value)
-        if num and num >= 0 then
-            AutoHop.Delay = num
+
+--------------------------------------------------
+-- CORE FUNCTIONS
+--------------------------------------------------
+
+local function RejoinSameServer()
+    if TeleportConfig.Busy then return end
+    TeleportConfig.Busy = true
+
+    sirenx("Rejoining same server...")
+    task.wait(TeleportConfig.RejoinDelay)
+
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(
+            TeleportConfig.PlaceId,
+            game.JobId,
+            player
+        )
+    end)
+end
+
+local function GetNewServerId()
+    local url = string.format(
+        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
+        TeleportConfig.PlaceId
+    )
+
+    local success, response = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+
+    if not success or not response or not response.data then
+        return nil
+    end
+
+    for _, server in ipairs(response.data) do
+        if server.id ~= game.JobId and server.playing < server.maxPlayers then
+            return server.id
         end
     end
+
+    return nil
+end
+
+local function ServerHop()
+    if TeleportConfig.Busy then return end
+    TeleportConfig.Busy = true
+
+    sirenx("Searching new server...")
+    task.wait(TeleportConfig.HopDelay)
+
+    local serverId = GetNewServerId()
+
+    if serverId then
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                TeleportConfig.PlaceId,
+                serverId,
+                player
+            )
+        end)
+    else
+        sirenx("No server found, fallback rejoin")
+        RejoinSameServer()
+    end
+end
+
+--------------------------------------------------
+-- DISCONNECT / ERROR HANDLER
+--------------------------------------------------
+
+local function HandleDisconnect()
+    if TeleportConfig.AutoHop then
+        ServerHop()
+    elseif TeleportConfig.AutoRejoin then
+        RejoinSameServer()
+    else
+        TeleportConfig.Busy = false
+    end
+end
+
+-- Teleport fail
+player.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.Failed then
+        HandleDisconnect()
+    end
+end)
+
+-- Error disconnect
+GuiService.ErrorMessageChanged:Connect(function()
+    HandleDisconnect()
+end)
+
+--------------------------------------------------
+-- RESET BUSY FLAG ON JOIN
+--------------------------------------------------
+
+player.CharacterAdded:Connect(function()
+    TeleportConfig.Busy = false
+end)
+
+--------------------------------------------------
+-- MANUAL BUTTONS (OPTIONAL)
+--------------------------------------------------
+
+RejoinSection:AddButton({
+    Title = "Rejoin Now (Same Server)",
+    Callback = function()
+        RejoinSameServer()
+    end
 })
+
+RejoinSection:AddButton({
+    Title = "Server Hop Now",
+    Callback = function()
+        ServerHop()
+    end
+})
+
 
 local shop = Tabs.Shop:AddSection("Merchant Shop")
 
@@ -2098,7 +2159,7 @@ task.spawn(function()
         end
     end
 end)
-
+--[[
 --//======================================================
 --// AUTO CHRISTMAS CAVE (WIB) - FULL FIX
 --//======================================================
@@ -2305,5 +2366,5 @@ player.CharacterAdded:Connect(function()
     if autoChristmas then
         inCave = false
     end
-end)
+end) ]]--
 
