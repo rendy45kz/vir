@@ -184,6 +184,7 @@ local antiAfkConnection = nil
 local oldRequestCharge = nil
 local autoSellCount = 0
 local autoSellCooldown = false
+local SavedTeleportCFrame = nil
 
 -- TRACK UUID YANG SUDAH DIHITUNG
 local countedFishUUID = {}
@@ -1451,6 +1452,44 @@ Islands:AddButton({
       sirenx("Teleported to " .. st.teleport.island)
     end
   end
+})
+
+local function SaveTeleportPosition()
+    local player = game:GetService("Players").LocalPlayer
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        sirenx("Failed to save position (HRP not found)")
+        return
+    end
+
+    SavedTeleportCFrame = hrp.CFrame
+    sirenx("Teleport position saved")
+end
+
+local function TeleportToSaved()
+    local player = game:GetService("Players").LocalPlayer
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not hrp or not SavedTeleportCFrame then
+        sirenx("No saved teleport position")
+        return
+    end
+
+    hrp.CFrame = SavedTeleportCFrame
+    sirenx("Teleported to saved position")
+end
+
+Islands:AddButton({
+    Title = "Save Current Position",
+    Content = "Saves your current position for later teleportation",
+    Callback = SaveTeleportPosition
+})
+Islands:AddButton({
+    Title = "Teleport to Saved Position",
+    Content = "Teleports you to the previously saved position",
+    Callback = TeleportToSaved
 })
 
 local Events = Tabs.Teleport:AddSection("Teleports Events")
