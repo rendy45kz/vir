@@ -1454,42 +1454,59 @@ Islands:AddButton({
   end
 })
 
-local function SaveTeleportPosition()
-    local player = game:GetService("Players").LocalPlayer
-    local char = player.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        sirenx("Failed to save position (HRP not found)")
-        return
-    end
-
-    SavedTeleportCFrame = hrp.CFrame
-    sirenx("Teleport position saved")
+local Save = Tabs.Automation:AddSection("Save position Features")
+ 
+function SavePosition(cf)
+  local data = { cf:GetComponents() }
+  writefile(PositionFile, svc.HttpService:JSONEncode(data))
 end
-
-local function TeleportToSaved()
-    local player = game:GetService("Players").LocalPlayer
-    local char = player.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    if not hrp or not SavedTeleportCFrame then
-        sirenx("No saved teleport position")
-        return
+ 
+function LoadPosition()
+  if isfile(PositionFile) then
+    local success, data = pcall(function()
+      return svc.HttpService:JSONDecode(readfile(PositionFile))
+    end)
+    if success and typeof(data) == "table" then
+      return CFrame.new(unpack(data))
     end
-
-    hrp.CFrame = SavedTeleportCFrame
-    sirenx("Teleported to saved position")
+  end
+  return nil
 end
-
-Islands:AddButton({
-    Title = "Save Current Position",
-    Content = "Saves your current position for later teleportation",
-    Callback = SaveTeleportPosition
-})
-Islands:AddButton({
-    Title = "Teleport to Saved Position",
-    Content = "Teleports you to the previously saved position",
-    Callback = TeleportToSaved
+ 
+function TeleportLastPos(char)
+  task.spawn(function()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local last = LoadPosition()
+ 
+    if last then
+      task.wait(2)
+      hrp.CFrame = last
+    end
+  end)
+end
+ 
+player.CharacterAdded:Connect(TeleportLastPos)
+if player.Character then
+  TeleportLastPos(player.Character)
+end
+ 
+Save:AddButton({
+  Title = "Save Position",
+  Callback = function()
+      local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+      SavePosition(hrp.CFrame)
+      sirenx("Position saved successfully!")
+    end
+  end,
+  SubTitle = "Reset Position",
+  SubCallback = function()
+    if isfile(PositionFile) then
+      delfile(PositionFile)
+    end
+    sirenx("Last position has been reset.")
+  end
 })
 
 local Events = Tabs.Teleport:AddSection("Teleports Events")
