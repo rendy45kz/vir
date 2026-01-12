@@ -185,6 +185,7 @@ local oldRequestCharge = nil
 local autoSellCount = 0
 local autoSellCooldown = false
 local SavedTeleportCFrame = nil
+local PLACE_ID = game.PlaceId
 
 -- TRACK UUID YANG SUDAH DIHITUNG
 local countedFishUUID = {}
@@ -1272,6 +1273,92 @@ local function DisableFPSBoost()
     CachedTerrain = {}
 end
 
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+
+-- SETTINGS
+local AutoRejoin = {
+    Enabled = false,
+    Delay = 5
+}
+
+local AutoHop = {
+    Enabled = false,
+    Delay = 5,
+    MinPlayers = 1
+}
+
+------------------------------------------------
+-- AUTO REJOIN (SAME SERVER)
+------------------------------------------------
+local function DoRejoin()
+    task.wait(AutoRejoin.Delay)
+    pcall(function()
+        TeleportService:Teleport(PLACE_ID, player)
+    end)
+end
+
+------------------------------------------------
+-- SERVER HOP (NEW SERVER)
+------------------------------------------------
+local function GetNewServer()
+    local url = ("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100"):format(PLACE_ID)
+    local data = HttpService:JSONDecode(game:HttpGet(url))
+
+    if data and data.data then
+        for _, server in ipairs(data.data) do
+            if server.playing < server.maxPlayers
+                and server.playing >= AutoHop.MinPlayers
+                and server.id ~= game.JobId
+            then
+                return server.id
+            end
+        end
+    end
+end
+
+local function DoServerHop()
+    task.wait(AutoHop.Delay)
+
+    local serverId = GetNewServer()
+    if serverId then
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                PLACE_ID,
+                serverId,
+                player
+            )
+        end)
+    else
+        -- fallback → rejoin
+        DoRejoin()
+    end
+end
+
+------------------------------------------------
+-- DISCONNECT DETECTOR
+------------------------------------------------
+player.OnTeleport:Connect(function(state)
+    if state == Enum.TeleportState.Failed then
+        if AutoHop.Enabled then
+            DoServerHop()
+        elseif AutoRejoin.Enabled then
+            DoRejoin()
+        end
+    end
+end)
+
+game:GetService("GuiService").ErrorMessageChanged:Connect(function()
+    if AutoHop.Enabled then
+        DoServerHop()
+    elseif AutoRejoin.Enabled then
+        DoRejoin()
+    end
+end)
+
 --------------------------------------------------------
 -- GUI TOGGLE
 --------------------------------------------------------
@@ -1306,6 +1393,47 @@ MiscSection:AddToggle({
     end
 })
 
+local ServerHop = Tabs.Misc:AddSection("Server Hop")
+ServerHop:AddToggle({
+    Title = "Auto Rejoin",
+    Content = "Automatically rejoins the same server on disconnect",
+    Default = false,
+    Callback = function(state)
+        AutoRejoin.Enabled = state
+    end
+})
+ServerHop:AddInput({
+    Title = "Rejoin Delay",
+    Content = "Delay time before rejoining (in seconds)",
+    Default = tostring(AutoRejoin.Delay),
+    Numeric = true,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and num >= 0 then
+            AutoRejoin.Delay = num
+        end
+    end
+})
+ServerHop:AddToggle({
+    Title = "Auto Server Hop",
+    Content = "Automatically hops to a new server on disconnect",
+    Default = false,
+    Callback = function(state)
+        AutoHop.Enabled = state
+    end
+})
+ServerHop:AddInput({
+    Title = "Server Hop Delay",
+    Content = "Delay time before hopping (in seconds)",
+    Default = tostring(AutoHop.Delay),
+    Numeric = true,
+    Callback = function(value)
+        local num = tonumber(value)
+        if num and num >= 0 then
+            AutoHop.Delay = num
+        end
+    end
+})
 
 local shop = Tabs.Shop:AddSection("Merchant Shop")
 
@@ -2178,3 +2306,4 @@ player.CharacterAdded:Connect(function()
         inCave = false
     end
 end)
+
