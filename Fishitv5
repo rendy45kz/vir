@@ -208,6 +208,58 @@ local PLATFORM_SIZE = Vector3.new(18, 1, 18)
 local WATER_OFFSET  = 3.2
 local RAY_DISTANCE  = 30
 
+local AntiDrown = {
+    Enabled = false,
+    Connection = nil,
+    LastSend = 0,
+    Interval = 0.5 -- anti spam (detik)
+}
+
+--==================================================
+-- ENABLE
+--==================================================
+local function EnableAntiDrown()
+    if AntiDrown.Enabled then return end
+    AntiDrown.Enabled = true
+
+    AntiDrown.Connection = RunService.Heartbeat:Connect(function()
+        if not AntiDrown.Enabled then return end
+
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        local oxygen = humanoid:FindFirstChild("Oxygen")
+        if not oxygen then return end
+
+        -- Oxygen rendah → refill
+        if oxygen.Value < 90 then
+            local now = tick()
+            if now - AntiDrown.LastSend >= AntiDrown.Interval then
+                AntiDrown.LastSend = now
+
+                pcall(function()
+                    Events.UpdateOxygen:FireServer(100)
+                end)
+            end
+        end
+    end)
+end
+
+--==================================================
+-- DISABLE
+--==================================================
+local function DisableAntiDrown()
+    AntiDrown.Enabled = false
+
+    if AntiDrown.Connection then
+        AntiDrown.Connection:Disconnect()
+        AntiDrown.Connection = nil
+    end
+end
+
 --==================================================
 -- CREATE PLATFORM (ONCE)
 --==================================================
@@ -483,6 +535,19 @@ Plyrs:AddToggle({
       DisableWalkOnWater()
     end
   end
+})
+
+Plyrs:AddToggle({
+    Title = "Anti Drown",
+    Content = "Prevents oxygen from decreasing",
+    Default = true,
+    Callback = function(state)
+        if state then
+            EnableAntiDrown()
+        else
+            DisableAntiDrown()
+        end
+    end
 })
 
 Plyrs:AddToggle({
