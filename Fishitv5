@@ -1,4 +1,4 @@
-local Sirenx = loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/aegishub.lua"))()
+local Sirenx = loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/aegishub2.lua"))()
 
 local Window = Sirenx:Window({
   Title   = "AegisHUB |",
