@@ -2117,17 +2117,12 @@ task.spawn(function()
 end)
 
 --====================================================
--- AUTO SPAWN TOTEM (SIMPLE VERSION - NO PARAGRAPH)
+-- AUTO SPAWN TOTEM (SIMPLE & MOBILE FRIENDLY)
 --====================================================
 
 local Players = game:GetService("Players")
 local RepStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
-
------------------------------------------------------
--- SECTION
------------------------------------------------------
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
 
 -----------------------------------------------------
 -- REMOTE
@@ -2156,7 +2151,8 @@ local TOTEM_DATA = {
 local selectedTotem = "Luck Totem"
 local AUTO_TOTEM = false
 local INTERVAL = 5
-local loopThread = nil
+local nextSpawn = 0
+local loopThread
 
 -----------------------------------------------------
 -- GET TOTEM UUID
@@ -2164,7 +2160,7 @@ local loopThread = nil
 local ReplionClient
 local CachedData
 
-local function GetTotemUUID(name)
+local function GetData()
     if not ReplionClient then
         local pkg = RepStorage:WaitForChild("Packages")
         local replion = pkg:WaitForChild("Replion")
@@ -2175,7 +2171,14 @@ local function GetTotemUUID(name)
         CachedData = ReplionClient:WaitReplion("Data")
     end
 
-    local inv = CachedData:Get("Inventory")
+    return CachedData
+end
+
+local function GetTotemUUID(name)
+    local data = GetData()
+    if not data then return end
+
+    local inv = data:Get("Inventory")
     if not inv or not inv.Totems then return end
 
     for _, t in ipairs(inv.Totems) do
@@ -2186,29 +2189,59 @@ local function GetTotemUUID(name)
 end
 
 -----------------------------------------------------
+-- SECTION
+-----------------------------------------------------
+local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+
+local Status = AutoTotem:AddParagraph({
+    Title = "Status: Inactive",
+    Content = "Stopped"
+})
+-----------------------------------------------------
 -- MAIN LOOP
 -----------------------------------------------------
 local function AutoTotemLoop()
     while AUTO_TOTEM do
-        local uuid = GetTotemUUID(selectedTotem)
-        if not uuid then
-            AUTO_TOTEM = false
-            break
+        local now = os.time()
+        local remain = math.max(0, nextSpawn - now)
+
+        Status:SetTitle("Status: Active")
+        Status:SetContent(
+            string.format(
+                "Totem: %s\nNext Spawn: %02d:%02d",
+                selectedTotem,
+                math.floor(remain / 60),
+                remain % 60
+            )
+        )
+
+        if remain <= 0 then
+            local uuid = GetTotemUUID(selectedTotem)
+            if uuid then
+                pcall(function()
+                    RE_SpawnTotem:FireServer(uuid)
+                end)
+                nextSpawn = now + INTERVAL
+            else
+                Status:SetTitle("Status: Error")
+                Status:SetContent("Totem not found in inventory")
+                AUTO_TOTEM = false
+                break
+            end
         end
 
-        pcall(function()
-            RE_SpawnTotem:FireServer(uuid)
-        end)
-
-        task.wait(INTERVAL)
+        task.wait(1)
     end
+
+    Status:SetTitle("Status: Inactive")
+    Status:SetContent("Stopped")
 end
 
 -----------------------------------------------------
--- UI
+-- UI ELEMENTS
 -----------------------------------------------------
 AutoTotem:AddDropdown({
-    Title = "Totem Type",
+    Title = "Select Totem",
     Options = {
         "Luck Totem",
         "Mutation Totem",
@@ -2217,18 +2250,23 @@ AutoTotem:AddDropdown({
     Default = "Luck Totem",
     Callback = function(v)
         selectedTotem = v
+        nextSpawn = 0
+        Status:SetTitle("Status: Selected")
+        Status:SetContent(v)
     end
 })
 
 AutoTotem:AddToggle({
-    Title = "Auto Spawn Totem (5s)",
+    Title = "Auto Spawn Totem",
     Default = false,
     Callback = function(state)
         AUTO_TOTEM = state
 
         if state then
+            nextSpawn = os.time()
             loopThread = task.spawn(AutoTotemLoop)
         else
+            AUTO_TOTEM = false
             if loopThread then
                 task.cancel(loopThread)
                 loopThread = nil
@@ -2238,7 +2276,7 @@ AutoTotem:AddToggle({
 })
 
 AutoTotem:AddButton({
-    Title = "Spawn Totem Now",
+    Title = "Spawn Now",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotem)
         if uuid then
@@ -2248,7 +2286,6 @@ AutoTotem:AddButton({
         end
     end
 })
-
 
 --[[
 --//======================================================
