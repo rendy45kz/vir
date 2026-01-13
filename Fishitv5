@@ -5,8 +5,8 @@ local Window = Sirenx:Window({
   Footer  = "Fish It",
   Image   = "85286478652862",
   Color   = Color3.fromRGB(244, 244, 245),
-  Theme = 129648704071138,
-  Version = 2.0.1,
+  Theme   = 129648704071138,
+  Version = 1,
 })
 
 local svc = {
