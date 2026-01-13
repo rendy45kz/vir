@@ -4,8 +4,9 @@ local Window = Sirenx:Window({
   Title   = "AegisHUB |",
   Footer  = "Fish It",
   Image   = "85286478652862",
-  Color   = Color3.fromRGB(244, 244, 245),
+  Color   = Color3.fromRGB(0, 150, 255),
   Theme   = 129648704071138,
+  ThemeTransparency = 1,
   Version = 1,
 })
 
@@ -1315,185 +1316,139 @@ MiscSection:AddToggle({
 })
 
 --==================================================
--- AUTO REJOIN & AUTO SERVER HOP (FULL FIX)
+-- AEGISHUB AUTO REJOIN SAME SERVER + KEEP SCRIPT
 --==================================================
 
-local Players         = game:GetService("Players")
+-- SERVICES
+local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
-local HttpService     = game:GetService("HttpService")
-local GuiService      = game:GetService("GuiService")
+local HttpService = game:GetService("HttpService")
 
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
---------------------------------------------------
+--==================================================
 -- CONFIG
---------------------------------------------------
-local TeleportConfig = {
-    PlaceId     = game.PlaceId,
-    AutoRejoin  = false,
-    AutoHop     = false,
-    RejoinDelay = 5,
-    HopDelay    = 5,
-    Busy        = false
+--==================================================
+local AutoServer = {
+    Enabled = false,
+    AutoKeep = true,
+    PlaceId = game.PlaceId,
+    JobId = game.JobId
 }
 
---------------------------------------------------
--- GUI (SESUIKAN DENGAN TAB KAMU)
---------------------------------------------------
+local SAVE_FILE = "AegisHub_Server.json"
 
-local RejoinSection = Tabs.Misc:AddSection("Auto Rejoin / Server Hop")
+--==================================================
+-- SAVE CURRENT SERVER
+--==================================================
+local function SaveCurrentServer()
+    AutoServer.PlaceId = game.PlaceId
+    AutoServer.JobId = game.JobId
 
-RejoinSection:AddInput({
-    Title = "Place Id",
-    Content = "Target PlaceId",
-    Default = tostring(TeleportConfig.PlaceId),
-    Numeric = true,
-    Callback = function(v)
-        local n = tonumber(v)
-        if n then
-            TeleportConfig.PlaceId = n
-            sirenx("PlaceId set to " .. n)
-        end
+    if writefile then
+        pcall(function()
+            writefile(SAVE_FILE, HttpService:JSONEncode({
+                PlaceId = AutoServer.PlaceId,
+                JobId = AutoServer.JobId
+            }))
+        end)
     end
-})
+end
 
-RejoinSection:AddToggle({
-    Title = "Auto Rejoin (Same Server)",
-    Content = "Reconnect to the SAME server",
-    Default = false,
-    Callback = function(state)
-        TeleportConfig.AutoRejoin = state
-        sirenx("Auto Rejoin: " .. (state and "ON" or "OFF"))
+-- AUTO SAVE ON LOAD
+SaveCurrentServer()
+
+--==================================================
+-- LOAD SAVED SERVER
+--==================================================
+local function LoadSavedServer()
+    if not readfile or not isfile then return end
+    if not isfile(SAVE_FILE) then return end
+
+    local data = HttpService:JSONDecode(readfile(SAVE_FILE))
+    if data and data.PlaceId and data.JobId then
+        AutoServer.PlaceId = data.PlaceId
+        AutoServer.JobId = data.JobId
     end
-})
+end
 
-RejoinSection:AddToggle({
-    Title = "Auto Server Hop",
-    Content = "Join a different server",
-    Default = false,
-    Callback = function(state)
-        TeleportConfig.AutoHop = state
-        sirenx("Auto Server Hop: " .. (state and "ON" or "OFF"))
-    end
-})
+LoadSavedServer()
 
---------------------------------------------------
--- CORE FUNCTIONS
---------------------------------------------------
-
+--==================================================
+-- REJOIN SAME SERVER (FIXED)
+--==================================================
 local function RejoinSameServer()
-    if TeleportConfig.Busy then return end
-    TeleportConfig.Busy = true
-
-    sirenx("Rejoining same server...")
-    task.wait(TeleportConfig.RejoinDelay)
+    if not AutoServer.Enabled then return end
+    if not AutoServer.PlaceId or AutoServer.JobId == "" then return end
 
     pcall(function()
         TeleportService:TeleportToPlaceInstance(
-            TeleportConfig.PlaceId,
-            game.JobId,
-            player
+            AutoServer.PlaceId,
+            AutoServer.JobId,
+            LocalPlayer
         )
     end)
 end
 
-local function GetNewServerId()
-    local url = string.format(
-        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100",
-        TeleportConfig.PlaceId
-    )
-
-    local success, response = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet(url))
-    end)
-
-    if not success or not response or not response.data then
-        return nil
-    end
-
-    for _, server in ipairs(response.data) do
-        if server.id ~= game.JobId and server.playing < server.maxPlayers then
-            return server.id
-        end
-    end
-
-    return nil
-end
-
-local function ServerHop()
-    if TeleportConfig.Busy then return end
-    TeleportConfig.Busy = true
-
-    sirenx("Searching new server...")
-    task.wait(TeleportConfig.HopDelay)
-
-    local serverId = GetNewServerId()
-
-    if serverId then
-        pcall(function()
-            TeleportService:TeleportToPlaceInstance(
-                TeleportConfig.PlaceId,
-                serverId,
-                player
-            )
-        end)
-    else
-        sirenx("No server found, fallback rejoin")
-        RejoinSameServer()
-    end
-end
-
---------------------------------------------------
--- DISCONNECT / ERROR HANDLER
---------------------------------------------------
-
-local function HandleDisconnect()
-    if TeleportConfig.AutoHop then
-        ServerHop()
-    elseif TeleportConfig.AutoRejoin then
-        RejoinSameServer()
-    else
-        TeleportConfig.Busy = false
-    end
-end
-
--- Teleport fail
-player.OnTeleport:Connect(function(state)
+--==================================================
+-- TELEPORT FAIL HANDLER
+--==================================================
+LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.Failed then
-        HandleDisconnect()
-    end
-end)
-
--- Error disconnect
-GuiService.ErrorMessageChanged:Connect(function()
-    HandleDisconnect()
-end)
-
---------------------------------------------------
--- RESET BUSY FLAG ON JOIN
---------------------------------------------------
-
-player.CharacterAdded:Connect(function()
-    TeleportConfig.Busy = false
-end)
-
---------------------------------------------------
--- MANUAL BUTTONS (OPTIONAL)
---------------------------------------------------
-
-RejoinSection:AddButton({
-    Title = "Rejoin Now (Same Server)",
-    Callback = function()
+        task.wait(2)
         RejoinSameServer()
     end
-})
+end)
 
-RejoinSection:AddButton({
-    Title = "Server Hop Now",
-    Callback = function()
-        ServerHop()
-    end
-})
+--==================================================
+-- AUTO KEEP AEGISHUB (RE-EXEC AFTER TELEPORT)
+--==================================================
+if queue_on_teleport and AutoServer.AutoKeep then
+    queue_on_teleport([[
+        repeat task.wait() until game:IsLoaded()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/Fishitv5"))()
+    ]])
+end
+
+--==================================================
+-- OPTIONAL GUI (SIMPLE, MOBILE FRIENDLY)
+--==================================================
+
+    local ServerSection = Tabs.Misc:AddSection("Server Control")
+
+    ServerSection:AddToggle({
+        Title = "Auto Rejoin Same Server",
+        Default = false,
+        Callback = function(v)
+            AutoServer.Enabled = v
+            sirenx("Auto Rejoin: " .. (v and "ON" or "OFF"))
+        end
+    })
+
+    ServerSection:AddToggle({
+        Title = "Auto Keep AegisHub",
+        Default = true,
+        Callback = function(v)
+            AutoServer.AutoKeep = v
+            sirenx("Auto Keep AegisHub: " .. (v and "ON" or "OFF"))
+        end
+    })
+
+    ServerSection:AddButton({
+        Title = "Save Current Server",
+        Callback = function()
+            SaveCurrentServer()
+            sirenx("Server saved (JobId locked)")
+        end
+    })
+
+    ServerSection:AddButton({
+        Title = "Rejoin Saved Server",
+        Callback = function()
+            RejoinSameServer()
+        end
+    })
+
 
 
 local shop = Tabs.Shop:AddSection("Merchant Shop")
