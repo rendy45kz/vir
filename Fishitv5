@@ -2117,7 +2117,7 @@ task.spawn(function()
 end)
 
 --====================================================
--- AUTO SPAWN TOTEM (SIMPLE & MOBILE FRIENDLY)
+-- AUTO SPAWN TOTEM (SIMPLE VERSION - NO PARAGRAPH)
 --====================================================
 
 local Players = game:GetService("Players")
@@ -2156,16 +2156,7 @@ local TOTEM_DATA = {
 local selectedTotem = "Luck Totem"
 local AUTO_TOTEM = false
 local INTERVAL = 5
-local nextSpawn = 0
-local loopThread
-
------------------------------------------------------
--- STATUS PARAGRAPH
------------------------------------------------------
-local Status = AutoTotem:AddParagraph({
-    Title = "Status: Inactive , Please Usu Auto Equip Rod",
-    Content = "Waiting..."
-})
+local loopThread = nil
 
 -----------------------------------------------------
 -- GET TOTEM UUID
@@ -2173,7 +2164,7 @@ local Status = AutoTotem:AddParagraph({
 local ReplionClient
 local CachedData
 
-local function GetData()
+local function GetTotemUUID(name)
     if not ReplionClient then
         local pkg = RepStorage:WaitForChild("Packages")
         local replion = pkg:WaitForChild("Replion")
@@ -2184,14 +2175,7 @@ local function GetData()
         CachedData = ReplionClient:WaitReplion("Data")
     end
 
-    return CachedData
-end
-
-local function GetTotemUUID(name)
-    local data = GetData()
-    if not data then return end
-
-    local inv = data:Get("Inventory")
+    local inv = CachedData:Get("Inventory")
     if not inv or not inv.Totems then return end
 
     for _, t in ipairs(inv.Totems) do
@@ -2206,46 +2190,25 @@ end
 -----------------------------------------------------
 local function AutoTotemLoop()
     while AUTO_TOTEM do
-        local now = os.time()
-        local remain = math.max(0, nextSpawn - now)
-
-        Status:SetTitle("Status: Active")
-        Status:SetContent(
-            string.format(
-                "Totem: %s\nNext Spawn: %02d:%02d",
-                selectedTotem,
-                math.floor(remain / 60),
-                remain % 60
-            )
-        )
-
-        if remain <= 0 then
-            local uuid = GetTotemUUID(selectedTotem)
-            if uuid then
-                pcall(function()
-                    RE_SpawnTotem:FireServer(uuid)
-                end)
-                nextSpawn = now + INTERVAL
-            else
-                Status:SetTitle("Status: Error")
-                Status:SetContent("Totem not found in inventory")
-                AUTO_TOTEM = false
-                break
-            end
+        local uuid = GetTotemUUID(selectedTotem)
+        if not uuid then
+            AUTO_TOTEM = false
+            break
         end
 
-        task.wait(1)
-    end
+        pcall(function()
+            RE_SpawnTotem:FireServer(uuid)
+        end)
 
-    Status:SetTitle("Status: Inactive")
-    Status:SetContent("Stopped")
+        task.wait(INTERVAL)
+    end
 end
 
 -----------------------------------------------------
--- UI ELEMENTS
+-- UI
 -----------------------------------------------------
 AutoTotem:AddDropdown({
-    Title = "Select Totem",
+    Title = "Totem Type",
     Options = {
         "Luck Totem",
         "Mutation Totem",
@@ -2254,23 +2217,18 @@ AutoTotem:AddDropdown({
     Default = "Luck Totem",
     Callback = function(v)
         selectedTotem = v
-        nextSpawn = 0
-        Status:SetTitle("Status: Selected")
-        Status:SetContent(v)
     end
 })
 
 AutoTotem:AddToggle({
-    Title = "Auto Spawn Totem",
+    Title = "Auto Spawn Totem (5s)",
     Default = false,
     Callback = function(state)
         AUTO_TOTEM = state
 
         if state then
-            nextSpawn = os.time()
             loopThread = task.spawn(AutoTotemLoop)
         else
-            AUTO_TOTEM = false
             if loopThread then
                 task.cancel(loopThread)
                 loopThread = nil
@@ -2280,7 +2238,7 @@ AutoTotem:AddToggle({
 })
 
 AutoTotem:AddButton({
-    Title = "Spawn Now",
+    Title = "Spawn Totem Now",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotem)
         if uuid then
