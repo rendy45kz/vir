@@ -6,7 +6,6 @@ local Window = Sirenx:Window({
   Image   = "85286478652862",
   Color   = Color3.fromRGB(0, 150, 255),
   Theme   = 139487706097843,
-  --ThemeTransparency = 1,
   Version = 1,
 })
 
