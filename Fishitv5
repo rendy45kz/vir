@@ -208,56 +208,40 @@ local PLATFORM_SIZE = Vector3.new(18, 1, 18)
 local WATER_OFFSET  = 3.2
 local RAY_DISTANCE  = 30
 
+--==================================================
+-- ANTI DROWN (OXYGEN BYPASS - SAFE)
+--==================================================
+
 local AntiDrown = {
     Enabled = false,
-    Connection = nil,
-    LastSend = 0,
-    Interval = 0.5 -- anti spam (detik)
+    Hooked = false
 }
 
 --==================================================
--- ENABLE
+-- METATABLE HOOK (LOAD ONCE)
 --==================================================
-local function EnableAntiDrown()
-    if AntiDrown.Enabled then return end
-    AntiDrown.Enabled = true
+local rawmt = getrawmetatable(game)
+if rawmt and not AntiDrown.Hooked then
+    setreadonly(rawmt, false)
 
-    AntiDrown.Connection = RunService.Heartbeat:Connect(function()
-        if not AntiDrown.Enabled then return end
+    local oldNamecall = rawmt.__namecall
 
-        local char = LocalPlayer.Character
-        if not char then return end
+    rawmt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
 
-        local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-
-        local oxygen = humanoid:FindFirstChild("Oxygen")
-        if not oxygen then return end
-
-        -- Oxygen rendah → refill
-        if oxygen.Value < 90 then
-            local now = tick()
-            if now - AntiDrown.LastSend >= AntiDrown.Interval then
-                AntiDrown.LastSend = now
-
-                pcall(function()
-                    Events.UpdateOxygen:FireServer(100)
-                end)
-            end
+        -- BLOCK OXYGEN UPDATE
+        if AntiDrown.Enabled
+            and method == "FireServer"
+            and tostring(self) == "URE/UpdateOxygen"
+        then
+            return nil
         end
+
+        return oldNamecall(self, ...)
     end)
-end
 
---==================================================
--- DISABLE
---==================================================
-local function DisableAntiDrown()
-    AntiDrown.Enabled = false
-
-    if AntiDrown.Connection then
-        AntiDrown.Connection:Disconnect()
-        AntiDrown.Connection = nil
-    end
+    setreadonly(rawmt, true)
+    AntiDrown.Hooked = true
 end
 
 --==================================================
@@ -538,15 +522,11 @@ Plyrs:AddToggle({
 })
 
 Plyrs:AddToggle({
-    Title = "Anti Drown",
-    Content = "Prevents oxygen from decreasing",
-    Default = true,
+    Title = "Anti Drown (Bypass)",
+    Content = "Block oxygen update (no drowning)",
+    Default = false,
     Callback = function(state)
-        if state then
-            EnableAntiDrown()
-        else
-            DisableAntiDrown()
-        end
+        AntiDrown.Enabled = state
     end
 })
 
