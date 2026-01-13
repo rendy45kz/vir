@@ -506,26 +506,6 @@ Camera:AddToggle({
 local LegitFishing = Tabs.Fishing:AddSection("Legit Fishing")
 
 --------------------------------------------------
--- SERVICES (UNTUK TAP / CURSOR)
---------------------------------------------------
-local VIM = game:GetService("VirtualInputManager")
-local Camera = workspace.CurrentCamera
-
---------------------------------------------------
--- TAP CURSOR (CENTER SCREEN)
---------------------------------------------------
-local function CursorTap()
-    local vp = Camera.ViewportSize
-    local x, y = vp.X / 2, vp.Y / 2
-
-    pcall(function()
-        VIM:SendTouchEvent(0, Enum.UserInputState.Begin, x, y)
-        task.wait(0.002)
-        VIM:SendTouchEvent(0, Enum.UserInputState.End, x, y)
-    end)
-end
-
---------------------------------------------------
 -- TOGGLE
 --------------------------------------------------
 LegitFishing:AddToggle({
@@ -555,9 +535,6 @@ LegitFishing:AddToggle({
                 if GUID then
                     task.wait(st.MinigameDelay)
 
-                    -- TAP CURSOR (LEGIT)
-                    CursorTap()
-
                     -- FINISH MINIGAME
                     pcall(function()
                         api.Events.REFishDone:FireServer()
@@ -580,8 +557,7 @@ LegitFishing:AddToggle({
 --------------------------------------------------
 -- INPUT DELAY
 --------------------------------------------------
-local MD
-MD = LegitFishing:AddInput({
+local MD = LegitFishing:AddInput({
     Title = "Minigame Delay",
     Content = "Delay for finish the minigame",
     Default = tostring(st.MinigameDelay),
