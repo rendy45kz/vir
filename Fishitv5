@@ -2116,174 +2116,209 @@ task.spawn(function()
     end
 end)
 
---====================================================
--- AUTO SPAWN TOTEM (SIMPLE & MOBILE FRIENDLY)
---====================================================
+--//======================================================
+--// AUTO TOTEM (1 HOUR INTERVAL - ADMIN EVENT PATTERN)
+--//======================================================
 
-local Players = game:GetService("Players")
+local player = game:GetService("Players").LocalPlayer
 local RepStorage = game:GetService("ReplicatedStorage")
-local player = Players.LocalPlayer
 
------------------------------------------------------
--- REMOTE
------------------------------------------------------
-local RPath = {"Packages","_Index","sleitnick_net@0.2.0","net"}
+local AutoTotem = Tabs.Automation:AddSection("Auto Totem")
+
+----------------------------------------------------------------
+-- REMOTES
+----------------------------------------------------------------
+local RPath = {"Packages", "_Index", "sleitnick_net@0.2.0", "net"}
 
 local function GetRemote(path, name)
     local cur = RepStorage
-    for _, v in ipairs(path) do
-        cur = cur:WaitForChild(v)
+    for _, p in ipairs(path) do
+        cur = cur:WaitForChild(p, 2)
+        if not cur then return nil end
     end
     return cur:FindFirstChild(name)
 end
 
 local RE_SpawnTotem = GetRemote(RPath, "RE/SpawnTotem")
+local RE_EquipToolFromHotbar = GetRemote(RPath, "RE/EquipToolFromHotbar")
 
------------------------------------------------------
+----------------------------------------------------------------
 -- DATA
------------------------------------------------------
+----------------------------------------------------------------
 local TOTEM_DATA = {
-    ["Luck Totem"]     = 1,
-    ["Mutation Totem"] = 2,
-    ["Shiny Totem"]    = 3
+    ["Luck Totem"]     = {Id = 1},
+    ["Mutation Totem"] = {Id = 2},
+    ["Shiny Totem"]    = {Id = 3},
 }
 
+----------------------------------------------------------------
+-- STATE
+----------------------------------------------------------------
+local autoTotemEnabled = false
 local selectedTotem = "Luck Totem"
-local AUTO_TOTEM = false
-local INTERVAL = 5
-local nextSpawn = 0
-local loopThread
+local nextSpawnTime = 0
+local SPAWN_INTERVAL = 3600 -- 1 JAM
 
------------------------------------------------------
--- GET TOTEM UUID
------------------------------------------------------
+----------------------------------------------------------------
+-- STATUS PARAGRAPH (AMAN)
+----------------------------------------------------------------
+local statusParagraph = AutoTotem:AddParagraph({
+    Title = "Auto Totem Status",
+    Content = "Inactive"
+})
+
+----------------------------------------------------------------
+-- REPLION INVENTORY
+----------------------------------------------------------------
 local ReplionClient
 local CachedData
 
-local function GetData()
+local function GetReplion()
     if not ReplionClient then
-        local pkg = RepStorage:WaitForChild("Packages")
-        local replion = pkg:WaitForChild("Replion")
-        ReplionClient = require(replion).Client
+        local pkg = RepStorage:WaitForChild("Packages", 5)
+        local mod = pkg and pkg:FindFirstChild("Replion")
+        if not mod then return nil end
+
+        local ok, m = pcall(require, mod)
+        if ok and m.Client then
+            ReplionClient = m.Client
+        end
     end
 
-    if not CachedData then
-        CachedData = ReplionClient:WaitReplion("Data")
+    if not CachedData and ReplionClient then
+        local ok, d = pcall(function()
+            return ReplionClient:WaitReplion("Data", 5)
+        end)
+        if ok then CachedData = d end
     end
 
     return CachedData
 end
 
 local function GetTotemUUID(name)
-    local data = GetData()
-    if not data then return end
+    local repl = GetReplion()
+    if not repl then return nil end
 
-    local inv = data:Get("Inventory")
-    if not inv or not inv.Totems then return end
+    local ok, inv = pcall(function()
+        return repl:Get("Inventory")
+    end)
+    if not ok or not inv or not inv.Totems then return nil end
 
     for _, t in ipairs(inv.Totems) do
-        if tonumber(t.Id) == TOTEM_DATA[name] and (t.Count or 1) > 0 then
+        if tonumber(t.Id) == TOTEM_DATA[name].Id and (t.Count or 1) > 0 then
             return t.UUID
         end
     end
 end
 
------------------------------------------------------
--- SECTION
------------------------------------------------------
-local AutoTotem = Tabs.Automation:AddSection("Auto Spawn Totem")
+----------------------------------------------------------------
+-- AUTO TOTEM LOOP (ADMIN EVENT STYLE)
+----------------------------------------------------------------
+task.spawn(function()
+    while true do
+        task.wait(1)
 
-local Status = AutoTotem:AddParagraph({
-    Title = "Status: Inactive",
-    Content = "Stopped"
-})
------------------------------------------------------
--- MAIN LOOP
------------------------------------------------------
-local function AutoTotemLoop()
-    while AUTO_TOTEM do
-        local now = os.time()
-        local remain = math.max(0, nextSpawn - now)
-
-        Status:SetTitle("Status: Active")
-        Status:SetContent(
-            string.format(
-                "Totem: %s\nNext Spawn: %02d:%02d",
-                selectedTotem,
-                math.floor(remain / 60),
-                remain % 60
-            )
-        )
-
-        if remain <= 0 then
-            local uuid = GetTotemUUID(selectedTotem)
-            if uuid then
-                pcall(function()
-                    RE_SpawnTotem:FireServer(uuid)
-                end)
-                nextSpawn = now + INTERVAL
-            else
-                Status:SetTitle("Status: Error")
-                Status:SetContent("Totem not found in inventory")
-                AUTO_TOTEM = false
-                break
-            end
+        if not autoTotemEnabled then
+            statusParagraph:SetContent("Inactive")
+            continue
         end
 
-        task.wait(1)
+        local now = os.time()
+        local left = nextSpawnTime - now
+
+        if left > 0 then
+            local m = math.floor(left / 60)
+            local s = left % 60
+            statusParagraph:SetContent(
+                string.format("Next Spawn: %02d:%02d", m, s)
+            )
+        else
+            local uuid = GetTotemUUID(selectedTotem)
+
+            if not uuid then
+                statusParagraph:SetContent("Totem Out of Stock")
+                autoTotemEnabled = false
+                sirenx("Totem habis di inventory")
+                continue
+            end
+
+            -- SPAWN TOTEM
+            pcall(function()
+                RE_SpawnTotem:FireServer(uuid)
+            end)
+
+            -- AUTO EQUIP ROD (AMAN)
+            task.spawn(function()
+                for i = 1, 3 do
+                    task.wait(0.2)
+                    pcall(function()
+                        RE_EquipToolFromHotbar:FireServer(1)
+                    end)
+                end
+            end)
+
+            nextSpawnTime = now + SPAWN_INTERVAL
+            statusParagraph:SetContent("Totem Spawned")
+            sirenx("Totem spawned: " .. selectedTotem)
+        end
     end
+end)
 
-    Status:SetTitle("Status: Inactive")
-    Status:SetContent("Stopped")
-end
-
------------------------------------------------------
--- UI ELEMENTS
------------------------------------------------------
+----------------------------------------------------------------
+-- GUI
+----------------------------------------------------------------
 AutoTotem:AddDropdown({
     Title = "Select Totem",
-    Options = {
-        "Luck Totem",
-        "Mutation Totem",
-        "Shiny Totem"
-    },
+    Options = {"Luck Totem", "Mutation Totem", "Shiny Totem"},
     Default = "Luck Totem",
     Callback = function(v)
         selectedTotem = v
-        nextSpawn = 0
-        Status:SetTitle("Status: Selected")
-        Status:SetContent(v)
+        nextSpawnTime = 0
+        sirenx("Selected Totem: " .. v)
     end
 })
 
 AutoTotem:AddToggle({
-    Title = "Auto Spawn Totem",
+    Title = "Enable Auto Totem",
+    Content = "Spawn totem every 1 hour",
     Default = false,
     Callback = function(state)
-        AUTO_TOTEM = state
+        autoTotemEnabled = state
+        nextSpawnTime = 0
 
         if state then
-            nextSpawn = os.time()
-            loopThread = task.spawn(AutoTotemLoop)
+            sirenx("Auto Totem Enabled")
         else
-            AUTO_TOTEM = false
-            if loopThread then
-                task.cancel(loopThread)
-                loopThread = nil
-            end
+            sirenx("Auto Totem Disabled")
         end
     end
 })
 
 AutoTotem:AddButton({
-    Title = "Spawn Now",
+    Title = "Spawn Totem Now",
+    Content = "Manual spawn",
     Callback = function()
         local uuid = GetTotemUUID(selectedTotem)
-        if uuid then
-            pcall(function()
-                RE_SpawnTotem:FireServer(uuid)
-            end)
+        if not uuid then
+            sirenx("No totem in inventory")
+            return
         end
+
+        pcall(function()
+            RE_SpawnTotem:FireServer(uuid)
+        end)
+
+        -- Auto equip rod
+        task.spawn(function()
+            for i = 1, 3 do
+                task.wait(0.2)
+                pcall(function()
+                    RE_EquipToolFromHotbar:FireServer(1)
+                end)
+            end
+        end)
+
+        sirenx("Totem spawned manually")
     end
 })
 
