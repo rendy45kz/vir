@@ -499,15 +499,8 @@ Camera:AddToggle({
   end
 })
 
---//======================================================
---// LEGIT FISHING (CURSOR TAP + PERFECTION)
---//======================================================
-
 local LegitFishing = Tabs.Fishing:AddSection("Legit Fishing")
 
---------------------------------------------------
--- TOGGLE
---------------------------------------------------
 LegitFishing:AddToggle({
     Title = "Legit Fishing",
     Content = "Automatically fishes for you",
@@ -516,36 +509,21 @@ LegitFishing:AddToggle({
         st.fishingLegit = state
 
         if state then
-            -- ENABLE PERFECTION
-            if EnablePerfection then
-                pcall(EnablePerfection)
-            end
+            EnablePerfection()
         else
-            -- DISABLE PERFECTION
-            if DisablePerfection then
-                pcall(DisablePerfection)
-            end
+            DisablePerfection()
         end
 
         task.spawn(function()
             while st.fishingLegit do
                 local GUID = mods.FishingController:GetCurrentGUID()
 
-                -- MINIGAME DETECTED
                 if GUID then
-                    task.wait(st.MinigameDelay)
-
-                    -- FINISH MINIGAME
-                    pcall(function()
-                        api.Events.REFishDone:FireServer()
-                    end)
-
-                -- NOT FISHING / NOT COOLDOWN
+                    task.wait(st.minigameDelay)
+                    api.Events.REFishDone:FireServer()
                 elseif not mods.FishingController:OnCooldown() then
-                    pcall(function()
-                        api.Functions.Cancel:InvokeServer()
-                        mods.FishingController:RequestChargeFishingRod(nil, true)
-                    end)
+                    api.Functions.Cancel:InvokeServer()
+                    mods.FishingController:RequestChargeFishingRod(nil, true)
                 end
 
                 task.wait(0.1)
@@ -554,25 +532,25 @@ LegitFishing:AddToggle({
     end
 })
 
---------------------------------------------------
--- INPUT DELAY
---------------------------------------------------
-local MD = LegitFishing:AddInput({
+local MD
+MD = LegitFishing:AddInput({
     Title = "Minigame Delay",
     Content = "Delay for finish the minigame",
-    Default = tostring(st.MinigameDelay),
+    Default = tostring(st.minigameDelay),
     Placeholder = "0.1",
     Callback = function(value)
         local num = tonumber(value)
+
         if not num or num < 0 or num > 5 then
             task.spawn(function()
                 task.wait()
-                MD:Set(tostring(st.MinigameDelay))
+                MD:Set(tostring(st.minigameDelay))
                 sirenx("Invalid number! Must be between 0 and 5.")
             end)
             return
         end
-        st.MinigameDelay = num
+
+        st.minigameDelay = num
     end
 })
 
