@@ -499,6 +499,150 @@ Camera:AddToggle({
   end
 })
 
+--//======================================================
+--// LEGIT FISHING (EVENT BASED - MOBILE TAP)
+--//======================================================
+
+local LegitFishing = Tabs.Fishing:AddSection("Legit Fishing (Mobile Legit)")
+
+--------------------------------------------------
+-- SERVICES
+--------------------------------------------------
+local Players = game:GetService("Players")
+local VIM = game:GetService("VirtualInputManager")
+local Camera = workspace.CurrentCamera
+
+local player = Players.LocalPlayer
+
+--------------------------------------------------
+-- STATE
+--------------------------------------------------
+st.fishingLegit = st.fishingLegit or false
+st.MinigameDelay = st.MinigameDelay or 0.5
+
+local minigameActive = false
+local fishingThread = nil
+
+--------------------------------------------------
+-- TAP FUNCTION (CENTER SCREEN)
+--------------------------------------------------
+local function Tap()
+    local vp = Camera.ViewportSize
+    local x, y = vp.X / 2, vp.Y / 2
+
+    pcall(function()
+        VIM:SendTouchEvent(0, Enum.UserInputState.Begin, x, y)
+        task.wait(0.03)
+        VIM:SendTouchEvent(0, Enum.UserInputState.End, x, y)
+    end)
+end
+
+--------------------------------------------------
+-- EVENT DETECTION (CORE)
+--------------------------------------------------
+api.Events.FishingMinigameChanged.OnClientEvent:Connect(function(state)
+    -- state biasanya: true / false
+    minigameActive = state
+end)
+
+api.Events.FishingStopped.OnClientEvent:Connect(function()
+    minigameActive = false
+end)
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+local function StartLegitFishing()
+    if fishingThread then
+        task.cancel(fishingThread)
+        fishingThread = nil
+    end
+
+    fishingThread = task.spawn(function()
+        while st.fishingLegit do
+
+            -- Jika minigame muncul → TAP
+            if minigameActive then
+                task.wait(st.MinigameDelay)
+
+                if st.fishingLegit and minigameActive then
+                    Tap()
+                end
+
+                -- tunggu sampai minigame selesai
+                while minigameActive and st.fishingLegit do
+                    task.wait(0.05)
+                end
+            end
+
+            -- Jika tidak sedang minigame → pastikan rod jalan
+            if not minigameActive then
+                pcall(function()
+                    api.Functions.Cancel:InvokeServer()
+                    api.Functions.ChargeRod:InvokeServer(workspace:GetServerTimeNow())
+                end)
+            end
+
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function StopLegitFishing()
+    if fishingThread then
+        task.cancel(fishingThread)
+        fishingThread = nil
+    end
+
+    minigameActive = false
+end
+
+--------------------------------------------------
+-- TOGGLE
+--------------------------------------------------
+LegitFishing:AddToggle({
+    Title = "Legit Fishing",
+    Content = "Auto tap only when minigame starts (Mobile)",
+    Default = false,
+    Callback = function(state)
+        st.fishingLegit = state
+
+        if state then
+            StartLegitFishing()
+            sirenx("Legit Fishing ON (Event Mode)")
+        else
+            StopLegitFishing()
+            sirenx("Legit Fishing OFF")
+        end
+    end
+})
+
+--------------------------------------------------
+-- DELAY INPUT
+--------------------------------------------------
+local MD
+MD = LegitFishing:AddInput({
+    Title = "Minigame Tap Delay",
+    Content = "Delay before tap when minigame detected",
+    Default = tostring(st.MinigameDelay),
+    Placeholder = "0.3 - 1.5",
+    Callback = function(value)
+        local n = tonumber(value)
+        if not n or n < 0.1 or n > 3 then
+            task.spawn(function()
+                task.wait()
+                MD:Set(tostring(st.MinigameDelay))
+                sirenx("Delay invalid (0.1 - 3)")
+            end)
+            return
+        end
+
+        st.MinigameDelay = n
+        sirenx("Tap delay set to " .. n)
+    end
+})
+
+
 local AutoFishing = Tabs.Fishing:AddSection("Instant Fishing")
 
 api.Events.RETextEffect.OnClientEvent:Connect(function(data)
