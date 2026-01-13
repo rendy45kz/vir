@@ -192,83 +192,121 @@ local TeleportConfig = {
     AutoRejoin = false,
     AutoHop = false
 }
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
 
--- FUNGSI WALK ON WATER
+local LocalPlayer = Players.LocalPlayer
+
+-- STATE
+local isWalkOnWater = false
+local waterPlatform = nil
+local walkOnWaterConnection = nil
+
+-- CONFIG
+local PLATFORM_SIZE = Vector3.new(18, 1, 18)
+local WATER_OFFSET  = 3.2
+local RAY_DISTANCE  = 30
+
+--==================================================
+-- CREATE PLATFORM (ONCE)
+--==================================================
+local function CreateWaterPlatform()
+    local p = Instance.new("Part")
+    p.Name = "WaterPlatform"
+    p.Anchored = true
+    p.CanCollide = true
+    p.Transparency = 1
+    p.Size = PLATFORM_SIZE
+    p.CastShadow = false
+    p.Parent = workspace
+    return p
+end
+
+--==================================================
+-- ENABLE WALK ON WATER
+--==================================================
 local function EnableWalkOnWater()
     if isWalkOnWater then return end
- 
     isWalkOnWater = true
- 
+
     if not waterPlatform then
-        waterPlatform = Instance.new("Part")
-        waterPlatform.Name = "WaterPlatform"
-        waterPlatform.Anchored = true
-        waterPlatform.CanCollide = true
-        waterPlatform.Transparency = 1 
-        waterPlatform.Size = Vector3.new(15, 1, 15)
-        waterPlatform.Parent = workspace
+        waterPlatform = CreateWaterPlatform()
     end
- 
-    if walkOnWaterConnection then 
-        walkOnWaterConnection:Disconnect() 
+
+    if walkOnWaterConnection then
+        walkOnWaterConnection:Disconnect()
     end
- 
-    walkOnWaterConnection = game:GetService("RunService").RenderStepped:Connect(function()
+
+    walkOnWaterConnection = RunService.Heartbeat:Connect(function()
         if not isWalkOnWater then return end
- 
-        local character = LocalPlayer.Character
-        if not character then return end
- 
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
- 
-        if not waterPlatform or not waterPlatform.Parent then
-            waterPlatform = Instance.new("Part")
-            waterPlatform.Name = "WaterPlatform"
-            waterPlatform.Anchored = true
-            waterPlatform.CanCollide = true
-            waterPlatform.Transparency = 1 
-            waterPlatform.Size = Vector3.new(15, 1, 15)
-            waterPlatform.Parent = workspace
-        end
- 
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {workspace.Terrain} 
-        rayParams.FilterType = Enum.RaycastFilterType.Include
-        rayParams.IgnoreWater = false
- 
-        local rayOrigin = hrp.Position + Vector3.new(0, 5, 0) 
-        local rayDirection = Vector3.new(0, -500, 0)
-        local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
- 
+
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        -- RAYCAST PARAMS (DETECT WATER)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances = {char}
+        params.IgnoreWater = false
+
+        local origin = hrp.Position + Vector3.new(0, 5, 0)
+        local direction = Vector3.new(0, -RAY_DISTANCE, 0)
+
+        local result = workspace:Raycast(origin, direction, params)
+
         if result and result.Material == Enum.Material.Water then
-            local waterSurfaceHeight = result.Position.Y
-            waterPlatform.Position = Vector3.new(hrp.Position.X, waterSurfaceHeight, hrp.Position.Z)
- 
-            if hrp.Position.Y < (waterSurfaceHeight + 2) and hrp.Position.Y > (waterSurfaceHeight - 5) then
+            local waterY = result.Position.Y
+
+            -- MOVE PLATFORM
+            waterPlatform.Position = Vector3.new(
+                hrp.Position.X,
+                waterY,
+                hrp.Position.Z
+            )
+
+            -- ONLY LIFT PLAYER IF NEAR WATER
+            if hrp.Position.Y < waterY + WATER_OFFSET then
                 if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    hrp.CFrame = CFrame.new(hrp.Position.X, waterSurfaceHeight + 3.2, hrp.Position.Z)
+                    hrp.Velocity = Vector3.new(
+                        hrp.Velocity.X,
+                        0,
+                        hrp.Velocity.Z
+                    )
+
+                    hrp.CFrame = CFrame.new(
+                        hrp.Position.X,
+                        waterY + WATER_OFFSET,
+                        hrp.Position.Z
+                    )
                 end
             end
         else
-            waterPlatform.Position = Vector3.new(hrp.Position.X, -500, hrp.Position.Z)
+            -- HIDE PLATFORM
+            waterPlatform.Position = Vector3.new(0, -500, 0)
         end
     end)
 end
 
+--==================================================
+-- DISABLE WALK ON WATER
+--==================================================
 local function DisableWalkOnWater()
     if not isWalkOnWater then return end
- 
     isWalkOnWater = false
- 
-    if walkOnWaterConnection then 
-        walkOnWaterConnection:Disconnect() 
-        walkOnWaterConnection = nil 
+
+    if walkOnWaterConnection then
+        walkOnWaterConnection:Disconnect()
+        walkOnWaterConnection = nil
     end
- 
-    if waterPlatform then 
-        waterPlatform:Destroy() 
-        waterPlatform = nil 
+
+    if waterPlatform then
+        waterPlatform:Destroy()
+        waterPlatform = nil
     end
 end
 
@@ -1637,7 +1675,7 @@ WeatherShop:AddToggle({
 local Islands= Tabs.Teleport:AddSection("Teleports Islands")
 
 local TeleportLocations = {
-  ["Fishermand Island"] = CFrame.new(251.970, 3.262, 2972.211) * CFrame.Angles(-3.141593, -1.257929, -3.141593),
+    ["Fishermand Island"] = CFrame.new(251.970, 3.262, 2972.211) * CFrame.Angles(-3.141593, -1.257929, -3.141593),
 	["Crater Island"] = CFrame.new(1072.845, 5.034, 5112.388) * CFrame.Angles(-0.000000, 1.229756, -0.000000),
 	["Ancient Jungle"] = CFrame.new(1433.173, 6.625, -782.708) * CFrame.Angles(-0.000000, -0.360566, -0.000000),
 	["Kohana"] = CFrame.new(-655.889, 17.250, 483.854) * CFrame.Angles(-0.000000, -1.567192, -0.000000),
@@ -1650,12 +1688,8 @@ local TeleportLocations = {
 	["Weather Machine"] = CFrame.new(-1515.702, 2.875, 1912.361) * CFrame.Angles(-3.141593, -0.177870, -3.141593),
 	["Esoteric Dephts"] = CFrame.new(3204.603, -1302.855, 1410.619) * CFrame.Angles(-0.000000, 0.454337, -0.000000),
 	["Ancient Ruin"] = CFrame.new(6099.980, -585.924, 4682.759) * CFrame.Angles(3.141535, 1.569459, -3.141535),
-	["Classic Island"] = CFrame.new(1226.521, 4.000, 2774.871) * CFrame.Angles(0.000000, 0.006386, -0.000000),
-	["Iron Cavern"] = CFrame.new(-8800.321, -585.000, 83.745) * CFrame.Angles(-0.000000, -0.943772, 0.000000),
-	["Iron Cafe"] = CFrame.new(-8642.318, -547.500, 158.730) * CFrame.Angles(0.000000, -1.559896, 0.000000),
 	["Underground Cellar"] = CFrame.new(2135.955, -91.199, -697.068) * CFrame.Angles(-0.000000, -0.098867, 0.000000),
 	["Pirate Cove"] = CFrame.new(3399.40234375, 4.191970348358154, 3478.972412109375,0.2146824449300766, -2.6497572136463533e-8, -0.9766839146614075,-6.210501890535625e-9, 1, -2.8495255932625697e-8,0.9766839146614075, 1.2183128283993483e-8, 0.2146824449300766)
-
 }
 
 local function GetNameTeleport()
@@ -1747,11 +1781,10 @@ Save:AddButton({
 
 local Events = Tabs.Teleport:AddSection("Teleports Events")
 
--- ===============================
--- EVENT AUTO TELEPORT (GUI MATCH)
--- ===============================
-
-local eventsList = { 
+--==================================================
+-- CONFIG
+--==================================================
+local eventsList = {
     "Shark Hunt",
     "Ghost Shark Hunt",
     "Worm Hunt",
@@ -1759,243 +1792,197 @@ local eventsList = {
     "Ghost Worm",
     "Black Hole",
     "Megalodon Hunt"
-
 }
 
-local autoEventTargetName = nil 
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+--==================================================
+-- STATE
+--==================================================
+local autoEventTargetName = nil
 local autoEventTeleportState = false
 local autoEventTeleportThread = nil
+
 local lastLocation = nil
 local currentEventModel = nil
 local lastEventPosition = nil
- 
--- VARIABEL WALK ON WATER
-local walkOnWaterConnection = nil
-local isWalkOnWater = false
-local waterPlatform = nil
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = game.Players.LocalPlayer
- 
--- FUNGSI SAVE LAST LOCATION (simpan ketika enable)
+
+--==================================================
+-- SAVE / RETURN POSITION
+--==================================================
 local function SaveLastLocation()
-    local character = LocalPlayer.Character
-    if not character then return false end
- 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
- 
     lastLocation = hrp.CFrame
     return true
 end
 
--- FUNGSI RETURN TO LAST LOCATION
 local function ReturnToLastLocation()
-    if not lastLocation then return false end
- 
-    local character = LocalPlayer.Character
-    if not character then return false end
- 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
- 
-    hrp.CFrame = lastLocation
-    return true
+    if not lastLocation then return end
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = lastLocation
+    end
 end
 
--- FUNGSI CARI EVENT
+--==================================================
+-- FIND EVENT MODEL
+--==================================================
 local function FindTargetEvent()
     if not autoEventTargetName then return nil end
- 
+
     local searchName = autoEventTargetName
     if searchName == "Temporary event" then
         searchName = "Black Hole"
     end
- 
-    for _, child in pairs(workspace:GetChildren()) do
-        if child.Name == "Props" then
-            local eventModel = nil
- 
-            if searchName == "Worm Hunt" then
-                eventModel = child:FindFirstChild("Model")
-            else
-                eventModel = child:FindFirstChild(searchName)
-            end
- 
-            if eventModel then
-                return eventModel
-            end
-        end
+
+    local props = workspace:FindFirstChild("Props")
+    if not props then return nil end
+
+    if searchName == "Worm Hunt" then
+        return props:FindFirstChild("Model")
     end
- 
-    return nil
+
+    return props:FindFirstChild(searchName)
 end
 
+--==================================================
 -- TELEPORT
-
+--==================================================
 local function TeleportToEvent(eventModel)
     if not eventModel then return false end
- 
-    local character = LocalPlayer.Character
-    if not character then return false end
- 
-    local hrp = character:FindFirstChild("HumanoidRootPart")
+
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return false end
- 
-    local targetPos = eventModel:GetPivot().Position
-    hrp.CFrame = CFrame.new(targetPos + Vector3.new(0, 15, 0))
- 
+
+    local pos = eventModel:GetPivot().Position
+    hrp.CFrame = CFrame.new(pos + Vector3.new(0, 18, 0))
+
     currentEventModel = eventModel
-    lastEventPosition = targetPos
- 
+    lastEventPosition = pos
     return true
 end
 
-local function HasEventMoved()
+--==================================================
+-- FOLLOW EVENT
+--==================================================
+local function FollowEvent()
     if not currentEventModel or not currentEventModel.Parent then
-        return true
-    end
- 
-    local currentPos = currentEventModel:GetPivot().Position
-    if not lastEventPosition then return true end
- 
-    local distance = (currentPos - lastEventPosition).Magnitude
-    return distance > 5
-end
-
-local function FollowMovingEvent()
-    if not currentEventModel then return false end
- 
-    if not currentEventModel.Parent then
         currentEventModel = nil
         lastEventPosition = nil
-        return false
+        return
     end
- 
-    if HasEventMoved() then
-        return TeleportToEvent(currentEventModel)
+
+    local pos = currentEventModel:GetPivot().Position
+    if not lastEventPosition then
+        lastEventPosition = pos
+        return
     end
- 
-    return false
+
+    if (pos - lastEventPosition).Magnitude > 6 then
+        TeleportToEvent(currentEventModel)
+    end
 end
 
-local function FindAndTeleportToTargetEvent()
-    if not autoEventTargetName then return false end
- 
-    local eventModel = FindTargetEvent()
-    if eventModel then
-        return TeleportToEvent(eventModel)
-    end
- 
-    return false
-end
- 
--- FUNGSI UNTUK RESTART AUTO TELEPORT LOOP
-local function RestartAutoTeleportLoop()
-    if not autoEventTeleportState then return end
- 
-    if autoEventTeleportThread then 
-        task.cancel(autoEventTeleportThread) 
+--==================================================
+-- MAIN LOOP
+--==================================================
+local function StartAutoEventLoop()
+    if autoEventTeleportThread then
+        task.cancel(autoEventTeleportThread)
         autoEventTeleportThread = nil
     end
- 
-    currentEventModel = nil
-    lastEventPosition = nil
- 
+
     autoEventTeleportThread = task.spawn(function()
         while autoEventTeleportState do
-            local success = FindAndTeleportToTargetEvent()
- 
-            if success then
-                for i = 1, 180 do
-                    if not autoEventTeleportState then break end
-                    FollowMovingEvent()
+            if not currentEventModel then
+                local found = FindTargetEvent()
+                if found then
+                    TeleportToEvent(found)
+                    task.wait(2)
+                else
                     task.wait(5)
                 end
             else
-                task.wait(10)
+                FollowEvent()
+                task.wait(1)
             end
         end
- 
-        currentEventModel = nil
-        lastEventPosition = nil
     end)
 end
 
--- ===============================
--- GUI (SIRENX STYLE)
--- ===============================
-
+--==================================================
+-- GUI
+--==================================================
 Events:AddDropdown({
     Title = "Select Target Event",
     Content = "Choose event to auto teleport",
     Options = eventsList,
-    Default = nil,
     Callback = function(value)
         autoEventTargetName = value
         currentEventModel = nil
         lastEventPosition = nil
-        if autoEventTeleportState and value then
-            FindAndTeleportToTargetEvent()
-            --RestartAutoTeleportLoop()
-        end
     end
 })
 
 Events:AddToggle({
     Title = "Auto Teleport Event",
-    Content = "Automatically teleport & follow event",
+    Content = "Teleport & follow selected event",
     Default = false,
     Callback = function(state)
         if state and not autoEventTargetName then
-            return false
+            sirenx("Select event first!")
+            return
         end
- 
+
         autoEventTeleportState = state
 
         if state then
-            -- Simpan lokasi terakhir
             SaveLastLocation()
-            -- Enable walk on water
             EnableWalkOnWater()
-            -- Langsung teleport ke event
-            FindAndTeleportToTargetEvent()
-            -- Mulai loop auto follow
-            --RestartAutoTeleportLoop()
+            StartAutoEventLoop()
+            sirenx("Auto Event Teleport ON")
         else
-            DisableWalkOnWater()
- 
-            -- Hentikan loop
             if autoEventTeleportThread then
                 task.cancel(autoEventTeleportThread)
                 autoEventTeleportThread = nil
             end
- 
-            -- Kembali ke lokasi terakhir
+
+            DisableWalkOnWater()
             ReturnToLastLocation()
+
             currentEventModel = nil
             lastEventPosition = nil
+
+            sirenx("Auto Event Teleport OFF")
         end
     end
 })
 
--- Cleanup
+--==================================================
+-- CHARACTER SAFETY
+--==================================================
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
     if autoEventTeleportState then
         EnableWalkOnWater()
     end
 end)
- 
+
 LocalPlayer.CharacterRemoving:Connect(function()
     autoEventTeleportState = false
- 
+
     if autoEventTeleportThread then
         task.cancel(autoEventTeleportThread)
         autoEventTeleportThread = nil
     end
- 
+
     DisableWalkOnWater()
 end)
+
 
 local Plyr = Tabs.Teleport:AddSection("Teleports Player")
 
@@ -2252,6 +2239,8 @@ task.spawn(function()
                 continue
             end
 
+            task.wait(0.5)
+
             -- SPAWN TOTEM
             pcall(function()
                 RE_SpawnTotem:FireServer(uuid)
@@ -2260,7 +2249,7 @@ task.spawn(function()
             -- AUTO EQUIP ROD (AMAN)
             task.spawn(function()
                 for i = 1, 3 do
-                    task.wait(0.2)
+                    task.wait(0.5)
                     pcall(function()
                         RE_EquipToolFromHotbar:FireServer(1)
                     end)
@@ -2505,6 +2494,7 @@ AdminEventSection:AddToggle({
 --======================================================
 -- BUTTONS
 --======================================================
+
 AdminEventSection:AddButton({
     Title = "Teleport Now",
     Content = "Force teleport to Christmas Cave",
