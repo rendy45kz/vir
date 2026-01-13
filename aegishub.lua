@@ -1836,7 +1836,7 @@ function Sirenx:Window(GuiConfig)
 
                 ToggleContent.Font = Enum.Font.GothamBold
                 ToggleContent.Text = ToggleConfig.Content
-                ToggleContent.TextColor3 = Color3.fromRGB(42, 1, 250)
+                ToggleContent.TextColor3 = Color3.fromRGB(129, 129, 131)
                 ToggleContent.TextSize = 12
                 ToggleContent.TextTransparency = 0.6
                 ToggleContent.TextXAlignment = Enum.TextXAlignment.Left
