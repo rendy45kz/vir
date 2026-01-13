@@ -193,6 +193,85 @@ local TeleportConfig = {
     AutoHop = false
 }
 
+-- FUNGSI WALK ON WATER
+local function EnableWalkOnWater()
+    if isWalkOnWater then return end
+ 
+    isWalkOnWater = true
+ 
+    if not waterPlatform then
+        waterPlatform = Instance.new("Part")
+        waterPlatform.Name = "WaterPlatform"
+        waterPlatform.Anchored = true
+        waterPlatform.CanCollide = true
+        waterPlatform.Transparency = 1 
+        waterPlatform.Size = Vector3.new(15, 1, 15)
+        waterPlatform.Parent = workspace
+    end
+ 
+    if walkOnWaterConnection then 
+        walkOnWaterConnection:Disconnect() 
+    end
+ 
+    walkOnWaterConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if not isWalkOnWater then return end
+ 
+        local character = LocalPlayer.Character
+        if not character then return end
+ 
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+ 
+        if not waterPlatform or not waterPlatform.Parent then
+            waterPlatform = Instance.new("Part")
+            waterPlatform.Name = "WaterPlatform"
+            waterPlatform.Anchored = true
+            waterPlatform.CanCollide = true
+            waterPlatform.Transparency = 1 
+            waterPlatform.Size = Vector3.new(15, 1, 15)
+            waterPlatform.Parent = workspace
+        end
+ 
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {workspace.Terrain} 
+        rayParams.FilterType = Enum.RaycastFilterType.Include
+        rayParams.IgnoreWater = false
+ 
+        local rayOrigin = hrp.Position + Vector3.new(0, 5, 0) 
+        local rayDirection = Vector3.new(0, -500, 0)
+        local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+ 
+        if result and result.Material == Enum.Material.Water then
+            local waterSurfaceHeight = result.Position.Y
+            waterPlatform.Position = Vector3.new(hrp.Position.X, waterSurfaceHeight, hrp.Position.Z)
+ 
+            if hrp.Position.Y < (waterSurfaceHeight + 2) and hrp.Position.Y > (waterSurfaceHeight - 5) then
+                if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    hrp.CFrame = CFrame.new(hrp.Position.X, waterSurfaceHeight + 3.2, hrp.Position.Z)
+                end
+            end
+        else
+            waterPlatform.Position = Vector3.new(hrp.Position.X, -500, hrp.Position.Z)
+        end
+    end)
+end
+
+local function DisableWalkOnWater()
+    if not isWalkOnWater then return end
+ 
+    isWalkOnWater = false
+ 
+    if walkOnWaterConnection then 
+        walkOnWaterConnection:Disconnect() 
+        walkOnWaterConnection = nil 
+    end
+ 
+    if waterPlatform then 
+        waterPlatform:Destroy() 
+        waterPlatform = nil 
+    end
+end
+
 
 -- TRACK UUID YANG SUDAH DIHITUNG
 local countedFishUUID = {}
@@ -356,6 +435,19 @@ Plyrs:AddSlider({
 })
 
 Plyrs:AddToggle({
+  Title = "Walk on Water",
+  Content = "Allows you to walk on water",
+  Default = false,
+  Callback = function(state)
+    if state then
+      EnableWalkOnWater()
+    else
+      DisableWalkOnWater()
+    end
+  end
+})
+
+Plyrs:AddToggle({
   Title = "Infinite Jump",
   Content = "Allows you to jump infinitely",
   Default = false,
@@ -499,62 +591,6 @@ Camera:AddToggle({
   end
 })
 
-local LegitFishing = Tabs.Fishing:AddSection("Legit Fishing")
-
-LegitFishing:AddToggle({
-    Title = "Legit Fishing",
-    Content = "Automatically fishes for you",
-    Default = false,
-    Callback = function(state)
-        st.fishingLegit = state
-
-        if state then
-            EnablePerfection()
-        else
-            DisablePerfection()
-        end
-
-        task.spawn(function()
-            while st.fishingLegit do
-                local GUID = mods.FishingController:GetCurrentGUID()
-
-                if GUID then
-                    task.wait(st.minigameDelay)
-                    api.Events.REFishDone:FireServer()
-                elseif not mods.FishingController:OnCooldown() then
-                    api.Functions.Cancel:InvokeServer()
-                    mods.FishingController:RequestChargeFishingRod(nil, true)
-                end
-
-                task.wait(0.1)
-            end
-        end)
-    end
-})
-
-local MD
-MD = LegitFishing:AddInput({
-    Title = "Minigame Delay",
-    Content = "Delay for finish the minigame",
-    Default = tostring(st.minigameDelay),
-    Placeholder = "0.1",
-    Callback = function(value)
-        local num = tonumber(value)
-
-        if not num or num < 0 or num > 5 then
-            task.spawn(function()
-                task.wait()
-                MD:Set(tostring(st.minigameDelay))
-                sirenx("Invalid number! Must be between 0 and 5.")
-            end)
-            return
-        end
-
-        st.minigameDelay = num
-    end
-})
-
-
 local AutoFishing = Tabs.Fishing:AddSection("Instant Fishing")
 
 api.Events.RETextEffect.OnClientEvent:Connect(function(data)
@@ -596,7 +632,6 @@ AutoFishing:AddInput({
       task.spawn(function()
         task.wait()
         CD:Set(tostring(st.completeDelay))
-        sirenx("Invalid number! Must be between 0 and 5.")
       end)
     end
     st.completeDelay = num
@@ -851,7 +886,6 @@ FishFeature:AddButton({
       lp:SetAttribute("Loading", nil)
       task.wait(0.05)
       lp:SetAttribute("Loading", false)
-      sirenx("Recovery Successfully!")
     end)
   end
 })
@@ -869,7 +903,6 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
     local uuid = info.InventoryItem.UUID
     if not uuid then return end
 
-    -- ❌ JANGAN HITUNG 2x UUID YANG SAMA
     if countedFishUUID[uuid] then return end
     countedFishUUID[uuid] = true
 
@@ -886,12 +919,6 @@ api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(itemId, 
             pcall(function()
                 api.Functions.SellAllItem:InvokeServer()
             end)
-
-            sirenx(
-                ("Auto Sell: %d fish sold (target %d)")
-                :format(autoSellCount, target)
-            )
-
             -- RESET SETELAH SELL
             autoSellCount = 0
             table.clear(countedFishUUID)
@@ -914,7 +941,6 @@ SellGroup:AddInput({
     Callback = function(v)
         local n = tonumber(v)
         st.sell.caughtTarget = n or 0
-        sirenx("Auto Sell target set to " .. st.sell.caughtTarget)
     end
 })
 
@@ -931,12 +957,6 @@ SellGroup:AddToggle({
         autoSellCount = 0
         table.clear(countedFishUUID)
         autoSellCooldown = false
-
-        if state then
-            sirenx("Auto Sell enabled (event-based, UUID safe)")
-        else
-            sirenx("Auto Sell disabled")
-        end
     end
 })
 
@@ -951,7 +971,6 @@ SellGroup:AddButton({
         pcall(function()
             api.Functions.SellAllItem:InvokeServer()
         end)
-        sirenx("Manual Sell executed")
     end
 })
 
@@ -1260,10 +1279,10 @@ local function EnableFPSBoost()
             WaterReflectance = Terrain.WaterReflectance
         }
 
-        Terrain.WaterWaveSize = 0
-        Terrain.WaterWaveSpeed = 0
+        Terrain.WaterWaveSize = 0.15
+        Terrain.WaterWaveSpeed = 0.15
         Terrain.WaterTransparency = 1
-        Terrain.WaterReflectance = 0
+        Terrain.WaterReflectance = 0.15
     end
 
     -- MAP OBJECTS
@@ -1349,10 +1368,8 @@ MiscSection:AddToggle({
     Callback = function(state)
         if state then
             EnableFPSBoost()
-            sirenx("FPS Boost ENABLED")
         else
             DisableFPSBoost()
-            sirenx("FPS Boost DISABLED")
         end
     end
 })
@@ -1375,20 +1392,26 @@ MiscSection:AddToggle({
 --==================================================
 
 -- SERVICES
-local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
+local Players          = game:GetService("Players")
+local TeleportService  = game:GetService("TeleportService")
+local HttpService      = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
+
+--==================================================
+-- GLOBAL FLAGS (ANTI DUPLICATE)
+--==================================================
+_G.__AEGIS_REJOIN_RUNNING = _G.__AEGIS_REJOIN_RUNNING or false
+_G.__AEGIS_QUEUED         = _G.__AEGIS_QUEUED or false
 
 --==================================================
 -- CONFIG
 --==================================================
 local AutoServer = {
-    Enabled = false,
+    Enabled  = false,
     AutoKeep = true,
-    PlaceId = game.PlaceId,
-    JobId = game.JobId
+    PlaceId  = game.PlaceId,
+    JobId    = game.JobId
 }
 
 local SAVE_FILE = "AegisHub_Server.json"
@@ -1398,13 +1421,13 @@ local SAVE_FILE = "AegisHub_Server.json"
 --==================================================
 local function SaveCurrentServer()
     AutoServer.PlaceId = game.PlaceId
-    AutoServer.JobId = game.JobId
+    AutoServer.JobId   = game.JobId
 
     if writefile then
         pcall(function()
             writefile(SAVE_FILE, HttpService:JSONEncode({
                 PlaceId = AutoServer.PlaceId,
-                JobId = AutoServer.JobId
+                JobId   = AutoServer.JobId
             }))
         end)
     end
@@ -1417,31 +1440,41 @@ SaveCurrentServer()
 -- LOAD SAVED SERVER
 --==================================================
 local function LoadSavedServer()
-    if not readfile or not isfile then return end
+    if not (readfile and isfile) then return end
     if not isfile(SAVE_FILE) then return end
 
-    local data = HttpService:JSONDecode(readfile(SAVE_FILE))
-    if data and data.PlaceId and data.JobId then
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile(SAVE_FILE))
+    end)
+
+    if ok and data and data.PlaceId and data.JobId then
         AutoServer.PlaceId = data.PlaceId
-        AutoServer.JobId = data.JobId
+        AutoServer.JobId   = data.JobId
     end
 end
 
 LoadSavedServer()
 
 --==================================================
--- REJOIN SAME SERVER (FIXED)
+-- REJOIN SAME SERVER (SAFE)
 --==================================================
 local function RejoinSameServer()
     if not AutoServer.Enabled then return end
-    if not AutoServer.PlaceId or AutoServer.JobId == "" then return end
+    if not AutoServer.PlaceId or not AutoServer.JobId or AutoServer.JobId == "" then
+        return
+    end
 
-    pcall(function()
-        TeleportService:TeleportToPlaceInstance(
-            AutoServer.PlaceId,
-            AutoServer.JobId,
-            LocalPlayer
-        )
+    if _G.__AEGIS_REJOIN_RUNNING then return end
+    _G.__AEGIS_REJOIN_RUNNING = true
+
+    task.delay(1, function()
+        pcall(function()
+            TeleportService:TeleportToPlaceInstance(
+                AutoServer.PlaceId,
+                AutoServer.JobId,
+                LocalPlayer
+            )
+        end)
     end)
 end
 
@@ -1450,61 +1483,64 @@ end
 --==================================================
 LocalPlayer.OnTeleport:Connect(function(state)
     if state == Enum.TeleportState.Failed then
+        _G.__AEGIS_REJOIN_RUNNING = false
         task.wait(2)
         RejoinSameServer()
     end
 end)
 
 --==================================================
--- AUTO KEEP AEGISHUB (RE-EXEC AFTER TELEPORT)
+-- AUTO KEEP AEGISHUB (ANTI DUPLICATE LOAD)
 --==================================================
-if queue_on_teleport and AutoServer.AutoKeep then
+if queue_on_teleport and AutoServer.AutoKeep and not _G.__AEGIS_QUEUED then
+    _G.__AEGIS_QUEUED = true
+
     queue_on_teleport([[
         repeat task.wait() until game:IsLoaded()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/Fishitv5"))()
+        if not _G.__AEGIS_LOADED then
+            _G.__AEGIS_LOADED = true
+            loadstring(game:HttpGet(
+                "https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/Fishitv5"
+            ))()
+        end
     ]])
 end
 
 --==================================================
--- OPTIONAL GUI (SIMPLE, MOBILE FRIENDLY)
+-- GUI (SIMPLE & MOBILE FRIENDLY)
 --==================================================
 
-    local ServerSection = Tabs.Misc:AddSection("Server Control")
+local ServerSection = Tabs.Misc:AddSection("Server Control")
 
-    ServerSection:AddToggle({
-        Title = "Auto Rejoin Same Server",
-        Default = false,
-        Callback = function(v)
-            AutoServer.Enabled = v
-            sirenx("Auto Rejoin: " .. (v and "ON" or "OFF"))
-        end
-    })
+ServerSection:AddToggle({
+    Title = "Auto Rejoin Same Server",
+    Default = false,
+    Callback = function(v)
+        AutoServer.Enabled = v
+    end
+})
 
-    ServerSection:AddToggle({
-        Title = "Auto Keep AegisHub",
-        Default = true,
-        Callback = function(v)
-            AutoServer.AutoKeep = v
-            sirenx("Auto Keep AegisHub: " .. (v and "ON" or "OFF"))
-        end
-    })
+ServerSection:AddToggle({
+    Title = "Auto Keep AegisHub",
+    Default = true,
+    Callback = function(v)
+        AutoServer.AutoKeep = v
+    end
+})
 
-    ServerSection:AddButton({
-        Title = "Save Current Server",
-        Callback = function()
-            SaveCurrentServer()
-            sirenx("Server saved (JobId locked)")
-        end
-    })
+ServerSection:AddButton({
+    Title = "Save Current Server",
+    Callback = function()
+        SaveCurrentServer()
+    end
+})
 
-    ServerSection:AddButton({
-        Title = "Rejoin Saved Server",
-        Callback = function()
-            RejoinSameServer()
-        end
-    })
-
-
+ServerSection:AddButton({
+    Title = "Rejoin Saved Server",
+    Callback = function()
+        RejoinSameServer()
+    end
+})
 
 local shop = Tabs.Shop:AddSection("Merchant Shop")
 
@@ -1648,7 +1684,6 @@ Islands:AddButton({
     local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if hrp then
       hrp.CFrame = loc
-      sirenx("Teleported to " .. st.teleport.island)
     end
   end
 })
@@ -1765,85 +1800,6 @@ local function ReturnToLastLocation()
  
     hrp.CFrame = lastLocation
     return true
-end
-
--- FUNGSI WALK ON WATER
-local function EnableWalkOnWater()
-    if isWalkOnWater then return end
- 
-    isWalkOnWater = true
- 
-    if not waterPlatform then
-        waterPlatform = Instance.new("Part")
-        waterPlatform.Name = "WaterPlatform"
-        waterPlatform.Anchored = true
-        waterPlatform.CanCollide = true
-        waterPlatform.Transparency = 1 
-        waterPlatform.Size = Vector3.new(15, 1, 15)
-        waterPlatform.Parent = workspace
-    end
- 
-    if walkOnWaterConnection then 
-        walkOnWaterConnection:Disconnect() 
-    end
- 
-    walkOnWaterConnection = game:GetService("RunService").RenderStepped:Connect(function()
-        if not isWalkOnWater then return end
- 
-        local character = LocalPlayer.Character
-        if not character then return end
- 
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
- 
-        if not waterPlatform or not waterPlatform.Parent then
-            waterPlatform = Instance.new("Part")
-            waterPlatform.Name = "WaterPlatform"
-            waterPlatform.Anchored = true
-            waterPlatform.CanCollide = true
-            waterPlatform.Transparency = 1 
-            waterPlatform.Size = Vector3.new(15, 1, 15)
-            waterPlatform.Parent = workspace
-        end
- 
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {workspace.Terrain} 
-        rayParams.FilterType = Enum.RaycastFilterType.Include
-        rayParams.IgnoreWater = false
- 
-        local rayOrigin = hrp.Position + Vector3.new(0, 5, 0) 
-        local rayDirection = Vector3.new(0, -500, 0)
-        local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
- 
-        if result and result.Material == Enum.Material.Water then
-            local waterSurfaceHeight = result.Position.Y
-            waterPlatform.Position = Vector3.new(hrp.Position.X, waterSurfaceHeight, hrp.Position.Z)
- 
-            if hrp.Position.Y < (waterSurfaceHeight + 2) and hrp.Position.Y > (waterSurfaceHeight - 5) then
-                if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    hrp.CFrame = CFrame.new(hrp.Position.X, waterSurfaceHeight + 3.2, hrp.Position.Z)
-                end
-            end
-        else
-            waterPlatform.Position = Vector3.new(hrp.Position.X, -500, hrp.Position.Z)
-        end
-    end)
-end
-
-local function DisableWalkOnWater()
-    if not isWalkOnWater then return end
- 
-    isWalkOnWater = false
- 
-    if walkOnWaterConnection then 
-        walkOnWaterConnection:Disconnect() 
-        walkOnWaterConnection = nil 
-    end
- 
-    if waterPlatform then 
-        waterPlatform:Destroy() 
-        waterPlatform = nil 
-    end
 end
 
 -- FUNGSI CARI EVENT
@@ -2067,14 +2023,12 @@ Plyr:AddButton({
   Title = "Refresh Player List",
   Callback = function()
     PlayerList:SetValues(GetPlayerNames(), st.teleport.player)
-    sirenx("Player list refreshed.")
   end,
   SubTitle = "Go to Player",
   SubCallback = function()
     TargetPlayer = svc.Players:FindFirstChild(st.teleport.player)
     if TargetPlayer and TargetPlayer.Character and TargetPlayer.Character:FindFirstChild("HumanoidRootPart") then
       st.char:PivotTo(TargetPlayer.Character:GetPivot())
-      sirenx("Teleported to " .. TargetPlayer.Name)
     end
   end
 })
@@ -2294,7 +2248,7 @@ task.spawn(function()
             if not uuid then
                 statusParagraph:SetContent("Totem Out of Stock")
                 autoTotemEnabled = false
-                sirenx("Totem habis di inventory")
+                sirenx("Totem out of stock: " .. selectedTotem)
                 continue
             end
 
@@ -2341,12 +2295,6 @@ AutoTotem:AddToggle({
     Callback = function(state)
         autoTotemEnabled = state
         nextSpawnTime = 0
-
-        if state then
-            sirenx("Auto Totem Enabled")
-        else
-            sirenx("Auto Totem Disabled")
-        end
     end
 })
 
@@ -2373,8 +2321,6 @@ AutoTotem:AddButton({
                 end)
             end
         end)
-
-        sirenx("Totem spawned manually")
     end
 })
 
