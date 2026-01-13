@@ -1,11 +1,11 @@
-local Sirenx = loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/aegishub2.lua"))()
+local Sirenx = loadstring(game:HttpGet("https://raw.githubusercontent.com/rendy45kz/vir/refs/heads/main/aegishub.lua"))()
 
 local Window = Sirenx:Window({
   Title   = "AegisHUB |",
   Footer  = "Fish It",
   Image   = "85286478652862",
   Color   = Color3.fromRGB(244, 244, 245),
-  
+  Theme   = 129648704071138,
   Version = 1,
 })
 
