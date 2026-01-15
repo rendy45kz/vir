@@ -129,7 +129,7 @@ local st                   = {
   fishingLegit     = false,
   minigameDelay    = 0.1,
   autoFishing      = false,
-  completeDelay    = 0.5,
+  completeDelay    = 0.7,
   instantFishing   = false,
 
   teleport = {
@@ -260,8 +260,9 @@ local function CreateWaterPlatform()
 end
 
 --==================================================
--- ENABLE WALK ON WATER
+-- WALK ON WATER (FIXED & STABLE)
 --==================================================
+
 local function EnableWalkOnWater()
     if isWalkOnWater then return end
     isWalkOnWater = true
@@ -274,7 +275,7 @@ local function EnableWalkOnWater()
         walkOnWaterConnection:Disconnect()
     end
 
-    walkOnWaterConnection = RunService.Heartbeat:Connect(function()
+    walkOnWaterConnection = RunService.Stepped:Connect(function()
         if not isWalkOnWater then return end
 
         local char = LocalPlayer.Character
@@ -284,49 +285,54 @@ local function EnableWalkOnWater()
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hrp or not hum then return end
 
-        -- RAYCAST PARAMS (DETECT WATER)
+        -- RAYCAST ONLY TERRAIN (WATER)
         local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Blacklist
-        params.FilterDescendantsInstances = {char}
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { workspace.Terrain }
         params.IgnoreWater = false
 
-        local origin = hrp.Position + Vector3.new(0, 5, 0)
-        local direction = Vector3.new(0, -RAY_DISTANCE, 0)
+        local origin = hrp.Position + Vector3.new(0, 6, 0)
+        local direction = Vector3.new(0, -120, 0)
 
         local result = workspace:Raycast(origin, direction, params)
 
         if result and result.Material == Enum.Material.Water then
             local waterY = result.Position.Y
 
-            -- MOVE PLATFORM
+            -- PLATFORM IKUT PLAYER (SEDIKIT DI BAWAH AIR)
             waterPlatform.Position = Vector3.new(
                 hrp.Position.X,
-                waterY,
+                waterY - 0.3,
                 hrp.Position.Z
             )
 
-            -- ONLY LIFT PLAYER IF NEAR WATER
-            if hrp.Position.Y < waterY + WATER_OFFSET then
+            -- JAGA PLAYER TIDAK TENGGELAM SAAT JALAN
+            if hrp.Position.Y < waterY + 2 then
                 if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    hrp.Velocity = Vector3.new(
-                        hrp.Velocity.X,
+                    hrp.AssemblyLinearVelocity = Vector3.new(
+                        hrp.AssemblyLinearVelocity.X,
                         0,
-                        hrp.Velocity.Z
+                        hrp.AssemblyLinearVelocity.Z
                     )
 
                     hrp.CFrame = CFrame.new(
                         hrp.Position.X,
-                        waterY + WATER_OFFSET,
+                        waterY + 3,
                         hrp.Position.Z
                     )
                 end
             end
         else
-            -- HIDE PLATFORM
-            waterPlatform.Position = Vector3.new(0, -500, 0)
+            -- JANGAN HILANGKAN PLATFORM, IKUTI PLAYER
+            waterPlatform.Position = Vector3.new(
+                hrp.Position.X,
+                hrp.Position.Y - 6,
+                hrp.Position.Z
+            )
         end
     end)
 end
+
 
 --==================================================
 -- DISABLE WALK ON WATER
@@ -1060,147 +1066,188 @@ SellGroup:AddButton({
 
 local Favorites = Tabs.Fishing:AddSection("Favorites")
 
-local function IsFavorited(UUID, items)
-  for _, Item in pairs(items) do
-    if Item.UUID == UUID then return Item.Favorited == true end
-  end
-  return false
-end
+----------------------------------------------------------------
+-- CHECK FAVORITE
+----------------------------------------------------------------
+local function IsFavorited(UUID)
+    local items = repl.Data.Data.Inventory.Items
+    if not items then return false end
 
-local RarityOrder = {Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Secret = 7}
-
-local function AutoFavorite(names, rarities, mutations)
-  local items = repl.Data.Data.Inventory.Items
-  if not items or #items == 0 then return end
-
-  local rarityTiers, namesList, mutationList = {}, {}, {}
-  
-  if rarities then
-    for _, rarity in ipairs(rarities) do
-      if RarityOrder[rarity] then 
-        rarityTiers[RarityOrder[rarity]] = true
-      end
-    end
-  end
-
-  if names then for _, name in ipairs(names) do namesList[name] = true end end
-  if mutations then for _, mutation in ipairs(mutations) do mutationList[mutation] = true end end
-
-  local toFavorite = {}
-  
-  for _, Item in pairs(items) do
-    if not Item.Favorited then
-      local FishData = mods.ItemUtility:GetItemData(Item.Id)
-      
-      if FishData and FishData.Data then
-        local data = FishData.Data
-        if namesList[data.Name] or rarityTiers[data.Tier] or (Item.Metadata and Item.Metadata.VariantId and mutationList[Item.Metadata.VariantId]) then
-          table.insert(toFavorite, Item.UUID)
+    for _, Item in pairs(items) do
+        if Item.UUID == UUID then
+            return Item.Favorited == true
         end
-      end
     end
-  end
-
-  for i, uuid in ipairs(toFavorite) do
-    task.spawn(function()
-      task.wait(i * 0.05)
-      api.Events.REFav:FireServer(uuid)
-    end)
-  end
+    return false
 end
 
+----------------------------------------------------------------
+-- AUTO FAVORITE CORE (RARITY FIX)
+----------------------------------------------------------------
+local function AutoFavorite(names, rarities, mutations)
+    local items = repl.Data.Data.Inventory.Items
+    if not items or #items == 0 then return end
+
+    local rarityMap   = {}
+    local nameMap     = {}
+    local mutationMap = {}
+
+    -- BUILD MAP (STRING BASED)
+    if rarities then
+        for _, r in ipairs(rarities) do
+            rarityMap[tostring(r)] = true
+        end
+    end
+
+    if names then
+        for _, n in ipairs(names) do
+            nameMap[tostring(n)] = true
+        end
+    end
+
+    if mutations then
+        for _, m in ipairs(mutations) do
+            mutationMap[tostring(m)] = true
+        end
+    end
+
+    local toFavorite = {}
+
+    for _, Item in pairs(items) do
+        if not Item.Favorited then
+            local FishData = mods.ItemUtility:GetItemData(Item.Id)
+            if FishData and FishData.Data then
+                local data = FishData.Data
+                local rarity = tostring(data.Tier)
+                local name   = tostring(data.Name)
+                local mutId  = Item.Metadata and Item.Metadata.VariantId
+
+                if
+                    (rarityMap[rarity]) or
+                    (nameMap[name]) or
+                    (mutId and mutationMap[mutId])
+                then
+                    table.insert(toFavorite, Item.UUID)
+                end
+            end
+        end
+    end
+
+    for i, uuid in ipairs(toFavorite) do
+        task.spawn(function()
+            task.wait(i * 0.05)
+            api.Events.REFav:FireServer(uuid)
+        end)
+    end
+end
+
+----------------------------------------------------------------
+-- UNFAVORITE ALL
+----------------------------------------------------------------
 local function UnAutoFavoriteAll()
-  local Items = repl.Data.Data.Inventory.Items
-  if not Items or #Items == 0 then return end
+    local items = repl.Data.Data.Inventory.Items
+    if not items then return end
 
-  for _, Item in pairs(Items) do
-    if IsFavorited(Item.UUID) then
-      pcall(api.Events.REFav.FireServer, api.Events.REFav, Item.UUID)
+    for _, Item in pairs(items) do
+        if Item.Favorited then
+            pcall(function()
+                api.Events.REFav:FireServer(Item.UUID)
+            end)
+        end
     end
-  end
 end
 
+----------------------------------------------------------------
+-- DROPDOWNS
+----------------------------------------------------------------
 Favorites:AddDropdown({
-  Title = "Auto Favorite by Rarity",
-  Content = "Favorite by Fish Rarity",
-  Multi = true,
-  Options = {"Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret"},
-  Default = st.favorite.rarities,
-  Callback = function(value)
-    st.favorite.rarities = value
-  end
+    Title = "Auto Favorite by Rarity",
+    Content = "Favorite by Fish Rarity",
+    Multi = true,
+    Options = {"Common","Uncommon","Rare","Epic","Legendary","Mythic","Secret"},
+    Default = st.favorite.rarities,
+    Callback = function(v)
+        st.favorite.rarities = v
+    end
 })
 
-local cachedFishNames = nil
+-- CACHE FISH NAMES
+local cachedFishNames
 local function GetFishNames()
-  if cachedFishNames then return cachedFishNames end
-  
-  local Names = {}
-  for _, Item in pairs(repl.Items:GetChildren()) do
-    local FishData = mods.ItemUtility:GetItemData(Item.Name)
-    if FishData and FishData.Data and FishData.Data.Type == "Fish" then
-      table.insert(Names, FishData.Data.Name)
+    if cachedFishNames then return cachedFishNames end
+
+    local list = {}
+    for _, Item in pairs(repl.Items:GetChildren()) do
+        local FishData = mods.ItemUtility:GetItemData(Item.Name)
+        if FishData and FishData.Data and FishData.Data.Type == "Fish" then
+            table.insert(list, FishData.Data.Name)
+        end
     end
-  end
-  cachedFishNames = Names
-  return Names
+    cachedFishNames = list
+    return list
 end
 
 Favorites:AddDropdown({
-  Title = "Auto Favorite by Name",
-  Content = "Favorite by Fish Name",
-  Multi = true,
-  Options = GetFishNames(),
-  Default = st.favorite.names,
-  Callback = function(value)
-    st.favorite.names = value
-  end
+    Title = "Auto Favorite by Name",
+    Multi = true,
+    Options = GetFishNames(),
+    Default = st.favorite.names,
+    Callback = function(v)
+        st.favorite.names = v
+    end
 })
 
-local cachedMutations = nil
+-- CACHE MUTATION
+local cachedMutations
 local function GetFishMutation()
-  if cachedMutations then return cachedMutations end
-  
-  local Names = {}
-  for _, Item in pairs(repl.Variants:GetChildren()) do
-    table.insert(Names, Item.Name)
-  end
-  cachedMutations = Names
-  return Names
+    if cachedMutations then return cachedMutations end
+
+    local list = {}
+    for _, v in pairs(repl.Variants:GetChildren()) do
+        table.insert(list, v.Name)
+    end
+    cachedMutations = list
+    return list
 end
 
 Favorites:AddDropdown({
-  Title = "Auto Favorite by Mutation",
-  Content = "Favorite by Fish Mutation",
-  Multi = true,
-  Options = GetFishMutation(),
-  Default = st.favorite.mutations,
-  Callback = function(value)
-    st.favorite.mutations = value
-  end
+    Title = "Auto Favorite by Mutation",
+    Multi = true,
+    Options = GetFishMutation(),
+    Default = st.favorite.mutations,
+    Callback = function(v)
+        st.favorite.mutations = v
+    end
 })
 
+----------------------------------------------------------------
+-- TOGGLE
+----------------------------------------------------------------
 Favorites:AddToggle({
-  Title = "Auto Favorite",
-  Content = "Automatically favorites fish for you",
-  Default = false,
-  Callback = function(state)
-    st.favorite.auto = state
+    Title = "Auto Favorite",
+    Content = "Automatically favorites fish",
+    Default = false,
+    Callback = function(state)
+        st.favorite.auto = state
 
-    task.spawn(function()
-      while st.favorite.auto do
-        AutoFavorite(st.favorite.names, st.favorite.rarities, st.favorite.mutations)
-        task.wait(2)
-      end
-    end)
-  end
+        task.spawn(function()
+            while st.favorite.auto do
+                AutoFavorite(
+                    st.favorite.names,
+                    st.favorite.rarities,
+                    st.favorite.mutations
+                )
+                task.wait(2)
+            end
+        end)
+    end
 })
 
 Favorites:AddButton({
-  Title = "Unfavorite All",
-  Content = "Unfavorites all favorited fish",
-  Callback = UnAutoFavoriteAll
+    Title = "Unfavorite All",
+    Callback = UnAutoFavoriteAll
 })
+
 
 local HideFeature = Tabs.Misc:AddSection("Hide Features")
 
@@ -1232,78 +1279,160 @@ HideFeature:AddToggle({
     end
 })
 
+--==================================================
+-- HIDE NOTIFICATION (SAFE HOOK, LOAD ONCE)
+--==================================================
+
 pcall(function()
-  local OriginalNotif = mods.NotificationController.PlaySmallItemObtained
-  mods.NotificationController.PlaySmallItemObtained = function(self, ...)
-    if st.hide.notifications then return end
-    return OriginalNotif(self, ...)
-  end
+    if not mods.NotificationController then return end
+
+    -- 🔒 CEGAH DOUBLE HOOK
+    if mods.NotificationController._AegisNotifHooked then return end
+    mods.NotificationController._AegisNotifHooked = true
+
+    -- SIMPAN ORIGINAL
+    local OriginalNotif = mods.NotificationController.PlaySmallItemObtained
+    mods.NotificationController._AegisOriginalNotif = OriginalNotif
+
+    -- OVERRIDE
+    mods.NotificationController.PlaySmallItemObtained = function(self, ...)
+        if st.hide.notifications then
+            return -- BLOCK NOTIFICATION
+        end
+        return OriginalNotif(self, ...)
+    end
 end)
 
+--==================================================
+-- GUI TOGGLE
+--==================================================
+
 HideFeature:AddToggle({
-  Title = "Hide Notification",
-  Content = "Hides get fishing notifications",
-  Default = false,
-  Callback = function(state)
-    st.hide.notifications = state
-  end
+    Title = "Hide Notification",
+    Content = "Hides fishing item notifications",
+    Default = false,
+    Callback = function(state)
+        st.hide.notifications = state
+    end
 }, "HideNotification")
 
+
+--==================================================
+-- SKIP CUTSCENE (INIT HOOK - SAFE VERSION)
+--==================================================
+
 pcall(function()
-  local OriginalInit = mods.CutsceneController.Init
-  mods.CutsceneController.Init = function(self, ...)
-    if st.hide.cutscenes then return end
-    return OriginalInit(self, ...)
-  end
+    if mods.CutsceneController and not mods.CutsceneController._AegisHooked then
+        mods.CutsceneController._AegisHooked = true
+
+        -- SIMPAN ORIGINAL
+        mods.CutsceneController._OriginalInit =
+            mods.CutsceneController._OriginalInit
+            or mods.CutsceneController.Init
+
+        -- OVERRIDE INIT
+        mods.CutsceneController.Init = function(self, ...)
+            if st.hide.cutscenes then
+                return -- block init
+            end
+            return mods.CutsceneController._OriginalInit(self, ...)
+        end
+    end
 end)
 
+--==================================================
+-- GUI TOGGLE
+--==================================================
+
 HideFeature:AddToggle({
-  Title = "Skip Cutscenes",
-  Content = "Automatically skips fishing cutscenes",
-  Default = false,
-  Callback = function(state)
-    st.hide.cutscenes = state
-  end
+    Title = "Skip Cutscenes",
+    Content = "Automatically skips fishing cutscenes",
+    Default = false,
+    Callback = function(state)
+        st.hide.cutscenes = state
+    end
 }, "HideCutscenes")
 
+--==================================================
+-- DISABLE ANIMATIONS (SAFE HOOK, LOAD ONCE)
+--==================================================
+
 pcall(function()
-  local OriginalAnim = mods.AnimationController.PlayAnimation
-  mods.AnimationController.PlayAnimation = function(self, ...)
-    if st.hide.animations then return end
-    return OriginalAnim(self, ...)
-  end
+    if not mods.AnimationController then return end
+
+    -- 🔒 ANTI DOUBLE HOOK
+    if mods.AnimationController._AegisAnimHooked then return end
+    mods.AnimationController._AegisAnimHooked = true
+
+    -- SIMPAN ORIGINAL
+    local OriginalAnim = mods.AnimationController.PlayAnimation
+    mods.AnimationController._AegisOriginalAnim = OriginalAnim
+
+    -- OVERRIDE
+    mods.AnimationController.PlayAnimation = function(self, ...)
+        if st.hide.animations then
+            return -- BLOCK ANIMATION
+        end
+        return OriginalAnim(self, ...)
+    end
 end)
 
+--==================================================
+-- GUI TOGGLE
+--==================================================
+
 HideFeature:AddToggle({
-  Title = "Disable Animations",
-  Content = "Disables fishing animations",
-  Default = false,
-  Callback = function(state)
-    st.hide.animations = state
-  end
+    Title = "Disable Animations",
+    Content = "Disables fishing animations",
+    Default = false,
+    Callback = function(state)
+        st.hide.animations = state
+    end
 }, "HideAnimations")
 
-pcall(function()
-  local OriginalRenderAP = mods.VFX.RenderAtPoint
-  mods.VFX.RenderAtPoint = function(self, ...)
-    if st.hide.vfx then return end
-    return OriginalRenderAP(self, ...)
-  end
+--==================================================
+-- DISABLE VFX / ROD EFFECT (SAFE HOOK, LOAD ONCE)
+--==================================================
 
-  local OriginalRenderI = mods.VFX.RenderInstance
-  mods.VFX.RenderInstance = function(self, ...)
-    if st.hide.vfx then return end
-    return OriginalRenderI(self, ...)
-  end
+pcall(function()
+    if not mods.VFX then return end
+
+    -- 🔒 ANTI DOUBLE HOOK
+    if mods.VFX._AegisVFXHooked then return end
+    mods.VFX._AegisVFXHooked = true
+
+    -- SIMPAN ORIGINAL
+    mods.VFX._AegisOriginalRenderAtPoint = mods.VFX.RenderAtPoint
+    mods.VFX._AegisOriginalRenderInstance = mods.VFX.RenderInstance
+
+    -- OVERRIDE RenderAtPoint
+    mods.VFX.RenderAtPoint = function(self, ...)
+        if st.hide.vfx then
+            return -- BLOCK VFX
+        end
+        return mods.VFX._AegisOriginalRenderAtPoint(self, ...)
+    end
+
+    -- OVERRIDE RenderInstance
+    mods.VFX.RenderInstance = function(self, ...)
+        if st.hide.vfx then
+            return -- BLOCK VFX
+        end
+        return mods.VFX._AegisOriginalRenderInstance(self, ...)
+    end
 end)
 
+--==================================================
+-- GUI TOGGLE
+--==================================================
+
 HideFeature:AddToggle({
-  Title = "Disable Rod Effect",
-  Content = "Hides the fishing rod bobber effect",
-  Default = false,
-  Callback = function(state)
-    st.hide.vfx = state
-  end
+    Title = "Disable Rod Effect",
+    Content = "Hides the fishing rod bobber effect",
+    Default = false,
+    Callback = function(state)
+        st.hide.vfx = state
+    end
 }, "HideVFX")
 
 --//======================================================
@@ -1734,7 +1863,8 @@ local TeleportLocations = {
 	["Esoteric Dephts"] = CFrame.new(3204.603, -1302.855, 1410.619) * CFrame.Angles(-0.000000, 0.454337, -0.000000),
 	["Ancient Ruin"] = CFrame.new(6099.980, -585.924, 4682.759) * CFrame.Angles(3.141535, 1.569459, -3.141535),
 	["Underground Cellar"] = CFrame.new(2135.955, -91.199, -697.068) * CFrame.Angles(-0.000000, -0.098867, 0.000000),
-	["Pirate Cove"] = CFrame.new(3399.40234375, 4.191970348358154, 3478.972412109375,0.2146824449300766, -2.6497572136463533e-8, -0.9766839146614075,-6.210501890535625e-9, 1, -2.8495255932625697e-8,0.9766839146614075, 1.2183128283993483e-8, 0.2146824449300766)
+	["Pirate Cove"] = CFrame.new(3399.40234375, 4.191970348358154, 3478.972412109375,0.2146824449300766, -2.6497572136463533e-8, -0.9766839146614075,-6.210501890535625e-9, 1, -2.8495255932625697e-8,0.9766839146614075, 1.2183128283993483e-8, 0.2146824449300766),
+    ["Pirate Treasure Room"] = CFrame.new(3357.815673828125,-300.98785400390627,3054.89306640625,-0.37050673365592959,-4.5237129597808237e-8,0.9288297891616821,-2.0744495898838978e-8,1,4.04284570265645e-8,-0.9288297891616821,-4.289090416165209e-9,-0.37050673365592959)
 }
 
 local function GetNameTeleport()
