@@ -824,6 +824,216 @@ Fish2:AddInput({
 })
 
 --//======================================================
+--// ULTRA BLATANT FISHING (FINAL FIX + AUTO ADJUST)
+--//======================================================
+
+local UltraBlatant = {
+    Active = false,
+    CompleteDelay = 0.7,
+    CancelDelay = 0.3,
+    Thread = nil
+}
+
+--======================================================
+-- AUTO ADJUST CONFIG
+--======================================================
+
+local AutoAdjust = {
+    Enabled = true,
+
+    MinComplete = 0.45,
+    MaxComplete = 1.2,
+
+    MinCancel = 0.15,
+    MaxCancel = 0.6,
+
+    StepUp = 0.05,
+    StepDown = 0.02,
+
+    TargetCycle = 1.1
+}
+
+--======================================================
+-- SAFE CALL (ANDROID FRIENDLY)
+--======================================================
+
+local function SafeCall(fn)
+    task.spawn(function()
+        pcall(fn)
+    end)
+end
+
+--======================================================
+-- PRECISE WAIT (TIME BASED)
+--======================================================
+
+local function PreciseWait(seconds)
+    local start = os.clock()
+    while os.clock() - start < seconds do
+        task.wait()
+    end
+end
+
+--======================================================
+-- ULTRA CAST (LOGIC ASLI)
+--======================================================
+
+local function UltraCast()
+    local t = workspace:GetServerTimeNow()
+
+    SafeCall(function()
+        api.Functions.ChargeRod:InvokeServer(t)
+    end)
+
+    task.wait()
+
+    SafeCall(function()
+        api.Functions.StartMini:InvokeServer(
+            -1.233184814453125,
+            0.994503488563327303,
+            t
+        )
+    end)
+end
+
+--======================================================
+-- AUTO ADJUST LOGIC
+--======================================================
+
+local function AdjustDelay(cycleTime)
+    if not AutoAdjust.Enabled then
+        return
+    end
+
+    if cycleTime < AutoAdjust.TargetCycle then
+        -- terlalu cepat → tambah delay
+        UltraBlatant.CompleteDelay = math.clamp(
+            UltraBlatant.CompleteDelay + AutoAdjust.StepUp,
+            AutoAdjust.MinComplete,
+            AutoAdjust.MaxComplete
+        )
+
+        UltraBlatant.CancelDelay = math.clamp(
+            UltraBlatant.CancelDelay + AutoAdjust.StepUp * 0.5,
+            AutoAdjust.MinCancel,
+            AutoAdjust.MaxCancel
+        )
+    else
+        -- stabil → kurangi perlahan
+        UltraBlatant.CompleteDelay = math.clamp(
+            UltraBlatant.CompleteDelay - AutoAdjust.StepDown,
+            AutoAdjust.MinComplete,
+            AutoAdjust.MaxComplete
+        )
+
+        UltraBlatant.CancelDelay = math.clamp(
+            UltraBlatant.CancelDelay - AutoAdjust.StepDown * 0.5,
+            AutoAdjust.MinCancel,
+            AutoAdjust.MaxCancel
+        )
+    end
+end
+
+--======================================================
+-- ULTRA LOOP (FINAL)
+--======================================================
+
+local function UltraLoop()
+    while UltraBlatant.Active do
+        local cycleStart = os.clock()
+
+        UltraCast()
+
+        PreciseWait(UltraBlatant.CompleteDelay)
+
+        if UltraBlatant.Active then
+            SafeCall(function()
+                api.Events.REFishDone:FireServer()
+            end)
+        end
+
+        PreciseWait(UltraBlatant.CancelDelay)
+
+        if UltraBlatant.Active then
+            SafeCall(function()
+                api.Functions.Cancel:InvokeServer()
+            end)
+        end
+
+        -- AUTO ADJUST
+        local cycleTime = os.clock() - cycleStart
+        AdjustDelay(cycleTime)
+    end
+end
+
+--======================================================
+-- GUI ULTRA SECTION
+--======================================================
+
+local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
+
+UltraSection:AddToggle({
+    Title = "Ultra Blatant Fishing",
+    Content = "Extremely fast & aggressive fishing",
+    Default = false,
+    Callback = function(state)
+        UltraBlatant.Active = state
+
+        if state then
+            -- AUTO ENABLE PERFECTION
+            st.perfection.autoByInstant = true
+            EnablePerfection()
+
+            -- EQUIP ROD
+            SafeCall(function()
+                api.Events.REEquip:FireServer(1)
+            end)
+
+            task.wait(0.05)
+
+            UltraBlatant.Thread = task.spawn(UltraLoop)
+        else
+            UltraBlatant.Active = false
+
+            SafeCall(function()
+                api.Functions.Cancel:InvokeServer()
+            end)
+
+            st.perfection.autoByInstant = false
+            if not st.perfection.activated then
+                DisablePerfection()
+            end
+        end
+    end
+})
+
+UltraSection:AddInput({
+    Title = "Complete Delay",
+    Content = "Delay before fish completed",
+    Default = tostring(UltraBlatant.CompleteDelay),
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 0 then
+            UltraBlatant.CompleteDelay = n
+        end
+    end
+})
+
+UltraSection:AddInput({
+    Title = "Cancel Delay",
+    Content = "Delay before cancel input",
+    Default = tostring(UltraBlatant.CancelDelay),
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 0 then
+            UltraBlatant.CancelDelay = n
+        end
+    end
+})
+
+
+--[[
+--//======================================================
 --// ULTRA BLATANT FISHING (IMPROVED & STABLE)
 --//======================================================
 
@@ -902,7 +1112,7 @@ UltraSection:AddToggle({
                 api.Events.REEquip:FireServer(1)
             end)
 
-            task.wait(0.15)
+            task.wait(0.05)
 
             UltraBlatant.Thread = task.spawn(UltraLoop)
         else
@@ -943,7 +1153,7 @@ UltraSection:AddInput({
         end
     end
 })
-
+--]]
 local FishFeature = Tabs.Fishing:AddSection("Fishing Features")
 
 FishFeature:AddToggle({
