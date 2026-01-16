@@ -1084,6 +1084,20 @@ end
 ----------------------------------------------------------------
 -- AUTO FAVORITE CORE (RARITY FIX)
 ----------------------------------------------------------------
+
+local TierToRarity = {
+    [1] = "Common",
+    [2] = "Uncommon",
+    [3] = "Rare",
+    [4] = "Epic",
+    [5] = "Legendary",
+    [6] = "Mythic",
+    [7] = "Secret"
+}
+
+----------------------------------------------------------------
+-- AUTO FAVORITE CORE (RARITY FIXED)
+----------------------------------------------------------------
 local function AutoFavorite(names, rarities, mutations)
     local items = repl.Data.Data.Inventory.Items
     if not items or #items == 0 then return end
@@ -1092,7 +1106,7 @@ local function AutoFavorite(names, rarities, mutations)
     local nameMap     = {}
     local mutationMap = {}
 
-    -- BUILD MAP (STRING BASED)
+    -- BUILD MAP
     if rarities then
         for _, r in ipairs(rarities) do
             rarityMap[tostring(r)] = true
@@ -1118,12 +1132,14 @@ local function AutoFavorite(names, rarities, mutations)
             local FishData = mods.ItemUtility:GetItemData(Item.Id)
             if FishData and FishData.Data then
                 local data = FishData.Data
-                local rarity = tostring(data.Tier)
+
+                -- ✅ FIXED PART
+                local rarity = TierToRarity[data.Tier]
                 local name   = tostring(data.Name)
                 local mutId  = Item.Metadata and Item.Metadata.VariantId
 
                 if
-                    (rarityMap[rarity]) or
+                    (rarity and rarityMap[rarity]) or
                     (nameMap[name]) or
                     (mutId and mutationMap[mutId])
                 then
@@ -1140,6 +1156,7 @@ local function AutoFavorite(names, rarities, mutations)
         end)
     end
 end
+
 
 ----------------------------------------------------------------
 -- UNFAVORITE ALL
