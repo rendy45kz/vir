@@ -823,216 +823,8 @@ Fish2:AddInput({
     end
 })
 
---//======================================================
---// ULTRA BLATANT FISHING (FINAL FIX + AUTO ADJUST)
---//======================================================
-
-local UltraBlatant = {
-    Active = false,
-    CompleteDelay = 0.7,
-    CancelDelay = 0.3,
-    Thread = nil
-}
-
---======================================================
--- AUTO ADJUST CONFIG
---======================================================
-
-local AutoAdjust = {
-    Enabled = true,
-
-    MinComplete = 0.45,
-    MaxComplete = 1.2,
-
-    MinCancel = 0.15,
-    MaxCancel = 0.6,
-
-    StepUp = 0.05,
-    StepDown = 0.02,
-
-    TargetCycle = 1.1
-}
-
---======================================================
--- SAFE CALL (ANDROID FRIENDLY)
---======================================================
-
-local function SafeCall(fn)
-    task.spawn(function()
-        pcall(fn)
-    end)
-end
-
---======================================================
--- PRECISE WAIT (TIME BASED)
---======================================================
-
-local function PreciseWait(seconds)
-    local start = os.clock()
-    while os.clock() - start < seconds do
-        task.wait()
-    end
-end
-
---======================================================
--- ULTRA CAST (LOGIC ASLI)
---======================================================
-
-local function UltraCast()
-    local t = workspace:GetServerTimeNow()
-
-    SafeCall(function()
-        api.Functions.ChargeRod:InvokeServer(t)
-    end)
-
-    task.wait()
-
-    SafeCall(function()
-        api.Functions.StartMini:InvokeServer(
-            -1.233184814453125,
-            0.994503488563327303,
-            t
-        )
-    end)
-end
-
---======================================================
--- AUTO ADJUST LOGIC
---======================================================
-
-local function AdjustDelay(cycleTime)
-    if not AutoAdjust.Enabled then
-        return
-    end
-
-    if cycleTime < AutoAdjust.TargetCycle then
-        -- terlalu cepat → tambah delay
-        UltraBlatant.CompleteDelay = math.clamp(
-            UltraBlatant.CompleteDelay + AutoAdjust.StepUp,
-            AutoAdjust.MinComplete,
-            AutoAdjust.MaxComplete
-        )
-
-        UltraBlatant.CancelDelay = math.clamp(
-            UltraBlatant.CancelDelay + AutoAdjust.StepUp * 0.15,
-            AutoAdjust.MinCancel,
-            AutoAdjust.MaxCancel
-        )
-    else
-        -- stabil → kurangi perlahan
-        UltraBlatant.CompleteDelay = math.clamp(
-            UltraBlatant.CompleteDelay - AutoAdjust.StepDown,
-            AutoAdjust.MinComplete,
-            AutoAdjust.MaxComplete
-        )
-
-        UltraBlatant.CancelDelay = math.clamp(
-            UltraBlatant.CancelDelay - AutoAdjust.StepDown * 0.15,
-            AutoAdjust.MinCancel,
-            AutoAdjust.MaxCancel
-        )
-    end
-end
-
---======================================================
--- ULTRA LOOP (FINAL)
---======================================================
-
-local function UltraLoop()
-    while UltraBlatant.Active do
-        local cycleStart = os.clock()
-
-        UltraCast()
-
-        PreciseWait(UltraBlatant.CompleteDelay)
-
-        if UltraBlatant.Active then
-            SafeCall(function()
-                api.Events.REFishDone:FireServer()
-            end)
-        end
-
-        PreciseWait(UltraBlatant.CancelDelay)
-
-        if UltraBlatant.Active then
-            SafeCall(function()
-                api.Functions.Cancel:InvokeServer()
-            end)
-        end
-
-        -- AUTO ADJUST
-        local cycleTime = os.clock() - cycleStart
-        AdjustDelay(cycleTime)
-    end
-end
-
---======================================================
--- GUI ULTRA SECTION
---======================================================
-
-local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
-
-UltraSection:AddToggle({
-    Title = "Ultra Blatant Fishing",
-    Content = "Extremely fast & aggressive fishing",
-    Default = false,
-    Callback = function(state)
-        UltraBlatant.Active = state
-
-        if state then
-            -- AUTO ENABLE PERFECTION
-            st.perfection.autoByInstant = true
-            EnablePerfection()
-
-            -- EQUIP ROD
-            SafeCall(function()
-                api.Events.REEquip:FireServer(1)
-            end)
-
-            task.wait(0.15)
-
-            UltraBlatant.Thread = task.spawn(UltraLoop)
-        else
-            UltraBlatant.Active = false
-
-            SafeCall(function()
-                api.Functions.Cancel:InvokeServer()
-            end)
-
-            st.perfection.autoByInstant = false
-            if not st.perfection.activated then
-                DisablePerfection()
-            end
-        end
-    end
-})
-
-UltraSection:AddInput({
-    Title = "Complete Delay",
-    Content = "Delay before fish completed",
-    Default = tostring(UltraBlatant.CompleteDelay),
-    Callback = function(v)
-        local n = tonumber(v)
-        if n and n >= 0 then
-            UltraBlatant.CompleteDelay = n
-        end
-    end
-})
-
-UltraSection:AddInput({
-    Title = "Cancel Delay",
-    Content = "Delay before cancel input",
-    Default = tostring(UltraBlatant.CancelDelay),
-    Callback = function(v)
-        local n = tonumber(v)
-        if n and n >= 0 then
-            UltraBlatant.CancelDelay = n
-        end
-    end
-})
 
 
---[[
 --//======================================================
 --// ULTRA BLATANT FISHING (IMPROVED & STABLE)
 --//======================================================
@@ -1112,7 +904,7 @@ UltraSection:AddToggle({
                 api.Events.REEquip:FireServer(1)
             end)
 
-            task.wait(0.05)
+            task.wait(0.15)
 
             UltraBlatant.Thread = task.spawn(UltraLoop)
         else
@@ -1153,7 +945,7 @@ UltraSection:AddInput({
         end
     end
 })
---]]
+
 local FishFeature = Tabs.Fishing:AddSection("Fishing Features")
 
 FishFeature:AddToggle({
@@ -1663,23 +1455,47 @@ HideFeature:AddToggle({
 }, "HideVFX")
 
 --//======================================================
---// FPS BOOST (REDUCE MAP / INVISIBLE)
+--// FPS BOOST (STABLE + SAFE VERSION)
 --//======================================================
 
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local Terrain = workspace:FindFirstChildOfClass("Terrain")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
 local FPS_BOOST_ACTIVE = false
 
--- CACHE ORIGINAL PROPERTIES (AGAR BISA RESTORE)
-local CachedParts = {}
+--======================================================
+-- CACHE (WEAK TABLE = NO MEMORY LEAK)
+--======================================================
+
+local CachedParts = setmetatable({}, { __mode = "k" })
+local CachedDecals = setmetatable({}, { __mode = "k" })
+local CachedEffects = setmetatable({}, { __mode = "k" })
+
 local CachedLighting = {}
 local CachedTerrain = {}
 
---------------------------------------------------------
--- SAVE ORIGINAL STATE
---------------------------------------------------------
+local DescendantConn
+
+--======================================================
+-- SAFE CALL
+--======================================================
+
+local function Safe(fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        warn("[FPS BOOST ERROR]", err)
+    end
+end
+
+--======================================================
+-- CACHE PART
+--======================================================
+
 local function CachePart(part)
     if CachedParts[part] then return end
 
@@ -1691,9 +1507,51 @@ local function CachePart(part)
     }
 end
 
---------------------------------------------------------
--- APPLY FPS BOOST
---------------------------------------------------------
+--======================================================
+-- APPLY TO SINGLE OBJECT
+--======================================================
+
+local function ApplyFPSBoost(obj)
+    if not FPS_BOOST_ACTIVE then return end
+    if obj:IsDescendantOf(Character) then return end
+
+    Safe(function()
+        if obj:IsA("BasePart") then
+            CachePart(obj)
+
+            obj.Material = Enum.Material.SmoothPlastic
+            obj.CastShadow = false
+
+            if obj.Size.Magnitude > 20 then
+                obj.Transparency = 1
+                obj.CanCollide = false
+            end
+
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            if not CachedDecals[obj] then
+                CachedDecals[obj] = obj.Transparency
+                obj.Transparency = 1
+            end
+
+        elseif obj:IsA("ParticleEmitter")
+            or obj:IsA("Trail")
+            or obj:IsA("Beam")
+            or obj:IsA("Fire")
+            or obj:IsA("Smoke")
+            or obj:IsA("Sparkles")
+        then
+            if not CachedEffects[obj] then
+                CachedEffects[obj] = obj.Enabled
+                obj.Enabled = false
+            end
+        end
+    end)
+end
+
+--======================================================
+-- ENABLE FPS BOOST
+--======================================================
+
 local function EnableFPSBoost()
     if FPS_BOOST_ACTIVE then return end
     FPS_BOOST_ACTIVE = true
@@ -1702,12 +1560,14 @@ local function EnableFPSBoost()
     CachedLighting = {
         GlobalShadows = Lighting.GlobalShadows,
         FogEnd = Lighting.FogEnd,
-        Brightness = Lighting.Brightness
+        Brightness = Lighting.Brightness,
+        Technology = Lighting.Technology
     }
 
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 9e9
     Lighting.Brightness = 1
+    Lighting.Technology = Enum.Technology.Compatibility
 
     -- TERRAIN
     if Terrain then
@@ -1718,55 +1578,44 @@ local function EnableFPSBoost()
             WaterReflectance = Terrain.WaterReflectance
         }
 
-        Terrain.WaterWaveSize = 0.15
-        Terrain.WaterWaveSpeed = 0.15
+        Terrain.WaterWaveSize = 0
+        Terrain.WaterWaveSpeed = 0
         Terrain.WaterTransparency = 1
-        Terrain.WaterReflectance = 0.15
+        Terrain.WaterReflectance = 0
     end
 
-    -- MAP OBJECTS
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if not FPS_BOOST_ACTIVE then break end
+    -- MAP (BATCH PROCESS)
+    task.spawn(function()
+        local count = 0
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if not FPS_BOOST_ACTIVE then break end
+            ApplyFPSBoost(obj)
 
-        -- BASEPART
-        if obj:IsA("BasePart") then
-            CachePart(obj)
-
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.CastShadow = false
-
-            -- Part besar → invisible
-            if obj.Size.Magnitude > 20 then
-                obj.Transparency = 1
-                obj.CanCollide = false
+            count += 1
+            if count % 300 == 0 then
+                task.wait()
             end
-
-        -- DECAL / TEXTURE
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            obj:Destroy()
-
-        -- PARTICLE / EFFECT
-        elseif obj:IsA("ParticleEmitter")
-            or obj:IsA("Trail")
-            or obj:IsA("Beam")
-            or obj:IsA("Fire")
-            or obj:IsA("Smoke")
-            or obj:IsA("Sparkles")
-        then
-            obj.Enabled = false
-
-        -- MESH DETAIL
-        elseif obj:IsA("SpecialMesh") then
-            obj:Destroy()
         end
-    end
+    end)
+
+    -- HANDLE NEW OBJECTS
+    DescendantConn = workspace.DescendantAdded:Connect(function(obj)
+        task.wait()
+        ApplyFPSBoost(obj)
+    end)
 end
 
---------------------------------------------------------
--- DISABLE FPS BOOST (RESTORE)
---------------------------------------------------------
+--======================================================
+-- DISABLE FPS BOOST (FULL RESTORE)
+--======================================================
+
 local function DisableFPSBoost()
     FPS_BOOST_ACTIVE = false
+
+    if DescendantConn then
+        DescendantConn:Disconnect()
+        DescendantConn = nil
+    end
 
     -- RESTORE PARTS
     for part, data in pairs(CachedParts) do
@@ -1777,7 +1626,23 @@ local function DisableFPSBoost()
             part.CanCollide = data.CanCollide
         end
     end
-    CachedParts = {}
+    CachedParts = setmetatable({}, { __mode = "k" })
+
+    -- RESTORE DECALS
+    for decal, t in pairs(CachedDecals) do
+        if decal and decal.Parent then
+            decal.Transparency = t
+        end
+    end
+    CachedDecals = setmetatable({}, { __mode = "k" })
+
+    -- RESTORE EFFECTS
+    for fx, state in pairs(CachedEffects) do
+        if fx and fx.Parent then
+            fx.Enabled = state
+        end
+    end
+    CachedEffects = setmetatable({}, { __mode = "k" })
 
     -- RESTORE LIGHTING
     for k, v in pairs(CachedLighting) do
@@ -1786,7 +1651,7 @@ local function DisableFPSBoost()
     CachedLighting = {}
 
     -- RESTORE TERRAIN
-    if Terrain and CachedTerrain then
+    if Terrain then
         for k, v in pairs(CachedTerrain) do
             Terrain[k] = v
         end
@@ -1794,15 +1659,15 @@ local function DisableFPSBoost()
     CachedTerrain = {}
 end
 
---------------------------------------------------------
--- GUI TOGGLE
---------------------------------------------------------
+--======================================================
+-- GUI
+--======================================================
 
 local MiscSection = Tabs.Misc:AddSection("Performance")
 
 MiscSection:AddToggle({
-    Title = "FPS Boost (Reduce Map)",
-    Content = "Hide map & effects to increase FPS",
+    Title = "FPS Boost (Stable)",
+    Content = "Reduce map & effects safely",
     Default = false,
     Callback = function(state)
         if state then
@@ -1813,18 +1678,17 @@ MiscSection:AddToggle({
     end
 })
 
-
 MiscSection:AddToggle({
     Title = "Disable 3D Rendering",
-    Content = "Disables 3D rendering to reduce GPU usage",
+    Content = "Disable 3D rendering to reduce GPU load",
     Default = false,
     Callback = function(state)
-        setfpscap(240)
         if RunService.Set3dRenderingEnabled then
             RunService:Set3dRenderingEnabled(not state)
         end
     end
 })
+
 
 --==================================================
 -- AEGISHUB AUTO REJOIN SAME SERVER + KEEP SCRIPT
