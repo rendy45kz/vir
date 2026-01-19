@@ -186,16 +186,6 @@ local ForceEquipRod = {
     Cooldown = 0.6     -- delay antar force equip
 }
 
-st.legitFishing = {
-    enabled = false,
-    thread = nil,
-
-    chargeDelay = 0.4,          -- delay sebelum start minigame
-    minWait = 1.5,              -- delay minimal antar siklus
-    maxWait = 3.0,              -- delay maksimal antar siklus
-    cancelDelay = 0.2,          -- delay sebelum cancel
-}
-
 local ConnectionWalkSpeed = nil
 local antiAfkConnection = nil
 local oldRequestCharge = nil
