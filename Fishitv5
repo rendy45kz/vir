@@ -697,12 +697,47 @@ Camera:AddToggle({
   end
 })
 
--- Legit Fishing
+--//======================================================
+--// LEGIT FISHING (FINAL STABLE VERSION)
+--//======================================================
+
+-- STATE LEGIT FISHING
+st.legitFishing = {
+    enabled = false,
+    running = false,
+    thread = nil,
+
+    chargeDelay = 0.45,   -- delay charge rod
+    minWait = 1.6,       -- delay minimal (human)
+    maxWait = 3.2,       -- delay maksimal (human)
+    cancelDelay = 0.25,  -- delay sebelum cancel
+}
+
+-- SAFE CALL (PAKAI SATU SAJA)
+local function SafeCall(fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        warn("[LegitFishing Error]", err)
+    end
+end
+
+--======================================================
+-- LEGIT FISHING LOOP (HUMAN-LIKE & SAFE)
+--======================================================
+
 local function LegitFishingLoop()
+    if st.legitFishing.running then return end
+    st.legitFishing.running = true
+
+    -- pastikan auto fishing server OFF
+    SafeCall(function()
+        api.Functions.AutoEnabled:InvokeServer(false)
+    end)
+
     while st.legitFishing.enabled do
         local cycleStart = os.clock()
 
-        -- Charge rod
+        -- Charge rod (human timing)
         SafeCall(function()
             api.Functions.ChargeRod:InvokeServer()
         end)
@@ -710,7 +745,7 @@ local function LegitFishingLoop()
         task.wait(st.legitFishing.chargeDelay)
         if not st.legitFishing.enabled then break end
 
-        -- Start fishing minigame (legit timing)
+        -- Start minigame
         SafeCall(function()
             api.Functions.StartMini:InvokeServer(
                 1,
@@ -719,7 +754,7 @@ local function LegitFishingLoop()
             )
         end)
 
-        -- Random human-like wait
+        -- Random human reaction
         local waitTime = math.random(
             st.legitFishing.minWait * 100,
             st.legitFishing.maxWait * 100
@@ -735,18 +770,42 @@ local function LegitFishingLoop()
 
         task.wait(st.legitFishing.cancelDelay)
 
-        -- Cancel input (end cycle)
+        -- Cancel input (clean end)
         SafeCall(function()
             api.Functions.Cancel:InvokeServer()
         end)
 
-        -- Anti-pattern idle (optional smoothing)
+        -- Anti pattern (minimal cycle)
         local elapsed = os.clock() - cycleStart
-        if elapsed < 1 then
-            task.wait(1 - elapsed)
+        if elapsed < 1.2 then
+            task.wait(1.2 - elapsed)
         end
     end
+
+    -- Safety cleanup
+    SafeCall(function()
+        api.Functions.Cancel:InvokeServer()
+    end)
+
+    st.legitFishing.running = false
 end
+
+--======================================================
+-- SERVER FAIL-SAFE (STOP FISHING EVENT)
+--======================================================
+
+api.Events.FishingStopped.OnClientEvent:Connect(function()
+    if st.legitFishing.enabled then
+        task.wait(0.1)
+        SafeCall(function()
+            api.Functions.Cancel:InvokeServer()
+        end)
+    end
+end)
+
+--======================================================
+-- GUI : LEGIT FISHING
+--======================================================
 
 local LegitSection = Tabs.Fishing:AddSection("Legit Fishing")
 
@@ -758,8 +817,10 @@ LegitSection:AddToggle({
         st.legitFishing.enabled = state
 
         if state then
-            -- pastikan mode lain tidak bentrok (jika ada)
-            if UltraBlatant and UltraBlatant.Active then
+            -- MATIKAN MODE LAIN (ANTI BENTROK)
+            st.autoFishing = false
+            _G.FBlatant = false
+            if UltraBlatant then
                 UltraBlatant.Active = false
             end
 
@@ -772,13 +833,41 @@ LegitSection:AddToggle({
                 st.legitFishing.thread = nil
             end
 
-            -- safety cancel
             SafeCall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
         end
     end
 })
+
+--======================================================
+-- OPTIONAL TUNING (GUI)
+--======================================================
+
+LegitSection:AddInput({
+    Title = "Legit Min Delay",
+    Content = "Minimum human delay",
+    Default = tostring(st.legitFishing.minWait),
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= 1 then
+            st.legitFishing.minWait = n
+        end
+    end
+})
+
+LegitSection:AddInput({
+    Title = "Legit Max Delay",
+    Content = "Maximum human delay",
+    Default = tostring(st.legitFishing.maxWait),
+    Callback = function(v)
+        local n = tonumber(v)
+        if n and n >= st.legitFishing.minWait then
+            st.legitFishing.maxWait = n
+        end
+    end
+})
+
 
 local AutoFishing = Tabs.Fishing:AddSection("Instant Fishing")
 
