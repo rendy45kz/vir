@@ -186,6 +186,16 @@ local ForceEquipRod = {
     Cooldown = 0.6     -- delay antar force equip
 }
 
+st.legitFishing = {
+    enabled = false,
+    thread = nil,
+
+    chargeDelay = 0.4,          -- delay sebelum start minigame
+    minWait = 1.5,              -- delay minimal antar siklus
+    maxWait = 3.0,              -- delay maksimal antar siklus
+    cancelDelay = 0.2,          -- delay sebelum cancel
+}
+
 local ConnectionWalkSpeed = nil
 local antiAfkConnection = nil
 local oldRequestCharge = nil
@@ -686,6 +696,88 @@ Camera:AddToggle({
     end
   end
 })
+
+-- Legit Fishing
+local function LegitFishingLoop()
+    while st.legitFishing.enabled do
+        local startTime = os.clock()
+
+        -- Charge rod (human-like)
+        SafeCall(function()
+            api.Functions.ChargeRod:InvokeServer()
+        end)
+
+        task.wait(st.legitFishing.chargeDelay)
+
+        if not st.legitFishing.enabled then break end
+
+        -- Start fishing minigame
+        SafeCall(function()
+            api.Functions.StartMini:InvokeServer(
+                1,
+                os.clock(),
+                os.clock()
+            )
+        end)
+
+        -- Random wait (simulate human reaction)
+        local waitTime = math.random(
+            st.legitFishing.minWait * 100,
+            st.legitFishing.maxWait * 100
+        ) / 100
+
+        task.wait(waitTime)
+        if not st.legitFishing.enabled then break end
+
+        -- Complete fishing
+        SafeCall(function()
+            api.Events.REFishDone:FireServer()
+        end)
+
+        task.wait(st.legitFishing.cancelDelay)
+
+        -- Cancel input (end cycle)
+        SafeCall(function()
+            api.Functions.Cancel:InvokeServer()
+        end)
+
+        -- Small idle pause (anti pattern)
+        local elapsed = os.clock() - startTime
+        if elapsed < 1 then
+            task.wait(1 - elapsed)
+        end
+    end
+end
+
+local LegitSection = Tabs.Fishing:AddSection("Legit Fishing")
+
+LegitSection:AddToggle({
+Title = "Legit Fishing",
+Content = "Human-like fishing (safe & slow)",
+Default = false,
+Callback = function(state)
+st.legitFishing.enabled = state
+    if state then
+        -- Pastikan mode lain mati
+        if UltraBlatant and UltraBlatant.Active then
+            UltraBlatant.Active = false
+        end
+
+        st.legitFishing.thread = task.spawn(LegitFishingLoop)
+    else
+        st.legitFishing.enabled = false
+
+        if st.legitFishing.thread then
+            task.cancel(st.legitFishing.thread)
+            st.legitFishing.thread = nil
+        end
+
+        -- safety cancel
+        SafeCall(function()
+            api.Functions.Cancel:InvokeServer()
+        end)
+    end
+end
 
 local AutoFishing = Tabs.Fishing:AddSection("Instant Fishing")
 
