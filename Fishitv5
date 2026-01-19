@@ -700,18 +700,17 @@ Camera:AddToggle({
 -- Legit Fishing
 local function LegitFishingLoop()
     while st.legitFishing.enabled do
-        local startTime = os.clock()
+        local cycleStart = os.clock()
 
-        -- Charge rod (human-like)
+        -- Charge rod
         SafeCall(function()
             api.Functions.ChargeRod:InvokeServer()
         end)
 
         task.wait(st.legitFishing.chargeDelay)
-
         if not st.legitFishing.enabled then break end
 
-        -- Start fishing minigame
+        -- Start fishing minigame (legit timing)
         SafeCall(function()
             api.Functions.StartMini:InvokeServer(
                 1,
@@ -720,7 +719,7 @@ local function LegitFishingLoop()
             )
         end)
 
-        -- Random wait (simulate human reaction)
+        -- Random human-like wait
         local waitTime = math.random(
             st.legitFishing.minWait * 100,
             st.legitFishing.maxWait * 100
@@ -741,8 +740,8 @@ local function LegitFishingLoop()
             api.Functions.Cancel:InvokeServer()
         end)
 
-        -- Small idle pause (anti pattern)
-        local elapsed = os.clock() - startTime
+        -- Anti-pattern idle (optional smoothing)
+        local elapsed = os.clock() - cycleStart
         if elapsed < 1 then
             task.wait(1 - elapsed)
         end
@@ -752,32 +751,34 @@ end
 local LegitSection = Tabs.Fishing:AddSection("Legit Fishing")
 
 LegitSection:AddToggle({
-Title = "Legit Fishing",
-Content = "Human-like fishing (safe & slow)",
-Default = false,
-Callback = function(state)
-st.legitFishing.enabled = state
-    if state then
-        -- Pastikan mode lain mati
-        if UltraBlatant and UltraBlatant.Active then
-            UltraBlatant.Active = false
+    Title = "Legit Fishing",
+    Content = "Human-like fishing (safe & slow)",
+    Default = false,
+    Callback = function(state)
+        st.legitFishing.enabled = state
+
+        if state then
+            -- pastikan mode lain tidak bentrok (jika ada)
+            if UltraBlatant and UltraBlatant.Active then
+                UltraBlatant.Active = false
+            end
+
+            st.legitFishing.thread = task.spawn(LegitFishingLoop)
+        else
+            st.legitFishing.enabled = false
+
+            if st.legitFishing.thread then
+                task.cancel(st.legitFishing.thread)
+                st.legitFishing.thread = nil
+            end
+
+            -- safety cancel
+            SafeCall(function()
+                api.Functions.Cancel:InvokeServer()
+            end)
         end
-
-        st.legitFishing.thread = task.spawn(LegitFishingLoop)
-    else
-        st.legitFishing.enabled = false
-
-        if st.legitFishing.thread then
-            task.cancel(st.legitFishing.thread)
-            st.legitFishing.thread = nil
-        end
-
-        -- safety cancel
-        SafeCall(function()
-            api.Functions.Cancel:InvokeServer()
-        end)
     end
-end
+})
 
 local AutoFishing = Tabs.Fishing:AddSection("Instant Fishing")
 
