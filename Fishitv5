@@ -179,6 +179,13 @@ local st                   = {
     autoByInstant = false,
 }
 }
+
+local ForceEquipRod = {
+    Enabled = false,
+    RodSlot = 1,        -- slot rod
+    Cooldown = 0.6     -- delay antar force equip
+}
+
 local ConnectionWalkSpeed = nil
 local antiAfkConnection = nil
 local oldRequestCharge = nil
@@ -945,6 +952,34 @@ UltraSection:AddInput({
         end
     end
 })
+-- AUTO EQUIP ROD --
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local lastForce = 0
+
+local function IsRodEquipped()
+    local char = LocalPlayer.Character
+    if not char then return false end
+
+    for _, obj in ipairs(char:GetChildren()) do
+        if obj:IsA("Tool") then
+            return true
+        end
+    end
+    return false
+end
+
+local function ForceEquip()
+    if not ForceEquipRod.Enabled then return end
+    if os.clock() - lastForce < ForceEquipRod.Cooldown then return end
+
+    lastForce = os.clock()
+
+    SafeCall(function()
+        api.Events.REEquip:FireServer(ForceEquipRod.RodSlot)
+    end)
+end
 
 local FishFeature = Tabs.Fishing:AddSection("Fishing Features")
 
@@ -962,6 +997,18 @@ FishFeature:AddToggle({
             if not st.perfection.autoByInstant then
                 DisablePerfection()
             end
+        end
+    end
+})
+
+FishFeature:AddToggle({
+    Title = "Auto Equip Rod",
+    Content = "Always equip fishing rod",
+    Default = false,
+    Callback = function(state)
+        ForceEquipRod.Enabled = state
+        if state then
+            ForceEquip()
         end
     end
 })
