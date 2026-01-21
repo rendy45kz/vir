@@ -235,6 +235,7 @@ local AntiDrown = {
     Hooked  = false
 }
 
+
 --==================================================
 -- METATABLE HOOK (LOAD ONCE)
 --==================================================
@@ -771,57 +772,109 @@ AutoFishing:AddInput({
 })
 
 --==================================================
--- BLATANT FISHING (STABLE - TASK.SPAWN LOOP)
+--==================================================
+-- BLATANT FISHING (PURE TASK.SPAWN - FAST)
 --==================================================
 
-local Blatant = {
+--==================================================
+-- ROD ANIMATION BYPASS CORE (LOAD ONCE)
+--==================================================
+
+local RodAnimBypass = {
     Enabled = false,
-    ReelDelay = 1.9,
-    FishDelay = 0.9,
-    Thread = nil
+    Hooked = false
 }
 
-local function BlatantCast()
-    local t = workspace:GetServerTimeNow()
-
-    pcall(function()
-        api.Functions.Cancel:InvokeServer()
-    end)
-
-    pcall(function()
-        api.Functions.ChargeRod:InvokeServer(t)
-    end)
-
-    pcall(function()
-        api.Functions.StartMini:InvokeServer(
-            -1.233184814453125,
-            0.994503488563327303,
-            t
-        )
-    end)
-
-    task.wait(Blatant.FishDelay)
-
-    pcall(function()
-        api.Events.REFishDone:FireServer()
-    end)
+local function IsRodAnim(anim)
+    if not anim then return false end
+    local id = tostring(anim.AnimationId or ""):lower()
+    return id:find("fish") or id:find("rod") or id:find("reel")
 end
 
-local function StartBlatant()
-    if Blatant.Thread then return end
+pcall(function()
+    if RodAnimBypass.Hooked then return end
+    RodAnimBypass.Hooked = true
 
-    Blatant.Thread = task.spawn(function()
-        while Blatant.Enabled do
-            BlatantCast()
-            task.wait(Blatant.ReelDelay)
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local old = mt.__namecall
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local m = getnamecallmethod()
+        if RodAnimBypass.Enabled and (m == "LoadAnimation" or m == "Play") then
+            local anim = ...
+            if IsRodAnim(anim) then
+                return nil -- BLOCK rod animation
+            end
         end
-        Blatant.Thread = nil
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end)
+
+local function StopRodTracks(char)
+    for _, tr in ipairs(char:GetDescendants()) do
+        if tr:IsA("AnimationTrack") then
+            local a = tr.Animation
+            if IsRodAnim(a) then
+                pcall(function()
+                    tr:Stop()
+                    tr:Destroy()
+                end)
+            end
+        end
+    end
+end
+
+player.CharacterAdded:Connect(function(c)
+    task.wait(0.3)
+    if RodAnimBypass.Enabled then
+        StopRodTracks(c)
+    end
+end)
+
+
+_G.FBlatant = _G.FBlatant or false
+_G.Reel = _G.Reel or 1.9
+_G.FishingDelay = _G.FishingDelay or 0.9
+
+local function Fastest()
+    task.spawn(function()
+        local t = workspace:GetServerTimeNow()
+
+        -- cancel dulu (biar reset state server)
+        pcall(function()
+            api.Functions.Cancel:InvokeServer()
+        end)
+
+        -- micro align (±1 frame)
+        task.wait(0.03)
+
+        pcall(function()
+            api.Functions.ChargeRod:InvokeServer(t)
+        end)
+
+        -- sinkronisasi window server (INI KUNCI)
+        local align = 0.045 + ((t * 1000) % 12) * 0.001
+        task.wait(align)
+
+        pcall(function()
+            api.Functions.StartMini:InvokeServer(
+                -1.233184814453125,
+                0.994503488563327303,
+                t
+            )
+        end)
+
+        -- delay ini JANGAN 0, harus masuk completion window
+        task.wait(_G.FishingDelay - 0.08)
+
+        pcall(function()
+            api.Events.REFishDone:FireServer()
+        end)
     end)
 end
 
-local function StopBlatant()
-    Blatant.Enabled = false
-end
 
 --------------------------------------------------
 -- GUI
@@ -832,103 +885,105 @@ Fish2:AddToggle({
     Title = "Blatant Fishing",
     Default = false,
     Callback = function(state)
-        Blatant.Enabled = state
+        _G.FBlatant = state
         api.Functions.AutoEnabled:InvokeServer(state)
 
         if state then
+            -- 🔥 AUTO BYPASS ANIM
+            RodAnimBypass.Enabled = true
+            StopRodTracks(player.Character)
+
             st.perfection.autoByInstant = true
             EnablePerfection()
-            StartBlatant()
+
+            task.spawn(function()
+                while _G.FBlatant do
+                    Fastest()
+                    task.wait(_G.Reel)
+                end
+            end)
         else
+            -- 🔁 RESTORE
+            RodAnimBypass.Enabled = false
+
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
                 DisablePerfection()
             end
-            StopBlatant()
         end
     end
 })
 
+
 Fish2:AddInput({
     Title = "Delay Reel",
-    Default = tostring(Blatant.ReelDelay),
+    Default = tostring(_G.Reel),
     Callback = function(v)
         local n = tonumber(v)
         if n and n > 0 then
-            Blatant.ReelDelay = n
+            _G.Reel = n
         end
     end
 })
 
 Fish2:AddInput({
     Title = "Delay Fishing",
-    Default = tostring(Blatant.FishDelay),
+    Default = tostring(_G.FishingDelay),
     Callback = function(v)
         local n = tonumber(v)
         if n and n > 0 then
-            Blatant.FishDelay = n
+            _G.FishingDelay = n
         end
     end
 })
 
 --==================================================
--- ULTRA BLATANT FISHING (TASK.SPAWN - SAFE)
+-- ULTRA BLATANT FISHING (PURE TASK.SPAWN - MAX SPEED)
 --==================================================
 
 local UltraBlatant = {
-    Enabled = false,
+    Active = false,
     CompleteDelay = 0.7,
-    CancelDelay = 0.3,
-    Thread = nil
+    CancelDelay = 0.3
 }
 
 local function UltraCast()
     local t = workspace:GetServerTimeNow()
 
-    pcall(function()
-        api.Functions.ChargeRod:InvokeServer(t)
-    end)
+    task.spawn(function()
+        pcall(function()
+            api.Functions.ChargeRod:InvokeServer(t)
+        end)
 
-    task.wait() -- 1 frame yield
+        -- 1 frame + offset kecil
+        task.wait(0.02 + ((t * 1000) % 9) * 0.001)
 
-    pcall(function()
-        api.Functions.StartMini:InvokeServer(
-            -1.233184814453125,
-            0.994503488563327303,
-            t
-        )
-    end)
-end
+        pcall(function()
+            api.Functions.StartMini:InvokeServer(
+                -1.233184814453125,
+                0.994503488563327303,
+                t
+            )
+        end)
 
-local function StartUltraBlatant()
-    if UltraBlatant.Thread then return end
+        task.wait(UltraBlatant.CompleteDelay - 0.06)
 
-    UltraBlatant.Thread = task.spawn(function()
-        while UltraBlatant.Enabled do
-            UltraCast()
-
-            task.wait(UltraBlatant.CompleteDelay)
-
-            if not UltraBlatant.Enabled then break end
+        if UltraBlatant.Active then
             pcall(function()
                 api.Events.REFishDone:FireServer()
             end)
+        end
 
-            task.wait(UltraBlatant.CancelDelay)
+        task.wait(UltraBlatant.CancelDelay)
 
-            if not UltraBlatant.Enabled then break end
+        if UltraBlatant.Active then
             pcall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
         end
-
-        UltraBlatant.Thread = nil
     end)
 end
 
-local function StopUltraBlatant()
-    UltraBlatant.Enabled = false
-end
 
 --------------------------------------------------
 -- GUI
@@ -940,9 +995,13 @@ UltraSection:AddToggle({
     Content = "Extremely fast & aggressive fishing",
     Default = false,
     Callback = function(state)
-        UltraBlatant.Enabled = state
+        UltraBlatant.Active = state
 
         if state then
+            -- 🔥 AUTO BYPASS ANIM
+            RodAnimBypass.Enabled = true
+            StopRodTracks(player.Character)
+
             st.perfection.autoByInstant = true
             EnablePerfection()
 
@@ -950,14 +1009,21 @@ UltraSection:AddToggle({
                 api.Events.REEquip:FireServer(1)
             end)
 
-            task.wait(0.15)
-            StartUltraBlatant()
+            task.spawn(function()
+                while UltraBlatant.Active do
+                    UltraCast()
+                    task.wait(0) -- pure speed
+                end
+            end)
         else
-            StopUltraBlatant()
+            UltraBlatant.Active = false
 
             pcall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
+
+            -- 🔁 RESTORE
+            RodAnimBypass.Enabled = false
 
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
@@ -966,6 +1032,7 @@ UltraSection:AddToggle({
         end
     end
 })
+
 
 UltraSection:AddInput({
     Title = "Complete Delay",
