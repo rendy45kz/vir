@@ -770,148 +770,177 @@ AutoFishing:AddInput({
     end
 })
 
---------------------------------------------------------
--- BLATANT FISHING (NO SPAWN FLOOD)
---------------------------------------------------------
-local Fish2 = Tabs.Fishing:AddSection("Blatant Fishing")
+--==================================================
+-- BLATANT FISHING (STABLE - TASK.SPAWN LOOP)
+--==================================================
 
-_G.FBlatant = _G.FBlatant or false
-_G.Reel = _G.Reel or 1.9
-_G.FishingDelay = _G.FishingDelay or 0.9
+local Blatant = {
+    Enabled = false,
+    ReelDelay = 1.9,
+    FishDelay = 0.9,
+    Thread = nil
+}
 
-local BlatantThread = nil
+local function BlatantCast()
+    local t = workspace:GetServerTimeNow()
 
-local function FastestOnce()
-    local now = workspace:GetServerTimeNow()
+    pcall(function()
+        api.Functions.Cancel:InvokeServer()
+    end)
 
-    pcall(function() api.Functions.Cancel:InvokeServer() end)
-    pcall(function() api.Functions.ChargeRod:InvokeServer(now) end)
+    pcall(function()
+        api.Functions.ChargeRod:InvokeServer(t)
+    end)
+
     pcall(function()
         api.Functions.StartMini:InvokeServer(
             -1.233184814453125,
             0.994503488563327303,
-            now
+            t
         )
     end)
 
-    task.wait(_G.FishingDelay)
+    task.wait(Blatant.FishDelay)
 
     pcall(function()
         api.Events.REFishDone:FireServer()
     end)
 end
 
+local function StartBlatant()
+    if Blatant.Thread then return end
+
+    Blatant.Thread = task.spawn(function()
+        while Blatant.Enabled do
+            BlatantCast()
+            task.wait(Blatant.ReelDelay)
+        end
+        Blatant.Thread = nil
+    end)
+end
+
+local function StopBlatant()
+    Blatant.Enabled = false
+end
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+local Fish2 = Tabs.Fishing:AddSection("Blatant Fishing")
+
 Fish2:AddToggle({
     Title = "Blatant Fishing",
-    Default = _G.FBlatant,
-    Callback = function(s)
-        _G.FBlatant = s
-        api.Functions.AutoEnabled:InvokeServer(s)
+    Default = false,
+    Callback = function(state)
+        Blatant.Enabled = state
+        api.Functions.AutoEnabled:InvokeServer(state)
 
-        if BlatantThread then
-            task.cancel(BlatantThread)
-            BlatantThread = nil
-        end
-
-        if s then
+        if state then
             st.perfection.autoByInstant = true
             EnablePerfection()
-
-            BlatantThread = task.spawn(function()
-                while _G.FBlatant do
-                    FastestOnce()
-                    task.wait(_G.Reel)
-                end
-            end)
+            StartBlatant()
         else
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
                 DisablePerfection()
             end
+            StopBlatant()
         end
     end
 })
 
 Fish2:AddInput({
     Title = "Delay Reel",
-    Default = tostring(_G.Reel),
+    Default = tostring(Blatant.ReelDelay),
     Callback = function(v)
         local n = tonumber(v)
         if n and n > 0 then
-            _G.Reel = n
+            Blatant.ReelDelay = n
         end
     end
 })
 
 Fish2:AddInput({
     Title = "Delay Fishing",
-    Default = tostring(_G.FishingDelay),
+    Default = tostring(Blatant.FishDelay),
     Callback = function(v)
         local n = tonumber(v)
         if n and n > 0 then
-            _G.FishingDelay = n
+            Blatant.FishDelay = n
         end
     end
 })
 
---------------------------------------------------------
--- ULTRA BLATANT (THREAD GUARDED)
---------------------------------------------------------
+--==================================================
+-- ULTRA BLATANT FISHING (TASK.SPAWN - SAFE)
+--==================================================
+
 local UltraBlatant = {
-    Active = false,
+    Enabled = false,
     CompleteDelay = 0.7,
     CancelDelay = 0.3,
     Thread = nil
 }
 
-local function UltraLoop()
-    while UltraBlatant.Active do
-        local t = workspace:GetServerTimeNow()
+local function UltraCast()
+    local t = workspace:GetServerTimeNow()
 
-        pcall(function()
-            api.Functions.ChargeRod:InvokeServer(t)
-        end)
+    pcall(function()
+        api.Functions.ChargeRod:InvokeServer(t)
+    end)
 
-        task.wait()
+    task.wait() -- 1 frame yield
 
-        pcall(function()
-            api.Functions.StartMini:InvokeServer(
-                -1.233184814453125,
-                0.994503488563327303,
-                t
-            )
-        end)
+    pcall(function()
+        api.Functions.StartMini:InvokeServer(
+            -1.233184814453125,
+            0.994503488563327303,
+            t
+        )
+    end)
+end
 
-        task.wait(UltraBlatant.CompleteDelay)
+local function StartUltraBlatant()
+    if UltraBlatant.Thread then return end
 
-        if UltraBlatant.Active then
+    UltraBlatant.Thread = task.spawn(function()
+        while UltraBlatant.Enabled do
+            UltraCast()
+
+            task.wait(UltraBlatant.CompleteDelay)
+
+            if not UltraBlatant.Enabled then break end
             pcall(function()
                 api.Events.REFishDone:FireServer()
             end)
-        end
 
-        task.wait(UltraBlatant.CancelDelay)
+            task.wait(UltraBlatant.CancelDelay)
 
-        if UltraBlatant.Active then
+            if not UltraBlatant.Enabled then break end
             pcall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
         end
-    end
+
+        UltraBlatant.Thread = nil
+    end)
 end
 
+local function StopUltraBlatant()
+    UltraBlatant.Enabled = false
+end
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
 local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
 
 UltraSection:AddToggle({
     Title = "Ultra Blatant Fishing",
+    Content = "Extremely fast & aggressive fishing",
     Default = false,
     Callback = function(state)
-        UltraBlatant.Active = state
-
-        if UltraBlatant.Thread then
-            task.cancel(UltraBlatant.Thread)
-            UltraBlatant.Thread = nil
-        end
+        UltraBlatant.Enabled = state
 
         if state then
             st.perfection.autoByInstant = true
@@ -921,8 +950,11 @@ UltraSection:AddToggle({
                 api.Events.REEquip:FireServer(1)
             end)
 
-            UltraBlatant.Thread = task.spawn(UltraLoop)
+            task.wait(0.15)
+            StartUltraBlatant()
         else
+            StopUltraBlatant()
+
             pcall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
@@ -956,6 +988,7 @@ UltraSection:AddInput({
         end
     end
 })
+
 
 --------------------------------------------------------
 -- AUTO EQUIP ROD (HEARTBEAT THROTTLE)
