@@ -264,101 +264,67 @@ if rawmt and not AntiDrown.Hooked then
 end
 
 --==================================================
--- CREATE PLATFORM (ONCE)
+-- WALK ON WATER (LEGACY FIX - STABLE)
 --==================================================
-local function CreateWaterPlatform()
+
+local RunService = game:GetService("RunService")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+local walkOnWaterEnabled = false
+local waterPlatform
+local wowConn
+
+local PLATFORM_SIZE = Vector3.new(20, 1, 20)
+local PLATFORM_OFFSET = 3.2
+
+local function createPlatform()
     local p = Instance.new("Part")
-    p.Name = "WaterPlatform"
+    p.Name = "Aegis_WaterPlatform"
+    p.Size = PLATFORM_SIZE
     p.Anchored = true
     p.CanCollide = true
     p.Transparency = 1
-    p.Size = PLATFORM_SIZE
     p.CastShadow = false
     p.Parent = workspace
     return p
 end
 
---==================================================
--- WALK ON WATER (CPU SAFE VERSION)
---==================================================
-
-local waterRayParams = RaycastParams.new()
-waterRayParams.FilterType = Enum.RaycastFilterType.Include
-waterRayParams.FilterDescendantsInstances = { workspace.Terrain }
-waterRayParams.IgnoreWater = false
-
-local waterTick = 0
-local WATER_INTERVAL = 0.12 -- <= INI KUNCI STABILITAS
-
 local function EnableWalkOnWater()
-    if isWalkOnWater then return end
-    isWalkOnWater = true
+    if walkOnWaterEnabled then return end
+    walkOnWaterEnabled = true
 
-    if not waterPlatform then
-        waterPlatform = CreateWaterPlatform()
+    if not waterPlatform or not waterPlatform.Parent then
+        waterPlatform = createPlatform()
     end
 
-    if walkOnWaterConnection then
-        walkOnWaterConnection:Disconnect()
-        walkOnWaterConnection = nil
+    if wowConn then
+        wowConn:Disconnect()
     end
 
-    walkOnWaterConnection = RunService.Heartbeat:Connect(function(dt)
-        waterTick += dt
-        if waterTick < WATER_INTERVAL then return end
-        waterTick = 0
-
-        if not isWalkOnWater then return end
+    wowConn = RunService.Heartbeat:Connect(function()
+        if not walkOnWaterEnabled then return end
 
         local char = LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
+        if not hrp then return end
 
-        local origin = hrp.Position + Vector3.new(0, 6, 0)
-        local direction = Vector3.new(0, -120, 0)
-
-        local result = workspace:Raycast(origin, direction, waterRayParams)
-
-        if result and result.Material == Enum.Material.Water then
-            local waterY = result.Position.Y
-
-            waterPlatform.Position = Vector3.new(
-                hrp.Position.X,
-                waterY - 0.3,
-                hrp.Position.Z
-            )
-
-            if hrp.Position.Y < waterY + 2 then
-                if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                    hrp.AssemblyLinearVelocity = Vector3.new(
-                        hrp.AssemblyLinearVelocity.X,
-                        0,
-                        hrp.AssemblyLinearVelocity.Z
-                    )
-
-                    hrp.CFrame = CFrame.new(
-                        hrp.Position.X,
-                        waterY + 3,
-                        hrp.Position.Z
-                    )
-                end
-            end
-        else
-            waterPlatform.Position = hrp.Position - Vector3.new(0, 6, 0)
-        end
+        -- PLATFORM SELALU IKUT PLAYER (TANPA RAYCAST)
+        waterPlatform.CFrame = CFrame.new(
+            hrp.Position.X,
+            hrp.Position.Y - PLATFORM_OFFSET,
+            hrp.Position.Z
+        )
     end)
 end
 
 local function DisableWalkOnWater()
-    if not isWalkOnWater then return end
-    isWalkOnWater = false
+    walkOnWaterEnabled = false
 
-    if walkOnWaterConnection then
-        walkOnWaterConnection:Disconnect()
-        walkOnWaterConnection = nil
+    if wowConn then
+        wowConn:Disconnect()
+        wowConn = nil
     end
 
     if waterPlatform then
@@ -366,6 +332,7 @@ local function DisableWalkOnWater()
         waterPlatform = nil
     end
 end
+
 
 
 -- TRACK UUID YANG SUDAH DIHITUNG
@@ -550,6 +517,7 @@ Plyrs:AddToggle({
     end
   end
 })
+
 
 Plyrs:AddToggle({
     Title = "Anti Drown (Bypass)",
