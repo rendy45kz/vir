@@ -264,67 +264,105 @@ if rawmt and not AntiDrown.Hooked then
 end
 
 --==================================================
--- WALK ON WATER (LEGACY FIX - STABLE)
+-- CREATE PLATFORM (ONCE)
 --==================================================
-
-local RunService = game:GetService("RunService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
-
-local walkOnWaterEnabled = false
-local waterPlatform
-local wowConn
-
-local PLATFORM_SIZE = Vector3.new(20, 1, 20)
-local PLATFORM_OFFSET = 3.2
-
-local function createPlatform()
+local function CreateWaterPlatform()
     local p = Instance.new("Part")
-    p.Name = "Aegis_WaterPlatform"
-    p.Size = PLATFORM_SIZE
+    p.Name = "WaterPlatform"
     p.Anchored = true
     p.CanCollide = true
     p.Transparency = 1
+    p.Size = PLATFORM_SIZE
     p.CastShadow = false
     p.Parent = workspace
     return p
 end
 
+--==================================================
+-- WALK ON WATER (FIXED & STABLE)
+--==================================================
+
 local function EnableWalkOnWater()
-    if walkOnWaterEnabled then return end
-    walkOnWaterEnabled = true
+    if isWalkOnWater then return end
+    isWalkOnWater = true
 
-    if not waterPlatform or not waterPlatform.Parent then
-        waterPlatform = createPlatform()
+    if not waterPlatform then
+        waterPlatform = CreateWaterPlatform()
     end
 
-    if wowConn then
-        wowConn:Disconnect()
+    if walkOnWaterConnection then
+        walkOnWaterConnection:Disconnect()
     end
 
-    wowConn = RunService.Heartbeat:Connect(function()
-        if not walkOnWaterEnabled then return end
+    walkOnWaterConnection = RunService.Stepped:Connect(function()
+        if not isWalkOnWater then return end
 
         local char = LocalPlayer.Character
         if not char then return end
 
         local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
 
-        -- PLATFORM SELALU IKUT PLAYER (TANPA RAYCAST)
-        waterPlatform.CFrame = CFrame.new(
-            hrp.Position.X,
-            hrp.Position.Y - PLATFORM_OFFSET,
-            hrp.Position.Z
-        )
+        -- RAYCAST ONLY TERRAIN (WATER)
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { workspace.Terrain }
+        params.IgnoreWater = false
+
+        local origin = hrp.Position + Vector3.new(0, 6, 0)
+        local direction = Vector3.new(0, -120, 0)
+
+        local result = workspace:Raycast(origin, direction, params)
+
+        if result and result.Material == Enum.Material.Water then
+            local waterY = result.Position.Y
+
+            -- PLATFORM IKUT PLAYER (SEDIKIT DI BAWAH AIR)
+            waterPlatform.Position = Vector3.new(
+                hrp.Position.X,
+                waterY - 0.3,
+                hrp.Position.Z
+            )
+
+            -- JAGA PLAYER TIDAK TENGGELAM SAAT JALAN
+            if hrp.Position.Y < waterY + 2 then
+                if not UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                    hrp.AssemblyLinearVelocity = Vector3.new(
+                        hrp.AssemblyLinearVelocity.X,
+                        0,
+                        hrp.AssemblyLinearVelocity.Z
+                    )
+
+                    hrp.CFrame = CFrame.new(
+                        hrp.Position.X,
+                        waterY + 3,
+                        hrp.Position.Z
+                    )
+                end
+            end
+        else
+            -- JANGAN HILANGKAN PLATFORM, IKUTI PLAYER
+            waterPlatform.Position = Vector3.new(
+                hrp.Position.X,
+                hrp.Position.Y - 6,
+                hrp.Position.Z
+            )
+        end
     end)
 end
 
-local function DisableWalkOnWater()
-    walkOnWaterEnabled = false
 
-    if wowConn then
-        wowConn:Disconnect()
-        wowConn = nil
+--==================================================
+-- DISABLE WALK ON WATER
+--==================================================
+local function DisableWalkOnWater()
+    if not isWalkOnWater then return end
+    isWalkOnWater = false
+
+    if walkOnWaterConnection then
+        walkOnWaterConnection:Disconnect()
+        walkOnWaterConnection = nil
     end
 
     if waterPlatform then
@@ -332,7 +370,6 @@ local function DisableWalkOnWater()
         waterPlatform = nil
     end
 end
-
 
 
 -- TRACK UUID YANG SUDAH DIHITUNG
@@ -556,88 +593,96 @@ Plyrs:AddToggle({
 })
 
 
+--------------------------------------------------------
+-- HIDE IDENTITY (FIXED & WORKING)
+--------------------------------------------------------
+
 local Connections = {}
 local OriginalText = {}
-local DescendantAddedConnection = nil
+local DescendantAddedConnection
 
-local function HandleUsernameChange(Object)
-	if not st.hideIdentity or not (Object:IsA("TextLabel") or Object:IsA("TextBox") or Object:IsA("TextButton")) then
-		return
-	end
-
-	if not Connections[Object] then
-		Connections[Object] = Object:GetPropertyChangedSignal("Text"):Connect(function()
-			HandleUsernameChange(Object)
-		end)
-	end
-
-	local text = Object.Text
-	if text:find(st.player.Name) or text:find(st.player.DisplayName) then
-		OriginalText[Object] = text
-		Object.Text = text:gsub(st.player.Name, st.hideNames):gsub(st.player.DisplayName, st.hideNames)
-	end
+local function SafeText(obj)
+    local ok, txt = pcall(function()
+        return obj.Text
+    end)
+    return ok and type(txt) == "string" and txt or nil
 end
 
-Plyrs:AddInput({
-  Title = "Set Name",
-  Content = "Sets the name to replace your username with",
-  Default = st.hideNames,
-  Placeholder = st.hideNames,
-  Callback = function(value)
-    st.hideNames = value
-  end
-})
+local function HandleUsernameChange(Object)
+    if not st.hideIdentity then return end
+    if not (Object:IsA("TextLabel") or Object:IsA("TextBox") or Object:IsA("TextButton")) then
+        return
+    end
 
-Plyrs:AddInput({
-  Title = "Set Level Text",
-  Content = "Sets the text to replace your level with",
-  Default = st.hideLevels,
-  Placeholder = st.hideLevels,
-  Callback = function(value)
-    st.hideLevels = value
-  end
-})
+    local text = SafeText(Object)
+    if not text then return end
 
-local lastHideScan = 0
+    if not Connections[Object] then
+        Connections[Object] = Object:GetPropertyChangedSignal("Text"):Connect(function()
+            HandleUsernameChange(Object)
+        end)
+    end
 
+    if text:find(st.player.Name, 1, true)
+        or text:find(st.player.DisplayName, 1, true)
+    then
+        OriginalText[Object] = OriginalText[Object] or text
+        Object.Text = text
+            :gsub(st.player.Name, st.hideNames)
+            :gsub(st.player.DisplayName, st.hideNames)
+    end
+end
+
+--------------------------------------------------------
+-- TOGGLE
+--------------------------------------------------------
 Plyrs:AddToggle({
-  Title = "Hide Identity",
-  Content = "Hides your player identity locally",
-  Default = false,
-  Callback = function(state)
-    st.hideIdentity = state
+    Title = "Hide Identity",
+    Content = "Hides your player identity locally",
+    Default = false,
+    Callback = function(state)
+        st.hideIdentity = state
 
-    if DescendantAddedConnection then
-      DescendantAddedConnection:Disconnect()
-      DescendantAddedConnection = nil
-    end
-
-    if state then
-      for _,v in ipairs(game:GetDescendants()) do
-        HandleUsernameChange(v)
-        task.wait() -- yield ringan
-      end
-
-      DescendantAddedConnection = game.DescendantAdded:Connect(function(v)
-        local now = os.clock()
-        if now - lastHideScan < 0.05 then return end
-        lastHideScan = now
-        HandleUsernameChange(v)
-      end)
-    else
-      for Object, Connection in pairs(Connections) do
-        if Connection then Connection:Disconnect() end
-      end
-      Connections = {}
-
-      for Object, Text in pairs(OriginalText) do
-        if Object and Object.Parent then
-          Object.Text = Text
+        -- CLEAN OLD
+        if DescendantAddedConnection then
+            DescendantAddedConnection:Disconnect()
+            DescendantAddedConnection = nil
         end
-      end
-      OriginalText = {}
+
+        for _, conn in pairs(Connections) do
+            if conn then conn:Disconnect() end
+        end
+        Connections = {}
+
+        -- RESTORE TEXT
+        for obj, text in pairs(OriginalText) do
+            if obj and obj.Parent then
+                pcall(function()
+                    obj.Text = text
+                end)
+            end
+        end
+        OriginalText = {}
+
+        if not state then return end
+
+        -- INITIAL SCAN (BATCH, NO FREEZE)
+        task.spawn(function()
+            local count = 0
+            for _, v in ipairs(game:GetDescendants()) do
+                HandleUsernameChange(v)
+                count += 1
+                if count % 150 == 0 then
+                    task.wait()
+                end
+            end
+        end)
+
+        -- NEW UI
+        DescendantAddedConnection = game.DescendantAdded:Connect(function(v)
+            HandleUsernameChange(v)
+        end)
     end
-  end
 })
 
 
@@ -1040,28 +1085,54 @@ UltraSection:AddInput({
 })
 
 --------------------------------------------------------
--- AUTO EQUIP ROD (HEARTBEAT THROTTLE)
+-- AUTO EQUIP ROD (FIXED LOOP)
 --------------------------------------------------------
+
+local EquipConn = nil
 local lastEquip = 0
 
-svc.RunService.Heartbeat:Connect(function(dt)
-    if not ForceEquipRod.Enabled then return end
-    if os.clock() - lastEquip < ForceEquipRod.Cooldown then return end
-
+local function IsRodEquipped()
     local char = LocalPlayer.Character
-    if not char then return end
+    if not char then return false end
 
     for _, obj in ipairs(char:GetChildren()) do
         if obj:IsA("Tool") then
-            return -- already equipped
+            return true
         end
     end
+    return false
+end
 
-    lastEquip = os.clock()
-    pcall(function()
-        api.Events.REEquip:FireServer(1)
+local function StartAutoEquip()
+    if EquipConn then return end -- anti double loop
+
+    lastEquip = 0
+
+    EquipConn = svc.RunService.Heartbeat:Connect(function()
+        if not ForceEquipRod.Enabled then return end
+
+        local now = os.clock()
+        if now - lastEquip < ForceEquipRod.Cooldown then return end
+
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        if IsRodEquipped() then return end
+
+        lastEquip = now
+        pcall(function()
+            api.Events.REEquip:FireServer(ForceEquipRod.RodSlot or 1)
+        end)
     end)
-end)
+end
+
+local function StopAutoEquip()
+    if EquipConn then
+        EquipConn:Disconnect()
+        EquipConn = nil
+    end
+end
+
 
 --------------------------------------------------------
 -- PERFECTION SUPPORT (SAFE)
@@ -1070,7 +1141,7 @@ local FishFeature = Tabs.Fishing:AddSection("Fishing Features")
 
 FishFeature:AddToggle({
     Title = "Perfection Support",
-    Default = false,
+    Default = true,
     Callback = function(state)
         st.perfection.activated = state
         if state then
@@ -1085,11 +1156,19 @@ FishFeature:AddToggle({
 
 FishFeature:AddToggle({
     Title = "Auto Equip Rod",
+    Content = "Force equip fishing rod (loop)",
     Default = false,
     Callback = function(state)
         ForceEquipRod.Enabled = state
+
+        if state then
+            StartAutoEquip()
+        else
+            StopAutoEquip()
+        end
     end
 })
+
 
 FishFeature:AddButton({
     Title = "Recovery Fishing",
@@ -1300,13 +1379,15 @@ local function ProcessFavoriteQueue()
 end
 
 --------------------------------------------------------
--- EVENT-BASED AUTO FAVORITE
+-- EVENT-BASED AUTO FAVORITE (FIXED)
 --------------------------------------------------------
-api.Events.REFishGot.OnClientEvent:Connect(function(_, info)
+api.Events.REObtainedNewFishNotification.OnClientEvent:Connect(function(_, _, info)
     if not st.favorite.auto then return end
     if not info or not info.InventoryItem then return end
 
     local Item = info.InventoryItem
+    if not Item.UUID then return end
+
     if ShouldFavoriteItem(Item) then
         table.insert(favoriteQueue, Item.UUID)
         ProcessFavoriteQueue()
@@ -1570,85 +1651,101 @@ HideFeature:AddToggle({
 --//======================================================
 --// FPS BOOST + SERVER + MERCHANT (CPU SAFE FIX)
 --//======================================================
+--------------------------------------------------------
+-- FPS BOOST (RESTORABLE VERSION)
+--------------------------------------------------------
 
---------------------------------------------------------
--- FPS BOOST (STABLE + THROTTLED)
---------------------------------------------------------
 local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
-local Terrain = workspace:FindFirstChildOfClass("Terrain")
+local Lighting   = game:GetService("Lighting")
+local Players    = game:GetService("Players")
+local Terrain    = workspace:FindFirstChildOfClass("Terrain")
 
 local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 
-local FPS_BOOST_ACTIVE = false
+--------------------------------------------------------
+-- STATE
+--------------------------------------------------------
+local FPS_ACTIVE = false
 local DescendantConn
-local lastDescendant = 0
+local CurrentCharacter
 
--- WEAK CACHES
+--------------------------------------------------------
+-- CACHES (WEAK, RESTORE SAFE)
+--------------------------------------------------------
 local CachedParts   = setmetatable({}, { __mode = "k" })
 local CachedDecals  = setmetatable({}, { __mode = "k" })
-local CachedEffects = setmetatable({}, { __mode = "k" })
+local CachedFX      = setmetatable({}, { __mode = "k" })
 local CachedLighting = {}
 local CachedTerrain  = {}
 
-local function Safe(fn)
-    local ok, err = pcall(fn)
-    if not ok then warn("[FPS BOOST]", err) end
+--------------------------------------------------------
+-- CHARACTER TRACK (IMPORTANT)
+--------------------------------------------------------
+local function UpdateCharacter(char)
+    CurrentCharacter = char
 end
 
-local function CachePart(part)
-    if CachedParts[part] then return end
-    CachedParts[part] = {
-        Transparency = part.Transparency,
-        Material = part.Material,
-        CastShadow = part.CastShadow,
-        CanCollide = part.CanCollide
-    }
-end
+UpdateCharacter(LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())
+LocalPlayer.CharacterAdded:Connect(UpdateCharacter)
 
-local function ApplyFPSBoost(obj)
-    if not FPS_BOOST_ACTIVE then return end
-    if obj:IsDescendantOf(Character) then return end
+--------------------------------------------------------
+-- APPLY
+--------------------------------------------------------
+local function Apply(obj)
+    if not FPS_ACTIVE then return end
+    if CurrentCharacter and obj:IsDescendantOf(CurrentCharacter) then return end
 
-    Safe(function()
-        if obj:IsA("BasePart") then
-            CachePart(obj)
-            obj.Material = Enum.Material.SmoothPlastic
-            obj.CastShadow = false
-            if obj.Size.Magnitude > 20 then
-                obj.Transparency = 1
-                obj.CanCollide = false
-            end
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            if not CachedDecals[obj] then
-                CachedDecals[obj] = obj.Transparency
-                obj.Transparency = 1
-            end
-        elseif obj:IsA("ParticleEmitter")
-            or obj:IsA("Trail")
-            or obj:IsA("Beam")
-            or obj:IsA("Fire")
-            or obj:IsA("Smoke")
-            or obj:IsA("Sparkles") then
-            if not CachedEffects[obj] then
-                CachedEffects[obj] = obj.Enabled
-                obj.Enabled = false
-            end
+    if obj:IsA("BasePart") then
+        if not CachedParts[obj] then
+            CachedParts[obj] = {
+                Transparency = obj.Transparency,
+                Material     = obj.Material,
+                CastShadow   = obj.CastShadow,
+                CanCollide   = obj.CanCollide
+            }
         end
-    end)
+
+        obj.Material = Enum.Material.SmoothPlastic
+        obj.CastShadow = false
+
+        if obj.Size.Magnitude > 20 then
+            obj.Transparency = 1
+            obj.CanCollide = false
+        end
+
+    elseif obj:IsA("Decal") or obj:IsA("Texture") then
+        if not CachedDecals[obj] then
+            CachedDecals[obj] = obj.Transparency
+            obj.Transparency = 1
+        end
+
+    elseif obj:IsA("ParticleEmitter")
+        or obj:IsA("Trail")
+        or obj:IsA("Beam")
+        or obj:IsA("Fire")
+        or obj:IsA("Smoke")
+        or obj:IsA("Sparkles") then
+
+        if not CachedFX[obj] then
+            CachedFX[obj] = obj.Enabled
+            obj.Enabled = false
+        end
+    end
 end
 
+--------------------------------------------------------
+-- ENABLE
+--------------------------------------------------------
 local function EnableFPSBoost()
-    if FPS_BOOST_ACTIVE then return end
-    FPS_BOOST_ACTIVE = true
+    if FPS_ACTIVE then return end
+    FPS_ACTIVE = true
 
+    -- Lighting
     CachedLighting = {
         GlobalShadows = Lighting.GlobalShadows,
-        FogEnd = Lighting.FogEnd,
-        Brightness = Lighting.Brightness,
-        Technology = Lighting.Technology
+        FogEnd        = Lighting.FogEnd,
+        Brightness    = Lighting.Brightness,
+        Technology    = Lighting.Technology
     }
 
     Lighting.GlobalShadows = false
@@ -1656,85 +1753,120 @@ local function EnableFPSBoost()
     Lighting.Brightness = 1
     Lighting.Technology = Enum.Technology.Compatibility
 
+    -- Terrain
     if Terrain then
         CachedTerrain = {
-            WaterWaveSize = Terrain.WaterWaveSize,
-            WaterWaveSpeed = Terrain.WaterWaveSpeed,
+            WaterWaveSize     = Terrain.WaterWaveSize,
+            WaterWaveSpeed    = Terrain.WaterWaveSpeed,
             WaterTransparency = Terrain.WaterTransparency,
-            WaterReflectance = Terrain.WaterReflectance
+            WaterReflectance  = Terrain.WaterReflectance
         }
+
         Terrain.WaterWaveSize = 0
         Terrain.WaterWaveSpeed = 0
         Terrain.WaterTransparency = 1
         Terrain.WaterReflectance = 0
     end
 
+    -- Initial Scan (BATCH)
     task.spawn(function()
         local i = 0
         for _, obj in ipairs(workspace:GetDescendants()) do
-            if not FPS_BOOST_ACTIVE then break end
-            ApplyFPSBoost(obj)
+            if not FPS_ACTIVE then break end
+            Apply(obj)
             i += 1
-            if i % 400 == 0 then task.wait() end
+            if i % 300 == 0 then task.wait() end
         end
     end)
 
+    -- New Objects
     DescendantConn = workspace.DescendantAdded:Connect(function(obj)
-        local now = os.clock()
-        if now - lastDescendant < 0.1 then return end
-        lastDescendant = now
-        ApplyFPSBoost(obj)
+        Apply(obj)
     end)
 end
 
+--------------------------------------------------------
+-- DISABLE (FULL RESTORE)
+--------------------------------------------------------
 local function DisableFPSBoost()
-    FPS_BOOST_ACTIVE = false
-    if DescendantConn then DescendantConn:Disconnect() DescendantConn = nil end
+    FPS_ACTIVE = false
 
+    if DescendantConn then
+        DescendantConn:Disconnect()
+        DescendantConn = nil
+    end
+
+    -- Restore Parts
     for part, data in pairs(CachedParts) do
         if part and part.Parent then
             part.Transparency = data.Transparency
-            part.Material = data.Material
-            part.CastShadow = data.CastShadow
-            part.CanCollide = data.CanCollide
+            part.Material     = data.Material
+            part.CastShadow   = data.CastShadow
+            part.CanCollide   = data.CanCollide
         end
     end
     CachedParts = setmetatable({}, { __mode = "k" })
 
-    for decal, t in pairs(CachedDecals) do
-        if decal and decal.Parent then decal.Transparency = t end
+    -- Restore Decals
+    for d, t in pairs(CachedDecals) do
+        if d and d.Parent then
+            d.Transparency = t
+        end
     end
     CachedDecals = setmetatable({}, { __mode = "k" })
 
-    for fx, stt in pairs(CachedEffects) do
-        if fx and fx.Parent then fx.Enabled = stt end
+    -- Restore FX
+    for fx, st in pairs(CachedFX) do
+        if fx and fx.Parent then
+            fx.Enabled = st
+        end
     end
-    CachedEffects = setmetatable({}, { __mode = "k" })
+    CachedFX = setmetatable({}, { __mode = "k" })
 
-    for k, v in pairs(CachedLighting) do Lighting[k] = v end
+    -- Restore Lighting
+    for k, v in pairs(CachedLighting) do
+        Lighting[k] = v
+    end
     CachedLighting = {}
 
+    -- Restore Terrain
     if Terrain then
-        for k, v in pairs(CachedTerrain) do Terrain[k] = v end
+        for k, v in pairs(CachedTerrain) do
+            Terrain[k] = v
+        end
     end
     CachedTerrain = {}
 end
 
 --==================================================
--- FPS & CPU PROFILING HUD (TOGGLE - PERFORMANCE TAB)
+-- FPS & CPU PROFILING HUD (FIXED & STABLE)
 --==================================================
 
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
 
 --------------------------------------------------
 -- STATE
 --------------------------------------------------
 local HUD_ENABLED = false
 local HUD_GUI = nil
-local HUD_CONN = nil
-local FRAME_CONN = nil
+local HUD_THREAD = nil
+local FPS_CONN = nil
+
+--------------------------------------------------
+-- SAFE STAT READ
+--------------------------------------------------
+local function SafeStat(fn, default)
+    local ok, val = pcall(fn)
+    if ok and val ~= nil then
+        return val
+    end
+    return default
+end
 
 --------------------------------------------------
 -- CREATE HUD
@@ -1747,51 +1879,68 @@ local function CreateHUD()
     HUD_GUI.ResetOnSpawn = false
     HUD_GUI.Parent = CoreGui
 
-    local Frame = Instance.new("Frame", HUD_GUI)
-    Frame.Size = UDim2.fromOffset(240, 120)
-    Frame.Position = UDim2.new(0, 15, 0.5, -60)
+    local Frame = Instance.new("Frame")
+    Frame.Parent = HUD_GUI
+    Frame.Size = UDim2.fromOffset(260, 135)
+    Frame.Position = UDim2.new(0, 15, 0.5, -65)
     Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-    Frame.BackgroundTransparency = 0.12
+    Frame.BackgroundTransparency = 0.1
     Frame.BorderSizePixel = 0
     Frame.Active = true
     Frame.Draggable = true
 
     Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 
-    local Text = Instance.new("TextLabel", Frame)
+    local Padding = Instance.new("UIPadding")
+    Padding.Parent = Frame
+    Padding.PaddingLeft = UDim.new(0, 10)
+    Padding.PaddingTop = UDim.new(0, 10)
+
+    local Text = Instance.new("TextLabel")
+    Text.Parent = Frame
     Text.Size = UDim2.fromScale(1, 1)
     Text.BackgroundTransparency = 1
     Text.Font = Enum.Font.Code
     Text.TextSize = 14
-    Text.TextXAlignment = Left
-    Text.TextYAlignment = Top
+    Text.TextXAlignment = Enum.TextXAlignment.Left
+    Text.TextYAlignment = Enum.TextYAlignment.Top
     Text.TextWrapped = true
     Text.TextColor3 = Color3.fromRGB(0, 255, 170)
-    Text.PaddingLeft = UDim.new(0, 8)
-    Text.PaddingTop = UDim.new(0, 8)
-    Text.Text = "Loading..."
+    Text.Text = "Initializing..."
 
     --------------------------------------------------
     -- FPS COUNTER
     --------------------------------------------------
     local frames = 0
+    local lastFPS = 0
 
-    FRAME_CONN = RunService.RenderStepped:Connect(function()
+    FPS_CONN = RunService.RenderStepped:Connect(function()
         frames += 1
     end)
 
     --------------------------------------------------
-    -- UPDATE LOOP (1s)
+    -- UPDATE LOOP
     --------------------------------------------------
-    HUD_CONN = task.spawn(function()
+    HUD_THREAD = task.spawn(function()
         while HUD_ENABLED and HUD_GUI do
-            local fps = frames
+            lastFPS = frames
             frames = 0
 
-            local mem = Stats:GetTotalMemoryUsageMb()
-            local phys = Stats:GetTotalPhysicsTime() * 1000
-            local draw = Stats.RenderStats.DrawCalls:GetValue()
-            local inst = Stats.InstanceCount:GetValue()
+            local mem = SafeStat(function()
+                return Stats:GetTotalMemoryUsageMb()
+            end, 0)
+
+            local phys = SafeStat(function()
+                return Stats:GetTotalPhysicsTime() * 1000
+            end, 0)
+
+            local drawCalls = SafeStat(function()
+                return Stats.RenderStats.DrawCalls:GetValue()
+            end, 0)
+
+            local instances = SafeStat(function()
+                return Stats.InstanceCount:GetValue()
+            end, 0)
 
             Text.Text = string.format(
                 "FPS        : %d\n" ..
@@ -1799,7 +1948,11 @@ local function CreateHUD()
                 "Memory     : %.1f MB\n" ..
                 "DrawCalls  : %d\n" ..
                 "Instances  : %d",
-                fps, phys, mem, draw, inst
+                lastFPS,
+                phys,
+                mem,
+                drawCalls,
+                instances
             )
 
             task.wait(1)
@@ -1813,14 +1966,14 @@ end
 local function DestroyHUD()
     HUD_ENABLED = false
 
-    if FRAME_CONN then
-        FRAME_CONN:Disconnect()
-        FRAME_CONN = nil
+    if FPS_CONN then
+        FPS_CONN:Disconnect()
+        FPS_CONN = nil
     end
 
-    if HUD_CONN then
-        task.cancel(HUD_CONN)
-        HUD_CONN = nil
+    if HUD_THREAD then
+        task.cancel(HUD_THREAD)
+        HUD_THREAD = nil
     end
 
     if HUD_GUI then
@@ -1830,13 +1983,8 @@ local function DestroyHUD()
 end
 
 --------------------------------------------------
--- GUI TOGGLE (PERFORMANCE TAB)
+-- PERFORMANCE TAB
 --------------------------------------------------
-
-
---------------------------------------------------------
--- GUI (FPS BOOST)
---------------------------------------------------------
 local MiscSection = Tabs.Misc:AddSection("Performance")
 
 MiscSection:AddToggle({
@@ -1870,6 +2018,7 @@ MiscSection:AddToggle({
         end
     end
 })
+
 --------------------------------------------------------
 -- AUTO REJOIN (COOLDOWN SAFE)
 --------------------------------------------------------
@@ -2101,9 +2250,15 @@ Islands:AddButton({
 -- TELEPORT EVENTS (CLEAN VERSION)
 --==================================================
 
+--==================================================
+-- TELEPORT EVENTS (FIXED + AUTO RETURN)
+--==================================================
+
 local Events = Tabs.Teleport:AddSection("Teleports Events")
 
+--------------------------------------------------
 -- CONFIG
+--------------------------------------------------
 local eventsList = {
     "Shark Hunt",
     "Ghost Shark Hunt",
@@ -2116,7 +2271,9 @@ local eventsList = {
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
+--------------------------------------------------
 -- STATE
+--------------------------------------------------
 local autoEventTargetName = nil
 local autoEventTeleportState = false
 local autoEventTeleportThread = nil
@@ -2124,6 +2281,7 @@ local autoEventTeleportThread = nil
 local lastLocation = nil
 local currentEventModel = nil
 local lastEventPosition = nil
+local hasReturned = false
 
 --------------------------------------------------
 -- SAVE / RETURN POSITION
@@ -2181,19 +2339,27 @@ local function TeleportToEvent(model)
 
     currentEventModel = model
     lastEventPosition = pos
+    hasReturned = false
 end
 
 --------------------------------------------------
--- FOLLOW EVENT (LOW CPU)
+-- FOLLOW EVENT (AUTO RETURN WHEN ENDED)
 --------------------------------------------------
 local function FollowEvent()
+    -- EVENT HILANG / DESPAWN
     if not currentEventModel or not currentEventModel.Parent then
+        if not hasReturned then
+            hasReturned = true
+            ReturnToLastLocation()
+        end
+
         currentEventModel = nil
         lastEventPosition = nil
         return
     end
 
     local pos = currentEventModel:GetPivot().Position
+
     if not lastEventPosition then
         lastEventPosition = pos
         return
@@ -2210,6 +2376,7 @@ end
 local function StartAutoEventLoop()
     if autoEventTeleportThread then
         task.cancel(autoEventTeleportThread)
+        autoEventTeleportThread = nil
     end
 
     autoEventTeleportThread = task.spawn(function()
@@ -2235,11 +2402,13 @@ end
 --------------------------------------------------
 Events:AddDropdown({
     Title = "Select Target Event",
+    Content = "Choose event to auto teleport",
     Options = eventsList,
     Callback = function(v)
         autoEventTargetName = v
         currentEventModel = nil
         lastEventPosition = nil
+        hasReturned = false
     end
 })
 
@@ -2259,6 +2428,7 @@ Events:AddToggle({
             SaveLastLocation()
             EnableWalkOnWater()
             StartAutoEventLoop()
+            sirenx("Auto Event Teleport ON")
         else
             if autoEventTeleportThread then
                 task.cancel(autoEventTeleportThread)
@@ -2267,13 +2437,19 @@ Events:AddToggle({
 
             DisableWalkOnWater()
             ReturnToLastLocation()
+
             currentEventModel = nil
             lastEventPosition = nil
+            hasReturned = false
+
+            sirenx("Auto Event Teleport OFF")
         end
     end
 })
 
+--------------------------------------------------
 -- CHARACTER SAFETY
+--------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
     if autoEventTeleportState then
@@ -2283,12 +2459,15 @@ end)
 
 LocalPlayer.CharacterRemoving:Connect(function()
     autoEventTeleportState = false
+
     if autoEventTeleportThread then
         task.cancel(autoEventTeleportThread)
         autoEventTeleportThread = nil
     end
+
     DisableWalkOnWater()
 end)
+
 
 --==================================================
 -- TELEPORT PLAYER (CLEAN VERSION)
