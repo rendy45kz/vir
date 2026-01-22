@@ -263,8 +263,6 @@ if rawmt and not AntiDrown.Hooked then
     AntiDrown.Hooked = true
 end
 
-Begini versi awal yang benar work 
-
 --==================================================
 -- CREATE PLATFORM (ONCE)
 --==================================================
