@@ -218,23 +218,30 @@ local ConnectionWalkSpeed = nil
 local antiAfkConnection  = nil
 local oldRequestCharge   = nil
 
---------------------------------------------------
--- WALK ON WATER STATE
---------------------------------------------------
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- STATE
 local isWalkOnWater = false
 local waterPlatform = nil
 local walkOnWaterConnection = nil
 
+-- CONFIG
 local PLATFORM_SIZE = Vector3.new(18, 1, 18)
+local WATER_OFFSET  = 3.2
+local RAY_DISTANCE  = 30
 
---------------------------------------------------
--- ANTI DROWN
---------------------------------------------------
+--==================================================
+-- ANTI DROWN (OXYGEN BYPASS - SAFE)
+--==================================================
+
 local AntiDrown = {
     Enabled = false,
-    Hooked  = false
+    Hooked = false
 }
-
 
 --==================================================
 -- METATABLE HOOK (LOAD ONCE)
@@ -262,7 +269,6 @@ if rawmt and not AntiDrown.Hooked then
     setreadonly(rawmt, true)
     AntiDrown.Hooked = true
 end
-
 
 --==================================================
 -- CREATE PLATFORM (ONCE)
