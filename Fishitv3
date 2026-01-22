@@ -263,6 +263,8 @@ if rawmt and not AntiDrown.Hooked then
     AntiDrown.Hooked = true
 end
 
+Begini versi awal yang benar work 
+
 --==================================================
 -- CREATE PLATFORM (ONCE)
 --==================================================
@@ -636,6 +638,26 @@ end
 --------------------------------------------------------
 -- TOGGLE
 --------------------------------------------------------
+Plyrs:AddInput({
+  Title = "Set Name",
+  Content = "Sets the name to replace your username with",
+  Default = st.hideNames,
+  Placeholder = st.hideNames,
+  Callback = function(value)
+    st.hideNames = value
+  end
+})
+
+Plyrs:AddInput({
+  Title = "Set Level Text",
+  Content = "Sets the text to replace your level with",
+  Default = st.hideLevels,
+  Placeholder = st.hideLevels,
+  Callback = function(value)
+    st.hideLevels = value
+  end
+})
+
 Plyrs:AddToggle({
     Title = "Hide Identity",
     Content = "Hides your player identity locally",
