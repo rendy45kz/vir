@@ -937,38 +937,48 @@ Fish2:AddInput({
     end
 })
 
---==================================================
--- ULTRA BLATANT FISHING (PURE TASK.SPAWN - MAX SPEED)
---==================================================
-
 local UltraBlatant = {
     Active = false,
-    CompleteDelay = 0.7,
-    CancelDelay = 0.3
+    CompleteDelay = 0.18, -- 🔥 tuned
+    CancelDelay = 0.06,   -- 🔥 tuned
+    Thread = nil
 }
 
+-- SAFE CALL (ANDROID FRIENDLY)
+local function SafeCall(fn)
+    task.spawn(function()
+        pcall(fn)
+    end)
+end
+
+-- ULTRA CAST (TUNED, SAME FLOW)
 local function UltraCast()
     local t = workspace:GetServerTimeNow()
 
-    task.spawn(function()
-        pcall(function()
-            api.Functions.ChargeRod:InvokeServer(t)
-        end)
+    SafeCall(function()
+        api.Functions.ChargeRod:InvokeServer(t)
+    end)
 
-        task.wait() -- 1 frame (asli)
+    task.wait() -- 1 frame (WAJIB, jangan dihapus)
 
-        pcall(function()
-            api.Functions.StartMini:InvokeServer(
-                -1.233184814453125,
-                0.994503488563327303,
-                t
-            )
-        end)
+    SafeCall(function()
+        api.Functions.StartMini:InvokeServer(
+            -1.233184814453125,
+            0.994503488563327303,
+            t
+        )
+    end)
+end
+
+-- ULTRA LOOP (TUNED)
+local function UltraLoop()
+    while UltraBlatant.Active do
+        UltraCast()
 
         task.wait(UltraBlatant.CompleteDelay)
 
         if UltraBlatant.Active then
-            pcall(function()
+            SafeCall(function()
                 api.Events.REFishDone:FireServer()
             end)
         end
@@ -976,17 +986,23 @@ local function UltraCast()
         task.wait(UltraBlatant.CancelDelay)
 
         if UltraBlatant.Active then
-            pcall(function()
+            SafeCall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
         end
-    end)
+
+        task.wait() -- 🔒 micro yield anti freeze
+    end
 end
 
 
 --------------------------------------------------
 -- GUI
 --------------------------------------------------
+--======================================================
+-- BLATANT BETA TAB (SAFE)
+--======================================================
+
 local UltraSection = Tabs.Fishing:AddSection("Blatant BETA")
 
 UltraSection:AddToggle({
@@ -994,27 +1010,34 @@ UltraSection:AddToggle({
     Content = "Extremely fast & aggressive fishing",
     Default = false,
     Callback = function(state)
+        if state == UltraBlatant.Active then return end -- 🔒 anti double toggle
+
         UltraBlatant.Active = state
 
         if state then
             st.perfection.autoByInstant = true
             EnablePerfection()
 
-            pcall(function()
+            SafeCall(function()
                 api.Events.REEquip:FireServer(1)
             end)
 
-            -- 🔥 ASLI: SPAWN LOOP TANPA LIMIT
-            task.spawn(function()
-                while UltraBlatant.Active do
-                    UltraCast()
-                    task.wait(0) -- pure spam (asli)
-                end
-            end)
+            task.wait(0.1)
+
+            if UltraBlatant.Thread then
+                task.cancel(UltraBlatant.Thread)
+            end
+
+            UltraBlatant.Thread = task.spawn(UltraLoop)
         else
             UltraBlatant.Active = false
 
-            pcall(function()
+            if UltraBlatant.Thread then
+                task.cancel(UltraBlatant.Thread)
+                UltraBlatant.Thread = nil
+            end
+
+            SafeCall(function()
                 api.Functions.Cancel:InvokeServer()
             end)
 
@@ -1031,8 +1054,8 @@ UltraSection:AddInput({
     Default = tostring(UltraBlatant.CompleteDelay),
     Callback = function(v)
         local n = tonumber(v)
-        if n and n >= 0 then
-            UltraBlatant.CompleteDelay = n
+        if n then
+            UltraBlatant.CompleteDelay = math.clamp(n, 0.05, 1)
         end
     end
 })
@@ -1042,11 +1065,12 @@ UltraSection:AddInput({
     Default = tostring(UltraBlatant.CancelDelay),
     Callback = function(v)
         local n = tonumber(v)
-        if n and n >= 0 then
-            UltraBlatant.CancelDelay = n
+        if n then
+            UltraBlatant.CancelDelay = math.clamp(n, 0.02, 0.5)
         end
     end
 })
+
 --------------------------------------------------------
 -- AUTO EQUIP ROD (HEARTBEAT THROTTLE)
 --------------------------------------------------------
@@ -1301,7 +1325,7 @@ local function ProcessFavoriteQueue()
         pcall(function()
             api.Events.REFav:FireServer(uuid)
         end)
-        task.wait(0.06) -- smooth & safe
+        task.wait(0.01) -- smooth & safe
     end
 
     favoriteRunning = false
