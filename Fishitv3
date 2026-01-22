@@ -955,8 +955,7 @@ local function UltraCast()
             api.Functions.ChargeRod:InvokeServer(t)
         end)
 
-        -- 1 frame + offset kecil
-        task.wait(0.02 + ((t * 1000) % 9) * 0.001)
+        task.wait() -- 1 frame (asli)
 
         pcall(function()
             api.Functions.StartMini:InvokeServer(
@@ -966,7 +965,7 @@ local function UltraCast()
             )
         end)
 
-        task.wait(UltraBlatant.CompleteDelay - 0.06)
+        task.wait(UltraBlatant.CompleteDelay)
 
         if UltraBlatant.Active then
             pcall(function()
@@ -998,10 +997,6 @@ UltraSection:AddToggle({
         UltraBlatant.Active = state
 
         if state then
-            -- 🔥 AUTO BYPASS ANIM
-            RodAnimBypass.Enabled = true
-            StopRodTracks(player.Character)
-
             st.perfection.autoByInstant = true
             EnablePerfection()
 
@@ -1009,10 +1004,11 @@ UltraSection:AddToggle({
                 api.Events.REEquip:FireServer(1)
             end)
 
+            -- 🔥 ASLI: SPAWN LOOP TANPA LIMIT
             task.spawn(function()
                 while UltraBlatant.Active do
                     UltraCast()
-                    task.wait(0) -- pure speed
+                    task.wait(0) -- pure spam (asli)
                 end
             end)
         else
@@ -1022,9 +1018,6 @@ UltraSection:AddToggle({
                 api.Functions.Cancel:InvokeServer()
             end)
 
-            -- 🔁 RESTORE
-            RodAnimBypass.Enabled = false
-
             st.perfection.autoByInstant = false
             if not st.perfection.activated then
                 DisablePerfection()
@@ -1032,7 +1025,6 @@ UltraSection:AddToggle({
         end
     end
 })
-
 
 UltraSection:AddInput({
     Title = "Complete Delay",
@@ -1055,8 +1047,6 @@ UltraSection:AddInput({
         end
     end
 })
-
-
 --------------------------------------------------------
 -- AUTO EQUIP ROD (HEARTBEAT THROTTLE)
 --------------------------------------------------------
@@ -1077,7 +1067,7 @@ svc.RunService.Heartbeat:Connect(function(dt)
 
     lastEquip = os.clock()
     pcall(function()
-        api.Events.REEquip:FireServer(ForceEquipRod.RodSlot)
+        api.Events.REEquip:FireServer(1)
     end)
 end)
 
