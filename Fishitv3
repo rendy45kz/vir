@@ -1751,33 +1751,76 @@ local function DisableFPSBoost()
 end
 
 --==================================================
--- FPS & CPU PROFILING HUD (FIXED & STABLE)
+-- PERFORMANCE HUD (REAL FPS / REAL PING / REAL CPU)
 --==================================================
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
 local CoreGui = game:GetService("CoreGui")
-local Players = game:GetService("Players")
 
-local LocalPlayer = Players.LocalPlayer
+local player = Players.LocalPlayer
 
 --------------------------------------------------
 -- STATE
 --------------------------------------------------
 local HUD_ENABLED = false
-local HUD_GUI = nil
-local HUD_THREAD = nil
-local FPS_CONN = nil
+local HUD_GUI
+local LOOP_CONN
 
 --------------------------------------------------
--- SAFE STAT READ
+-- METRIC STATE
 --------------------------------------------------
-local function SafeStat(fn, default)
-    local ok, val = pcall(fn)
-    if ok and val ~= nil then
-        return val
+local lastRender = os.clock()
+local lastCPU = os.clock()
+
+local fps = 0
+local cpuMs = 0
+local ping = 0
+
+--------------------------------------------------
+-- HISTORY (GRAPH)
+--------------------------------------------------
+local MAX_POINTS = 60
+local fpsHistory = {}
+local pingHistory = {}
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+local function clamp(n, min, max)
+    return math.max(min, math.min(max, n))
+end
+
+--------------------------------------------------
+-- REAL FPS
+--------------------------------------------------
+RunService.RenderStepped:Connect(function()
+    local now = os.clock()
+    local dt = now - lastRender
+    lastRender = now
+    if dt > 0 then
+        fps = math.floor(1 / dt)
     end
-    return default
+end)
+
+--------------------------------------------------
+-- REAL CPU (DEVICE, NOT SERVER)
+--------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    local now = os.clock()
+    cpuMs = (now - lastCPU) * 1000
+    lastCPU = now
+end)
+
+--------------------------------------------------
+-- REAL NETWORK PING
+--------------------------------------------------
+local function getPing()
+    local ok, stat = pcall(function()
+        return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    return ok and math.floor(stat) or 0
 end
 
 --------------------------------------------------
@@ -1787,85 +1830,93 @@ local function CreateHUD()
     if HUD_GUI then return end
 
     HUD_GUI = Instance.new("ScreenGui")
-    HUD_GUI.Name = "AegisPerformanceHUD"
+    HUD_GUI.Name = "Aegis_PerfHUD"
+    HUD_GUI.IgnoreGuiInset = true
     HUD_GUI.ResetOnSpawn = false
     HUD_GUI.Parent = CoreGui
 
-    local Frame = Instance.new("Frame")
-    Frame.Parent = HUD_GUI
-    Frame.Size = UDim2.fromOffset(260, 135)
-    Frame.Position = UDim2.new(0, 15, 0.5, -65)
-    Frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-    Frame.BackgroundTransparency = 0.1
-    Frame.BorderSizePixel = 0
-    Frame.Active = true
-    Frame.Draggable = true
+    local Card = Instance.new("Frame", HUD_GUI)
+    Card.Size = UDim2.fromOffset(300, 170)
+    Card.Position = UDim2.fromOffset(20, 120)
+    Card.BackgroundColor3 = Color3.fromRGB(18, 22, 30)
+    Card.BorderSizePixel = 0
+    Card.BackgroundTransparency = 0.05
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 12)
 
-    Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
+    local Title = Instance.new("TextLabel", Card)
+    Title.Size = UDim2.new(1, -20, 0, 26)
+    Title.Position = UDim2.fromOffset(10, 6)
+    Title.Text = "📊 Performance Monitor"
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    Title.TextXAlignment = Left
+    Title.TextColor3 = Color3.fromRGB(180, 220, 255)
+    Title.BackgroundTransparency = 1
 
-    local Padding = Instance.new("UIPadding")
-    Padding.Parent = Frame
-    Padding.PaddingLeft = UDim.new(0, 10)
-    Padding.PaddingTop = UDim.new(0, 10)
-
-    local Text = Instance.new("TextLabel")
-    Text.Parent = Frame
-    Text.Size = UDim2.fromScale(1, 1)
-    Text.BackgroundTransparency = 1
-    Text.Font = Enum.Font.Code
-    Text.TextSize = 14
-    Text.TextXAlignment = Enum.TextXAlignment.Left
-    Text.TextYAlignment = Enum.TextYAlignment.Top
-    Text.TextWrapped = true
-    Text.TextColor3 = Color3.fromRGB(0, 255, 170)
-    Text.Text = "Initializing..."
+    local Content = Instance.new("TextLabel", Card)
+    Content.Size = UDim2.new(1, -20, 0, 60)
+    Content.Position = UDim2.fromOffset(10, 36)
+    Content.TextWrapped = true
+    Content.TextXAlignment = Left
+    Content.TextYAlignment = Top
+    Content.Font = Enum.Font.Code
+    Content.TextSize = 13
+    Content.TextColor3 = Color3.fromRGB(230,230,230)
+    Content.BackgroundTransparency = 1
 
     --------------------------------------------------
-    -- FPS COUNTER
+    -- GRAPH AREA
     --------------------------------------------------
-    local frames = 0
-    local lastFPS = 0
+    local GraphFrame = Instance.new("Frame", Card)
+    GraphFrame.Size = UDim2.new(1, -20, 0, 50)
+    GraphFrame.Position = UDim2.fromOffset(10, 110)
+    GraphFrame.BackgroundTransparency = 1
 
-    FPS_CONN = RunService.RenderStepped:Connect(function()
-        frames += 1
-    end)
+    --------------------------------------------------
+    -- DRAW GRAPH
+    --------------------------------------------------
+    local function drawGraph(data, maxVal, yOffset, colorName, color)
+        for _, v in ipairs(GraphFrame:GetChildren()) do
+            if v.Name == colorName then
+                v:Destroy()
+            end
+        end
+
+        local w = GraphFrame.AbsoluteSize.X / MAX_POINTS
+        for i, v in ipairs(data) do
+            local h = clamp(v / maxVal, 0, 1)
+            local bar = Instance.new("Frame")
+            bar.Name = colorName
+            bar.AnchorPoint = Vector2.new(0,1)
+            bar.BorderSizePixel = 0
+            bar.BackgroundColor3 = color
+            bar.Size = UDim2.new(0, w-1, 0, h * 24)
+            bar.Position = UDim2.new(0, (i-1)*w, 1, -yOffset)
+            bar.Parent = GraphFrame
+        end
+    end
 
     --------------------------------------------------
     -- UPDATE LOOP
     --------------------------------------------------
-    HUD_THREAD = task.spawn(function()
-        while HUD_ENABLED and HUD_GUI do
-            lastFPS = frames
-            frames = 0
+    LOOP_CONN = task.spawn(function()
+        while HUD_ENABLED do
+            ping = getPing()
 
-            local mem = SafeStat(function()
-                return Stats:GetTotalMemoryUsageMb()
-            end, 0)
+            table.insert(fpsHistory, fps)
+            table.insert(pingHistory, ping)
+            if #fpsHistory > MAX_POINTS then table.remove(fpsHistory, 1) end
+            if #pingHistory > MAX_POINTS then table.remove(pingHistory, 1) end
 
-            local phys = SafeStat(function()
-                return Stats:GetTotalPhysicsTime() * 1000
-            end, 0)
-
-            local drawCalls = SafeStat(function()
-                return Stats.RenderStats.DrawCalls:GetValue()
-            end, 0)
-
-            local instances = SafeStat(function()
-                return Stats.InstanceCount:GetValue()
-            end, 0)
-
-            Text.Text = string.format(
-                "FPS        : %d\n" ..
-                "CPU (Phys) : %.2f ms\n" ..
-                "Memory     : %.1f MB\n" ..
-                "DrawCalls  : %d\n" ..
-                "Instances  : %d",
-                lastFPS,
-                phys,
-                mem,
-                drawCalls,
-                instances
+            Content.Text = string.format(
+                "FPS        : %d\nPING (NET) : %d ms\nCPU DEVICE : %.2f ms",
+                fps,
+                ping,
+                cpuMs
             )
+
+            drawGraph(fpsHistory, 144, 26, "FPS", Color3.fromRGB(90,220,160))
+            drawGraph(pingHistory, 200, 0, "PING", Color3.fromRGB(100,180,255))
 
             task.wait(1)
         end
@@ -1877,22 +1928,16 @@ end
 --------------------------------------------------
 local function DestroyHUD()
     HUD_ENABLED = false
-
-    if FPS_CONN then
-        FPS_CONN:Disconnect()
-        FPS_CONN = nil
+    if LOOP_CONN then
+        task.cancel(LOOP_CONN)
+        LOOP_CONN = nil
     end
-
-    if HUD_THREAD then
-        task.cancel(HUD_THREAD)
-        HUD_THREAD = nil
-    end
-
     if HUD_GUI then
         HUD_GUI:Destroy()
         HUD_GUI = nil
     end
 end
+
 
 --------------------------------------------------
 -- PERFORMANCE TAB
@@ -1918,8 +1963,8 @@ MiscSection:AddToggle({
 })
 
 MiscSection:AddToggle({
-    Title = "FPS & CPU HUD",
-    Content = "Show real FPS & CPU profiling",
+    Title = "Show Stat Information",
+    Content = "Show realtime FPS / Ping / CPU graph",
     Default = false,
     Callback = function(state)
         HUD_ENABLED = state
@@ -1930,6 +1975,7 @@ MiscSection:AddToggle({
         end
     end
 })
+
 
 --------------------------------------------------------
 -- AUTO REJOIN (COOLDOWN SAFE)
