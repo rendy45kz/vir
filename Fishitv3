@@ -2803,3 +2803,165 @@ AutoTotem:AddButton({
         statusParagraph:SetContent("Totem Spawned")
     end
 })
+
+--==================================================
+-- AUTO MINING CRYSTAL CAVE
+-- Auto Teleport + Return + Fish Again
+--==================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+--------------------------------------------------
+-- REMOTES
+--------------------------------------------------
+local Net = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+local MiningRemote = Net["RE/PickaxeMining"]
+local EquipRemote = Net["RE/EquipToolFromHotbar"]
+
+--------------------------------------------------
+-- STATE
+--------------------------------------------------
+local AutoMining = {
+    Enabled = false,
+    Thread = nil,
+    SavedCFrame = nil,
+    Delay = 0.6
+}
+
+--------------------------------------------------
+-- HELPERS
+--------------------------------------------------
+local function GetHRP()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function EquipPickaxe()
+    pcall(function()
+        EquipRemote:FireServer(2) -- asumsi pickaxe slot 2
+    end)
+end
+
+local function EquipRod()
+    pcall(function()
+        EquipRemote:FireServer(1) -- rod slot 1
+    end)
+end
+
+--------------------------------------------------
+-- FIND CRYSTAL
+--------------------------------------------------
+local function FindCrystal()
+    local areas = {
+        workspace:FindFirstChild("Crystal Cave"),
+        workspace:FindFirstChild("CrystalCave"),
+        workspace:FindFirstChild("Mining"),
+        workspace
+    }
+
+    for _, area in ipairs(areas) do
+        if area then
+            for _, obj in ipairs(area:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    local n = obj.Name:lower()
+                    if n:find("crystal") or n:find("ore") then
+                        return obj
+                    end
+                end
+            end
+        end
+    end
+end
+
+--------------------------------------------------
+-- TELEPORT
+--------------------------------------------------
+local function TeleportTo(pos)
+    local hrp = GetHRP()
+    if hrp then
+        hrp.CFrame = pos
+    end
+end
+
+--------------------------------------------------
+-- MAIN LOOP
+--------------------------------------------------
+local function StartAutoMining()
+    if AutoMining.Thread then
+        task.cancel(AutoMining.Thread)
+    end
+
+    AutoMining.Thread = task.spawn(function()
+        local hrp = GetHRP()
+        if not hrp then return end
+
+        -- SAVE FARM POSITION
+        AutoMining.SavedCFrame = hrp.CFrame
+
+        -- ENSURE ROD EQUIPPED
+        EquipRod()
+
+        while AutoMining.Enabled do
+            local crystal = FindCrystal()
+
+            if crystal and crystal.Parent then
+                -- TELEPORT TO CRYSTAL
+                TeleportTo(crystal.CFrame + Vector3.new(0, 6, 0))
+                task.wait(0.25)
+
+                -- EQUIP PICKAXE
+                EquipPickaxe()
+                task.wait(0.2)
+
+                -- MINE
+                for i = 1, 12 do
+                    if not AutoMining.Enabled or not crystal.Parent then break end
+                    pcall(function()
+                        MiningRemote:FireServer(crystal)
+                    end)
+                    task.wait(0.25)
+                end
+
+                -- RETURN TO FARM
+                if AutoMining.SavedCFrame then
+                    TeleportTo(AutoMining.SavedCFrame)
+                    task.wait(0.3)
+                end
+
+                -- EQUIP ROD & CONTINUE FISHING
+                EquipRod()
+            end
+
+            task.wait(AutoMining.Delay)
+        end
+    end)
+end
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+local MiningSection = Tabs.Automation:AddSection("Auto Mining")
+
+MiningSection:AddToggle({
+    Title = "Auto Mining Crystal Cave",
+    Content = "Teleport, mine, return & fish again",
+    Default = false,
+    Callback = function(state)
+        AutoMining.Enabled = state
+
+        if state then
+            StartAutoMining()
+            sirenx("Auto Mining Crystal: ON")
+        else
+            if AutoMining.Thread then
+                task.cancel(AutoMining.Thread)
+                AutoMining.Thread = nil
+            end
+            AutoMining.SavedCFrame = nil
+            sirenx("Auto Mining Crystal: OFF")
+        end
+    end
+})
