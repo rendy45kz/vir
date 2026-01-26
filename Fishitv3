@@ -2854,24 +2854,41 @@ end
 --------------------------------------------------
 -- FIND CRYSTAL
 --------------------------------------------------
+--------------------------------------------------
+-- FIND CRYSTAL (CRYSTAL DEPTHS - FIXED TARGET)
+--------------------------------------------------
 local function FindCrystal()
-    local areas = {
-        workspace:FindFirstChild("Crystal Cave"),
-        workspace:FindFirstChild("CrystalCave"),
-        workspace:FindFirstChild("Mining"),
-        workspace
+    local islands = workspace:FindFirstChild("Islands")
+    if not islands then return end
+
+    local crystalDepths = islands:FindFirstChild("Crystal Depths")
+    if not crystalDepths then return end
+
+    local crystals = crystalDepths:FindFirstChild("Crystals")
+    if not crystals then return end
+
+    local meshes = crystals:FindFirstChild("Meshes")
+    if not meshes then return end
+
+    -- PRIORITY LIST (AMAN & CEPAT)
+    local targets = {
+        "FI_Cave_Decor_Crystal_Chunk",
+        "FI_Cave_Decor_Crystal_Chunk1",
+        "FI_Cave_Decor_Crystal_Chunk2",
+        "FI_Cave_Decor_Crystal_Chunk3"
     }
 
-    for _, area in ipairs(areas) do
-        if area then
-            for _, obj in ipairs(area:GetDescendants()) do
-                if obj:IsA("BasePart") then
-                    local n = obj.Name:lower()
-                    if n:find("crystal") or n:find("ore") then
-                        return obj
-                    end
-                end
-            end
+    for _, name in ipairs(targets) do
+        local obj = meshes:FindFirstChild(name)
+        if obj and obj:IsA("BasePart") then
+            return obj
+        end
+    end
+
+    -- FALLBACK (jika nama beda / update map)
+    for _, obj in ipairs(meshes:GetChildren()) do
+        if obj:IsA("BasePart") then
+            return obj
         end
     end
 end
