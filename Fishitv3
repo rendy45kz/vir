@@ -2841,7 +2841,7 @@ end
 
 local function EquipPickaxe()
     pcall(function()
-        EquipRemote:FireServer(2) -- asumsi pickaxe slot 2
+        EquipRemote:FireServer(4) -- asumsi pickaxe slot 2
     end)
 end
 
