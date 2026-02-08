@@ -752,7 +752,6 @@ end
 
 local win = library:CreateWindow("Rend - UI Fixed")
 
-
 ------------------------------------------------------------
 -- SERVICES & BASE
 ------------------------------------------------------------
@@ -762,10 +761,14 @@ local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer       = Players.LocalPlayer
 
-local function safeWait(parent, name, t)
-    local obj = parent:WaitForChild(name, t or 5)
+------------------------------------------------------------
+-- SAFE WAIT (ANTI FREEZE)
+------------------------------------------------------------
+local function safeWait(parent, name, timeout)
+    timeout = timeout or 8
+    local obj = parent:WaitForChild(name, timeout)
     if not obj then
-        warn("Missing:", name)
+        warn("[UI FIX] Missing object:", name, "in", parent:GetFullName())
     end
     return obj
 end
@@ -773,39 +776,46 @@ end
 ------------------------------------------------------------
 -- NET EVENTS (PASTIKAN SAMA PERSIS DENGAN GAME)
 ------------------------------------------------------------
-local packages = safeWait(ReplicatedStorage, "Packages", 5)
-local index = packages and safeWait(packages, "_Index", 5)
-local netIndex = index and safeWait(index, "sleitnick_net@0.2.0", 5)
-local net = netIndex and safeWait(netIndex, "net", 5)
+local Packages = safeWait(ReplicatedStorage, "Packages", 8)
+local Index    = Packages and safeWait(Packages, "_Index", 8)
+local NetPkg   = Index and safeWait(Index, "sleitnick_net@0.2.0", 8)
+local net      = NetPkg and safeWait(NetPkg, "net", 8)
 
-local Events = {
-    completeFish = net:WaitForChild("RE/FishingCompleted"), 
-    chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
-    startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
-    cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
-    equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
-    unequipTool  = net:WaitForChild("RE/UnequipToolFromHotbar"),
-    gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"), -- kalau ada
-}
+local Events = {}
 
+if net then
+    Events = {
+        completeFish = safeWait(net, "RE/FishingCompleted", 8),
+
+        chargeRod    = safeWait(net, "RF/ChargeFishingRod", 8),
+        startMini    = safeWait(net, "RF/RequestFishingMinigameStarted", 8),
+        cancelMini   = safeWait(net, "RF/CancelFishingInputs", 8),
+
+        equipHotbar  = safeWait(net, "RE/EquipToolFromHotbar", 8),
+        unequipTool  = safeWait(net, "RE/UnequipToolFromHotbar", 8),
+
+        gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"),
+    }
+else
+    warn("[UI FIX] Net folder not found, Events disabled")
+end
 
 ------------------------------------------------------------
 -- CONFIG
 ------------------------------------------------------------
 local Config = {
-    AutoFish    = false,   -- toggle utama
+    AutoFish    = false,
     BlatantFish = false,
-    CatchDelay  = 0.2,    
+    CatchDelay  = 0.2,
     SpamDelay   = 0.9,
-    PerfectCast = true,    -- optional
+    PerfectCast = true,
 }
--- internal state
-local loopRunning  = false
+
+local loopRunning = false
 
 ------------------------------------------------------------
 -- HELPER
 ------------------------------------------------------------
-
 local function getServerTime()
     local ok, t = pcall(function()
         return Workspace:GetServerTimeNow()
@@ -821,7 +831,6 @@ local function ensureCharacter()
     return char
 end
 
--- hitung cast power (kalau PerfectCast false, dia agak random)
 local function getCastPower()
     if Config.PerfectCast then
         return 0.99
@@ -836,15 +845,18 @@ end
 -- SATU SIKLUS BLATANT (x5 SPEED)
 ------------------------------------------------------------
 local function doOneBlatantCycle()
+    if not Events.completeFish or not Events.chargeRod or not Events.startMini or not Events.equipHotbar then
+        warn("[AutoFish] Events belum siap / missing, loop dihentikan")
+        Config.AutoFish = false
+        return
+    end
+
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
 
-    -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
     local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
 
-    ----------------------------------------------------------------
-    -- 1) EQUIP ROD SLOT 1
-    ----------------------------------------------------------------
+    -- equip rod
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
@@ -853,6 +865,7 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.chargeRod:InvokeServer(100)
     end)
+
     _wait(0.001)
 
     -- start minigame
@@ -870,19 +883,13 @@ local function doOneBlatantCycle()
         return
     end
 
-    ----------------------------------------------------------------
-    -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
-    ----------------------------------------------------------------
     _wait(catchDel)
 
-    ----------------------------------------------------------------
-    -- 4) SPAM FISHING COMPLETED (ikan naik)
-    ----------------------------------------------------------------
     for i = 1, 5 do
-        pcall(function()            
+        pcall(function()
             Events.completeFish:FireServer()
         end)
-       _wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
+        _wait(0.001)
     end
 end
 
@@ -892,14 +899,13 @@ end
 local function mainFishingLoop()
     if loopRunning then return end
     loopRunning = true
-    
+
     while Config.AutoFish do
-        local ok, err = pcall(doOneBlatantCycle)        
-        --_wait(0.001)
+        pcall(doOneBlatantCycle)
+        _wait(0.01)
     end
 
     loopRunning = false
-    
 end
 
 local Fishing = {}
@@ -914,7 +920,6 @@ function Fishing:Stop()
     Config.AutoFish = false
 end
 
-
 ------------------------------------------------------------
 -- UI AEGISHUB – TAB AUTO
 ------------------------------------------------------------
@@ -922,7 +927,6 @@ local TabAuto = win:CreateTab("Farm")
 
 TabAuto:Label("Instant Fishing")
 
--- Toggle utama
 TabAuto:Toggle("Enable Auto Fishing", function(state)
     if state then
         Fishing:Start()
@@ -935,7 +939,7 @@ TabAuto:Box("Catch Delay (seconds)", function(txt)
     local n = tonumber(txt)
     if n then
         n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
+        Config.CatchDelay = n
     end
 end)
 
