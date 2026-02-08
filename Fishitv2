@@ -845,11 +845,7 @@ end
 -- SATU SIKLUS BLATANT (x5 SPEED)
 ------------------------------------------------------------
 local function doOneBlatantCycle()
-    if not Events.completeFish or not Events.chargeRod or not Events.startMini or not Events.equipHotbar then
-        warn("[AutoFish] Events belum siap / missing, loop dihentikan")
-        Config.AutoFish = false
-        return
-    end
+    
 
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
