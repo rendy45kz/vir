@@ -762,31 +762,32 @@ local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer       = Players.LocalPlayer
 
+local function safeWait(parent, name, t)
+    local obj = parent:WaitForChild(name, t or 5)
+    if not obj then
+        warn("Missing:", name)
+    end
+    return obj
+end
+
 ------------------------------------------------------------
 -- NET EVENTS (PASTIKAN SAMA PERSIS DENGAN GAME)
 ------------------------------------------------------------
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
+local packages = safeWait(ReplicatedStorage, "Packages", 5)
+local index = packages and safeWait(packages, "_Index", 5)
+local netIndex = index and safeWait(index, "sleitnick_net@0.2.0", 5)
+local net = netIndex and safeWait(netIndex, "net", 5)
 
 local Events = {
-    completeFish = net:WaitForChild("RE/FishingCompleted"),
-    sellAll      = net:WaitForChild("RF/SellAllItems"),
-
+    completeFish = net:WaitForChild("RE/FishingCompleted"), 
     chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
     startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
     cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
-
     equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
     unequipTool  = net:WaitForChild("RE/UnequipToolFromHotbar"),
-
     gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"), -- kalau ada
 }
 
-local ArrayUpdate = net:FindFirstChild("ArrayUpdate")
-    or ReplicatedStorage:FindFirstChild("ArrayUpdate", true)
 
 ------------------------------------------------------------
 -- CONFIG
@@ -837,11 +838,6 @@ end
 local function doOneBlatantCycle()
     local char = ensureCharacter()
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    -- if not hrp then
-        -- warn("[BlatantFish] HRP not found")
-        -- _wait(0.01)
-        -- return
-    -- end
 
     -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
     local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
@@ -852,11 +848,6 @@ local function doOneBlatantCycle()
     pcall(function()
         Events.equipHotbar:FireServer(1)
     end)
-    ----------------------------------------------------------------
-    -- 2) CHARGE ROD + START MINIGAME
-    ----------------------------------------------------------------
-    local castPower = Config.PerfectCast and 0.99 or getCastPower()
-    local now       = getServerTime()
 
     -- charge
     pcall(function()
@@ -941,29 +932,6 @@ TabAuto:Toggle("Enable Auto Fishing", function(state)
 end)
 
 TabAuto:Box("Catch Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
-end)
-
--- Toggle utama
-TabAuto:Toggle("Enable Bltant Mode", function(state)
-    if state then
-        
-    end
-end)
-
-TabAuto:Box("Reel Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
-end)
-
-TabAuto:Box("Complate Delay (seconds)", function(txt)
     local n = tonumber(txt)
     if n then
         n = math.clamp(n, 0.02, 3.0)
