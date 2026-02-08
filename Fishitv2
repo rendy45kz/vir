@@ -761,44 +761,25 @@ local Workspace         = game:GetService("Workspace")
 
 local LocalPlayer       = Players.LocalPlayer
 
-------------------------------------------------------------
--- SAFE WAIT (ANTI FREEZE)
-------------------------------------------------------------
-local function safeWait(parent, name, timeout)
-    timeout = timeout or 8
-    local obj = parent:WaitForChild(name, timeout)
-    if not obj then
-        warn("[UI FIX] Missing object:", name, "in", parent:GetFullName())
-    end
-    return obj
-end
+local netIndex = ReplicatedStorage:WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_net@0.2.0")
 
-------------------------------------------------------------
--- NET EVENTS (PASTIKAN SAMA PERSIS DENGAN GAME)
-------------------------------------------------------------
-local Packages = safeWait(ReplicatedStorage, "Packages", 8)
-local Index    = Packages and safeWait(Packages, "_Index", 8)
-local NetPkg   = Index and safeWait(Index, "sleitnick_net@0.2.0", 8)
-local net      = NetPkg and safeWait(NetPkg, "net", 8)
+local net = netIndex:WaitForChild("net")
 
-local Events = {}
+local Events = {
+    completeFish = net:WaitForChild("RE/FishingCompleted"),
+    sellAll      = net:WaitForChild("RF/SellAllItems"),
 
-if net then
-    Events = {
-        completeFish = safeWait(net, "RE/FishingCompleted", 8),
+    chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
+    startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
+    cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
 
-        chargeRod    = safeWait(net, "RF/ChargeFishingRod", 8),
-        startMini    = safeWait(net, "RF/RequestFishingMinigameStarted", 8),
-        cancelMini   = safeWait(net, "RF/CancelFishingInputs", 8),
+    equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
+    unequipTool  = net:WaitForChild("RE/UnequipToolFromHotbar"),
 
-        equipHotbar  = safeWait(net, "RE/EquipToolFromHotbar", 8),
-        unequipTool  = safeWait(net, "RE/UnequipToolFromHotbar", 8),
-
-        gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"),
-    }
-else
-    warn("[UI FIX] Net folder not found, Events disabled")
-end
+    gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"), -- kalau ada
+}
 
 ------------------------------------------------------------
 -- CONFIG
