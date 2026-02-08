@@ -237,19 +237,23 @@ function library:CreateWindow(title)
     -- SIDEBAR
     ----------------------------------------------------------------
     local sidebar = Instance.new("Frame")
-    sidebar.Parent = main
-    sidebar.Size = UDim2.new(0, 150, 1, -32)
-    sidebar.Position = UDim2.new(0, 0, 0, 32)
-    sidebar.BackgroundColor3 = theme.bg2
-    sidebar.BorderSizePixel = 0
+sidebar.Parent = main
+sidebar.Size = UDim2.new(0, 150, 1, -32)
+sidebar.Position = UDim2.new(0, 0, 0, 32)
+sidebar.BackgroundColor3 = theme.bg2
+sidebar.BorderSizePixel = 0
+sidebar.ClipsDescendants = true
+sidebar.ZIndex = 2
     local sideCorner = Instance.new("UICorner", sidebar)
     sideCorner.CornerRadius = UDim.new(0, 8)
     applyStroke(sidebar, theme.borderSoft)
 
-    local sideList = Instance.new("UIListLayout", sidebar)
-    sideList.SortOrder = Enum.SortOrder.LayoutOrder
-    sideList.Padding = UDim.new(0, 6)
-    sideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    local sideList = Instance.new("UIListLayout")
+sideList.Parent = sidebar
+sideList.SortOrder = Enum.SortOrder.LayoutOrder
+sideList.Padding = UDim.new(0, 6)
+sideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+sideList.VerticalAlignment = Enum.VerticalAlignment.Top
 
     local sidePad = Instance.new("UIPadding", sidebar)
     sidePad.PaddingTop = UDim.new(0, 8)
@@ -263,6 +267,7 @@ function library:CreateWindow(title)
     holder.Parent = main
     holder.Size = UDim2.new(1, -150, 1, -32)
     holder.Position = UDim2.new(0, 150, 0, 32)
+holder.ZIndex = 1
     holder.BackgroundColor3 = theme.bg
     holder.BorderSizePixel = 0
     local holderCorner = Instance.new("UICorner", holder)
@@ -292,7 +297,11 @@ function library:CreateWindow(title)
         --------------------------------------------
         local tabBtn = Instance.new("TextButton")
         tabBtn.Parent = sidebar
-        tabBtn.Size = UDim2.new(1, 0, 0, 28)
+        tabBtn.Size = UDim2.new(1, -12, 0, 28)
+tabBtn.Position = UDim2.new(0, 6, 0, 0)
+tabBtn.ZIndex = 5
+tabBtn.AutoButtonColor = false
+
         tabBtn.BackgroundColor3 = theme.bg
         tabBtn.BorderSizePixel = 0
         tabBtn.Font = Enum.Font.GothamSemibold
