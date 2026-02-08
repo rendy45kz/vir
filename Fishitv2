@@ -15,9 +15,8 @@ local _delay = (_task and _task.delay) or function(t, fn, ...)
     end)
 end
 
-
 ----------------------------------------------------------------
--- AegisHub UI – Neon Card Redesigned
+-- AegisHub UI – Neon Card Redesigned (FULL FIXED)
 ----------------------------------------------------------------
 if not game:IsLoaded() then game.Loaded:Wait() end
 
@@ -27,7 +26,7 @@ local CoreGui          = game:GetService("CoreGui")
 
 local library = {}
 
--- THEME BARU
+-- THEME
 local theme = {
     bg           = Color3.fromRGB(8, 10, 18),
     bg2          = Color3.fromRGB(14, 18, 30),
@@ -45,7 +44,7 @@ local theme = {
 }
 
 local function tween(obj, dur, props)
-    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props)
+    return TweenService:Create(obj, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
 end
 
 local function applyStroke(frame, color)
@@ -61,7 +60,7 @@ local function applyCard(frame, color, borderColor)
     frame.BackgroundColor3 = color or theme.card
     frame.BorderSizePixel = 0
     local c = Instance.new("UICorner", frame)
-    c.CornerRadius = UDim.new(0, 5)
+    c.CornerRadius = UDim.new(0, 6)
     applyStroke(frame, borderColor)
 end
 
@@ -69,10 +68,15 @@ end
 -- MAIN WINDOW
 ----------------------------------------------------------------
 function library:CreateWindow(title)
+    if CoreGui:FindFirstChild("AegisHub_Neon") then
+        CoreGui:FindFirstChild("AegisHub_Neon"):Destroy()
+    end
+
     local gui = Instance.new("ScreenGui")
     gui.Name = "AegisHub_Neon"
     gui.Parent = CoreGui
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.ResetOnSpawn = false
 
     -- main window
     local main = Instance.new("Frame")
@@ -97,7 +101,7 @@ function library:CreateWindow(title)
     -- overlay button (mini)
     local overlayBtn = Instance.new("TextButton")
     overlayBtn.Parent = gui
-    overlayBtn.Size = UDim2.new(0, 32, 0, 32)
+    overlayBtn.Size = UDim2.new(0, 34, 0, 34)
     overlayBtn.Position = UDim2.new(0, 10, 0.5, -16)
     overlayBtn.Text = "≡"
     overlayBtn.Font = Enum.Font.GothamBold
@@ -119,6 +123,7 @@ function library:CreateWindow(title)
                 dragging = true
                 start    = i.Position
                 offset   = overlayBtn.Position
+
                 i.Changed:Connect(function()
                     if i.UserInputState == Enum.UserInputState.End then
                         dragging = false
@@ -126,6 +131,7 @@ function library:CreateWindow(title)
                 end)
             end
         end)
+
         UserInputService.InputChanged:Connect(function(i)
             if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
                 or i.UserInputType == Enum.UserInputType.Touch) then
@@ -164,18 +170,7 @@ function library:CreateWindow(title)
     titleLabel.TextSize = 15
     titleLabel.TextColor3 = theme.text
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.Text = tostring(title)
-
-    local titleSub = Instance.new("TextLabel")
-    titleSub.Parent = top
-    titleSub.Size = UDim2.new(0, 140, 1, 0)
-    titleSub.Position = UDim2.new(1, -150, 0, 0)
-    titleSub.BackgroundTransparency = 1
-    titleSub.Font = Enum.Font.Gotham
-    titleSub.TextSize = 11
-    titleSub.TextColor3 = theme.subText
-    titleSub.TextXAlignment = Enum.TextXAlignment.Right
-    
+    titleLabel.Text = tostring(title or "AegisHub UI")
 
     -- minimize button
     local mini = Instance.new("TextButton")
@@ -217,6 +212,7 @@ function library:CreateWindow(title)
                 dragging = true
                 start    = i.Position
                 offset   = main.Position
+
                 i.Changed:Connect(function()
                     if i.UserInputState == Enum.UserInputState.End then
                         dragging = false
@@ -224,6 +220,7 @@ function library:CreateWindow(title)
                 end)
             end
         end)
+
         UserInputService.InputChanged:Connect(function(i)
             if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement
                 or i.UserInputType == Enum.UserInputType.Touch) then
@@ -237,7 +234,7 @@ function library:CreateWindow(title)
     end
 
     ----------------------------------------------------------------
-    -- SIDEBAR TABS
+    -- SIDEBAR
     ----------------------------------------------------------------
     local sidebar = Instance.new("Frame")
     sidebar.Parent = main
@@ -260,7 +257,7 @@ function library:CreateWindow(title)
     sidePad.PaddingRight = UDim.new(0, 6)
 
     ----------------------------------------------------------------
-    -- RIGHT PAGE HOLDER
+    -- RIGHT HOLDER
     ----------------------------------------------------------------
     local holder = Instance.new("Frame")
     holder.Parent = main
@@ -276,6 +273,18 @@ function library:CreateWindow(title)
     -- TAB SYSTEM
     ----------------------------------------------------------------
     local win = {}
+    local firstTabSet = false
+    local tabs = {}
+
+    local function resetTabs()
+        for _, t in ipairs(tabs) do
+            if t.Page then t.Page.Visible = false end
+            if t.Button then
+                tween(t.Button, 0.12, {BackgroundColor3 = theme.bg})
+                t.Button.TextColor3 = theme.subText
+            end
+        end
+    end
 
     function win:CreateTab(name)
         --------------------------------------------
@@ -289,23 +298,10 @@ function library:CreateWindow(title)
         tabBtn.Font = Enum.Font.GothamSemibold
         tabBtn.TextSize = 13
         tabBtn.TextColor3 = theme.subText
-        tabBtn.Text = name
+        tabBtn.Text = name or "Tab"
         local tabCorner = Instance.new("UICorner", tabBtn)
         tabCorner.CornerRadius = UDim.new(0, 6)
         applyStroke(tabBtn, theme.borderSoft)
-
-        local active = false
-
-        local function setActive(state)
-            active = state
-            if active then
-                tween(tabBtn, 0.15, {BackgroundColor3 = theme.card2})
-                tabBtn.TextColor3 = theme.text
-            else
-                tween(tabBtn, 0.15, {BackgroundColor3 = theme.bg})
-                tabBtn.TextColor3 = theme.subText
-            end
-        end
 
         --------------------------------------------
         -- PAGE (SCROLLINGFRAME)
@@ -314,45 +310,45 @@ function library:CreateWindow(title)
         page.Parent = holder
         page.Size = UDim2.new(1, 0, 1, 0)
         page.BackgroundTransparency = 1
-        page.ScrollBarThickness = 3
+        page.ScrollBarThickness = 4
+        page.ScrollBarImageColor3 = theme.accent
         page.CanvasSize = UDim2.new(0, 0, 0, 0)
-        page.AutomaticCanvasSize = Enum.AutomaticSize.Y
         page.Visible = false
+        page.BorderSizePixel = 0
 
         local layout = Instance.new("UIListLayout", page)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Padding = UDim.new(0, 6)
+
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+        end)
 
         local pad = Instance.new("UIPadding", page)
         pad.PaddingTop = UDim.new(0, 8)
         pad.PaddingLeft = UDim.new(0, 8)
         pad.PaddingRight = UDim.new(0, 8)
 
-        -- tab click
-        tabBtn.MouseButton1Click:Connect(function()
-            for _, pg in ipairs(holder:GetChildren()) do
-                if pg:IsA("ScrollingFrame") then
-                    pg.Visible = false
-                end
-            end
-            for _, b in ipairs(sidebar:GetChildren()) do
-                if b:IsA("TextButton") then
-                    b.BackgroundColor3 = theme.bg
-                    b.TextColor3 = theme.subText
-                end
-            end
+        local function setActive()
+            resetTabs()
             page.Visible = true
-            setActive(true)
-        end)
-
-        -- first tab auto-active
-        local count = 0
-        for _, pg in ipairs(holder:GetChildren()) do
-            if pg:IsA("ScrollingFrame") then count += 1 end
+            tween(tabBtn, 0.12, {BackgroundColor3 = theme.card2})
+            tabBtn.TextColor3 = theme.text
         end
-        if count == 1 then
-            page.Visible = true
-            setActive(true)
+
+        tabBtn.MouseButton1Click:Connect(setActive)
+
+        table.insert(tabs, {
+            Button = tabBtn,
+            Page = page
+        })
+
+        -- auto open first tab
+        if not firstTabSet then
+            firstTabSet = true
+            _delay(0.05, function()
+                setActive()
+            end)
         end
 
         ------------------------------------------------------------
@@ -360,9 +356,6 @@ function library:CreateWindow(title)
         ------------------------------------------------------------
         local api = {}
 
-        ------------------------------------------------
-        -- Label
-        ------------------------------------------------
         function api:Label(text, opts)
             opts = opts or {}
             local lbl = Instance.new("TextLabel")
@@ -377,9 +370,6 @@ function library:CreateWindow(title)
             return { Object = lbl }
         end
 
-        ------------------------------------------------
-        -- TextBox
-        ------------------------------------------------
         function api:Box(placeholder, callback, opts)
             callback = callback or function() end
             opts = opts or {}
@@ -415,116 +405,100 @@ function library:CreateWindow(title)
             }
         end
 
-        ------------------------------------------------
-        -- Toggle
-        ------------------------------------------------
-        ------------------------------------------------
--- Toggle (dengan indikator ON / OFF yang jelas)
-------------------------------------------------
-function api:Toggle(text, callback, opts)
-    callback = callback or function() end
-    opts = opts or {}
+        function api:Toggle(text, callback, opts)
+            callback = callback or function() end
+            opts = opts or {}
 
-    local fr = Instance.new("Frame")
-    fr.Parent = page
-    fr.Size = UDim2.new(1, -4, 0, 30)
-    applyCard(fr, theme.card, opts.borderColor)
+            local fr = Instance.new("Frame")
+            fr.Parent = page
+            fr.Size = UDim2.new(1, -4, 0, 30)
+            applyCard(fr, theme.card, opts.borderColor)
 
-    -- label kiri
-    local lbl = Instance.new("TextLabel")
-    lbl.Parent = fr
-    lbl.Size = UDim2.new(1, -80, 1, 0)
-    lbl.Position = UDim2.new(0, 8, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 12
-    lbl.TextColor3 = theme.text
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Text = text or ""
+            local lbl = Instance.new("TextLabel")
+            lbl.Parent = fr
+            lbl.Size = UDim2.new(1, -90, 1, 0)
+            lbl.Position = UDim2.new(0, 8, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 12
+            lbl.TextColor3 = theme.text
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+            lbl.Text = text or ""
 
-    -- container switch kanan
-    local btn = Instance.new("Frame")
-    btn.Parent = fr
-    btn.Size = UDim2.new(0, 60, 0, 18)
-    btn.Position = UDim2.new(1, -70, 0.5, -9)
-    btn.BackgroundColor3 = theme.bg
-    btn.BorderSizePixel = 0
-    local btnCorner = Instance.new("UICorner", btn)
-    btnCorner.CornerRadius = UDim.new(1, 0)
-    applyStroke(btn, theme.borderSoft)
+            local btn = Instance.new("Frame")
+            btn.Parent = fr
+            btn.Size = UDim2.new(0, 70, 0, 18)
+            btn.Position = UDim2.new(1, -80, 0.5, -9)
+            btn.BackgroundColor3 = theme.bg
+            btn.BorderSizePixel = 0
+            local btnCorner = Instance.new("UICorner", btn)
+            btnCorner.CornerRadius = UDim.new(1, 0)
+            applyStroke(btn, theme.borderSoft)
 
-    -- "slider" kecil di dalam pill
-    local fill = Instance.new("Frame")
-    fill.Parent = btn
-    fill.Size = UDim2.new(0.45, 0, 1, 0)
-    fill.Position = UDim2.new(0, 0, 0, 0)
-    fill.BackgroundColor3 = theme.borderSoft
-    fill.BorderSizePixel = 0
-    local fillCorner = Instance.new("UICorner", fill)
-    fillCorner.CornerRadius = UDim.new(1, 0)
+            local fill = Instance.new("Frame")
+            fill.Parent = btn
+            fill.Size = UDim2.new(0.45, 0, 1, 0)
+            fill.Position = UDim2.new(0, 0, 0, 0)
+            fill.BackgroundColor3 = theme.borderSoft
+            fill.BorderSizePixel = 0
+            local fillCorner = Instance.new("UICorner", fill)
+            fillCorner.CornerRadius = UDim.new(1, 0)
 
-    -- teks ON / OFF di pill
-    local stateLabel = Instance.new("TextLabel")
-    stateLabel.Parent = btn
-    stateLabel.Size = UDim2.new(1, 0, 1, 0)
-    stateLabel.BackgroundTransparency = 1
-    stateLabel.Font = Enum.Font.GothamBold
-    stateLabel.TextSize = 11
-    stateLabel.TextXAlignment = Enum.TextXAlignment.Center
-
-    -- area klik full baris
-    local click = Instance.new("TextButton")
-    click.Parent = fr
-    click.Size = UDim2.new(1, 0, 1, 0)
-    click.BackgroundTransparency = 1
-    click.Text = ""
-
-    local state = false
-
-    local function apply()
-        if state then
-            -- ON
-            tween(btn, 0.12, {BackgroundColor3 = theme.accent})
-            tween(fill, 0.12, {
-                Position = UDim2.new(0.55, 0, 0, 0),
-                BackgroundColor3 = theme.success,
-            })
-            stateLabel.Text = ""
-            stateLabel.TextColor3 = theme.bg
-        else
-            -- OFF
-            tween(btn, 0.12, {BackgroundColor3 = theme.bg})
-            tween(fill, 0.12, {
-                Position = UDim2.new(0, 0, 0, 0),
-                BackgroundColor3 = theme.borderSoft,
-            })
-            stateLabel.Text = ""
+            local stateLabel = Instance.new("TextLabel")
+            stateLabel.Parent = btn
+            stateLabel.Size = UDim2.new(1, 0, 1, 0)
+            stateLabel.BackgroundTransparency = 1
+            stateLabel.Font = Enum.Font.GothamBold
+            stateLabel.TextSize = 11
+            stateLabel.TextXAlignment = Enum.TextXAlignment.Center
             stateLabel.TextColor3 = theme.subText
+
+            local click = Instance.new("TextButton")
+            click.Parent = fr
+            click.Size = UDim2.new(1, 0, 1, 0)
+            click.BackgroundTransparency = 1
+            click.Text = ""
+
+            local state = false
+
+            local function apply()
+                if state then
+                    tween(btn, 0.12, {BackgroundColor3 = theme.accent})
+                    tween(fill, 0.12, {
+                        Position = UDim2.new(0.55, 0, 0, 0),
+                        BackgroundColor3 = theme.success,
+                    })
+                    stateLabel.Text = "ON"
+                    stateLabel.TextColor3 = theme.bg
+                else
+                    tween(btn, 0.12, {BackgroundColor3 = theme.bg})
+                    tween(fill, 0.12, {
+                        Position = UDim2.new(0, 0, 0, 0),
+                        BackgroundColor3 = theme.borderSoft,
+                    })
+                    stateLabel.Text = "OFF"
+                    stateLabel.TextColor3 = theme.subText
+                end
+
+                callback(state)
+            end
+
+            click.MouseButton1Click:Connect(function()
+                state = not state
+                apply()
+            end)
+
+            apply()
+
+            return {
+                Set = function(_, v)
+                    state = v and true or false
+                    apply()
+                end,
+                Object = fr,
+            }
         end
 
-        -- callback ke user
-        callback(state)
-    end
-
-    click.MouseButton1Click:Connect(function()
-        state = not state
-        apply()
-    end)
-
-    -- API ke luar
-    return {
-        Set = function(_, v)
-            state = v and true or false
-            apply()
-        end,
-        Object = fr,
-    }
-end
-
-
-        ------------------------------------------------
-        -- Slider
-        ------------------------------------------------
         function api:Slider(text, min, max, default, callback, opts)
             callback = callback or function() end
             opts = opts or {}
@@ -599,6 +573,7 @@ end
                     updateFromX(i.Position.X)
                 end
             end)
+
             bar.InputEnded:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1
                 or i.UserInputType == Enum.UserInputType.Touch then
@@ -624,9 +599,6 @@ end
             }
         end
 
-        ------------------------------------------------
-        -- Button
-        ------------------------------------------------
         function api:Button(text, callback, opts)
             callback = callback or function() end
             opts = opts or {}
@@ -658,15 +630,10 @@ end
             }
         end
 
-        ------------------------------------------------
-        -- Dropdown (Single)
-        ------------------------------------------------
         function api:Dropdown(text, list, callback, opts)
             callback = callback or function() end
             opts = opts or {}
             list = list or {}
-
-            local selected = nil
 
             local fr = Instance.new("Frame")
             fr.Parent = page
@@ -683,7 +650,7 @@ end
             lbl.TextSize = 12
             lbl.TextColor3 = theme.text
             lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text
+            lbl.Text = text or "Dropdown"
 
             local arrow = Instance.new("TextLabel")
             arrow.Parent = fr
@@ -731,6 +698,7 @@ end
                 for _, c in ipairs(holderDD:GetChildren()) do
                     if c:IsA("TextButton") then c:Destroy() end
                 end
+
                 for _, opt in ipairs(optsList) do
                     local b = Instance.new("TextButton")
                     b.Parent = holderDD
@@ -740,13 +708,13 @@ end
                     b.Font = Enum.Font.Gotham
                     b.TextSize = 12
                     b.TextColor3 = theme.text
-                    b.Text = opt
+                    b.Text = tostring(opt)
+
                     local bc2 = Instance.new("UICorner", b)
                     bc2.CornerRadius = UDim.new(0, 4)
 
                     b.MouseButton1Click:Connect(function()
-                        selected = opt
-                        lbl.Text = text .. " : " .. opt
+                        lbl.Text = (text or "Dropdown") .. " : " .. tostring(opt)
                         setOpen(false)
                         callback(opt)
                     end)
@@ -757,264 +725,13 @@ end
 
             return {
                 Set = function(_, opt)
-                    selected = opt
-                    lbl.Text = text .. " : " .. (opt or "")
+                    lbl.Text = (text or "Dropdown") .. " : " .. tostring(opt or "")
                 end,
-                SetOptions = function(_, opts)
-                    list = opts or {}
-                    rebuild(list)
+                SetOptions = function(_, opts2)
+                    rebuild(opts2 or {})
                 end,
                 Object = fr,
             }
-        end
-
-        ------------------------------------------------
-        -- Multi Dropdown
-        ------------------------------------------------
-        function api:MultiDropdown(text, list, callback, opts)
-            callback = callback or function() end
-            opts = opts or {}
-            list = list or {}
-
-            local selected = {}
-
-            local fr = Instance.new("Frame")
-            fr.Parent = page
-            fr.Size = UDim2.new(1, -4, 0, 32)
-            fr.AutomaticSize = Enum.AutomaticSize.Y
-            applyCard(fr, theme.card, opts.borderColor)
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = fr
-            lbl.Size = UDim2.new(1, -30, 0, 32)
-            lbl.Position = UDim2.new(0, 8, 0, 0)
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 12
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.Text = text .. " : None"
-
-            local arrow = Instance.new("TextLabel")
-            arrow.Parent = fr
-            arrow.Size = UDim2.new(0, 18, 0, 32)
-            arrow.Position = UDim2.new(1, -18, 0, 0)
-            arrow.BackgroundTransparency = 1
-            arrow.Font = Enum.Font.GothamBold
-            arrow.TextSize = 16
-            arrow.TextColor3 = theme.accent
-            arrow.Text = "▼"
-
-            local holderDD = Instance.new("Frame")
-            holderDD.Parent = fr
-            holderDD.Position = UDim2.new(0, 0, 0, 32)
-            holderDD.Size = UDim2.new(1, 0, 0, 0)
-            holderDD.BackgroundColor3 = theme.bg
-            holderDD.Visible = false
-            holderDD.BorderSizePixel = 0
-            holderDD.AutomaticSize = Enum.AutomaticSize.Y
-            local hc = Instance.new("UICorner", holderDD)
-            hc.CornerRadius = UDim.new(0, 4)
-            applyStroke(holderDD, theme.borderSoft)
-
-            local hlist = Instance.new("UIListLayout", holderDD)
-            hlist.Padding = UDim.new(0, 2)
-
-            local headBtn = Instance.new("TextButton")
-            headBtn.Parent = fr
-            headBtn.Size = UDim2.new(1, 0, 0, 32)
-            headBtn.BackgroundTransparency = 1
-            headBtn.Text = ""
-
-            local open = false
-            local function setOpen(b)
-                open = b
-                holderDD.Visible = open
-                arrow.Text = open and "▲" or "▼"
-            end
-
-            headBtn.MouseButton1Click:Connect(function()
-                setOpen(not open)
-            end)
-
-            local function updateText()
-                local arr = {}
-                for k, v in pairs(selected) do
-                    if v then table.insert(arr, k) end
-                end
-                table.sort(arr)
-                if #arr == 0 then
-                    lbl.Text = text .. " : None"
-                else
-                    lbl.Text = text .. " : " .. table.concat(arr, ", ")
-                end
-            end
-
-            local function rebuild(optsList)
-                for _, c in ipairs(holderDD:GetChildren()) do
-                    if c:IsA("TextButton") then c:Destroy() end
-                end
-                for _, opt in ipairs(optsList) do
-                    local b = Instance.new("TextButton")
-                    b.Parent = holderDD
-                    b.Size = UDim2.new(1, 0, 0, 24)
-                    b.BackgroundColor3 = theme.card
-                    b.BorderSizePixel = 0
-                    b.Font = Enum.Font.Gotham
-                    b.TextSize = 12
-                    b.TextColor3 = theme.text
-                    b.Text = opt
-                    local bc2 = Instance.new("UICorner", b)
-                    bc2.CornerRadius = UDim.new(0, 4)
-
-                    b.MouseButton1Click:Connect(function()
-                        selected[opt] = not selected[opt]
-                        callback(opt, selected[opt])
-                        updateText()
-                    end)
-                end
-                updateText()
-            end
-
-            rebuild(list)
-
-            return {
-                Set = function(_, opt, state)
-                    selected[opt] = state and true or false
-                    updateText()
-                end,
-                List = function()
-                    local t = {}
-                    for k, v in pairs(selected) do if v then table.insert(t, k) end end
-                    return t
-                end,
-                SetOptions = function(_, opts)
-                    list = opts or {}
-                    rebuild(list)
-                end,
-                Object = fr,
-            }
-        end
-
-        ------------------------------------------------
-        -- LiveLabel (support Collapse)
-        ------------------------------------------------
-        function api:LiveLabel(getTextFn, refreshDelay)
-            refreshDelay = refreshDelay or 0.5
-
-            local lbl = Instance.new("TextLabel")
-            lbl.Parent = page
-            lbl.Size = UDim2.new(1, -4, 0, 40)
-            lbl.AutomaticSize = Enum.AutomaticSize.Y
-            lbl.BackgroundTransparency = 1
-            lbl.Font = Enum.Font.Gotham
-            lbl.TextSize = 13
-            lbl.TextColor3 = theme.text
-            lbl.TextXAlignment = Enum.TextXAlignment.Left
-            lbl.TextYAlignment = Enum.TextYAlignment.Top
-            lbl.TextWrapped = true
-            lbl.Text = ""
-
-            _spawn(function()
-                while lbl.Parent do
-                    local ok, txt = pcall(getTextFn)
-                    if ok and txt ~= nil then
-                        lbl.Text = tostring(txt)
-                    end
-                    _wait(refreshDelay)
-                end
-            end)
-
-            return { Object = lbl }
-        end
-
-        ------------------------------------------------
-        -- Collapse Group (All components support)
-        ------------------------------------------------
-        function api:CreateCollapseGroup(title, buildFn, opts)
-            opts = opts or {}
-            local group = {}
-            group.IsOpen = false
-            group.Items = {}
-
-            local header = Instance.new("Frame")
-            header.Parent = page
-            header.Size = UDim2.new(1, -4, 0, 28)
-            header.BackgroundColor3 = theme.card2
-            header.BorderSizePixel = 0
-            applyCard(header, theme.card2, opts.borderColor or theme.border)
-
-            local titleLabel = Instance.new("TextLabel")
-            titleLabel.Parent = header
-            titleLabel.Size = UDim2.new(1, -30, 1, 0)
-            titleLabel.Position = UDim2.new(0, 8, 0, 0)
-            titleLabel.BackgroundTransparency = 1
-            titleLabel.Font = Enum.Font.GothamSemibold
-            titleLabel.TextSize = 13
-            titleLabel.TextColor3 = theme.text
-            titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            titleLabel.Text = title
-
-            local iconLabel = Instance.new("TextLabel")
-            iconLabel.Parent = header
-            iconLabel.Size = UDim2.new(0, 22, 1, 0)
-            iconLabel.Position = UDim2.new(1, -22, 0, 0)
-            iconLabel.BackgroundTransparency = 1
-            iconLabel.Font = Enum.Font.GothamBold
-            iconLabel.TextSize = 18
-            iconLabel.TextColor3 = theme.accent
-            iconLabel.TextXAlignment = Enum.TextXAlignment.Center
-            iconLabel.Text = "▼"
-
-            local click = Instance.new("TextButton")
-            click.Parent = header
-            click.Size = UDim2.new(1, 0, 1, 0)
-            click.BackgroundTransparency = 1
-            click.Text = ""
-
-            function group:SetOpen(open)
-                self.IsOpen = open and true or false
-                iconLabel.Text = self.IsOpen and "▲" or "▼"
-                for _, ctrl in ipairs(self.Items) do
-                    if ctrl then
-                        local obj = ctrl.Object or ctrl
-                        if obj and obj.Visible ~= nil then
-                            obj.Visible = self.IsOpen
-                        end
-                    end
-                end
-            end
-
-            function group:Toggle()
-                self:SetOpen(not self.IsOpen)
-            end
-
-            click.MouseButton1Click:Connect(function()
-                group:Toggle()
-            end)
-
-            group.Header = {
-                Object = header,
-                Set = function(_, txt) titleLabel.Text = txt end,
-            }
-
-            local function add(ctrl)
-                if ctrl then
-                    local obj = ctrl.Object or ctrl
-                    if obj then
-                        obj.Visible = false
-                    end
-                    table.insert(group.Items, ctrl)
-                end
-                return ctrl
-            end
-
-            if typeof(buildFn) == "function" then
-                buildFn(add, group)
-            end
-
-            group:SetOpen(false)
-            return group
         end
 
         return api
@@ -1248,3 +965,4 @@ TabAuto:Box("Complate Delay (seconds)", function(txt)
     end
 end)
 
+return library
