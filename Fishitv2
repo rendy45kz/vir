@@ -741,228 +741,29 @@ function library:CreateWindow(title)
 end
 
 
-----------------------------------------------------------------
--- BUAT WINDOW
-----------------------------------------------------------------
-local win = library:CreateWindow("Rend - Fish It")
+local win = library:CreateWindow("Rend - UI Fixed")
 
-
-------------------------------------------------------------
--- SERVICES & BASE
-------------------------------------------------------------
-local Players           = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace         = game:GetService("Workspace")
-
-local LocalPlayer       = Players.LocalPlayer
-
-------------------------------------------------------------
--- NET EVENTS (PASTIKAN SAMA PERSIS DENGAN GAME)
-------------------------------------------------------------
-local netIndex = ReplicatedStorage:WaitForChild("Packages")
-    :WaitForChild("_Index")
-    :WaitForChild("sleitnick_net@0.2.0")
-
-local net = netIndex:WaitForChild("net")
-
-local Events = {
-    completeFish = net:WaitForChild("RE/FishingCompleted"),
-    sellAll      = net:WaitForChild("RF/SellAllItems"),
-
-    chargeRod    = net:WaitForChild("RF/ChargeFishingRod"),
-    startMini    = net:WaitForChild("RF/RequestFishingMinigameStarted"),
-    cancelMini   = net:WaitForChild("RF/CancelFishingInputs"),
-
-    equipHotbar  = net:WaitForChild("RE/EquipToolFromHotbar"),
-    unequipTool  = net:WaitForChild("RE/UnequipToolFromHotbar"),
-
-    gotFish      = net:FindFirstChild("RE/ObtainedNewFishNotification"), -- kalau ada
-}
-
-local ArrayUpdate = net:FindFirstChild("ArrayUpdate")
-    or ReplicatedStorage:FindFirstChild("ArrayUpdate", true)
-
-------------------------------------------------------------
--- CONFIG
-------------------------------------------------------------
-local Config = {
-    AutoFish    = false,   -- toggle utama
-    BlatantFish = false,
-    CatchDelay  = 0.2,    
-    SpamDelay   = 0.9,
-    PerfectCast = true,    -- optional
-}
--- internal state
-local loopRunning  = false
-
-------------------------------------------------------------
--- HELPER
-------------------------------------------------------------
-
-local function getServerTime()
-    local ok, t = pcall(function()
-        return Workspace:GetServerTimeNow()
-    end)
-    return ok and t or tick()
-end
-
-local function ensureCharacter()
-    local char = LocalPlayer.Character
-    if not char or not char.Parent then
-        char = LocalPlayer.CharacterAdded:Wait()
-    end
-    return char
-end
-
--- hitung cast power (kalau PerfectCast false, dia agak random)
-local function getCastPower()
-    if Config.PerfectCast then
-        return 0.99
-    else
-        local min = 0.75
-        local max = 0.97
-        return min + (max - min) * math.random()
-    end
-end
-
-------------------------------------------------------------
--- SATU SIKLUS BLATANT (x5 SPEED)
-------------------------------------------------------------
-local function doOneBlatantCycle()
-    local char = ensureCharacter()
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    -- if not hrp then
-        -- warn("[BlatantFish] HRP not found")
-        -- _wait(0.01)
-        -- return
-    -- end
-
-    -- cuma pakai CatchDelay (min 0.02 biar gak super glitch)
-    local catchDel = math.max(tonumber(Config.CatchDelay) or 0.20, 0.02)
-
-    ----------------------------------------------------------------
-    -- 1) EQUIP ROD SLOT 1
-    ----------------------------------------------------------------
-    pcall(function()
-        Events.equipHotbar:FireServer(1)
-    end)
-    ----------------------------------------------------------------
-    -- 2) CHARGE ROD + START MINIGAME
-    ----------------------------------------------------------------
-    local castPower = Config.PerfectCast and 0.99 or getCastPower()
-    local now       = getServerTime()
-
-    -- charge
-    pcall(function()
-        Events.chargeRod:InvokeServer(100)
-    end)
-    _wait(0.001)
-
-    -- start minigame
-    local okStart = pcall(function()
-        if typeof(Events.startMini.InvokeServer) == "function" then
-            return Events.startMini:InvokeServer(-1.233184814453125, 0.9945034885633273)
-        else
-            Events.startMini:FireServer(-1.233184814453125, 0.9945034885633273)
-            return true
-        end
-    end)
-
-    if not okStart then
-        warn("[BlatantFish] gagal start minigame")
-        return
-    end
-
-    ----------------------------------------------------------------
-    -- 3) TUNGGU CATCH DELAY (waktu sampai ikan “nyangkut”)
-    ----------------------------------------------------------------
-    _wait(catchDel)
-
-    ----------------------------------------------------------------
-    -- 4) SPAM FISHING COMPLETED (ikan naik)
-    ----------------------------------------------------------------
-    for i = 1, 5 do
-        pcall(function()            
-            Events.completeFish:FireServer()
-        end)
-       _wait(0.001) -- sangat kecil, biar request-nya gak numpuk bareng
-    end
-end
-
-------------------------------------------------------------
--- LOOP UTAMA
-------------------------------------------------------------
-local function mainFishingLoop()
-    if loopRunning then return end
-    loopRunning = true
-    
-    while Config.AutoFish do
-        local ok, err = pcall(doOneBlatantCycle)        
-        --_wait(0.001)
-    end
-
-    loopRunning = false
-    
-end
-
-local Fishing = {}
-
-function Fishing:Start()
-    if Config.AutoFish then return end
-    Config.AutoFish = true
-    _spawn(mainFishingLoop)
-end
-
-function Fishing:Stop()
-    Config.AutoFish = false
-end
-
-
-------------------------------------------------------------
--- UI AEGISHUB – TAB AUTO
-------------------------------------------------------------
 local TabAuto = win:CreateTab("Farm")
+TabAuto:Label("UI Fixed - No Exploit Included", {bold = true})
 
-TabAuto:Label("Instant Fishing")
-
--- Toggle utama
-TabAuto:Toggle("Enable Auto Fishing", function(state)
-    if state then
-        Fishing:Start()
-    else
-        Fishing:Stop()
-    end
+TabAuto:Toggle("Example Toggle", function(state)
+    print("Toggle state:", state)
 end)
 
-TabAuto:Box("Catch Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
+TabAuto:Slider("Example Slider", 0, 100, 50, function(v)
+    print("Slider:", v)
 end)
 
--- Toggle utama
-TabAuto:Toggle("Enable Bltant Mode", function(state)
-    if state then
-        
-    end
+TabAuto:Box("Type something...", function(txt)
+    print("TextBox:", txt)
 end)
 
-TabAuto:Box("Reel Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
+TabAuto:Dropdown("Select Option", {"One", "Two", "Three"}, function(opt)
+    print("Dropdown selected:", opt)
 end)
 
-TabAuto:Box("Complate Delay (seconds)", function(txt)
-    local n = tonumber(txt)
-    if n then
-        n = math.clamp(n, 0.02, 3.0)
-        Config.CatchDelay = n        
-    end
+TabAuto:Button("Example Button", function()
+    print("Button clicked!")
 end)
 
 return library
